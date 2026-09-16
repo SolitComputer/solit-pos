@@ -149,124 +149,15 @@ export async function POST(
     return NextResponse.json({ success: true, data: updated }, { status: 201 });
 }
 
-// ── PUT: edit realisasi pengeluaran untuk pengajuan yang sudah direalisasi ─────
-export async function PUT(
-    request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    const { id } = await params;
-    const userId = request.headers.get("x-user-id");
-    const roles = (request.headers.get("x-user-roles") || "").split(",").filter(Boolean);
-
-    if (!userId) {
-        return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-    }
-    if (!FUND_EXECUTOR_IDS.includes(userId) && !roles.includes("ADMIN")) {
-        return NextResponse.json(
-            { success: false, message: "Anda tidak memiliki wewenang untuk mengedit realisasi" },
-            { status: 403 }
-        );
-    }
-
-    let body: {
-        category?: string;
-        nominal?: number | string;
-        keterangan?: string;
-        tanggal?: string;
-        payment_method?: string;
-        photo_url?: string | null;
-    };
-    try {
-        body = await request.json();
-    } catch {
-        return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
-    }
-
-    const { category, nominal, keterangan, tanggal, payment_method, photo_url } = body;
-
-    const nom = Math.round(Number(nominal));
-    if (!Number.isFinite(nom) || nom <= 0) {
-        return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
-    }
-    if (!category || !isValidCategory("OUT", category)) {
-        return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
-    }
-    const pm = payment_method === "SALDO" ? "SALDO" : "CASH";
-
-    const supabase = db();
-
-    const { data: fundRequest, error: fetchErr } = await supabase
-        .from("fund_requests")
-        .select("id, purpose, is_executed, realisasi_cashflow_id, executed_by_id, realisasi_by_id")
-        .eq("id", id)
-        .single();
-
-    if (fetchErr || !fundRequest) {
-        return NextResponse.json({ success: false, message: "Pengajuan tidak ditemukan" }, { status: 404 });
-    }
-    if (!fundRequest.realisasi_cashflow_id) {
-        return NextResponse.json(
-            { success: false, message: "Pengajuan ini belum diisi realisasinya" },
-            { status: 400 }
-        );
-    }
-
-    if (!roles.includes("ADMIN") && fundRequest.realisasi_by_id !== userId && fundRequest.executed_by_id !== userId) {
-        return NextResponse.json(
-            { success: false, message: "Hanya yang mengisi realisasi atau Admin yang bisa mengubah data realisasi ini" },
-            { status: 403 }
-        );
-    }
-
-    // Cek apakah entry cashflow terkait sudah diaudit
-    const { data: cfEntry } = await supabase
-        .from("cashflow_entries")
-        .select("id, is_audited")
-        .eq("id", fundRequest.realisasi_cashflow_id)
-        .single();
-
-    if (cfEntry?.is_audited) {
-        return NextResponse.json(
-            { success: false, message: "Entry cashflow sudah diaudit dan tidak bisa diubah. Batalkan status audit terlebih dahulu." },
-            { status: 400 }
-        );
-    }
-
-    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-
-    const cfUpdatePayload: any = {
-        category,
-        nominal: nom,
-        keterangan: keterangan?.trim() || fundRequest.purpose || null,
-        tanggal: tanggal || jakartaToday,
-        payment_method: pm,
-    };
-    if (photo_url !== undefined) {
-        cfUpdatePayload.photo_url = photo_url;
-    }
-
-    const { error: cfUpdateErr } = await supabase
-        .from("cashflow_entries")
-        .update(cfUpdatePayload)
-        .eq("id", fundRequest.realisasi_cashflow_id);
-
-    if (cfUpdateErr) {
-        console.error("[pengajuan-dana realisasi PUT] update cashflow error:", cfUpdateErr);
-        return NextResponse.json({ success: false, message: cfUpdateErr.message }, { status: 500 });
-    }
-
-    const { data: updated, error: updateErr } = await supabase
-        .from("fund_requests")
-        .update({
-            realisasi_nominal: nom,
-        })
-        .eq("id", id)
-        .select()
-        .single();
-
-    if (updateErr) {
-        return NextResponse.json({ success: false, message: updateErr.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, data: updated });
+// ── PUT: edit realisasi — SENGAJA DINONAKTIFKAN ───────────────────────────────
+// Realisasi bersifat FINAL: begitu sebuah pengajuan sudah diisi realisasinya
+// (realisasi_cashflow_id terisi), tidak ada cara mengubahnya lagi lewat method
+// ini, berapa pun rolenya (termasuk ADMIN) dan meskipun entry cashflow-nya
+// belum diaudit. Sama seperti pola "unexecute" yang diblokir total di
+// src/app/api/pengajuan-dana/[id]/route.ts.
+export async function PUT() {
+    return NextResponse.json(
+        { success: false, message: "Realisasi tidak bisa diedit setelah diinput" },
+        { status: 400 }
+    );
 }
