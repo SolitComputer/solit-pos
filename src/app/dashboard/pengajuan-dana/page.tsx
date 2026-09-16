@@ -38,6 +38,15 @@ interface Meta {
   executorIds: string[];
 }
 
+type StatusFilter =
+  | "all"
+  | "approved"
+  | "not_approved"
+  | "executed"
+  | "not_executed"
+  | "realized"
+  | "not_realized";
+
 const CREATE_ROLES = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PURCHASING",
   "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
@@ -151,8 +160,13 @@ function SummaryCard({
   };
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-sm border border-white/70 transition-all hover:-translate-y-1 hover:shadow-md flex flex-col justify-between h-full">
+      <div className="flex items-start justify-between gap-2 mb-2.5">
+        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider leading-tight">{label}</span>
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg[color]}`}>
+          {icon}
+        </div>
+      </div>
       <div>
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">{label}</span>
         <p className={`text-xl sm:text-2xl font-extrabold tabular-nums ${valueColor[color]}`}>{value}</p>
         {sub && <p className="text-[10px] text-slate-400 font-semibold mt-1">{sub}</p>}
       </div>
@@ -719,6 +733,7 @@ export default function PengajuanDanaPage() {
   const [detailTarget, setDetailTarget] = useState<FundRequest | null>(null);
   const [realisasiTarget, setRealisasiTarget] = useState<FundRequest | null>(null);
   const [editMetodeTarget, setEditMetodeTarget] = useState<FundRequest | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -788,11 +803,33 @@ export default function PengajuanDanaPage() {
   };
 
   const totalNominal = data.reduce((s, r) => s + r.amount, 0);
-  const totalCash = data.filter((r) => r.payment_method === "CASH").reduce((s, r) => s + r.amount, 0);
-  const totalSaldo = data.filter((r) => r.payment_method === "SALDO").reduce((s, r) => s + r.amount, 0);
   const totalRealisasi = data.reduce((s, r) => s + (r.realisasi_nominal ?? 0), 0);
   const totalApproved = data.filter((r) => r.is_approved).length;
+  const totalNotApproved = data.length - totalApproved;
   const totalExecuted = data.filter((r) => r.is_executed).length;
+  const totalNotExecuted = data.length - totalExecuted;
+  const totalRealized = data.filter((r) => r.realisasi_cashflow_id).length;
+  const totalNotRealized = data.length - totalRealized;
+
+  const filteredData = data.filter((r) => {
+    if (statusFilter === "approved") return r.is_approved;
+    if (statusFilter === "not_approved") return !r.is_approved;
+    if (statusFilter === "executed") return r.is_executed;
+    if (statusFilter === "not_executed") return !r.is_executed;
+    if (statusFilter === "realized") return !!r.realisasi_cashflow_id;
+    if (statusFilter === "not_realized") return !r.realisasi_cashflow_id;
+    return true;
+  });
+
+  const FILTERS: { key: StatusFilter; label: string; count: number; icon: React.ReactNode }[] = [
+    { key: "all", label: "Semua", count: data.length, icon: <ClipboardList className="w-3 h-3" /> },
+    { key: "approved", label: "Sudah Disetujui", count: totalApproved, icon: <CheckCheck className="w-3 h-3" /> },
+    { key: "not_approved", label: "Belum Disetujui", count: totalNotApproved, icon: <Clock className="w-3 h-3" /> },
+    { key: "executed", label: "Sudah Eksekusi", count: totalExecuted, icon: <Banknote className="w-3 h-3" /> },
+    { key: "not_executed", label: "Belum Eksekusi", count: totalNotExecuted, icon: <Clock className="w-3 h-3" /> },
+    { key: "realized", label: "Sudah Realisasi", count: totalRealized, icon: <CheckCircle2 className="w-3 h-3" /> },
+    { key: "not_realized", label: "Belum Realisasi", count: totalNotRealized, icon: <Clock className="w-3 h-3" /> },
+  ];
 
   const CARD_STYLE = "bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_30px_-6px_rgba(99,102,241,0.12)] transition-all duration-300";
 
@@ -813,11 +850,16 @@ export default function PengajuanDanaPage() {
         {/* ── Header ─────────────────────────────────────────────────────────── */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2"
           style={{ animation: "pdFadeIn 0.3s ease-out both" }}>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Pengajuan Dana</h1>
-            <p className="text-xs text-slate-400 font-medium mt-1">
-              Dana operasional — disetujui CEO, dieksekusi Purchasing
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 items-center justify-center shadow-md shadow-indigo-500/20 flex-shrink-0">
+              <CircleDollarSign className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Pengajuan Dana</h1>
+              <p className="text-xs text-slate-400 font-medium mt-1">
+                Dana operasional — disetujui CEO, dieksekusi Purchasing
+              </p>
+            </div>
           </div>
           {canCreate && (
             <button
@@ -864,32 +906,31 @@ export default function PengajuanDanaPage() {
             {/* Stat Cards inside banner */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               <SummaryCard
-                icon={<ClipboardList className="w-5 h-5" />}
+                icon={<ClipboardList className="w-4 h-4" />}
                 label="Total Pengajuan"
                 value={data.length.toString()}
                 color="slate"
               />
               <SummaryCard
-                icon={<Wallet className="w-5 h-5" />}
+                icon={<Wallet className="w-4 h-4" />}
                 label="Total Nominal Pengajuan"
-                value={fmtShort(totalNominal)}
+                value={formatRupiah(totalNominal)}
                 color="indigo"
-                sub={`Cash ${fmtShort(totalCash)} · Saldo ${fmtShort(totalSaldo)}`}
               />
               <SummaryCard
-                icon={<Banknote className="w-5 h-5" />}
+                icon={<Banknote className="w-4 h-4" />}
                 label="Total Nominal Realisasi"
-                value={fmtShort(totalRealisasi)}
+                value={formatRupiah(totalRealisasi)}
                 color="teal"
               />
               <SummaryCard
-                icon={<CheckCircle2 className="w-5 h-5" />}
+                icon={<CheckCircle2 className="w-4 h-4" />}
                 label="Disetujui"
                 value={`${totalApproved} / ${data.length}`}
                 color="emerald"
               />
               <SummaryCard
-                icon={<Landmark className="w-5 h-5" />}
+                icon={<Landmark className="w-4 h-4" />}
                 label="Sudah Eksekusi"
                 value={`${totalExecuted} / ${data.length}`}
                 color="blue"
@@ -933,9 +974,42 @@ export default function PengajuanDanaPage() {
               </div>
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900">Daftar Pengajuan Dana</h3>
-                <p className="text-[11px] text-slate-400 font-medium">{data.length} total pengajuan</p>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  {statusFilter === "all"
+                    ? `${data.length} total pengajuan`
+                    : `${filteredData.length} dari ${data.length} pengajuan`}
+                </p>
               </div>
             </div>
+          </div>
+
+          {/* ── Filter Status ──────────────────────────────────────────────── */}
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Filter Status</p>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setStatusFilter(f.key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                  statusFilter === f.key
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-500/20"
+                    : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 hover:text-slate-700"
+                }`}
+              >
+                <span className={statusFilter === f.key ? "text-white" : "text-slate-400"}>{f.icon}</span>
+                {f.label}
+                <span
+                  className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold ${
+                    statusFilter === f.key
+                      ? "bg-white/25 text-white"
+                      : "bg-white text-slate-500 border border-slate-200"
+                  }`}
+                >
+                  {f.count}
+                </span>
+              </button>
+            ))}
           </div>
 
           {loading ? (
@@ -960,10 +1034,24 @@ export default function PengajuanDanaPage() {
                 </button>
               )}
             </div>
+          ) : filteredData.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-3xl bg-slate-50 flex items-center justify-center">
+                <FileText className="w-7 h-7 text-slate-300" />
+              </div>
+              <p className="text-sm font-bold text-slate-600">Tidak ada pengajuan untuk filter ini</p>
+              <button
+                onClick={() => setStatusFilter("all")}
+                className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold rounded-full transition-all"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Tampilkan Semua
+              </button>
+            </div>
           ) : (
-            <div className="overflow-x-auto -mx-1">
-              <table className="w-full text-sm">
-                <thead>
+            <div className="overflow-x-auto -mx-1 rounded-2xl border border-slate-100">
+              <table className="w-full text-sm min-w-[960px]">
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-slate-100">
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider w-10">No</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pengaju</th>
@@ -971,14 +1059,14 @@ export default function PengajuanDanaPage() {
                     <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nominal</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Metode</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                    <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Persetujui</th>
+                    <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l border-slate-100">Persetujui</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Eksekusi</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Realisasi</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tanggal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {data.map((row, idx) => {
+                  {filteredData.map((row, idx) => {
                     const busy = actionLoading[row.id] ?? false;
                     const canRealisasiRow = row.executed_by_id === userId || userRoles.includes("ADMIN");
 
@@ -1042,7 +1130,7 @@ export default function PengajuanDanaPage() {
                         </td>
 
                         {/* Persetujui */}
-                        <td className="px-4 py-4 text-center">
+                        <td className="px-4 py-4 text-center border-l border-slate-100">
                           {row.is_approved ? (
                             <div className="inline-flex flex-col items-center gap-1">
                               <button
@@ -1113,15 +1201,12 @@ export default function PengajuanDanaPage() {
                         <td className="px-4 py-4 text-center">
                           {row.realisasi_cashflow_id ? (
                             <div className="inline-flex flex-col items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => canRealisasiRow && setRealisasiTarget(row)}
-                                disabled={!canRealisasiRow}
-                                title={canRealisasiRow ? `Klik untuk edit realisasi · Direalisasi oleh ${row.realisasi_by_name ?? "-"}` : `Direalisasi oleh ${row.realisasi_by_name ?? "-"}`}
-                                className={`w-8 h-8 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center transition-all ${canRealisasiRow ? "hover:scale-110 active:scale-95 hover:bg-teal-200 cursor-pointer" : "cursor-default"}`}
+                              <span
+                                title={`Realisasi sudah final dan tidak bisa diedit · Direalisasi oleh ${row.realisasi_by_name ?? "-"}`}
+                                className="w-8 h-8 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center cursor-default"
                               >
                                 <CheckCircle2 className="w-4 h-4" />
-                              </button>
+                              </span>
                               <span className="text-[10px] text-slate-500 font-semibold max-w-[92px] truncate">{formatRupiah(row.realisasi_nominal ?? 0)}</span>
                               <span className="text-[9px] text-slate-400 max-w-[92px] truncate">{row.realisasi_by_name}</span>
                               <span className="text-[9px] text-slate-400 max-w-[92px] text-center leading-tight">{formatDateTime(row.realisasi_at)}</span>
