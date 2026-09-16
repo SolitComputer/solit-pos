@@ -787,10 +787,8 @@ export default function PengajuanDanaPage() {
     finally { setActionLoading((p) => ({ ...p, [id]: false })); }
   };
 
-  const totalNominal = data.reduce((s, r) => s + r.amount, 0);
-  const totalCash = data.filter((r) => r.payment_method === "CASH").reduce((s, r) => s + r.amount, 0);
-  const totalSaldo = data.filter((r) => r.payment_method === "SALDO").reduce((s, r) => s + r.amount, 0);
-  const totalRealisasi = data.reduce((s, r) => s + (r.realisasi_nominal ?? 0), 0);
+const totalNominal = data.reduce((s, r) => s + r.amount, 0);
+const totalRealisasi = data.reduce((s, r) => s + (r.realisasi_nominal ?? 0), 0);
   const totalApproved = data.filter((r) => r.is_approved).length;
   const totalExecuted = data.filter((r) => r.is_executed).length;
 
@@ -872,14 +870,13 @@ export default function PengajuanDanaPage() {
               <SummaryCard
                 icon={<Wallet className="w-5 h-5" />}
                 label="Total Nominal Pengajuan"
-                value={fmtShort(totalNominal)}
+                value={formatRupiah(totalNominal)}
                 color="indigo"
-                sub={`Cash ${fmtShort(totalCash)} · Saldo ${fmtShort(totalSaldo)}`}
               />
               <SummaryCard
                 icon={<Banknote className="w-5 h-5" />}
                 label="Total Nominal Realisasi"
-                value={fmtShort(totalRealisasi)}
+                value={formatRupiah(totalRealisasi)}
                 color="teal"
               />
               <SummaryCard
@@ -1113,15 +1110,12 @@ export default function PengajuanDanaPage() {
                         <td className="px-4 py-4 text-center">
                           {row.realisasi_cashflow_id ? (
                             <div className="inline-flex flex-col items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => canRealisasiRow && setRealisasiTarget(row)}
-                                disabled={!canRealisasiRow}
-                                title={canRealisasiRow ? `Klik untuk edit realisasi · Direalisasi oleh ${row.realisasi_by_name ?? "-"}` : `Direalisasi oleh ${row.realisasi_by_name ?? "-"}`}
-                                className={`w-8 h-8 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center transition-all ${canRealisasiRow ? "hover:scale-110 active:scale-95 hover:bg-teal-200 cursor-pointer" : "cursor-default"}`}
+                              <span
+                                title={`Realisasi sudah final dan tidak bisa diedit · Direalisasi oleh ${row.realisasi_by_name ?? "-"}`}
+                                className="w-8 h-8 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center cursor-default"
                               >
                                 <CheckCircle2 className="w-4 h-4" />
-                              </button>
+                              </span>
                               <span className="text-[10px] text-slate-500 font-semibold max-w-[92px] truncate">{formatRupiah(row.realisasi_nominal ?? 0)}</span>
                               <span className="text-[9px] text-slate-400 max-w-[92px] truncate">{row.realisasi_by_name}</span>
                               <span className="text-[9px] text-slate-400 max-w-[92px] text-center leading-tight">{formatDateTime(row.realisasi_at)}</span>
