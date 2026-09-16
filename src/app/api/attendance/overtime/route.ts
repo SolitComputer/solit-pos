@@ -100,6 +100,14 @@ function isHolidayOvertimeLate(
 const HOLIDAY_OVERTIME_PAY = { LATE: 50000, ON_TIME: 100000 } as const;
 const PKL_HOLIDAY_OVERTIME_PAY = { LATE: 25000, ON_TIME: 50000 } as const;
 
+// ✅ NEW — override nominal FLAT lembur hari libur per user_id tertentu,
+// di luar skema LATE/ON_TIME standar di atas. Achmad Jaelani (KEBERSIHAN)
+// selalu dapat Rp70.000 flat per lembur hari libur, telat atau tidak.
+// Tambahkan user_id lain di sini kalau ada kasus serupa ke depannya.
+const HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES: Record<string, number> = {
+  "950c01fc-4f27-46dc-a608-f6db5d942193": 70000, // Achmad Jaelani
+};
+
 // ─── HELPER: apakah approver (single role) bisa approve target ─────────────
 function canApprove(
   approverRole: string,
@@ -863,9 +871,14 @@ export async function PATCH(request: Request) {
           ? auditSchedule.lateFrom.h * 60 + auditSchedule.lateFrom.m
           : 8 * 60;
         const late = isHolidayOvertimeLate(overtime, holidayLateThresholdMinutes);
-        const holidayPay = isPKL
-          ? (late ? PKL_HOLIDAY_OVERTIME_PAY.LATE : PKL_HOLIDAY_OVERTIME_PAY.ON_TIME)
-          : (late ? HOLIDAY_OVERTIME_PAY.LATE : HOLIDAY_OVERTIME_PAY.ON_TIME);
+        // ✅ NEW — cek override flat rate dulu; kalau user_id-nya terdaftar,
+        // pakai nominal itu tanpa peduli status telat/PKL sama sekali.
+        const flatOverride = HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES[overtime.user_id];
+        const holidayPay = flatOverride !== undefined
+          ? flatOverride
+          : isPKL
+            ? (late ? PKL_HOLIDAY_OVERTIME_PAY.LATE : PKL_HOLIDAY_OVERTIME_PAY.ON_TIME)
+            : (late ? HOLIDAY_OVERTIME_PAY.LATE : HOLIDAY_OVERTIME_PAY.ON_TIME);
 
         const { data, error } = await supabase.from("overtime_requests").update({
           audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
