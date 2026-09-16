@@ -117,9 +117,8 @@ function calcDuration(start: string | null, end: string | null): string {
   return m > 0 ? `${h}j ${m}m` : `${h} jam`;
 }
 
-function detectLateFromTime(timeStr: string | null | undefined): boolean {
+function detectLateFromTime(timeStr: string | null | undefined, lateThresholdMinutes: number = 8 * 60): boolean {
   if (!timeStr) return false;
-  const LATE_THRESHOLD = 8 * 60;
   let totalMin: number;
   if (timeStr.includes("T")) {
     const w = new Date(new Date(timeStr).getTime() + 7 * 60 * 60 * 1000);
@@ -129,7 +128,7 @@ function detectLateFromTime(timeStr: string | null | undefined): boolean {
     if (Number.isNaN(h)) return false;
     totalMin = h * 60 + (m || 0);
   }
-  return totalMin >= LATE_THRESHOLD;
+  return totalMin >= lateThresholdMinutes;
 }
 
 
@@ -765,19 +764,25 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
 }
 
 function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
- const start = o.actual_start ?? o.scheduled_start, end = o.actual_end ?? o.scheduled_end;
-  // ✅ FIX: simpan durasi dalam menit (durationMinutes) buat hitung bayaran
-  // proporsional, "hours" tetap dipakai cuma buat tampilan "X jam".
+  const start = o.actual_start ?? o.scheduled_start, end = o.actual_end ?? o.scheduled_end;
   const durationMinutes = (!start || !end) ? 0 : Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
   const hours = Math.floor(durationMinutes / 60);
 
-  // ✅ NEW — aturan KETAT lembur hari libur:
-  // Karyawan: Tepat waktu = Rp100.000, Terlambat = Rp50.000 (setengah).
-  // PKL: Tepat waktu = Rp50.000, Terlambat = Rp25.000 (setengah).
-  // Nominal ini TIDAK bisa diedit manual sama sekali kalau overtime ini ditandai is_holiday.
   const isTargetPkl = isPKLRole(o.users?.role);
   const isHoliday = o.is_holiday === true;
-  const holidayLate = isHoliday && (o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start)));
+
+  const [lateThreshold, setLateThreshold] = useState<{ h: number; m: number }>({ h: 8, m: 0 });
+  useEffect(() => {
+    if (o.is_late != null || !isHoliday) return;
+    let cancelled = false;
+    fetch(`/api/attendance/shift-config?user_id=${o.user_id}`)
+      .then(r => r.json())
+      .then(d => { if (!cancelled && d.success && d.data) setLateThreshold({ h: d.data.late_hour ?? 8, m: d.data.late_minute ?? 0 }); })
+      .catch(() => { });
+    return () => { cancelled = true; };
+  }, [o.user_id, o.is_late, isHoliday]);
+
+  const holidayLate = isHoliday && (o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start, lateThreshold.h * 60 + lateThreshold.m)));
   const holidayAutoPay = isHoliday ? (isTargetPkl ? (holidayLate ? 25000 : 50000) : (holidayLate ? 50000 : 100000)) : null;
 
   const isFlatPay = o.is_holiday === true || (!o.rate_per_hour && (o.total_pay ?? 0) > 0);
@@ -786,7 +791,7 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
   const [fixedPay, setFixedPay] = useState(holidayAutoPay ?? (o.total_pay ?? 0));
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
 
- // ✅ FIX: mode Per Jam sekarang proporsional per menit, bukan dibulatkan
+  // ✅ FIX: mode Per Jam sekarang proporsional per menit, bukan dibulatkan
   // ke bawah per jam penuh (mis. 6j30m bukan cuma dibayar 6 jam).
   const totalPay = isHoliday ? (holidayAutoPay as number) : (payMode === "PER_JAM" ? Math.round((durationMinutes / 60) * rate) : fixedPay);
 
