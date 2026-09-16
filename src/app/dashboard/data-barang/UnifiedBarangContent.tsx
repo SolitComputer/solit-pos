@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useDeferredValue } from "react";
+import { useEffect, useState, useCallback, useMemo, useDeferredValue, useRef } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Filter, RotateCcw, SlidersHorizontal, ArrowUpDown, Search, X, ChevronDown, ChevronUp, Tag, Maximize2, Minimize2 } from "lucide-react";
@@ -424,6 +424,121 @@ function ConvertToAccessoryModal({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DROPDOWN: Filter Kategori bergaya Excel — checklist multi-select + search.
+// kategoriFilter kosong ([]) berarti SEMUA kategori dianggap tercentang.
+// Begitu satu item di-uncheck, baru materialisasi jadi array eksplisit
+// (semua ID kecuali yang di-uncheck itu) — meniru AutoFilter Excel: klik
+// checkbox satu-satu, baris yang kategorinya di-uncheck langsung hilang
+// dari tabel, sisanya tetap tampil.
+// ═══════════════════════════════════════════════════════════════════════════
+function CategoryChecklistDropdown({
+    categories, selected, onChange,
+}: {
+    categories: { id: string; name: string }[];
+    selected: string[];
+    onChange: (ids: string[]) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const wrapRef = useRef<HTMLDivElement>(null);
+
+    // Klik di luar dropdown → tutup otomatis.
+    useEffect(() => {
+        if (!open) return;
+        const onClickOutside = (e: MouseEvent) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener("mousedown", onClickOutside);
+        return () => document.removeEventListener("mousedown", onClickOutside);
+    }, [open]);
+
+    const allIds = useMemo(() => categories.map(c => c.id), [categories]);
+    const isChecked = (id: string) => selected.length === 0 || selected.includes(id);
+    const checkedCount = selected.length === 0 ? categories.length : selected.length;
+    const allChecked = categories.length > 0 && checkedCount === categories.length;
+    const someChecked = checkedCount > 0 && !allChecked;
+
+    const toggleAll = () => onChange(allChecked ? [] : allIds);
+    const toggleOne = (id: string) => {
+        const base = selected.length === 0 ? allIds : selected;
+        const next = base.includes(id) ? base.filter(x => x !== id) : [...base, id];
+        onChange(next.length === categories.length ? [] : next);
+    };
+
+    const filtered = search.trim()
+        ? categories.filter(c => c.name.toLowerCase().includes(search.trim().toLowerCase()))
+        : categories;
+
+    const label = selected.length === 0 ? "Semua Kategori"
+        : selected.length === 1 ? (categories.find(c => c.id === selected[0])?.name || "1 kategori")
+            : `${selected.length} kategori dipilih`;
+
+    return (
+        <div className="relative" ref={wrapRef}>
+            <button
+                type="button"
+                onClick={() => setOpen(v => !v)}
+                className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-zinc-700 font-medium flex items-center justify-between gap-2"
+            >
+                <span className="truncate">{label}</span>
+                <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+
+            {open && (
+                <div className="absolute z-30 mt-1.5 w-64 max-w-[85vw] bg-white border border-zinc-200 rounded-xl shadow-xl overflow-hidden animate-fadeIn">
+                    <div className="p-2 border-b border-zinc-100">
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2 pointer-events-none" />
+                            <input
+                                autoFocus
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Cari kategori..."
+                                className="w-full h-8 pl-8 pr-2 border border-zinc-200 rounded-lg text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                            />
+                        </div>
+                    </div>
+
+                    <label className="flex items-center gap-2 px-3 py-2 border-b border-zinc-100 cursor-pointer hover:bg-zinc-50">
+                        <input
+                            type="checkbox"
+                            checked={allChecked}
+                            ref={el => { if (el) el.indeterminate = someChecked; }}
+                            onChange={toggleAll}
+                            className="w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900/20"
+                        />
+                        <span className="text-xs font-semibold text-zinc-700">Semua Kategori</span>
+                    </label>
+
+                    <div className="max-h-56 overflow-y-auto table-scroll">
+                        {filtered.length === 0 ? (
+                            <p className="text-xs text-zinc-400 text-center py-4">Kategori tidak ditemukan</p>
+                        ) : (
+                            filtered.map(c => (
+                                <label key={c.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-zinc-50">
+                                    <input
+                                        type="checkbox"
+                                        checked={isChecked(c.id)}
+                                        onChange={() => toggleOne(c.id)}
+                                        className="w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900/20"
+                                    />
+                                    <span className="text-xs text-zinc-700 truncate">{c.name}</span>
+                                </label>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="flex gap-2 p-2 border-t border-zinc-100 bg-zinc-50/60">
+                        <button onClick={() => onChange([])} className="flex-1 h-7 rounded-lg text-[11px] font-semibold text-zinc-600 bg-zinc-100 hover:bg-zinc-200 transition">Reset</button>
+                        <button onClick={() => setOpen(false)} className="flex-1 h-7 rounded-lg text-[11px] font-semibold text-white bg-zinc-900 hover:bg-zinc-800 transition">Terapkan</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════════════════
 export default function UnifiedBarangContent() {
@@ -441,7 +556,7 @@ export default function UnifiedBarangContent() {
     const [userId, setUserId] = useState<string | null>(null);
 
     const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>("ALL");
-    const [kategoriFilter, setKategoriFilter] = useState("");
+    const [kategoriFilter, setKategoriFilter] = useState<string[]>([]);
     const [brandFilter, setBrandFilter] = useState("");
     const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS">("ALL");
     const [minPrice, setMinPrice] = useState("");
@@ -608,7 +723,7 @@ export default function UnifiedBarangContent() {
     }, []);
 
     // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe)
-    useEffect(() => { setKategoriFilter(""); }, [tipeFilter]);
+    useEffect(() => { setKategoriFilter([]); }, [tipeFilter]);
 
     // Deep-link: baca ?tipe= dari URL sekali saat mount — dipakai tombol
     // breadcrumb "Data Aksesori" di halaman Kelola Unit, supaya begitu balik
@@ -683,14 +798,16 @@ export default function UnifiedBarangContent() {
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
 
         // 2. Kategori
-        if (kategoriFilter) {
-            const selectedName = (categories.find(c => c.id === kategoriFilter)?.name || "").toUpperCase();
-            const matchLaptop = (r: UnifiedRow) => r.kategori_id === kategoriFilter;
-            const matchAksesoris = (r: UnifiedRow) => (r.kategori || "").toUpperCase() === selectedName;
+        // 2. Kategori (checklist multi-select ala Excel — array kosong berarti
+        // tidak ada filter aktif / semua kategori dianggap tercentang)
+        if (kategoriFilter.length > 0) {
+            const selectedIds = new Set(kategoriFilter);
+            const selectedNames = new Set(
+                kategoriFilter.map(id => (categories.find(c => c.id === id)?.name || "").toUpperCase())
+            );
             list = list.filter(r => {
-                if (tipeFilter === "LAPTOP") return matchLaptop(r);
-                if (tipeFilter === "AKSESORIS") return matchAksesoris(r);
-                return r.tipe === "LAPTOP" ? matchLaptop(r) : matchAksesoris(r);
+                if (r.tipe === "LAPTOP") return r.kategori_id != null && selectedIds.has(r.kategori_id);
+                return selectedNames.has((r.kategori || "").toUpperCase());
             });
         }
 
@@ -1216,7 +1333,7 @@ export default function UnifiedBarangContent() {
 
     const activeFilterCount = [
         tipeFilter !== "ALL",
-        !!kategoriFilter,
+        kategoriFilter.length > 0,
         !!brandFilter,
         stokFilter !== "ALL",
         !!minPrice.trim(),
@@ -1230,7 +1347,7 @@ export default function UnifiedBarangContent() {
 
     const resetFilter = () => {
         setTipeFilter("ALL");
-        setKategoriFilter("");
+        setKategoriFilter([]);
         setBrandFilter("");
         setStokFilter("ALL");
         setMinPrice("");
@@ -1301,15 +1418,15 @@ export default function UnifiedBarangContent() {
                             jadi 4-5 baris), di layar >= sm kembali flex-wrap seperti semula. */}
                         <div className="flex gap-2 overflow-x-auto pills-scroll -mx-1 px-1 pb-0.5 sm:flex-wrap sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
                             <button
-                                onClick={() => setKategoriFilter("")}
-                                className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${kategoriFilter === "" ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                onClick={() => setKategoriFilter([])}
+                                className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${kategoriFilter.length === 0 ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
                                 Semua Kategori
                             </button>
                             {filterCategories.map(c => (
                                 <button
                                     key={c.id}
-                                    onClick={() => setKategoriFilter(prev => prev === c.id ? "" : c.id)}
-                                    className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${kategoriFilter === c.id ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                    onClick={() => setKategoriFilter(prev => (prev.length === 1 && prev[0] === c.id) ? [] : [c.id])}
+                                    className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${kategoriFilter.length === 1 && kategoriFilter[0] === c.id ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
                                     {c.name}
                                 </button>
                             ))}
@@ -1336,16 +1453,13 @@ export default function UnifiedBarangContent() {
                                 )}
                             </div>
 
-                            {/* Kategori Dropdown */}
+                            {/* Kategori Dropdown — checklist ala Excel (multi-select + search) */}
                             <div className="lg:col-span-3">
-                                <select
-                                    className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-zinc-700 font-medium"
-                                    value={kategoriFilter}
-                                    onChange={e => setKategoriFilter(e.target.value)}
-                                >
-                                    <option value="">Semua Kategori</option>
-                                    {filterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
+                                <CategoryChecklistDropdown
+                                    categories={filterCategories}
+                                    selected={kategoriFilter}
+                                    onChange={setKategoriFilter}
+                                />
                             </div>
 
                             {/* Brand Dropdown */}
@@ -1477,10 +1591,14 @@ export default function UnifiedBarangContent() {
                                     {filteredRows.length} dari {rows.length} barang
                                 </span>
 
-                                {kategoriFilter && (
+                                {kategoriFilter.length > 0 && (
                                     <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium max-w-full">
-                                        <span className="truncate">Kategori: {categories.find(c => c.id === kategoriFilter)?.name || kategoriFilter}</span>
-                                        <button onClick={() => setKategoriFilter("")} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                                        <span className="truncate">
+                                            Kategori: {kategoriFilter.length === 1
+                                                ? (categories.find(c => c.id === kategoriFilter[0])?.name || kategoriFilter[0])
+                                                : `${kategoriFilter.length} dipilih`}
+                                        </span>
+                                        <button onClick={() => setKategoriFilter([])} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
                                     </span>
                                 )}
                                 {brandFilter && (
