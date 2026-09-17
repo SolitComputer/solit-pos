@@ -85,6 +85,13 @@ const COLOR_STYLES: Record<string, { bg: string; text: string; border: string; l
   GREEN: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", label: "Sudah Diaudit" },
 };
 
+// ✅ FIX — harus sama persis dengan HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES di
+// src/app/api/attendance/overtime/route.ts, supaya preview di dialog
+// konfirmasi Audit konsisten dengan nominal yang benar-benar dikunci server.
+const HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES: Record<string, number> = {
+  "950c01fc-4f27-46dc-a608-f6db5d942193": 70000, // Achmad Jaelani
+};
+
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n);
 }
@@ -335,7 +342,10 @@ export function OvertimeTable({
                                   isLate = detectLateFromTimeStr(o.requested_start ?? o.actual_start);
                                 }
                               }
-                              const holidayPay = isTargetPkl ? (isLate ? 25000 : 50000) : (isLate ? 50000 : 100000);
+                                                            const flatOverride = HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES[o.user_id];
+                              const holidayPay = flatOverride !== undefined
+                                ? flatOverride
+                                : isTargetPkl ? (isLate ? 25000 : 50000) : (isLate ? 50000 : 100000);
                               if (confirm(`Audit lemburan hari libur ${o.users?.name}?\n\nStatus: ${isLate ? "Terlambat" : "Tepat Waktu"} — nominal terkunci ${formatRupiah(holidayPay)} (aturan tetap ${isTargetPkl ? "PKL" : "karyawan"}).`)) {
                                 runAction(o.id, { action: "AUDIT", decision: "APPROVE", total_pay: holidayPay, rate_per_hour: null });
                               }
