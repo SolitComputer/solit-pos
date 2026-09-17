@@ -58,6 +58,11 @@ function fmt(n: number) {
     return "Rp" + (n || 0).toLocaleString("id-ID");
 }
 
+// ─── Label Unit: Aksesori dipanggil pakai SN, Laptop tetap pakai nama ────────
+function unitLabel(u: { unit_type?: "laptop" | "accessory"; laptop_name?: string; serial_number: string }) {
+    return u.unit_type === "accessory" ? u.serial_number : u.laptop_name;
+}
+
 // ─── ConfirmRow Helper ────────────────────────────────────────────────────────
 function ConfirmRow({ icon, label, value, bold, mono }: {
     icon: ReactNode; label: string; value: string; bold?: boolean; mono?: boolean;
@@ -77,7 +82,7 @@ function ConfirmRow({ icon, label, value, bold, mono }: {
 
 // ─── Unit Card (di daftar terpilih) ──────────────────────────────────────────
 function SelectedUnitCard({ unit, index, onRemove }: {
-    unit: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number }
+    unit: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number; unit_type?: "laptop" | "accessory" }
     index: number;
     onRemove: () => void;
 }) {
@@ -88,14 +93,16 @@ function SelectedUnitCard({ unit, index, onRemove }: {
                     <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
                         {index + 1}
                     </span>
-                    <p className="text-xs font-semibold text-gray-800 truncate">{unit.laptop_name}</p>
+                    <p className="text-xs font-semibold text-gray-800 truncate">{unitLabel(unit)}</p>
                     {unit.grade && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
                             {unit.grade}
                         </span>
                     )}
                 </div>
-                <p className="text-[10px] font-mono text-gray-500 mt-0.5 ml-5.5">SN: {unit.serial_number}</p>
+                <p className="text-[10px] font-mono text-gray-500 mt-0.5 ml-5.5">
+                    {unit.unit_type === "accessory" ? unit.laptop_name : `SN: ${unit.serial_number}`}
+                </p>
                 <p className="text-[10px] text-gray-400 ml-5.5">Jual: {fmt(unit.selling_price)}</p>
             </div>
             <button
@@ -137,7 +144,7 @@ export default function CreatePaymentPage() {
     const [isSubmitted, setIsSubmitted] = useState(false);
 
     // ── Multi-unit state ──────────────────────────────────────────────────────
-    const [selectedUnits, setSelectedUnits] = useState<(UnitItem & { grade?: string; condition_note?: string; purchase_price?: number })[]>([]);
+    const [selectedUnits, setSelectedUnits] = useState<(UnitItem & { grade?: string; condition_note?: string; purchase_price?: number; unit_type?: "laptop" | "accessory" })[]>([]);
     const [snSearch, setSnSearch] = useState("");
     const [snResults, setSnResults] = useState<UnitOption[]>([]);
     const [isLoadingUnits, setIsLoadingUnits] = useState(false);
@@ -569,7 +576,7 @@ export default function CreatePaymentPage() {
             return;
         }
 
-       if (paymentFlow === "DIRECT" && !paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
+        if (paymentFlow === "DIRECT" && !paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
         if (!latitude || !longitude) { alert("GPS wajib diambil"); return; }
 
         if (data.payment_method === "TF_CASH") {
@@ -621,7 +628,7 @@ export default function CreatePaymentPage() {
         alert(`Tidak bisa lanjut — ${firstMsg}\n\n(Cek Console untuk detail lengkap semua field yang error)\n\n${fieldErrors.join("\n")}`);
     };
 
-   const handleConfirmedSubmit = async () => {
+    const handleConfirmedSubmit = async () => {
         if (!pendingSubmitData) return;
         setShowConfirmModal(false);
         setSubmitting(true);
@@ -851,7 +858,7 @@ export default function CreatePaymentPage() {
                     {step === 1 && (paymentFlow === "DIRECT" || pendingSubType) && (
                         <>
                             <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
-                          <div>
+                            <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">
                                     Tanggal Lahir Customer {paymentFlow === "DIRECT" ? "*" : <span className="text-gray-400 font-normal">(opsional)</span>}
                                 </label>
@@ -1033,14 +1040,16 @@ export default function CreatePaymentPage() {
                                                             <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
                                                                 {i + 1}
                                                             </span>
-                                                            <p className="text-xs font-semibold text-gray-700 truncate flex-1">{u.laptop_name}</p>
+                                                            <p className="text-xs font-semibold text-gray-700 truncate flex-1">{unitLabel(u)}</p>
                                                             {u.grade && (
                                                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
                                                                     {u.grade}
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <p className="text-[10px] font-mono text-gray-400 ml-5.5">SN: {u.serial_number}</p>
+                                                        <p className="text-[10px] font-mono text-gray-400 ml-5.5">
+                                                            {u.unit_type === "accessory" ? u.laptop_name : `SN: ${u.serial_number}`}
+                                                        </p>
                                                         {hasPedagangPrice(u.unit_id) && (
                                                             <p className="text-[10px] text-emerald-600 font-medium ml-5.5">Harga mengikuti price list pedagang — masih bisa diubah manual</p>
                                                         )}
@@ -1287,7 +1296,7 @@ export default function CreatePaymentPage() {
 
                             <div className="flex gap-2 pt-1">
                                 <button type="button" onClick={() => setStep(1)} className={`${btnSecondary} inline-flex items-center justify-center gap-1.5`}><ChevronLeft size={16} /> Kembali</button>
-                                                               <button type="button" onClick={() => {
+                                <button type="button" onClick={() => {
                                     const paidAcc = selectedAccessories.filter(a => !a.is_bonus).length;
                                     if (!selectedUnits.length && selectedAccessories.length === 0) { alert("Pilih minimal 1 unit atau aksesori dulu"); return; }
                                     if (!selectedUnits.length && paidAcc === 0) { alert("Transaksi hanya berisi bonus. Tambahkan unit atau aksesori berbayar."); return; }
@@ -1312,8 +1321,10 @@ export default function CreatePaymentPage() {
                                     {selectedUnits.map((u, i) => (
                                         <div key={u.unit_id} className="space-y-1.5 pb-2">
                                             <div className="text-xs text-gray-700">
-                                                <span className="font-semibold">{i + 1}. {u.laptop_name}</span>
-                                                <span className="font-mono text-gray-500 ml-2">SN: {u.serial_number}</span>
+                                                <span className="font-semibold">{i + 1}. {unitLabel(u)}</span>
+                                                <span className="font-mono text-gray-500 ml-2">
+                                                    {u.unit_type === "accessory" ? u.laptop_name : `SN: ${u.serial_number}`}
+                                                </span>
                                             </div>
                                             {hasPedagangPrice(u.unit_id) && (
                                                 <p className="text-[10px] text-emerald-600 font-medium">Harga mengikuti price list pedagang — masih bisa diubah manual</p>
@@ -1536,7 +1547,7 @@ export default function CreatePaymentPage() {
                             )}
 
                             {/* Foto */}
-                           <div>
+                            <div>
                                 <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
                                     <Camera size={14} /> Foto Bukti Pembayaran {paymentFlow === "DIRECT" ? "*" : <span className="text-gray-400 font-normal">(opsional)</span>}
                                 </label>
@@ -1640,7 +1651,7 @@ export default function CreatePaymentPage() {
                                             <p className="text-xs text-gray-400 mb-1.5 inline-flex items-center gap-1"><Laptop size={12} /> Unit ({selectedUnits.length})</p>
                                             {selectedUnits.map((u, i) => (
                                                 <div key={u.unit_id} className="flex justify-between text-xs mb-1">
-                                                    <span className="text-gray-600 truncate max-w-[45%]">{i + 1}. {u.laptop_name}</span>
+                                                    <span className="text-gray-600 truncate max-w-[45%]">{i + 1}. {unitLabel(u)}</span>
                                                     <span className="font-mono text-gray-700 font-semibold">{fmt(unitPrices[u.unit_id] || 0)}</span>
                                                 </div>
                                             ))}

@@ -951,55 +951,55 @@ export default function LaporanHarianSalesPage() {
                   tab "Semua". Keterangan & Diinput Oleh baru tampil mulai layar
                   lg supaya tabel tidak sesak di layar medium/tablet. */}
               <div className="overflow-x-auto hidden md:block">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
-                      <th className="px-4 sm:px-5 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider w-14">No</th>
+                    <tr className="bg-gradient-to-b from-gray-50 to-white">
+                      <th className="border border-gray-200 px-4 sm:px-5 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider w-14">No</th>
                       {channelFilter === "ALL" && (
-                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Channel</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Channel</th>
                       )}
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Nama / Kontak</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Minat</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Keterangan</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Sumber</th>
-                      <th className="px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Transaksi</th>
-                      <th className="px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Audit</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Diinput Oleh</th>
-                      <th className="px-4 sm:px-5 py-3 w-20 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Aksi</th>
+                      <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Nama / Kontak</th>
+                      <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Minat</th>
+                      <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Keterangan</th>
+                      <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Sumber</th>
+                      <th className="border border-gray-200 px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Transaksi</th>
+                      <th className="border border-gray-200 px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Audit</th>
+                      <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Diinput Oleh</th>
+                      <th className="border border-gray-200 px-4 sm:px-5 py-3 w-20 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100/70">
+                  <tbody>
                     {paginatedEntries.map((entry, idx) => (
                       <tr
                         key={entry.id}
                         className={`group transition-colors ${entry.audited ? "bg-fuchsia-50/25 hover:bg-fuchsia-50/50" : "hover:bg-violet-50/40"}`}
                       >
-                        <td className={`pl-3 sm:pl-4 pr-4 py-3.5 border-l-4 ${channelBorderClass[entry.channel]}`}>
+                        <td className={`border border-gray-200 pl-3 sm:pl-4 pr-4 py-3.5 border-l-4 ${channelBorderClass[entry.channel]}`}>
                           <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-[11px] font-bold tabular-nums ${channelBadgeClass[entry.channel]}`}>
                             {pageStart + idx}
                           </span>
                         </td>
                         {channelFilter === "ALL" && (
-                          <td className="px-4 py-3">
+                          <td className="border border-gray-200 px-4 py-3">
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${channelBadgeClass[entry.channel]}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${channelDotClass[entry.channel]}`} />
                               {channelLabels[entry.channel]}
                             </span>
                           </td>
                         )}
-                        <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap tabular-nums">
+                        <td className="border border-gray-200 px-4 py-3 font-medium text-gray-900 whitespace-nowrap tabular-nums">
                           {entry.phone_number || entry.partner_name}
                           <div className="text-[10px] font-normal text-gray-400 mt-0.5">
                             {new Date(entry.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })} · {new Date(entry.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={entry.interest}>{entry.interest}</td>
-                        <td className="px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden md:table-cell" title={entry.keterangan || undefined}>{entry.keterangan || "—"}</td>
-                        <td className="px-4 py-3 text-gray-500 max-w-[160px] truncate hidden lg:table-cell" title={entry.sumber || undefined}>{entry.sumber || "—"}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="border border-gray-200 px-4 py-3 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={entry.interest}>{entry.interest}</td>
+                        <td className="border border-gray-200 px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden md:table-cell" title={entry.keterangan || undefined}>{entry.keterangan || "—"}</td>
+                        <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[160px] truncate hidden lg:table-cell" title={entry.sumber || undefined}>{entry.sumber || "—"}</td>
+                        <td className="border border-gray-200 px-4 py-3 text-center">
                           <StatusBadge purchased={entry.purchased} />
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="border border-gray-200 px-4 py-3 text-center">
                           {entry.audited ? (
                             <span
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-fuchsia-50 text-fuchsia-600 ring-1 ring-inset ring-fuchsia-100"
@@ -1018,7 +1018,7 @@ export default function LaporanHarianSalesPage() {
                             <span className="text-[11px] text-gray-300 font-medium">Menunggu</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap hidden lg:table-cell">
+                        <td className="border border-gray-200 px-4 py-3 whitespace-nowrap hidden lg:table-cell">
                           <div className="flex items-center gap-2">
                             <span
                               className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 ${avatarStyle(
@@ -1030,7 +1030,7 @@ export default function LaporanHarianSalesPage() {
                             <span className="text-gray-600">{entry.filled_by_name}</span>
                           </div>
                         </td>
-                        <td className="px-4 sm:px-5 py-3">
+                        <td className="border border-gray-200 px-4 sm:px-5 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => openEditModal(entry)}
