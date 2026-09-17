@@ -17,6 +17,7 @@ import BackButton from "@/components/ui/BackButton";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { isPrepSilent } from "@/lib/prepAlarm";
 import { expandRolesWithParents } from "@/lib/permissions";
+import PengajuanDanaNotifier from "@/components/layout/PengajuanDanaNotifier";
 
 
 function ScrollRestorer() {
@@ -98,6 +99,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SellerReminderNotifier userId={isSilentAdmin ? null : soundUserId} />
         <ReminderPopupModal userId={soundUserId} />
         <PatchNoteFab />
+        <PengajuanDanaNotifier userRoles={authUserRoles} />
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}
