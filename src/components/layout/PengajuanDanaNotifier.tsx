@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { CircleDollarSign } from "lucide-react";
+import { CircleDollarSign, Volume2, VolumeX } from "lucide-react";
 import { usePengajuanDanaNotify } from "@/hooks/usePengajuanDanaNotify";
 
 function formatRupiah(n: number): string {
@@ -23,7 +23,7 @@ export default function PengajuanDanaNotifier({ userRoles }: PengajuanDanaNotifi
   const isAdmin = userRoles.includes("ADMIN");
 
   // enabled = false kalau bukan ADMIN -> hook tidak polling sama sekali
-  const { alerts } = usePengajuanDanaNotify(isAdmin);
+  const { alerts, muted, volume, toggleMute, setVolume } = usePengajuanDanaNotify(isAdmin);
 
   if (!isAdmin || alerts.length === 0) return null;
 
@@ -32,6 +32,31 @@ export default function PengajuanDanaNotifier({ userRoles }: PengajuanDanaNotifi
 
   return (
     <div className="fixed top-4 inset-x-0 z-[100] flex flex-col items-center gap-2 px-4 pointer-events-none">
+      {/* Kontrol mute & volume — mengatur SUARA saja, card tetap tampil
+          apapun statusnya, supaya admin tetap ingat ada yang menunggu. */}
+      <div className="pointer-events-auto flex items-center gap-2 bg-white/95 backdrop-blur-sm shadow-md border border-slate-200 rounded-full px-3 py-1.5">
+        <button
+          type="button"
+          onClick={toggleMute}
+          title={muted ? "Bunyikan lagi" : "Bisukan sementara"}
+          className="w-6 h-6 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition flex-shrink-0"
+        >
+          {muted ? <VolumeX className="w-4 h-4 text-slate-400" /> : <Volume2 className="w-4 h-4 text-indigo-600" />}
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={volume}
+          disabled={muted}
+          onChange={(e) => setVolume(Number(e.target.value))}
+          aria-label="Volume notifikasi Pengajuan Dana"
+          className="w-20 accent-indigo-600 disabled:opacity-40"
+        />
+        {muted && <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">Dibisukan</span>}
+      </div>
+
       {visible.map((alert) => (
         <button
           key={alert.id}
