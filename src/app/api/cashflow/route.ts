@@ -598,7 +598,14 @@ export const GET = withAuth(async () => {
         (s: number, e: any) => (e.is_voided ? s : s + effectiveNominal(e)),
         0
     );
-    const totalKeluar = keluar.reduce((s: number, e: any) => s + Number(e.nominal || 0), 0);
+    // ✅ FIX: totalKeluar dulu tidak cek is_voided sama sekali (beda dari totalMasuk
+    // di atas yang sudah benar) — kalau nanti ada entry OUT yang bisa di-void, nominalnya
+    // ikut kehitung ke saldo padahal seharusnya tidak. Disamakan dengan expenseValue
+    // di page.tsx yang sudah lebih dulu diperbaiki begini.
+    const totalKeluar = keluar.reduce(
+        (s: number, e: any) => (e.is_voided ? s : s + Number(e.nominal || 0)),
+        0
+    );
 
     const modalAwalEntry = all.find((e: any) => e.source_type === "MODAL_AWAL") ?? null;
 
