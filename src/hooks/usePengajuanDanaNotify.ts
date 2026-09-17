@@ -22,6 +22,7 @@ interface FundRequestRow {
 const POLL_INTERVAL_MS = 15_000;
 const SEEN_STORAGE_KEY = "pengajuan_dana_seen_ids";
 const PENDING_STORAGE_KEY = "pengajuan_dana_pending_alerts";
+const INITIALIZED_STORAGE_KEY = "pengajuan_dana_initialized";
 const MAX_SEEN_IDS = 300;
 const MAX_PENDING_ALERTS = 20;
 
@@ -64,6 +65,30 @@ function savePendingAlerts(alerts: PengajuanDanaAlert[]) {
       PENDING_STORAGE_KEY,
       JSON.stringify(alerts.slice(0, MAX_PENDING_ALERTS))
     );
+  } catch {
+    // ignore
+  }
+}
+
+// ── Flag "sudah pernah baseline sekali" — SENGAJA di localStorage, bukan
+// cuma useRef, karena useRef reset ke initial value setiap komponen
+// remount (mis. admin pindah halaman dashboard → DashboardLayout dibuat
+// ulang). Kalau flag ini cuma di useRef, tiap remount akan mengulang
+// proses "baseline tanpa bunyi" — pengajuan baru yang masuk pas remount
+// jadi ikut ke-skip tanpa suara sama sekali. ────────────────────────────
+function loadHasInitialized(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(INITIALIZED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveHasInitialized() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(INITIALIZED_STORAGE_KEY, "1");
   } catch {
     // ignore
   }
@@ -129,7 +154,6 @@ function playNotifySound() {
 export function usePengajuanDanaNotify(enabled: boolean) {
   const [alerts, setAlerts] = useState<PengajuanDanaAlert[]>([]);
   const seenIdsRef = useRef<Set<string>>(new Set());
-  const initializedRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -153,6 +177,11 @@ export function usePengajuanDanaNotify(enabled: boolean) {
     if (!enabled) return;
 
     seenIdsRef.current = loadSeenIds();
+    // Dibaca dari localStorage, bukan useRef kosong — supaya remount
+    // (navigasi antar halaman dashboard, atau refresh browser) TIDAK
+    // dianggap "load pertama kali" lagi kalau browser ini sebenarnya
+    // sudah pernah baseline sebelumnya.
+    let hasInitialized = loadHasInitialized();
     let cancelled = false;
 
     const poll = async () => {
@@ -164,12 +193,15 @@ export function usePengajuanDanaNotify(enabled: boolean) {
         const rows: FundRequestRow[] = json.data ?? [];
         const seen = seenIdsRef.current;
 
-        if (!initializedRef.current) {
-          // Load pertama: tandai semua data lama sebagai "sudah dilihat"
-          // supaya tidak memicu notifikasi untuk data yang sudah ada.
+        if (!hasInitialized) {
+          // Load pertama kali DI BROWSER INI (bukan cuma pertama sejak
+          // komponen mount) — tandai semua data lama sebagai "sudah
+          // dilihat" supaya tidak memicu notifikasi untuk data yang
+          // sudah ada sebelum fitur ini dipasang.
           rows.forEach((r) => seen.add(r.id));
           saveSeenIds(seen);
-          initializedRef.current = true;
+          hasInitialized = true;
+          saveHasInitialized();
           return;
         }
 
