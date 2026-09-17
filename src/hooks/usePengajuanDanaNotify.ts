@@ -12,6 +12,7 @@ export interface PengajuanDanaAlert {
 
 interface FundRequestRow {
   id: string;
+  requester_id: string;
   requester_name: string;
   purpose: string;
   amount: number;
@@ -28,6 +29,17 @@ const POLL_INTERVAL_MS = 15_000;
 // stop() sempurna (setInterval browser tidak 100% presisi). Jeda 50ms
 // ini nyaris tidak kedengaran -> alarm terdengar nonstop "tinuttinuttinut...".
 const LOOP_INTERVAL_MS = 500;
+
+// ── Filter sumber pengajuan: alarm & card notifikasi HANYA dipicu untuk
+// pengajuan dana yang requester_id-nya ada di daftar ini (Yoga & Reinaldy).
+// Pengajuan dari requester lain TETAP muncul di tabel dan tetap bisa
+// di-approve seperti biasa — cuma tidak memicu suara/notifikasi mengambang.
+// GANTI 2 placeholder di bawah dengan UUID asli dari tabel fund_requests.
+const NOTIFY_SOURCE_IDS: string[] = [
+  "7b56de81-244e-42af-b2f6-0e29631c4114", // Yoga Adi Prakoso
+  "236c08b5-0dd2-4f2f-95d6-286c5b6dd75e", // Reinaldy Olyvierd Sendouw
+];
+
 const SEEN_STORAGE_KEY = "pengajuan_dana_seen_ids";
 // ID pengajuan yang SEDANG aktif menunggu approval — bukan snapshot alert
 // siap-tampil seperti versi sebelumnya. Status ini direkonstruksi ulang
@@ -310,27 +322,38 @@ export function usePengajuanDanaNotify(enabled: boolean) {
         }
 
         // 1) Deteksi pengajuan baru (belum pernah "dilihat") yang masih
-        //    menunggu approval -> masukkan ke daftar pending.
+        //    menunggu approval DAN requester-nya ada di NOTIFY_SOURCE_IDS
+        //    -> masukkan ke daftar pending. Pengajuan dari requester lain
+        //    tetap ditandai "sudah dilihat" (supaya tidak tiba-tiba memicu
+        //    alarm kalau nanti ID-nya ditambahkan ke daftar), tapi TIDAK
+        //    masuk ke pending -> tidak bunyi, tidak muncul card.
         let seenChanged = false;
         for (const r of rows) {
           if (!seen.has(r.id)) {
             seen.add(r.id);
             seenChanged = true;
-            if (!r.is_approved) pending.add(r.id);
+            if (!r.is_approved && NOTIFY_SOURCE_IDS.includes(r.requester_id)) {
+              pending.add(r.id);
+            }
           }
         }
         if (seenChanged) saveSeenIds(seen);
 
         // 2) Re-validasi SEMUA id yang sedang pending terhadap data terbaru:
-        //    kalau sudah is_approved=true ATAU barisnya sudah tidak ada lagi
-        //    (dihapus), keluarkan dari daftar pending. INI yang membuat
-        //    alert & alarm berhenti otomatis begitu benar-benar di-approve —
-        //    bukan karena di-klik atau ditutup.
+        //    kalau sudah is_approved=true, barisnya sudah tidak ada lagi
+        //    (dihapus), ATAU requester_id-nya sudah tidak ada di
+        //    NOTIFY_SOURCE_IDS, keluarkan dari daftar pending. Baris
+        //    terakhir ini penting: kalau browser admin masih menyimpan
+        //    pending lama (dari sebelum filter ini dipasang, mis. dari
+        //    akun testing), otomatis "dibersihkan" di poll pertama tanpa
+        //    perlu admin clear localStorage manual.
         const rowById = new Map(rows.map((r) => [r.id, r]));
         const stillPending: string[] = [];
         for (const id of pending) {
           const row = rowById.get(id);
-          if (row && !row.is_approved) stillPending.push(id);
+          if (row && !row.is_approved && NOTIFY_SOURCE_IDS.includes(row.requester_id)) {
+            stillPending.push(id);
+          }
         }
         pendingIdsRef.current = new Set(stillPending);
         savePendingIds(pendingIdsRef.current);
