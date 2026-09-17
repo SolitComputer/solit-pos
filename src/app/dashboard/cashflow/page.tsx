@@ -1665,9 +1665,42 @@ export default function CashflowPage() {
 
     const handleExport = async () => {
         setExporting(true);
-        try { await exportCashflowExcel(masuk.filter((e) => !e.is_voided), keluar.filter((e) => !e.is_voided)); }
-        finally { setExporting(false); }
+        try {
+            // ⬅️ FIX: dulu export pakai `masuk`/`keluar` dari state React yang sudah
+            // ada di memori — padahal Cashflow ini live (auto-sync tiap GET + polling
+            // 10 detik). Kalau ada transaksi baru ke-sync PERSIS di antara kamu lihat
+            // angka di layar dan klik Export, Excel bisa beda dari yang barusan kamu
+            // lihat. Sekarang Export SELALU fetch data paling baru dulu, lalu
+            // menyamakan juga angka yang tampil di layar ke snapshot yang sama —
+            // supaya card "Masuk/Keluar/Saldo" dan file Excel dijamin identik.
+            const res = await fetch("/api/cashflow", { cache: "no-store" });
+            const json = await res.json();
+            if (!json.success) {
+                alert(json.message || "Gagal mengambil data terbaru untuk export");
+                return;
+            }
+
+            const freshMasuk = sortEntries(json.data.masuk ?? []);
+            const freshKeluar = sortEntries(json.data.keluar ?? []);
+            setMasuk(freshMasuk);
+            setKeluar(freshKeluar);
+            setSummary(json.summary);
+            setLastUpdated(new Date());
+
+            // Modal Awal & filter tetap dikecualikan/diterapkan di sini sebagai jaga-jaga
+            // ke depan (mis. kalau nanti Modal Awal diisi, atau kamu lagi apply filter
+            // tanggal/kategori) — meski untuk gap hari ini penyebabnya murni soal timing di atas.
+            const exportMasuk = applyFilters(
+                freshMasuk.filter((e) => !e.is_voided && e.source_type !== "MODAL_AWAL"),
+                filterIn
+            );
+            const exportKeluar = applyFilters(freshKeluar.filter((e) => !e.is_voided), filterOut);
+            await exportCashflowExcel(exportMasuk, exportKeluar);
+        } finally {
+            setExporting(false);
+        }
     };
+    
 
     const toggleAudit = async (entry: Entry) => {
         if (entry.direction === "OUT" && !canAuditOut) return;
