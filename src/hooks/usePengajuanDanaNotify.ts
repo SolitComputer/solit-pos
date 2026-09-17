@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 export interface PengajuanDanaAlert {
   id: string;
@@ -38,6 +38,8 @@ const PENDING_ALERTS_STORAGE_KEY = "pengajuan_dana_pending_alerts";
 const INITIALIZED_STORAGE_KEY = "pengajuan_dana_initialized";
 const MAX_SEEN_IDS = 300;
 const MAX_PENDING_ALERTS = 20;
+const MUTED_STORAGE_KEY = "pengajuan_dana_muted";
+const VOLUME_STORAGE_KEY = "pengajuan_dana_volume";
 
 function loadSeenIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -122,6 +124,48 @@ function saveHasInitialized() {
   }
 }
 
+// ── Preferensi mute & volume — per-browser, TIDAK mempengaruhi apakah alert
+// masih muncul atau tidak (itu murni dari status is_approved). Mute cuma
+// mematikan suaranya; card notifikasi tetap tampil sebagai reminder visual. ──
+function loadMuted(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(MUTED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveMuted(value: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(MUTED_STORAGE_KEY, value ? "1" : "0");
+  } catch {
+    // ignore
+  }
+}
+
+function loadVolume(): number {
+  if (typeof window === "undefined") return 1;
+  try {
+    const raw = localStorage.getItem(VOLUME_STORAGE_KEY);
+    if (raw === null) return 1;
+    const n = Number(raw);
+    return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function saveVolume(value: number) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(VOLUME_STORAGE_KEY, String(value));
+  } catch {
+    // ignore
+  }
+}
+
 // ── Audio: AudioContext dibuat sekali & di-"unlock" saat interaksi pertama,
 // supaya tidak diblokir autoplay policy browser ────────────────────────────
 let sharedCtx: AudioContext | null = null;
@@ -145,34 +189,43 @@ if (typeof window !== "undefined") {
   window.addEventListener("keydown", unlockAudio);
 }
 
-// ── Bunyi alarm "tinut-tinut-tinut": 3 beep pendek & tajam berturut-turut,
-// GANTI dari chime 2-nada "ding-dong" sebelumnya. Dipanggil berulang oleh
-// loop di bawah selama masih ada pengajuan yang belum di-approve. ──────────
-function playNotifySound() {
+// ── Chime lembut 2-nada (C5 → E5, sine wave) dengan fade-out halus — GANTI
+// dari 3-beep square-wave 1046Hz yang terdengar cempreng/menusuk. Karakter
+// sine wave + envelope yang landai membuatnya terdengar seperti lonceng
+// kecil, tapi tetap jelas terdengar untuk keperluan alarm loop. Dipanggil
+// berulang oleh loop di bawah selama masih ada pengajuan yang belum
+// di-approve. ────────────────────────────────────────────────────────────
+function playNotifySound(volume: number = 1) {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
+    // Puncak gain diturunkan (0.2 -> 0.12) karena sine wave sudah terasa
+    // lebih "penuh" secara persepsi dibanding square di gain yang sama.
+    const peak = 0.12 * Math.min(1, Math.max(0, volume));
+    if (peak <= 0) return;
+
     const now = ctx.currentTime;
 
-    const beep = (start: number) => {
+    const tone = (freq: number, start: number, duration: number) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "square"; // gelombang square -> karakter "tut" tajam, bukan chime lembut
-      osc.frequency.value = 1046; // nada tinggi, khas bunyi alarm
+      osc.type = "sine"; // sine -> nada paling bersih, tanpa harmonik tajam
+      osc.frequency.value = freq;
       gain.gain.setValueAtTime(0, now + start);
-      gain.gain.linearRampToValueAtTime(0.2, now + start + 0.01);
-      gain.gain.setValueAtTime(0.2, now + start + 0.09);
-      gain.gain.linearRampToValueAtTime(0, now + start + 0.12);
+      // Attack landai (30ms) -> tidak ada "sentakan" di awal nada
+      gain.gain.linearRampToValueAtTime(peak, now + start + 0.03);
+      // Decay eksponensial -> ekor nada meluruh halus, bukan dipotong kasar
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now + start);
-      osc.stop(now + start + 0.13);
+      osc.stop(now + start + duration + 0.02);
     };
 
-    // 3 beep cepat berturut-turut: "tinut" - "tinut" - "tinut"
-    beep(0);
-    beep(0.16);
-    beep(0.32);
+    // 2 nada naik (interval terts mayor) -> kesan "ting-ting" lembut,
+    // bukan alarm beruntun senada yang terasa mendesak.
+    tone(523.25, 0, 0.3);     // C5
+    tone(659.25, 0.14, 0.35); // E5
   } catch {
     // suara gagal diputar — jangan ganggu UX utama
   }
@@ -191,9 +244,33 @@ function playNotifySound() {
  */
 export function usePengajuanDanaNotify(enabled: boolean) {
   const [alerts, setAlerts] = useState<PengajuanDanaAlert[]>([]);
+  const [muted, setMuted] = useState<boolean>(() => loadMuted());
+  const [volume, setVolumeState] = useState<number>(() => loadVolume());
+  // Dibaca oleh interval loop tanpa jadi dependency useEffect-nya — supaya
+  // geser slider volume TIDAK me-restart interval/oscillator (yang bisa
+  // menyebabkan beep dobel tiap kali slider digeser sedikit).
+  const volumeRef = useRef(volume);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const pendingIdsRef = useRef<Set<string>>(new Set());
   const loopIntervalIdRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  const toggleMute = useCallback(() => {
+    setMuted((prev) => {
+      const next = !prev;
+      saveMuted(next);
+      return next;
+    });
+  }, []);
+
+  const setVolume = useCallback((value: number) => {
+    const clamped = Math.min(1, Math.max(0, value));
+    setVolumeState(clamped);
+    saveVolume(clamped);
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -288,11 +365,12 @@ export function usePengajuanDanaNotify(enabled: boolean) {
   }, [enabled]);
 
   // ── Looping alarm: selama `alerts` masih berisi minimal 1 pengajuan yang
-  // belum di-approve, alarm diputar berulang tiap LOOP_INTERVAL_MS. Berhenti
-  // OTOMATIS begitu poll() di atas mendeteksi semua sudah di-approve
-  // (alerts.length jadi 0) — bukan lewat aksi klik admin.
+  // belum di-approve DAN admin belum mute, alarm diputar berulang tiap
+  // LOOP_INTERVAL_MS. Berhenti OTOMATIS begitu poll() di atas mendeteksi
+  // semua sudah di-approve (alerts.length jadi 0), ATAU begitu admin
+  // menekan tombol mute — dua jalur berhenti yang independen, keduanya sah.
   useEffect(() => {
-    if (!enabled || alerts.length === 0) {
+    if (!enabled || alerts.length === 0 || muted) {
       if (loopIntervalIdRef.current) {
         clearInterval(loopIntervalIdRef.current);
         loopIntervalIdRef.current = null;
@@ -300,8 +378,9 @@ export function usePengajuanDanaNotify(enabled: boolean) {
       return;
     }
 
-    playNotifySound();
-    loopIntervalIdRef.current = setInterval(playNotifySound, LOOP_INTERVAL_MS);
+    const fire = () => playNotifySound(volumeRef.current);
+    fire();
+    loopIntervalIdRef.current = setInterval(fire, LOOP_INTERVAL_MS);
 
     return () => {
       if (loopIntervalIdRef.current) {
@@ -309,8 +388,10 @@ export function usePengajuanDanaNotify(enabled: boolean) {
         loopIntervalIdRef.current = null;
       }
     };
+    // volume SENGAJA tidak dimasukkan sebagai dependency — dibaca lewat
+    // volumeRef di dalam fire() supaya geser slider tidak me-restart loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, alerts.length]);
+  }, [enabled, alerts.length, muted]);
 
-  return { alerts };
+  return { alerts, muted, volume, toggleMute, setVolume };
 }
