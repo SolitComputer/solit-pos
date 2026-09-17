@@ -968,7 +968,7 @@ export function SolitBorder({
           position: relative;
           display: inline-flex;
           border-radius: 9999px;
-        }
+        }da
         .sb-bg-wrap {
           position: absolute;
           inset: 0;
