@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { CircleDollarSign, X } from "lucide-react";
+import { CircleDollarSign } from "lucide-react";
 import { usePengajuanDanaNotify } from "@/hooks/usePengajuanDanaNotify";
 
 function formatRupiah(n: number): string {
@@ -23,7 +23,7 @@ export default function PengajuanDanaNotifier({ userRoles }: PengajuanDanaNotifi
   const isAdmin = userRoles.includes("ADMIN");
 
   // enabled = false kalau bukan ADMIN -> hook tidak polling sama sekali
-  const { alerts, dismiss, dismissAll } = usePengajuanDanaNotify(isAdmin);
+  const { alerts } = usePengajuanDanaNotify(isAdmin);
 
   if (!isAdmin || alerts.length === 0) return null;
 
@@ -31,21 +31,15 @@ export default function PengajuanDanaNotifier({ userRoles }: PengajuanDanaNotifi
   const hiddenCount = alerts.length - visible.length;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col items-end gap-2 w-[calc(100%-2rem)] max-w-sm pointer-events-none">
-      {alerts.length > 1 && (
-        <button
-          onClick={dismissAll}
-          className="pointer-events-auto text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition bg-white/80 backdrop-blur px-2.5 py-1 rounded-full shadow-sm"
-        >
-          Tutup semua ({alerts.length})
-        </button>
-      )}
-
+    <div className="fixed top-4 inset-x-0 z-[100] flex flex-col items-center gap-2 px-4 pointer-events-none">
       {visible.map((alert) => (
-        <div
+        <button
           key={alert.id}
-          className="pointer-events-auto relative w-full overflow-hidden rounded-2xl bg-white shadow-2xl shadow-black/10 border border-indigo-100"
-          style={{ animation: "pdnSlideIn 0.35s cubic-bezier(0.16,1,0.3,1) both" }}
+          type="button"
+          onClick={() => router.push("/dashboard/pengajuan-dana")}
+          title="Klik untuk membuka & menyetujui pengajuan ini"
+          className="pointer-events-auto w-full max-w-sm text-left overflow-hidden rounded-2xl bg-white shadow-2xl shadow-black/15 border border-indigo-100 hover:-translate-y-0.5 transition-transform"
+          style={{ animation: "pdnDropIn 0.35s cubic-bezier(0.16,1,0.3,1) both" }}
         >
           <div className="h-1 bg-gradient-to-r from-indigo-500 to-purple-600" />
           <div className="p-4 flex items-start gap-3">
@@ -54,7 +48,7 @@ export default function PengajuanDanaNotifier({ userRoles }: PengajuanDanaNotifi
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
-                Pengajuan Dana Baru
+                Pengajuan Dana Baru · Menunggu Persetujuan
               </p>
               <p className="text-sm font-bold text-slate-800 truncate mt-0.5">
                 {alert.requester_name}
@@ -63,38 +57,22 @@ export default function PengajuanDanaNotifier({ userRoles }: PengajuanDanaNotifi
               <p className="text-sm font-extrabold text-slate-900 mt-1">
                 {formatRupiah(alert.amount)}
               </p>
-              <button
-                onClick={() => {
-                  dismiss(alert.id);
-                  router.push("/dashboard/pengajuan-dana");
-                }}
-                className="mt-2 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
-              >
-                Lihat &amp; Setujui →
-              </button>
             </div>
-            <button
-              onClick={() => dismiss(alert.id)}
-              className="w-6 h-6 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition flex-shrink-0"
-              aria-label="Tutup notifikasi"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
           </div>
-        </div>
+        </button>
       ))}
 
       {hiddenCount > 0 && (
-        <p className="pointer-events-none text-[11px] font-semibold text-slate-400 bg-white/80 backdrop-blur px-2.5 py-1 rounded-full shadow-sm">
-          +{hiddenCount} pengajuan lainnya
+        <p className="pointer-events-none text-[11px] font-semibold text-slate-500 bg-white/90 backdrop-blur px-2.5 py-1 rounded-full shadow-sm">
+          +{hiddenCount} pengajuan lain menunggu persetujuan
         </p>
       )}
 
       <style dangerouslySetInnerHTML={{
         __html: `
-        @keyframes pdnSlideIn {
-          from { opacity: 0; transform: translateX(24px) scale(0.96); }
-          to { opacity: 1; transform: translateX(0) scale(1); }
+        @keyframes pdnDropIn {
+          from { opacity: 0; transform: translateY(-16px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}} />
     </div>
