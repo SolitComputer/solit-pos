@@ -421,7 +421,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ROUTE_PERMISSIONS di file ini (lihat komentar dekat SO_ROLES di bawah).
   "/dashboard/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
 
-  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
+  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH", "PKL_PENGELOLA_BARANG"],
   "/dashboard/audit-barang-keluar": [...ITEM_OUTFLOW_ROLES],
 
   "/dashboard/warranty": [
@@ -1229,6 +1229,7 @@ export const ACCESSORY_VIEW_ROLES: UserRole[] = [
   "KEPALA_ONPOINT", "ONPOINT",
   "KEPALA_SOTECH", "SOTECH",
   "KEPALA_ZENITH",
+  "PKL_PENGELOLA_BARANG",
 ];
 export const ACCESSORY_EDIT_ROLES: UserRole[] = [...ACCESSORY_CREATE_ROLES];
 
