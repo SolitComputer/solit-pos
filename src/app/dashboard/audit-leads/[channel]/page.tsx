@@ -18,6 +18,12 @@ import {
   XCircle,
   ClipboardCheck,
   Megaphone,
+  User,
+  Tag,
+  MessageSquare,
+  Link2,
+  ShoppingBag,
+  UserCircle2,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -235,24 +241,40 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
           {/* Tabel — laptop/tablet (md ke atas). Keterangan & Ads baru tampil
               mulai lg supaya tidak sesak di layar medium. */}
           <div className="overflow-x-auto hidden md:block">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-violet-50/70 border-b border-violet-100">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700 w-10">No</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700">Nama/No Telpon</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700">Minat</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700 hidden lg:table-cell">Keterangan</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700 hidden lg:table-cell">Sumber</th>
-                  <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-violet-700">Transaksi</th>
-                  <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-violet-700 hidden lg:table-cell">Ads</th>
-                  <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-violet-700">Audit</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700 hidden lg:table-cell">Diinput Oleh</th>
+                <tr className="bg-gradient-to-r from-violet-50 via-fuchsia-50/60 to-violet-50">
+                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider w-12">No</th>
+                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5"><User className="w-3 h-3" /> Nama/No Telpon</span>
+                  </th>
+                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5"><Tag className="w-3 h-3" /> Minat</span>
+                  </th>
+                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                    <span className="inline-flex items-center gap-1.5"><MessageSquare className="w-3 h-3" /> Keterangan</span>
+                  </th>
+                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                    <span className="inline-flex items-center gap-1.5"><Link2 className="w-3 h-3" /> Sumber</span>
+                  </th>
+                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5"><ShoppingBag className="w-3 h-3" /> Transaksi</span>
+                  </th>
+                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                    <span className="inline-flex items-center gap-1.5"><Megaphone className="w-3 h-3" /> Ads</span>
+                  </th>
+                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5"><ShieldCheck className="w-3 h-3" /> Audit</span>
+                  </th>
+                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                    <span className="inline-flex items-center gap-1.5"><UserCircle2 className="w-3 h-3" /> Diinput Oleh</span>
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody>
                 {loading ? (
                   [1, 2, 3].map((i) => (
-                    <tr key={i}>
+                    <tr key={i} className="border-b border-gray-50 last:border-0">
                       <td colSpan={9} className="px-4 py-3.5">
                         <div className="flex items-center gap-3 animate-pulse">
                           <div className="h-3 w-5 bg-gray-100 rounded-full" />
@@ -276,10 +298,19 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                     </td>
                   </tr>
                 ) : (
-                  paginated.map((row, i) => (
-                    <tr key={row.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="px-4 py-3 text-gray-400 tabular-nums">{(page - 1) * PAGE_SIZE + i + 1}</td>
-                      <td className="px-4 py-3">
+                   paginated.map((row, i) => (
+                    <tr
+                      key={row.id}
+                      className={`group transition-colors duration-150 ${
+                        i % 2 === 0 ? "bg-white" : "bg-gray-50/40"
+                      } hover:bg-violet-50/50`}
+                    >
+                      <td className="border border-gray-200 px-4 py-3.5 text-center">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold tabular-nums group-hover:bg-violet-100 group-hover:text-violet-600 transition-colors">
+                          {(page - 1) * PAGE_SIZE + i + 1}
+                        </span>
+                      </td>
+                      <td className="border border-gray-200 px-4 py-3.5">
                         <p className="font-medium text-gray-900">{row.nama}</p>
                         <div className="text-[10px] font-normal text-gray-400 mt-0.5">
                           {new Date(row.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })} · {new Date(row.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
@@ -288,20 +319,20 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                           {sourceBadge[row.source].label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={row.minat}>{row.minat}</td>
-                      <td className="px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
-                      <td className="px-4 py-3 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="border border-gray-200 px-4 py-3.5 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={row.minat}>{row.minat}</td>
+                      <td className="border border-gray-200 px-4 py-3.5 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
+                      <td className="border border-gray-200 px-4 py-3.5 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
+                      <td className="border border-gray-200 px-4 py-3.5 text-center">
                         <TransaksiBadge value={row.transaksi} />
                       </td>
-                      <td className="px-4 py-3 text-center hidden lg:table-cell">
+                      <td className="border border-gray-200 px-4 py-3.5 text-center hidden lg:table-cell">
                         {row.source === "sales_report" ? (
                           <span className="text-xs text-gray-300">—</span>
                         ) : (
                           <AdsBadge value={row.ads} />
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="border border-gray-200 px-4 py-3.5 text-center">
                         {row.audited ? (
                           <span
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600"
@@ -320,7 +351,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                           <span className="text-[11px] text-gray-300 font-medium">Belum</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap hidden lg:table-cell">
+                      <td className="border border-gray-200 px-4 py-3.5 whitespace-nowrap hidden lg:table-cell">
                         <div className="flex items-center gap-2">
                           <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 ${avatarStyle(row.created_by_name)}`}>
                             {initials(row.created_by_name)}

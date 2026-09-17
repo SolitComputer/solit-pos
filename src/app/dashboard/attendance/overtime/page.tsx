@@ -1662,7 +1662,11 @@ export default function OvertimePage() {
   const [overtimes, setOvertimes] = useState<OvertimeRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [filterStatus, setFilterStatus] = useState("Semua");
+  type UnifiedFilter = "ALL" | "PENDING_ACC" | "UNAUDITED" | "AUDITED" | "REJECTED";
+  type SortOption = "PRIORITY" | "DATE_DESC" | "DATE_ASC" | "NAME_ASC";
+
+  const [unifiedFilter, setUnifiedFilter] = useState<UnifiedFilter>("ALL");
+  const [sortBy, setSortBy] = useState<SortOption>("PRIORITY");
   const [searchQuery, setSearchQuery] = useState("");
   const [calendarMonth, setCalendarMonth] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -1813,16 +1817,15 @@ export default function OvertimePage() {
 
   const filtered = useMemo(() => {
     let list = overtimes;
-    if (filterStatus !== "Semua") list = list.filter(o => o.status === filterStatus);
     if (selectedDate) list = list.filter(o => o.request_date === selectedDate);
     return list;
-  }, [overtimes, filterStatus, selectedDate]);
+  }, [overtimes, selectedDate]);
 
   const groupedByUser = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const map = new Map<string, { user: { id: string; name: string; role: string }; items: OvertimeRequest[] }>();
 
-    if (!selectedDate && filterStatus === "Semua") {
+    if (!selectedDate && unifiedFilter === "ALL") {
       allUsers.forEach(u => { if (!q || u.name.toLowerCase().includes(q)) map.set(u.id, { user: u, items: [] }); });
     }
     filtered.forEach(o => {
@@ -1831,20 +1834,85 @@ export default function OvertimePage() {
       if (map.has(uid)) { map.get(uid)!.items.push(o); }
       else if (!q || o.users.name.toLowerCase().includes(q)) { map.set(uid, { user: o.users, items: [o] }); }
     });
-    const hasFilter = filterStatus !== "Semua" || !!selectedDate;
+    const hasFilter = unifiedFilter !== "ALL" || !!selectedDate;
     const result = Array.from(map.values()).filter(g => !hasFilter || g.items.length > 0);
     return result.sort((a, b) => a.user.name.localeCompare(b.user.name, "id-ID"));
-  }, [filtered, allUsers, filterStatus, searchQuery, selectedDate]);
+  }, [filtered, allUsers, unifiedFilter, searchQuery, selectedDate]);
+
+  const FILTER_TABS: { key: UnifiedFilter; label: string; dot?: string }[] = [
+    { key: "ALL", label: "Semua" },
+    { key: "PENDING_ACC", label: "Belum di-ACC", dot: "bg-amber-400" },
+    { key: "UNAUDITED", label: "Belum Diaudit", dot: "bg-blue-400" },
+    { key: "AUDITED", label: "Sudah Diaudit", dot: "bg-emerald-400" },
+    { key: "REJECTED", label: "Ditolak", dot: "bg-red-400" },
+  ];
+
+  const baseRows = useMemo(() => {
+    return filtered
+      .filter((o) => o.users)
+      .filter((o) => (activeTab === "KARYAWAN" ? !isUserPKL(o.users!.role) : isUserPKL(o.users!.role)));
+  }, [filtered, activeTab]);
+
+  const tabCounts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const list = q ? baseRows.filter(o => o.users?.name.toLowerCase().includes(q)) : baseRows;
+    return {
+      ALL: list.length,
+      PENDING_ACC: list.filter(o => o.status === "PENDING").length,
+      UNAUDITED: list.filter(o => o.status !== "PENDING" && o.status !== "REJECTED" && o.status !== "CANCELLED" && (o as any).audit_status !== "AUDITED").length,
+      AUDITED: list.filter(o => (o as any).audit_status === "AUDITED").length,
+      REJECTED: list.filter(o => o.status === "REJECTED").length,
+    };
+  }, [baseRows, searchQuery]);
 
   const tableRows: OvertimeTableRow[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return filtered
-      .filter((o) => o.users)
-      .filter((o) => (activeTab === "KARYAWAN" ? !isUserPKL(o.users!.role) : isUserPKL(o.users!.role)))
-      .filter((o) => filterStatus === "REJECTED" || o.status !== "REJECTED")
-      .filter((o) => !q || o.users!.name.toLowerCase().includes(q))
-      .sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime()) as unknown as OvertimeTableRow[];
-  }, [filtered, searchQuery, activeTab, filterStatus]);
+    let list = baseRows;
+    if (q) {
+      list = list.filter(o => o.users!.name.toLowerCase().includes(q));
+    }
+
+    if (unifiedFilter === "PENDING_ACC") {
+      list = list.filter(o => o.status === "PENDING");
+    } else if (unifiedFilter === "UNAUDITED") {
+      list = list.filter(o => o.status !== "PENDING" && o.status !== "REJECTED" && o.status !== "CANCELLED" && (o as any).audit_status !== "AUDITED");
+    } else if (unifiedFilter === "AUDITED") {
+      list = list.filter(o => (o as any).audit_status === "AUDITED");
+    } else if (unifiedFilter === "REJECTED") {
+      list = list.filter(o => o.status === "REJECTED");
+    }
+
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      if (sortBy === "DATE_DESC") {
+        return new Date(b.request_date).getTime() - new Date(a.request_date).getTime();
+      }
+      if (sortBy === "DATE_ASC") {
+        return new Date(a.request_date).getTime() - new Date(b.request_date).getTime();
+      }
+      if (sortBy === "NAME_ASC") {
+        return (a.users?.name || "").localeCompare(b.users?.name || "", "id-ID");
+      }
+      // Default: "PRIORITY" -> Prioritas Belum di-ACC di atas
+      const getPriority = (o: OvertimeRequest) => {
+        if (o.status === "PENDING") return 1;
+        if (o.status === "NEED_PROOF" || o.status === "ONGOING") return 2;
+        if (o.status === "COMPLETED" && (o as any).audit_status !== "AUDITED") return 3;
+        if ((o as any).audit_status === "AUDITED") return 4;
+        return 5;
+      };
+
+      const pA = getPriority(a);
+      const pB = getPriority(b);
+      if (pA !== pB) return pA - pB;
+
+      const dateDiff = new Date(b.request_date).getTime() - new Date(a.request_date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return sorted as unknown as OvertimeTableRow[];
+  }, [baseRows, searchQuery, unifiedFilter, sortBy]);
 
   const groupedKaryawan = useMemo(
     () => groupedByUser.filter(g => !isUserPKL(g.user.role)),
@@ -1883,7 +1951,7 @@ export default function OvertimePage() {
 
   const handleDateSelect = (dk: string) => {
     if (selectedDate === dk) { setSelectedDate(null); return; }
-    setSelectedDate(dk); setSelectedUserId(null); setFilterStatus("Semua"); setSearchQuery("");
+    setSelectedDate(dk); setSelectedUserId(null); setUnifiedFilter("ALL"); setSearchQuery("");
   };
 
   const statCards = [
@@ -2021,7 +2089,7 @@ export default function OvertimePage() {
                 return (
                   <button
                     key={tab}
-                    onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); setSelectedUserId(null); setRecapUserId("ALL"); }}
+                    onClick={() => { setActiveTab(tab); setSearchQuery(""); setUnifiedFilter("ALL"); setSelectedUserId(null); setRecapUserId("ALL"); }}
                     className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${active
                       ? "bg-[#0f0c29] text-white shadow-md"
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
@@ -2090,32 +2158,69 @@ export default function OvertimePage() {
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-              <input
-                type="text"
-                placeholder="Cari nama karyawan..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full h-9 pl-9 pr-3.5 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300"
-              />
-            </div>
-            {statuses.length > 0 && (
-              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-                {["Semua", ...statuses].map(s => {
-                  const c = s !== "Semua" ? STATUS_CONFIG[s] : null;
-                  const active = filterStatus === s;
-                  const Icon = c?.icon;
-                  return (
-                    <button key={s} onClick={() => setFilterStatus(s)}
-                      className={`flex-shrink-0 h-9 px-3 rounded-xl text-[10px] font-semibold transition-all border ${active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"}`}>
-                      {c && Icon ? <span className="inline-flex items-center gap-1"><Icon size={12} />{c.label}</span> : "Semua"}
-                    </button>
-                  );
-                })}
+          {/* ── UNIFIED FILTER BAR & CONTROLS ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+              <div className="relative flex-1">
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Cari nama karyawan..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full h-10 pl-10 pr-9 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                    <X size={14} />
+                  </button>
+                )}
               </div>
-            )}
+
+              {/* Urutan / Sort Dropdown */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-[11px] text-gray-400 font-semibold whitespace-nowrap hidden sm:inline">Urutan:</span>
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as SortOption)}
+                  className="h-10 px-3 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-gray-50/50 hover:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all cursor-pointer w-full sm:w-auto"
+                >
+                  <option value="PRIORITY"> Prioritas Belum di-ACC</option>
+                  <option value="DATE_DESC"> Tanggal Terbaru</option>
+                  <option value="DATE_ASC"> Tanggal Terlama</option>
+                  <option value="NAME_ASC"> Nama Karyawan (A–Z)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pt-0.5 pb-0.5">
+              {FILTER_TABS.map(tab => {
+                const active = unifiedFilter === tab.key;
+                const count = tabCounts[tab.key];
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setUnifiedFilter(tab.key)}
+                    className={`flex-shrink-0 h-9 px-3.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 active:scale-95 ${
+                      active
+                        ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {tab.dot && <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tab.dot}`} />}
+                    <span>{tab.label}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black tabular-nums transition-colors ${
+                      active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <OvertimeTable
