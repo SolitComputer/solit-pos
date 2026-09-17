@@ -20,6 +20,9 @@ interface FundRequestRow {
 }
 
 const POLL_INTERVAL_MS = 15_000;
+// Jeda antar-pengulangan suara SELAMA masih ada alert yang belum di-dismiss —
+// admin harus klik notifikasinya (atau "Tutup semua") supaya suara berhenti.
+const LOOP_INTERVAL_MS = 4_000;
 const SEEN_STORAGE_KEY = "pengajuan_dana_seen_ids";
 const PENDING_STORAGE_KEY = "pengajuan_dana_pending_alerts";
 const INITIALIZED_STORAGE_KEY = "pengajuan_dana_initialized";
@@ -154,6 +157,7 @@ function playNotifySound() {
 export function usePengajuanDanaNotify(enabled: boolean) {
   const [alerts, setAlerts] = useState<PengajuanDanaAlert[]>([]);
   const seenIdsRef = useRef<Set<string>>(new Set());
+  const loopIntervalIdRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -223,8 +227,9 @@ export function usePengajuanDanaNotify(enabled: boolean) {
             savePendingAlerts(merged);
             return merged;
           });
-
-          playNotifySound();
+          // Suara TIDAK dipanggil di sini lagi — sekarang ditangani oleh efek
+          // looping di bawah (lihat useEffect setelah efek poll ini), yang
+          // otomatis mulai/berhenti mengikuti panjang array `alerts`.
         }
       } catch {
         // gagal fetch — diamkan, coba lagi di interval berikutnya
@@ -239,6 +244,34 @@ export function usePengajuanDanaNotify(enabled: boolean) {
       clearInterval(interval);
     };
   }, [enabled]);
+
+  // ── Looping alarm: selama `alerts` masih berisi minimal 1 item, suara
+  // diputar berulang tiap LOOP_INTERVAL_MS. Berhenti otomatis begitu admin
+  // dismiss satu-satunya alert yang tersisa (alerts.length jadi 0) — jadi
+  // "klik notifikasi utk berhenti" murni efek samping dari dismiss()
+  // mengosongkan array ini, bukan logic terpisah yang perlu disinkronkan.
+  useEffect(() => {
+    if (!enabled || alerts.length === 0) {
+      if (loopIntervalIdRef.current) {
+        clearInterval(loopIntervalIdRef.current);
+        loopIntervalIdRef.current = null;
+      }
+      return;
+    }
+
+    // Bunyi langsung begitu ada alert (baru masuk ATAU sisa dari
+    // localStorage saat halaman baru dibuka), lalu diulang tiap interval.
+    playNotifySound();
+    loopIntervalIdRef.current = setInterval(playNotifySound, LOOP_INTERVAL_MS);
+
+    return () => {
+      if (loopIntervalIdRef.current) {
+        clearInterval(loopIntervalIdRef.current);
+        loopIntervalIdRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, alerts.length]);
 
   return { alerts, dismiss, dismissAll };
 }
