@@ -8,6 +8,7 @@ import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, X, CheckCheck, RotateCcw, Banknote,
   ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon, Pencil,
+  Search, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 interface FundRequest {
@@ -53,6 +54,9 @@ const CREATE_ROLES = [
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG",
   "KEPALA_CC",
 ];
+
+// ── Pagination: jumlah baris per halaman tabel Pengajuan Dana ─────────────────
+const ITEMS_PER_PAGE = 10;
 
 function formatRupiah(n: number): string {
   return "Rp " + n.toLocaleString("id-ID");
@@ -719,6 +723,80 @@ function DetailModal({
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  PAGINATION — kontrol halaman untuk tabel Pengajuan Dana (next/prev + nomor)
+ * ════════════════════════════════════════════════════════════════════════════ */
+function Pagination({
+  currentPage, totalPages, onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+
+  const windowSize = 5;
+  let start = Math.max(1, currentPage - Math.floor(windowSize / 2));
+  let end = Math.min(totalPages, start + windowSize - 1);
+  start = Math.max(1, end - windowSize + 1);
+  const pages: number[] = [];
+  for (let p = start; p <= end; p++) pages.push(p);
+
+  const btnBase = "min-w-[32px] h-8 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center";
+  const btnIdle = "bg-slate-50 text-slate-500 hover:bg-slate-100";
+  const btnActive = "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20";
+  const btnDisabled = "disabled:opacity-40 disabled:cursor-not-allowed";
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1.5 pt-4 mt-2 border-t border-slate-100">
+      <button
+        type="button"
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        title="Halaman sebelumnya"
+        className={`${btnBase} ${btnIdle} ${btnDisabled}`}
+      >
+        <ChevronLeft className="w-3.5 h-3.5" />
+      </button>
+
+      {start > 1 && (
+        <>
+          <button type="button" onClick={() => onPageChange(1)} className={`${btnBase} ${btnIdle}`}>1</button>
+          {start > 2 && <span className="text-slate-300 text-xs px-1">…</span>}
+        </>
+      )}
+
+      {pages.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onPageChange(p)}
+          className={`${btnBase} ${p === currentPage ? btnActive : btnIdle}`}
+        >
+          {p}
+        </button>
+      ))}
+
+      {end < totalPages && (
+        <>
+          {end < totalPages - 1 && <span className="text-slate-300 text-xs px-1">…</span>}
+          <button type="button" onClick={() => onPageChange(totalPages)} className={`${btnBase} ${btnIdle}`}>{totalPages}</button>
+        </>
+      )}
+
+      <button
+        type="button"
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        title="Halaman berikutnya"
+        className={`${btnBase} ${btnIdle} ${btnDisabled}`}
+      >
+        <ChevronRight className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  MAIN PAGE
  * ════════════════════════════════════════════════════════════════════════════ */
 export default function PengajuanDanaPage() {
@@ -734,7 +812,8 @@ export default function PengajuanDanaPage() {
   const [realisasiTarget, setRealisasiTarget] = useState<FundRequest | null>(null);
   const [editMetodeTarget, setEditMetodeTarget] = useState<FundRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -812,14 +891,44 @@ export default function PengajuanDanaPage() {
   const totalNotRealized = data.length - totalRealized;
 
   const filteredData = data.filter((r) => {
-    if (statusFilter === "approved") return r.is_approved;
-    if (statusFilter === "not_approved") return !r.is_approved;
-    if (statusFilter === "executed") return r.is_executed;
-    if (statusFilter === "not_executed") return !r.is_executed;
-    if (statusFilter === "realized") return !!r.realisasi_cashflow_id;
-    if (statusFilter === "not_realized") return !r.realisasi_cashflow_id;
+    if (statusFilter === "approved" && !r.is_approved) return false;
+    if (statusFilter === "not_approved" && r.is_approved) return false;
+    if (statusFilter === "executed" && !r.is_executed) return false;
+    if (statusFilter === "not_executed" && r.is_executed) return false;
+    if (statusFilter === "realized" && !r.realisasi_cashflow_id) return false;
+    if (statusFilter === "not_realized" && r.realisasi_cashflow_id) return false;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const statusText = r.is_executed ? "selesai" : r.is_approved ? "disetujui" : "menunggu";
+      const haystack = [
+        r.requester_name,
+        r.purpose,
+        String(r.amount),
+        formatRupiah(r.amount),
+        r.payment_method,
+        statusText,
+        r.approved_by_name ?? "",
+        r.executed_by_name ?? "",
+        r.realisasi_by_name ?? "",
+        formatDate(r.created_at),
+      ].join(" ").toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+
     return true;
   });
+
+  // ── Pagination: potong filteredData jadi per-halaman ─────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / ITEMS_PER_PAGE));
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
 
   const FILTERS: { key: StatusFilter; label: string; count: number; icon: React.ReactNode }[] = [
     { key: "all", label: "Semua", count: data.length, icon: <ClipboardList className="w-3 h-3" /> },
@@ -975,12 +1084,35 @@ export default function PengajuanDanaPage() {
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900">Daftar Pengajuan Dana</h3>
                 <p className="text-[11px] text-slate-400 font-medium">
-                  {statusFilter === "all"
+                  {filteredData.length === data.length
                     ? `${data.length} total pengajuan`
                     : `${filteredData.length} dari ${data.length} pengajuan`}
+                  {filteredData.length > 0 && ` · Halaman ${currentPage}/${totalPages}`}
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* ── Pencarian ─────────────────────────────────────────────────── */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              placeholder="Cari nama pengaju, kebutuhan, nominal, metode, atau status..."
+              className="w-full pl-10 pr-9 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 focus:bg-white transition-all placeholder:text-slate-400"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => { setSearchQuery(""); setCurrentPage(1); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-500 flex items-center justify-center transition"
+                aria-label="Hapus pencarian"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
           {/* ── Filter Status ──────────────────────────────────────────────── */}
@@ -990,21 +1122,19 @@ export default function PengajuanDanaPage() {
               <button
                 key={f.key}
                 type="button"
-                onClick={() => setStatusFilter(f.key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
-                  statusFilter === f.key
+                onClick={() => { setStatusFilter(f.key); setCurrentPage(1); }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${statusFilter === f.key
                     ? "bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-500/20"
                     : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 hover:text-slate-700"
-                }`}
+                  }`}
               >
                 <span className={statusFilter === f.key ? "text-white" : "text-slate-400"}>{f.icon}</span>
                 {f.label}
                 <span
-                  className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold ${
-                    statusFilter === f.key
+                  className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold ${statusFilter === f.key
                       ? "bg-white/25 text-white"
                       : "bg-white text-slate-500 border border-slate-200"
-                  }`}
+                    }`}
                 >
                   {f.count}
                 </span>
@@ -1039,9 +1169,9 @@ export default function PengajuanDanaPage() {
               <div className="w-16 h-16 mx-auto mb-4 rounded-3xl bg-slate-50 flex items-center justify-center">
                 <FileText className="w-7 h-7 text-slate-300" />
               </div>
-              <p className="text-sm font-bold text-slate-600">Tidak ada pengajuan untuk filter ini</p>
+              <p className="text-sm font-bold text-slate-600">Tidak ada pengajuan untuk filter atau pencarian ini</p>
               <button
-                onClick={() => setStatusFilter("all")}
+                onClick={() => { setStatusFilter("all"); setSearchQuery(""); setCurrentPage(1); }}
                 className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold rounded-full transition-all"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -1066,7 +1196,7 @@ export default function PengajuanDanaPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {filteredData.map((row, idx) => {
+                  {paginatedData.map((row, idx) => {
                     const busy = actionLoading[row.id] ?? false;
                     const canRealisasiRow = row.executed_by_id === userId || userRoles.includes("ADMIN");
 
@@ -1085,8 +1215,7 @@ export default function PengajuanDanaPage() {
                         className="group hover:bg-slate-50/60 transition-colors"
                         style={{ animation: `pdSlideUp 0.3s ease-out both`, animationDelay: `${idx * 40}ms` }}
                       >
-                        <td className="px-4 py-4 text-slate-400 font-semibold tabular-nums text-xs">{idx + 1}</td>
-
+                        <td className="px-4 py-4 text-slate-400 font-semibold tabular-nums text-xs">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-2.5">
                             <div className={`w-8 h-8 rounded-2xl bg-gradient-to-br ${bgGradient} text-white font-bold flex items-center justify-center text-[11px] flex-shrink-0`}>
@@ -1238,6 +1367,14 @@ export default function PengajuanDanaPage() {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {!loading && filteredData.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           )}
         </div>
       </div>
