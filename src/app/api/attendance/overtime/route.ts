@@ -41,8 +41,13 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
     "KEPALA_SALES", "PKL_SALES", "PKL", "PKL_PENGANTARAN",
   ],
   KEPALA_MARKETING: [
-    "MARKETING", "KONTEN",
-    "KEPALA_MARKETING", "PKL_MARKETING", "PKL_KONTEN", "PKL",
+    "MARKETING",
+    "KEPALA_MARKETING", "PKL_MARKETING", "PKL",
+  ],
+  // ✅ NEW — Kepala CC pisah dari Kepala Marketing, ACC lembur & input manual khusus KONTEN
+  KEPALA_CC: [
+    "KONTEN",
+    "KEPALA_CC", "PKL_KONTEN", "PKL",
   ],
   KEPALA_TEKNISI: [
     "TEKNISI", "PENGELOLA_BARANG",
@@ -71,7 +76,7 @@ const PAY_VIEW_ROLES = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
   "KEPALA_PENYEDIA_BARANG", "KEPALA_ONPOINT", "KEPALA_SOTECH",
-  "KEPALA_PENGELOLA_BARANG",
+  "KEPALA_PENGELOLA_BARANG", "KEPALA_CC",
 ];
 
 function isHolidayOvertimeLate(
