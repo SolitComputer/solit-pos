@@ -11,7 +11,7 @@ function db() {
   );
 }
 
-// ── PATCH: approve atau execute pengajuan dana ────────────────────────────────
+// ── PATCH: approve, reject, execute, dsb. untuk pengajuan dana ────────────────
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -25,7 +25,7 @@ export async function PATCH(
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { action?: string; payment_method?: string };
+  let body: { action?: string; payment_method?: string; reason?: string };
   try {
     body = await request.json();
   } catch {
@@ -41,6 +41,21 @@ export async function PATCH(
       return NextResponse.json(
         { success: false, message: "Anda tidak memiliki wewenang untuk menyetujui" },
         { status: 403 }
+      );
+    }
+
+    // ⬅️ Guard: pengajuan yang sudah ditolak tidak bisa langsung di-approve —
+    // harus dibatalkan penolakannya (action "unreject") dulu.
+    const { data: existingForApprove } = await supabase
+      .from("fund_requests")
+      .select("is_rejected")
+      .eq("id", id)
+      .single();
+
+    if (existingForApprove?.is_rejected) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan ini sudah ditolak. Batalkan penolakan dulu sebelum menyetujui." },
+        { status: 400 }
       );
     }
 
@@ -82,6 +97,79 @@ export async function PATCH(
       })
       .eq("id", id)
       .eq("is_executed", false) // tidak bisa un-approve kalau sudah dieksekusi
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Tolak (reject) ────────────────────────────────────────────────────────────
+  // Hanya bisa menolak pengajuan yang belum disetujui & belum dieksekusi.
+  // Alasan penolakan (reason) opsional, dipakai sebagai jejak audit.
+  if (action === "reject") {
+    if (!FUND_APPROVER_IDS.includes(userId)) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang untuk menolak" },
+        { status: 403 }
+      );
+    }
+
+    const { data: existing } = await supabase
+      .from("fund_requests")
+      .select("is_approved, is_executed")
+      .eq("id", id)
+      .single();
+
+    if (existing?.is_approved || existing?.is_executed) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan yang sudah disetujui/dieksekusi tidak bisa ditolak" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_rejected: true,
+        rejected_by_id: userId,
+        rejected_by_name: userName,
+        rejected_at: new Date().toISOString(),
+        rejection_reason: body.reason?.trim() || null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Batal Tolak (un-reject) ────────────────────────────────────────────────────
+  if (action === "unreject") {
+    if (!FUND_APPROVER_IDS.includes(userId)) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang" },
+        { status: 403 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_rejected: false,
+        rejected_by_id: null,
+        rejected_by_name: null,
+        rejected_at: null,
+        rejection_reason: null,
+      })
+      .eq("id", id)
       .select()
       .single();
 
@@ -238,7 +326,7 @@ export async function DELETE(
     return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
   }
 
-  // ⬅️ BARU: sudah direalisasi ke Cashflow — jangan biarkan pengajuannya dihapus,
+  // ⬅️ Sudah direalisasi ke Cashflow — jangan biarkan pengajuannya dihapus,
   // supaya entry Cashflow yang sudah tercatat tidak jadi yatim (source_id
   // menunjuk ke pengajuan yang sudah tidak ada). Berlaku untuk SEMUA role,
   // termasuk Admin/Programmer.
