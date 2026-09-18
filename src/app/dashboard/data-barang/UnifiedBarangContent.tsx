@@ -78,8 +78,14 @@ const Dash = () => <span className="text-zinc-300">-</span>;
 // yang field `type`-nya kepencet beda kapital/ada spasi nyempil (mis. hasil
 // insert sebelum form Tambah Kategori disederhanakan) TETAP kehitung Aksesoris,
 // bukan malah "hilang" dari kedua filter sekaligus.
-function isLaptopCategoryType(type?: string | null): boolean {
-    return (type ?? "").trim().toUpperCase() === "LAPTOP";
+function isLaptopCategoryType(type?: string | null, name?: string | null): boolean {
+    const t = (type ?? "").trim().toUpperCase();
+    if (t === "LAPTOP" || t === "PC") return true;
+    // Kategori "PC" dibuat lewat modal Tambah Kategori yang TIDAK punya input
+    // Tipe — kolom `type` di database untuk kategori ini hampir pasti kosong.
+    // Fallback: cek NAMA kategori juga, supaya kategori bernama persis "PC"
+    // tetap dianggap Laptop.
+    return (name ?? "").trim().toUpperCase() === "PC";
 }
 
 // TTL audit BEDA antara laptop (2 hari) & aksesoris (3 hari) — ini business
@@ -754,7 +760,7 @@ export default function UnifiedBarangContent() {
     // aksesoris & sebaliknya. Transition-safe: kategori tanpa `type` (mis. migrasi
     // belum jalan) tetap ikut muncul di kedua tipe — persis perilaku lama.
     const laptopCategories = useMemo(
-        () => categories.filter(c => isLaptopCategoryType(c.type)),
+        () => categories.filter(c => isLaptopCategoryType(c.type, c.name)),
         [categories],
     );
     // Sebelumnya strict `c.type === "AKSESORIS"` — kategori dengan nilai type
@@ -763,7 +769,7 @@ export default function UnifiedBarangContent() {
     // Sekarang: apa pun yang BUKAN Laptop otomatis kehitung layak dipakai untuk
     // Aksesoris.
     const accessoryCategories = useMemo(
-        () => categories.filter(c => !isLaptopCategoryType(c.type)),
+        () => categories.filter(c => !isLaptopCategoryType(c.type, c.name)),
         [categories],
     );
     // Dipakai KHUSUS di dropdown Master Kategori pada mode CREATE — supaya
@@ -771,7 +777,7 @@ export default function UnifiedBarangContent() {
     // ber-type "LAPTOP" dari situ (backend juga akan menolak, ini cuma
     // supaya UI-nya tidak menyesatkan).
     const creatableCategories = useMemo(
-        () => categories.filter(c => (isLaptopCategoryType(c.type) ? canCreateLaptop : canCreateAcc)),
+        () => categories.filter(c => (isLaptopCategoryType(c.type, c.name) ? canCreateLaptop : canCreateAcc)),
         [categories, canCreateLaptop, canCreateAcc],
     );
     // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
@@ -1228,8 +1234,8 @@ export default function UnifiedBarangContent() {
     // Umum/null) → form Aksesoris. Ini satu-satunya tempat yang masih peduli
     // pada field `type` di tabel categories — sudah tidak diekspos lagi
     // sebagai pilihan terpisah ke user.
-    const inferTipeFromCategory = (cat?: { type?: string | null }): ItemType =>
-        isLaptopCategoryType(cat?.type) ? "LAPTOP" : "AKSESORIS";
+    const inferTipeFromCategory = (cat?: { type?: string | null; name?: string }): ItemType =>
+        isLaptopCategoryType(cat?.type, cat?.name) ? "LAPTOP" : "AKSESORIS";
 
     const handleCategoryPick = (categoryId: string) => {
         setSelectedCategoryId(categoryId);
