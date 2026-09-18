@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
-import { UserRole } from "@/lib/permissions";
+import { UserRole, ACCESSORY_AUDIT_ROLES } from "@/lib/permissions";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -11,8 +11,8 @@ interface Props {
 // Harus SAMA dengan AUDIT_TTL_MS di AccessoriesContent.tsx (auto-reset 3 hari).
 const AUDIT_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
-// Audit HANYA boleh dilakukan/dibatalkan oleh ADMIN (dibatasi — sebelumnya ikut CREATE_ROLES)
-const AUDIT_ROLES: UserRole[] = ["ADMIN"];
+// Audit boleh dilakukan/dibatalkan oleh role yang ada di ACCESSORY_AUDIT_ROLES
+// (ADMIN & ACCOUNTING) — didefinisikan terpusat di src/lib/permissions.ts
 
 // Boleh lihat riwayat audit (samain dgn ALLOWED_ROLES di route accessories)
 const AUDIT_VIEW_ROLES: UserRole[] = [
@@ -120,4 +120,4 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
 }
 
 export const GET = withAuth(getHandler, AUDIT_VIEW_ROLES);
-export const PATCH = withAuth(patchHandler, AUDIT_ROLES);
+export const PATCH = withAuth(patchHandler, ACCESSORY_AUDIT_ROLES);
