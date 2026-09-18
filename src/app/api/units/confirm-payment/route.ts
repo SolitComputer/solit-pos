@@ -518,6 +518,72 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
           ? transaction.unit_ids[0]
           : null);
 
+      // FIX: transaksi aksesoris manual-stock (SSD/RAM/Charger dst — tanpa SN
+      // per unit, sesuai keputusan fitur Kelola Unit Aksesoris) TIDAK PERNAH
+      // punya unit_id/unit_ids, dan serial_number-nya sengaja "-" (lihat
+      // transaction/create). Stoknya sudah dikurangi via
+      // decrement_accessory_stock saat transaksi dibuat, jadi di sini cukup
+      // ubah status ke PAID — TIDAK boleh dipaksa cari laptop_units, karena
+      // memang tidak pernah ada.
+      const isAccessoryOnly =
+        !targetUnitId &&
+        (transaction.item_kind === "accessory" || transaction.serial_number === "-");
+
+      if (isAccessoryOnly) {
+        const { data: updatedTx, error: updateErr } = await supabaseAdmin
+          .from("transactions")
+          .update({
+            status: "PAID",
+            deal_price: newDealTotal,
+            amount: newDealTotal,
+            dp_amount: newDealTotal,
+            paid_at: now,
+            payment_photo: payment_photo || transaction.payment_photo,
+            last_edited_by: user.name,
+            last_edited_at: now,
+          })
+          .eq("invoice_number", invoice_number)
+          .eq("status", transaction.status)
+          .select()
+          .maybeSingle();
+
+        if (updateErr) {
+          console.error("[confirm-payment] gagal update status PAID (aksesoris):", updateErr.message);
+          return NextResponse.json({ success: false, message: "Gagal konfirmasi pembayaran: " + updateErr.message }, { status: 500 });
+        }
+        if (!updatedTx) {
+          return NextResponse.json(
+            { success: false, message: "Transaksi ini sudah diproses (mungkin bersamaan dengan permintaan lain). Silakan refresh." },
+            { status: 409 }
+          );
+        }
+
+        if (finalPayment > 0) {
+          const { error: payErr } = await supabaseAdmin.from("transaction_payments").insert({
+            transaction_id: transaction.id,
+            invoice_number,
+            amount: finalPayment,
+            payment_type: "PELUNASAN",
+            payment_method: payment_method || transaction.payment_method || null,
+            created_by_name: user.name,
+          });
+          if (payErr) console.error("[confirm-payment] gagal catat pelunasan (aksesoris):", payErr.message);
+        }
+
+        await logActivity({
+          userId: user.id, userName: user.name, userRole: user.role,
+          action: "EDIT", entity: "transaction", entityId: transaction.id,
+          entityLabel: `${invoice_number} — KONFIRMASI LUNAS (aksesoris, tanpa unit)`,
+          beforeData: transaction, afterData: updatedTx,
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: "Pembayaran dikonfirmasi",
+          invoice_number,
+        });
+      }
+
       let unit: { id: string; laptop_id: string; status: string; serial_number: string } | null = null;
 
       if (targetUnitId) {
