@@ -31,6 +31,13 @@ function TypeBadge({ type }: { type?: string | null }) {
             </span>
         );
     }
+    if (type === "PC") {
+        return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-indigo-600 text-white">
+                PC
+            </span>
+        );
+    }
     if (type === "SPAREPART") {
         return (
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-200">
@@ -290,6 +297,7 @@ function CategoryFormModal({
 }) {
     const isEdit = !!category;
     const [name, setName] = useState(category?.name ?? "");
+    const [type, setType] = useState(category?.type ?? "");
     const [submitting, setSubmitting] = useState(false);
 
     const handleSubmit = async () => {
@@ -304,6 +312,7 @@ function CategoryFormModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     name: name.trim(),
+                    type: type || null,
                 }),
             });
             const json = await res.json();
@@ -333,7 +342,7 @@ function CategoryFormModal({
                     </button>
                 </div>
 
-                                <div className="p-5 space-y-4">
+                <div className="p-5 space-y-4">
                     <div>
                         <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Nama Kategori</label>
                         <input
@@ -343,6 +352,22 @@ function CategoryFormModal({
                             className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
                             autoFocus
                         />
+                    </div>
+                    <div>
+                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Tipe Kategori</label>
+                        <select
+                            value={type ?? ""}
+                            onChange={e => setType(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                        >
+                            <option value="">Semua / Umum (Aksesoris)</option>
+                            <option value="LAPTOP">Laptop</option>
+                            <option value="PC">PC</option>
+                            <option value="SPAREPART">Sparepart</option>
+                        </select>
+                        <p className="mt-1 text-[11px] text-gray-400">
+                            Laptop &amp; PC menampilkan form spek (CPU/RAM/dll). Selain itu dianggap Aksesoris.
+                        </p>
                     </div>
                 </div>
 
