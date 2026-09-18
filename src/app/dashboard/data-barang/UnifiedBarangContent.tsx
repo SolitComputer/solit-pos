@@ -385,12 +385,16 @@ function ConvertToAccessoryModal({
     row, categories, onClose, onConfirm, loading,
 }: {
     row: UnifiedRow;
-    categories: { id: string; name: string }[];
+    categories: { id: string; name: string; type?: string | null }[];
     onClose: () => void;
     onConfirm: (categoryName: string) => void;
     loading: boolean;
 }) {
     const [categoryName, setCategoryName] = useState("");
+    const selectedCategory = categories.find(c => c.name === categoryName);
+    const targetIsLaptopFamily = selectedCategory ? isLaptopCategoryType(selectedCategory.type, selectedCategory.name) : false;
+    const laptopPcOptions = categories.filter(c => isLaptopCategoryType(c.type, c.name));
+    const accessoryOnlyOptions = categories.filter(c => !isLaptopCategoryType(c.type, c.name));
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !loading && onClose()} />
@@ -402,7 +406,11 @@ function ConvertToAccessoryModal({
                 </div>
                 <div className="p-5">
                     <p className="text-xs text-zinc-500 mb-3">
-                        Barang ini akan dipindahkan dari <b>Laptop</b> menjadi <b>Aksesoris</b> dengan kategori di bawah. Data laptop lama akan dihapus permanen.
+                        {categoryName === ""
+                            ? "Pilih kategori tujuan yang benar untuk barang ini."
+                            : targetIsLaptopFamily
+                                ? "Barang tetap tersimpan sebagai Laptop/PC — hanya kategorinya yang diperbarui, data spek (CPU/RAM/dll) tetap aman."
+                                : <>Barang ini akan dipindahkan dari <b>Laptop</b> menjadi <b>Aksesoris</b>. Data spek laptop lama (CPU/RAM/dll) akan dihapus permanen.</>}
                     </p>
                     <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
                         Kategori Tujuan
@@ -414,14 +422,23 @@ function ConvertToAccessoryModal({
                         className="w-full h-10 border border-zinc-200 rounded-xl px-3 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400"
                     >
                         <option value="">-- Pilih Kategori --</option>
-                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        {laptopPcOptions.length > 0 && (
+                            <optgroup label="Laptop / PC">
+                                {laptopPcOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </optgroup>
+                        )}
+                        {accessoryOnlyOptions.length > 0 && (
+                            <optgroup label="Aksesoris">
+                                {accessoryOnlyOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </optgroup>
+                        )}
                     </select>
                     <div className="flex gap-3 mt-5">
                         <button onClick={onClose} disabled={loading} className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 transition disabled:opacity-50">Batal</button>
                         <button onClick={() => categoryName && onConfirm(categoryName)} disabled={loading || !categoryName}
                             className="flex-1 h-10 bg-amber-600 text-white rounded-xl text-sm font-semibold hover:bg-amber-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
                             {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                            Konversi
+                            {targetIsLaptopFamily ? "Simpan" : "Konversi"}
                         </button>
                     </div>
                 </div>
@@ -948,7 +965,7 @@ export default function UnifiedBarangContent() {
                     if (units.length === 0) {
                         // Model belum punya unit sama sekali — tetap 1 baris, SN kosong
                         exportRows.push({
-                            No: no++, Tipe: "Laptop", "Nama Barang": row.nama,
+                            No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
                             Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                             CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
                             SN: "-", "Status Unit": "-",
@@ -961,7 +978,7 @@ export default function UnifiedBarangContent() {
 
                     units.forEach((u) => {
                         exportRows.push({
-                            No: no++, Tipe: "Laptop", "Nama Barang": row.nama,
+                            No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
                             Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                             CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
                             SN: u.serial_number, "Status Unit": u.status,
@@ -976,7 +993,7 @@ export default function UnifiedBarangContent() {
                 } else {
                     const acc = row.raw as AccessoryRaw;
                     exportRows.push({
-                        No: no++, Tipe: "Aksesoris", "Nama Barang": row.nama,
+                        No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
                         Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                         CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
                         SN: "-", "Status Unit": "-",
@@ -1102,22 +1119,36 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    // ── Konversi Laptop → Aksesoris (perbaikan data yang salah tipe) ───────
+    // ── Perbaiki Tipe: kategori tujuan Laptop/PC → cukup ganti category_id
+    // (tetap di tabel laptops, spek aman). Kategori tujuan Aksesoris → tetap
+    // pindah ke tabel accessories lewat convert-to-accessory (perilaku lama).
     const convertToAccessory = async (categoryName: string) => {
         if (!convertTarget) return;
+        const targetCategory = categories.find(c => c.name === categoryName);
+        const targetIsLaptopFamily = isLaptopCategoryType(targetCategory?.type, targetCategory?.name);
         setConverting(true);
         try {
-            const res = await fetch(`/api/laptops/${convertTarget.id}/convert-to-accessory`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ category: categoryName }),
-            });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.error || "Gagal mengonversi barang");
-            toast.success("Barang berhasil dipindahkan ke Aksesoris");
+            if (targetIsLaptopFamily) {
+                const res = await fetch(`/api/laptops/${convertTarget.id}`, {
+                    method: "PUT", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ category_id: targetCategory?.id ?? null }),
+                });
+                const json = await res.json();
+                if (!json.success) throw new Error(json.message || "Gagal memindahkan kategori");
+                toast.success("Kategori berhasil diperbarui");
+            } else {
+                const res = await fetch(`/api/laptops/${convertTarget.id}/convert-to-accessory`, {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ category: categoryName }),
+                });
+                const json = await res.json();
+                if (!json.success) throw new Error(json.error || "Gagal mengonversi barang");
+                toast.success("Barang berhasil dipindahkan ke Aksesoris");
+            }
             setConvertTarget(null);
             fetchAll();
         } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Gagal mengonversi barang");
+            toast.error(e instanceof Error ? e.message : "Gagal memperbarui tipe barang");
         } finally {
             setConverting(false);
         }
@@ -2131,7 +2162,7 @@ export default function UnifiedBarangContent() {
             {convertTarget && (
                 <ConvertToAccessoryModal
                     row={convertTarget}
-                    categories={accessoryCategories}
+                    categories={categories}
                     loading={converting}
                     onClose={() => { if (!converting) setConvertTarget(null); }}
                     onConfirm={convertToAccessory}
