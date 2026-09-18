@@ -26,6 +26,11 @@ interface FundRequest {
   executed_by_id: string | null;
   executed_by_name: string | null;
   executed_at: string | null;
+  is_rejected: boolean;
+  rejected_by_id: string | null;
+  rejected_by_name: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
   created_at: string;
   realisasi_cashflow_id: string | null;
   realisasi_nominal: number | null;
@@ -43,6 +48,7 @@ type StatusFilter =
   | "all"
   | "approved"
   | "not_approved"
+  | "rejected"
   | "executed"
   | "not_executed"
   | "realized"
@@ -87,7 +93,7 @@ function formatDateTime(iso: string | null): string {
 /* ════════════════════════════════════════════════════════════════════════════
  *  STATUS BADGE
  * ════════════════════════════════════════════════════════════════════════════ */
-function StatusPill({ approved, executed }: { approved: boolean; executed: boolean }) {
+function StatusPill({ approved, executed, rejected }: { approved: boolean; executed: boolean; rejected: boolean }) {
   if (executed) {
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/80">
@@ -101,6 +107,14 @@ function StatusPill({ approved, executed }: { approved: boolean; executed: boole
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-600 border border-blue-200/80">
         <CheckCheck className="w-3 h-3" />
         Disetujui
+      </span>
+    );
+  }
+  if (rejected) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200/80">
+        <X className="w-3 h-3" />
+        Ditolak
       </span>
     );
   }
@@ -500,6 +514,76 @@ function EditMetodeModal({
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  REJECT MODAL — tolak pengajuan yang belum disetujui, alasan opsional
+ * ════════════════════════════════════════════════════════════════════════════ */
+function RejectModal({
+  fundRequest, onClose, onSaved,
+}: {
+  fundRequest: FundRequest;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pengajuan-dana/${fundRequest.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject", reason: reason.trim() || undefined }),
+      });
+      const json = await res.json();
+      if (!json.success) { toast.error(json.message || "Gagal menolak pengajuan"); return; }
+      toast.success("Pengajuan berhasil ditolak");
+      onSaved();
+      onClose();
+    } catch { toast.error("Terjadi kesalahan koneksi"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        <div className="h-1 bg-gradient-to-r from-rose-400 to-red-500" />
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center"><X size={16} /></div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">Tolak Pengajuan Dana</p>
+              <p className="text-[11px] text-slate-400 line-clamp-1 max-w-[220px]">{fundRequest.purpose}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-2">
+          <label className="block text-xs font-bold text-slate-700 mb-1">Alasan Penolakan <span className="text-slate-400 font-normal">(opsional)</span></label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder="Contoh: Belum mendesak, ajukan lagi bulan depan"
+            className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-400/15 focus:bg-white transition-all resize-none placeholder:text-slate-400"
+          />
+        </div>
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 bg-slate-50/60">
+          <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition disabled:opacity-50">Batal</button>
+          <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition disabled:opacity-60">{saving ? "Menyimpan..." : "Tolak Pengajuan"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  REALISASI MODAL — isi realisasi setelah pengajuan dieksekusi, otomatis
  *  sinkron ke Cashflow (Uang Keluar) lewat /api/pengajuan-dana/[id]/realisasi
  * ════════════════════════════════════════════════════════════════════════════ */
@@ -694,6 +778,15 @@ function DetailModal({
             </div>
           </div>
           <div className="border-t border-slate-100 pt-3 space-y-2.5">
+            {fundRequest.is_rejected && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-500 flex-shrink-0">Ditolak oleh</span>
+                <span className="text-xs font-semibold text-rose-600 text-right">
+                  {fundRequest.rejected_by_name} · {formatDateTime(fundRequest.rejected_at)}
+                  {fundRequest.rejection_reason ? ` — "${fundRequest.rejection_reason}"` : ""}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-slate-500 flex-shrink-0">Disetujui oleh</span>
               <span className="text-xs font-semibold text-slate-700 text-right">
@@ -811,6 +904,7 @@ export default function PengajuanDanaPage() {
   const [detailTarget, setDetailTarget] = useState<FundRequest | null>(null);
   const [realisasiTarget, setRealisasiTarget] = useState<FundRequest | null>(null);
   const [editMetodeTarget, setEditMetodeTarget] = useState<FundRequest | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<FundRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -874,6 +968,7 @@ export default function PengajuanDanaPage() {
       const msgs: Record<string, string> = {
         approve: "Pengajuan disetujui", unapprove: "Persetujuan dibatalkan",
         execute: "Ditandai sudah dieksekusi", unexecute: "Status eksekusi dibatalkan",
+        unreject: "Penolakan dibatalkan",
       };
       toast.success(msgs[action] || "Berhasil");
       fetchData();
@@ -885,6 +980,7 @@ export default function PengajuanDanaPage() {
   const totalRealisasi = data.reduce((s, r) => s + (r.realisasi_nominal ?? 0), 0);
   const totalApproved = data.filter((r) => r.is_approved).length;
   const totalNotApproved = data.length - totalApproved;
+  const totalRejected = data.filter((r) => r.is_rejected).length;
   const totalExecuted = data.filter((r) => r.is_executed).length;
   const totalNotExecuted = data.length - totalExecuted;
   const totalRealized = data.filter((r) => r.realisasi_cashflow_id).length;
@@ -893,6 +989,7 @@ export default function PengajuanDanaPage() {
   const filteredData = data.filter((r) => {
     if (statusFilter === "approved" && !r.is_approved) return false;
     if (statusFilter === "not_approved" && r.is_approved) return false;
+    if (statusFilter === "rejected" && !r.is_rejected) return false;
     if (statusFilter === "executed" && !r.is_executed) return false;
     if (statusFilter === "not_executed" && r.is_executed) return false;
     if (statusFilter === "realized" && !r.realisasi_cashflow_id) return false;
@@ -900,7 +997,7 @@ export default function PengajuanDanaPage() {
 
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      const statusText = r.is_executed ? "selesai" : r.is_approved ? "disetujui" : "menunggu";
+      const statusText = r.is_executed ? "selesai" : r.is_approved ? "disetujui" : r.is_rejected ? "ditolak" : "menunggu";
       const haystack = [
         r.requester_name,
         r.purpose,
@@ -934,6 +1031,7 @@ export default function PengajuanDanaPage() {
     { key: "all", label: "Semua", count: data.length, icon: <ClipboardList className="w-3 h-3" /> },
     { key: "approved", label: "Sudah Disetujui", count: totalApproved, icon: <CheckCheck className="w-3 h-3" /> },
     { key: "not_approved", label: "Belum Disetujui", count: totalNotApproved, icon: <Clock className="w-3 h-3" /> },
+    { key: "rejected", label: "Ditolak", count: totalRejected, icon: <X className="w-3 h-3" /> },
     { key: "executed", label: "Sudah Eksekusi", count: totalExecuted, icon: <Banknote className="w-3 h-3" /> },
     { key: "not_executed", label: "Belum Eksekusi", count: totalNotExecuted, icon: <Clock className="w-3 h-3" /> },
     { key: "realized", label: "Sudah Realisasi", count: totalRealized, icon: <CheckCircle2 className="w-3 h-3" /> },
@@ -1255,7 +1353,7 @@ export default function PengajuanDanaPage() {
                         </td>
 
                         <td className="px-4 py-4 text-center">
-                          <StatusPill approved={row.is_approved} executed={row.is_executed} />
+                          <StatusPill approved={row.is_approved} executed={row.is_executed} rejected={row.is_rejected} />
                         </td>
 
                         {/* Persetujui */}
@@ -1276,18 +1374,44 @@ export default function PengajuanDanaPage() {
                               <span className="text-[10px] text-slate-400 max-w-[92px] truncate">{row.approved_by_name}</span>
                               <span className="text-[9px] text-slate-400 max-w-[92px] text-center leading-tight">{formatDateTime(row.approved_at)}</span>
                             </div>
+                          ) : row.is_rejected ? (
+                            <div className="inline-flex flex-col items-center gap-1">
+                              <button
+                                onClick={() => canApprove ? handleAction(row.id, "unreject") : undefined}
+                                disabled={busy || !canApprove}
+                                title={canApprove ? "Batalkan penolakan" : `Ditolak oleh ${row.rejected_by_name}`}
+                                className={`w-8 h-8 rounded-2xl flex items-center justify-center transition-all ${canApprove
+                                  ? "bg-rose-500 text-white shadow-sm shadow-rose-500/30 hover:bg-rose-600 cursor-pointer active:scale-90"
+                                  : "bg-rose-100 text-rose-600 cursor-default"
+                                  }`}
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              <span className="text-[10px] text-slate-400 max-w-[92px] truncate">{row.rejected_by_name}</span>
+                              <span className="text-[9px] text-slate-400 max-w-[92px] text-center leading-tight">{formatDateTime(row.rejected_at)}</span>
+                            </div>
                           ) : canApprove ? (
-                            <button
-                              onClick={() => handleAction(row.id, "approve")}
-                              disabled={busy}
-                              title="Setujui pengajuan"
-                              className="w-8 h-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 flex items-center justify-center mx-auto transition-all hover:scale-110 active:scale-90 disabled:opacity-50"
-                            >
-                              {busy
-                                ? <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-emerald-500 rounded-full animate-spin" />
-                                : <CheckCheck className="w-4 h-4 text-slate-300 group-hover:text-emerald-500" />
-                              }
-                            </button>
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleAction(row.id, "approve")}
+                                disabled={busy}
+                                title="Setujui pengajuan"
+                                className="w-8 h-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 flex items-center justify-center transition-all hover:scale-110 active:scale-90 disabled:opacity-50"
+                              >
+                                {busy
+                                  ? <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-emerald-500 rounded-full animate-spin" />
+                                  : <CheckCheck className="w-4 h-4 text-slate-300 group-hover:text-emerald-500" />
+                                }
+                              </button>
+                              <button
+                                onClick={() => setRejectTarget(row)}
+                                disabled={busy}
+                                title="Tolak pengajuan"
+                                className="w-8 h-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-rose-400 hover:bg-rose-50 flex items-center justify-center transition-all hover:scale-110 active:scale-90 disabled:opacity-50"
+                              >
+                                <X className="w-4 h-4 text-slate-300 group-hover:text-rose-500" />
+                              </button>
+                            </div>
                           ) : (
                             <div className="w-8 h-8 rounded-2xl border-2 border-slate-100 bg-slate-50 mx-auto" />
                           )}
@@ -1399,6 +1523,14 @@ export default function PengajuanDanaPage() {
         <EditMetodeModal
           fundRequest={editMetodeTarget}
           onClose={() => setEditMetodeTarget(null)}
+          onSaved={fetchData}
+        />
+      )}
+
+      {rejectTarget && (
+        <RejectModal
+          fundRequest={rejectTarget}
+          onClose={() => setRejectTarget(null)}
           onSaved={fetchData}
         />
       )}
