@@ -231,6 +231,14 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
     const auditLabel = (e: Entry) =>
         e.is_audited ? `Sudah Audit${e.audited_by_user?.name ? ` (${e.audited_by_user.name})` : ""}` : "Belum Audit";
 
+    // ⬅️ FIX: entry TRANSACTION yang sudah diaudit tapi harga transaksi sumbernya
+    // berubah belakangan (is_stale) harus export pakai harga TERKINI (source_nominal),
+    // disamakan dengan effectiveNominal() yang sudah dipakai buat Saldo & Summary
+    // Card di halaman ini.
+    const effNominal = (e: Entry) =>
+        e.is_stale && e.source_nominal != null ? Number(e.source_nominal) : Number(e.nominal || 0);
+
+
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
     const borderThin: Partial<ExcelJS.Borders> = {
@@ -342,10 +350,10 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
                     ? [i + 1, fmtDateExcel(e.tanggal), sourceLabel(e.source_type),
                     e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" ? (e.created_by_user?.name ?? e.nama) : e.nama,
                     e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel("IN", e.category),
-                    Number(e.nominal || 0), e.keterangan ?? "", auditLabel(e)]
+                    effNominal(e), e.keterangan ?? "", auditLabel(e)]
                     : [i + 1, fmtDateExcel(e.tanggal), sourceLabel(e.source_type),
                     e.created_by_user?.name ?? e.nama, categoryLabel("OUT", e.category),
-                    methodLabel(e.payment_method), Number(e.nominal || 0), e.keterangan ?? "", auditLabel(e)];
+                    methodLabel(e.payment_method), effNominal(e), e.keterangan ?? "", auditLabel(e)];
 
                 const row = ws.addRow(rowValues);
                 row.height = 18;
