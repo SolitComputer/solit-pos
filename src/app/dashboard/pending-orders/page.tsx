@@ -221,6 +221,9 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // FIX: penanda upload paling terakhir — supaya kalau ada 2 upload
+    // overlap, cuma hasil upload TERAKHIR yang boleh kesimpen di state
+    const uploadSeqRef = useRef(0);
     const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
     const [cicilanAmount, setCicilanAmount] = useState("");
     const [confirmSN, setConfirmSN] = useState(tx.serial_number || "");
@@ -300,6 +303,10 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawFile = e.target.files?.[0];
         if (!rawFile) return;
+
+        // FIX: tandai upload ini sebagai yang paling baru
+        const mySeq = ++uploadSeqRef.current;
+
         setUploadingPhoto(true);
         setError("");
         try {
@@ -309,15 +316,26 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
             fd.append("invoice", tx.invoice_number);
             const res = await fetch("/api/receipt/upload-image", { method: "POST", body: fd });
             const r = await res.json();
+
+            // FIX: kalau selama upload ini jalan sudah ada upload BARU yang
+            // dimulai (mySeq bukan lagi yang terakhir), buang hasil ini —
+            // jangan sampai menimpa foto yang lebih baru
+            if (mySeq !== uploadSeqRef.current) return;
+
             if (res.ok && r.url) {
-                setPaymentPhoto(r.url);
+                // FIX: cache-buster — cegah browser/CDN nampilin foto lama
+                // yang ke-cache di URL storage yang sama
+                const bustedUrl = `${r.url}${r.url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+                setPaymentPhoto(bustedUrl);
+                if (fileInputRef.current) fileInputRef.current.value = "";
             } else {
                 setError(r.error || r.message || "Gagal mengupload foto bukti");
             }
         } catch (err: any) {
+            if (mySeq !== uploadSeqRef.current) return;
             setError(err?.message || "Gagal mengupload foto bukti");
         } finally {
-            setUploadingPhoto(false);
+            if (mySeq === uploadSeqRef.current) setUploadingPhoto(false);
         }
     };
 
