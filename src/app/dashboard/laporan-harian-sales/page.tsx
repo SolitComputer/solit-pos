@@ -198,6 +198,7 @@ export default function LaporanHarianSalesPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>("today");
   const [channelFilter, setChannelFilter] = useState<Channel | "ALL">("ALL");
+  const [auditStatusFilter, setAuditStatusFilter] = useState<"all" | "audited" | "unaudited">("all");
   const [listError, setListError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -234,10 +235,10 @@ export default function LaporanHarianSalesPage() {
     fetchEntries(period);
   }, [period, fetchEntries]);
 
-  // Balik ke halaman 1 setiap ganti periode atau tab channel.
+  // Balik ke halaman 1 setiap ganti periode, tab channel, atau filter status audit.
   useEffect(() => {
     setCurrentPage(1);
-  }, [period, channelFilter]);
+  }, [period, channelFilter, auditStatusFilter]);
 
   // Statistik ringkas dari data yang sedang tampil (sesuai periode aktif, semua channel).
   const stats = useMemo(() => {
@@ -255,10 +256,20 @@ export default function LaporanHarianSalesPage() {
     return map;
   }, [entries]);
 
+  // Jumlah laporan sudah/belum diaudit — dipakai untuk badge angka di pill
+  // filter status audit & kartu ringkasan "Diaudit". Dihitung dari semua
+  // channel (sesuai periode aktif), sama seperti channelCounts di atas.
+  const auditStats = useMemo(() => {
+    const audited = entries.filter((e) => e.audited).length;
+    return { audited, unaudited: entries.length - audited };
+  }, [entries]);
+
   const filteredEntries = useMemo(() => {
-    if (channelFilter === "ALL") return entries;
-    return entries.filter((e) => e.channel === channelFilter);
-  }, [entries, channelFilter]);
+    let result = channelFilter === "ALL" ? entries : entries.filter((e) => e.channel === channelFilter);
+    if (auditStatusFilter === "audited") result = result.filter((e) => e.audited);
+    else if (auditStatusFilter === "unaudited") result = result.filter((e) => !e.audited);
+    return result;
+  }, [entries, channelFilter, auditStatusFilter]);
 
   // Potongan data untuk halaman aktif.
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / ROWS_PER_PAGE));
@@ -514,7 +525,7 @@ export default function LaporanHarianSalesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2.5 sm:gap-3 flex-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 flex-1">
               <StatCard
                 label="Total Laporan"
                 value={stats.total}
@@ -542,6 +553,14 @@ export default function LaporanHarianSalesPage() {
                 icon={XCircle}
                 iconClass="bg-gray-100 text-gray-500"
                 accentClass="from-gray-300 to-gray-200"
+              />
+              <StatCard
+                label="Diaudit"
+                value={auditStats.audited}
+                caption={`dari ${stats.total} laporan`}
+                icon={ShieldCheck}
+                iconClass="bg-fuchsia-50 text-fuchsia-600"
+                accentClass="from-fuchsia-400 to-fuchsia-300"
               />
             </div>
           </div>
@@ -906,6 +925,45 @@ export default function LaporanHarianSalesPage() {
             <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent sm:hidden" />
           </div>
 
+          {/* Filter status audit — biar ketauan berapa laporan yang sudah &
+              belum diaudit tanpa hitung manual. Filter ini jalan bareng tab
+              channel di atas, semua di sisi client (tidak nambah request API). */}
+          <div className="px-4 sm:px-5 py-2.5 border-b border-gray-100 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+            <button
+              onClick={() => setAuditStatusFilter("all")}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${
+                auditStatusFilter === "all" ? "bg-fuchsia-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              Semua Status
+              <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${auditStatusFilter === "all" ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"}`}>
+                {stats.total}
+              </span>
+            </button>
+            <button
+              onClick={() => setAuditStatusFilter("audited")}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${
+                auditStatusFilter === "audited" ? "bg-fuchsia-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              <ShieldCheck className="w-3 h-3" /> Sudah Diaudit
+              <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${auditStatusFilter === "audited" ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"}`}>
+                {auditStats.audited}
+              </span>
+            </button>
+            <button
+              onClick={() => setAuditStatusFilter("unaudited")}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${
+                auditStatusFilter === "unaudited" ? "bg-fuchsia-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              Belum Diaudit
+              <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${auditStatusFilter === "unaudited" ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"}`}>
+                {auditStats.unaudited}
+              </span>
+            </button>
+          </div>
+
           {listError && (
             <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-4 sm:px-5 py-3">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -931,16 +989,20 @@ export default function LaporanHarianSalesPage() {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 flex items-center justify-center mb-3 ring-1 ring-violet-100/60">
                 <Inbox className="w-6 h-6 text-violet-300" />
               </div>
-              <p className="text-sm font-medium text-gray-700">Belum ada laporan untuk filter ini</p>
-              <p className="text-xs text-gray-400 mt-1 max-w-[220px]">
-                Laporan leads yang kamu catat akan muncul di sini.
+              <p className="text-sm font-medium text-gray-700">
+                {entries.length === 0 ? "Belum ada laporan pada periode ini" : "Tidak ada laporan yang cocok dengan filter ini"}
               </p>
-              <button
-                onClick={openAddModal}
-                className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 hover:gap-2 transition-all focus:outline-none"
-              >
-                <Plus className="w-3.5 h-3.5" /> Tambah laporan pertama
-              </button>
+              <p className="text-xs text-gray-400 mt-1 max-w-[220px]">
+                {entries.length === 0 ? "Laporan leads yang kamu catat akan muncul di sini." : "Coba ganti channel atau filter status audit di atas."}
+              </p>
+              {entries.length === 0 && (
+                <button
+                  onClick={openAddModal}
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 hover:gap-2 transition-all focus:outline-none"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Tambah laporan pertama
+                </button>
+              )}
             </div>
           ) : (
             <>
