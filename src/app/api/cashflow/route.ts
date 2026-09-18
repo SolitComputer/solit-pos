@@ -23,8 +23,6 @@ function getAdmin(): SupabaseClient {
 const jakartaDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
-const CASHFLOW_HOLD_UNTIL_PAID_CUTOFF_ISO = "2026-08-10T00:00:00+07:00";
-const CASHFLOW_HOLD_UNTIL_PAID_CUTOFF = new Date(CASHFLOW_HOLD_UNTIL_PAID_CUTOFF_ISO);
 
 function getJoinedName(joined: any): string | null {
     if (!joined) return null;
@@ -107,15 +105,15 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
         .in("invoice_number", transactions.map((t: any) => t.invoice_number as string));
     const invoicesWithPayments = new Set((paidInvoicesWithPayments ?? []).map((p: any) => p.invoice_number as string));
 
-    // Transaksi BARU (dibuat >= cutoff) selalu di-sync PENUH sekali di sini saat PAID,
-    // meskipun sempat ada baris transaction_payments (DP/cicilan) — karena baris itu
-    // sengaja TIDAK disinkronkan lagi ke Cashflow (lihat syncTransactionPaymentEntries).
-    // Transaksi LAMA (dibuat < cutoff) tetap pakai aturan lama: kalau sudah pernah
-    // tercatat sebagian lewat transaction_payments, jangan dobel-hitung di sini.
-    const transactionsToSync = (transactions as any[]).filter((t) => {
-        if (new Date(t.created_at as string) >= CASHFLOW_HOLD_UNTIL_PAID_CUTOFF) return true;
-        return !invoicesWithPayments.has(t.invoice_number as string);
-    });
+    // ✅ FIX: dulu transaksi BARU (dibuat >= cutoff) SELALU di-sync PENUH saat PAID
+    // walau sudah ada baris transaction_payments (DP/cicilan). Sekarang DP/cicilan
+    // SELALU disinkronkan begitu terjadi (lihat syncLegacyDpEntries &
+    // syncTransactionPaymentEntries), jadi aturan skip-nya disamakan utk semua
+    // transaksi: kalau invoice sudah tercatat sebagian lewat transaction_payments,
+    // jangan dobel-hitung lagi di sini saat status jadi PAID.
+    const transactionsToSync = (transactions as any[]).filter(
+        (t) => !invoicesWithPayments.has(t.invoice_number as string)
+    );
     if (transactionsToSync.length === 0) return;
 
     const invoices = transactionsToSync.map((t: any) => t.invoice_number as string);
@@ -289,8 +287,10 @@ async function syncLegacyDpEntries(supabase: SupabaseClient) {
         .from("transactions")
         .select("id, invoice_number, customer_name, sales_name, laptop_name, dp_amount, status, created_at")
         .in("status", ["RESERVED", "HELD", "PACKING"])
-        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`)
-        .lt("created_at", CASHFLOW_HOLD_UNTIL_PAID_CUTOFF_ISO);
+        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
+        // ✅ FIX: dulu ada .lt("created_at", CASHFLOW_HOLD_UNTIL_PAID_CUTOFF_ISO) di sini,
+        // jadi transaksi DP yang dibuat >= 10 Agu 2026 tidak pernah ikut ke-backfill.
+        // Filter cutoff dihapus — berlaku utk SEMUA transaksi DP/Ambil-Dulu/Packing.
 
     if (error) {
         console.error("[cashflow sync] fetch legacy DP transactions error:", error.message);
@@ -372,14 +372,12 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
         (txRows ?? []).map((t: any) => [t.invoice_number as string, t])
     );
 
-    const missingForLegacyOnly = missing.filter((p: any) => {
-        const info = txInfoMap.get(p.invoice_number as string);
-        if (!info?.created_at) return true;
-        return new Date(info.created_at) < CASHFLOW_HOLD_UNTIL_PAID_CUTOFF;
-    });
-    if (missingForLegacyOnly.length === 0) return;
+    // ✅ FIX: dulu di sini di-filter ke missingForLegacyOnly (cuma transaksi dibuat
+    // < 10 Agu 2026), jadi DP/cicilan transaksi BARU tidak pernah masuk Cashflow.
+    // Sekarang SEMUA transaction_payments yang belum tercatat ikut disinkronkan.
+    if (missing.length === 0) return;
 
-    const toInsert = missingForLegacyOnly
+    const toInsert = missing
         .map((p: any) => {
             const info = txInfoMap.get(p.invoice_number as string);
             return buildPaymentPayload(p, info?.customer_name ?? "—", info?.sales_name ?? "Sales", info?.laptop_name ?? "");
