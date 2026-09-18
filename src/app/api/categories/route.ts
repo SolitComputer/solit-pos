@@ -18,7 +18,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const { data, error } = await supabase
       .from("laptop_categories")
-      .select("*")
+      .select("*") 
       .order("name", { ascending: true });
 
     if (error) {

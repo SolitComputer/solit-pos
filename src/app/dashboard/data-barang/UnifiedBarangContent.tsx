@@ -780,6 +780,15 @@ export default function UnifiedBarangContent() {
         () => categories.filter(c => (isLaptopCategoryType(c.type, c.name) ? canCreateLaptop : canCreateAcc)),
         [categories, canCreateLaptop, canCreateAcc],
     );
+    // Kategori "PC" masuk keluarga LAPTOP (form & tabelnya sama), tapi label
+    // teks di modal (judul, "Nama Laptop") harus beda — dicek terpisah dari
+    // selectedCategoryId supaya "Tambah Laptop" vs "Tambah PC" akurat.
+    const selectedCategoryIsPc = useMemo(() => {
+        const cat = categories.find(c => c.id === selectedCategoryId);
+        if (!cat) return false;
+        if ((cat.type ?? "").trim().toUpperCase() === "PC") return true;
+        return (cat.name ?? "").trim().toUpperCase() === "PC";
+    }, [categories, selectedCategoryId]);
     // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
     const filterCategories = tipeFilter === "LAPTOP" ? laptopCategories
         : tipeFilter === "AKSESORIS" ? accessoryCategories
@@ -2005,7 +2014,7 @@ export default function UnifiedBarangContent() {
                         <div className="h-0.5 w-full bg-gradient-to-r from-zinc-300 via-zinc-600 to-black" />
                         <div className="px-5 sm:px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
                             <h2 className="font-bold text-zinc-900 text-[15px]">
-                                {formModal.mode === "edit" ? "Edit" : "Tambah"} {formModal.tipe === "LAPTOP" ? "Laptop" : formModal.tipe === "AKSESORIS" ? "Aksesori" : "Barang"}
+                                {formModal.mode === "edit" ? "Edit" : "Tambah"} {formModal.tipe === "LAPTOP" ? (selectedCategoryIsPc ? "PC" : "Laptop") : formModal.tipe === "AKSESORIS" ? "Aksesori" : "Barang"}
                             </h2>
                             <button onClick={closeForm} className="text-zinc-400 hover:text-zinc-700">✕</button>
                         </div>
@@ -2050,7 +2059,7 @@ export default function UnifiedBarangContent() {
                                 </p>
                             ) : formModal.tipe === "LAPTOP" ? (
                                 <>
-                                    <Field label="Nama Laptop" required>
+                                    <Field label={selectedCategoryIsPc ? "Nama PC" : "Nama Laptop"} required>
                                         <input className={inputCls} value={laptopForm.laptop_name} onChange={e => setLaptopForm(p => ({ ...p, laptop_name: e.target.value }))} />
                                     </Field>
                                     <div className="grid grid-cols-2 gap-3">
