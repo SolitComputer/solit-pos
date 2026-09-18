@@ -1245,3 +1245,4 @@ export const ACCESSORY_DELETE_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "TEKNISI", "KEPALA_TEKNISI",
 ];
+export const ACCESSORY_AUDIT_ROLES: UserRole[] = ["ADMIN", "ACCOUNTING"];
