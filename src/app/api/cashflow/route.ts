@@ -118,6 +118,20 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
 
     const invoices = transactionsToSync.map((t: any) => t.invoice_number as string);
 
+    // ✅ FIX: sebelumnya nominal TRANSACTION_DP yang sudah tercatat (lihat syncLegacyDpEntries)
+    // tidak pernah dicek di sini, jadi begitu transaksi jadi PAID, insert-nya pakai deal_price
+    // FULL — padahal DP-nya sudah masuk & diaudit duluan sebagai entry terpisah. Efeknya
+    // dobel-hitung ("transaksi sudah diaudit kok muncul lagi"). Map ini dipakai buat
+    // mengurangi nominal yang akan di-insert dengan DP yang sudah tercatat.
+    const { data: legacyDpEntries } = await supabase
+        .from("cashflow_entries")
+        .select("source_id, nominal")
+        .eq("source_type", "TRANSACTION_DP")
+        .in("source_id", invoices);
+    const dpNominalMap = new Map<string, number>(
+        (legacyDpEntries ?? []).map((e: any) => [e.source_id as string, Number(e.nominal ?? 0)])
+    );
+
     const { data: existing } = await supabase
         .from("cashflow_entries")
         .select("id, source_id, nominal, nama, keterangan, tanggal, category, is_audited")
@@ -133,6 +147,15 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
 
     for (const t of transactionsToSync) {
         const desired = buildTxPayload(t);
+
+        // ✅ FIX: kurangi dengan DP yang sudah tercatat (TRANSACTION_DP) supaya yang
+        // masuk cuma SISA pelunasan, bukan deal_price utuh. Kalau DP == deal_price
+        // (lunas lewat DP doang), nominal jadi 0 → otomatis di-skip, tidak ada entry baru.
+        const dpAlready = dpNominalMap.get(t.invoice_number as string) ?? 0;
+        if (dpAlready > 0) {
+            desired.nominal = Math.max(0, desired.nominal - dpAlready);
+        }
+
         if (desired.nominal <= 0 || desired.tanggal < CASHFLOW_START_DATE) continue;
 
         const cur = existingMap.get(t.invoice_number as string);
