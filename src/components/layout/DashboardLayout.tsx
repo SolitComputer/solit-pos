@@ -99,8 +99,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SellerReminderNotifier userId={isSilentAdmin ? null : soundUserId} />
         <ReminderPopupModal userId={soundUserId} />
         <PatchNoteFab />
-        <PengajuanDanaNotifier userRoles={authUserRoles} />
-
+        <PengajuanDanaNotifier userRoles={authUserRoles} userId={soundUserId} />
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}
           <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0 sticky top-0 z-30">
