@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
@@ -14,12 +15,12 @@ export default function EditablePriceCell({
     onSaved: (unitId: string, newPrice: number) => void;
 }) {
     const [editing, setEditing] = useState(false);
-    const [inputVal, setInputVal] = useState(String(value));
+    const [inputVal, setInputVal] = useState(value);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
     useEffect(() => {
-        if (!editing) setInputVal(String(value));
+        if (!editing) setInputVal(value);
     }, [value, editing]);
 
     const handleSave = async () => {
@@ -27,7 +28,7 @@ export default function EditablePriceCell({
         // cepat (termasuk key-repeat) bisa memanggil handleSave sebelum state
         // `saving` sempat re-render, jadi beberapa PATCH terkirim sekaligus.
         if (saving) return;
-        const parsed = Math.round(Number(inputVal.replace(/\./g, "").replace(/,/g, "")));
+        const parsed = Math.round(inputVal);
         if (!Number.isFinite(parsed) || parsed < 0) {
             setError("Nominal tidak valid");
             return;
@@ -59,11 +60,11 @@ export default function EditablePriceCell({
         }
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter") handleSave();
         if (e.key === "Escape") {
             setEditing(false);
-            setInputVal(String(value));
+            setInputVal(value);
             setError("");
         }
     };
@@ -72,14 +73,12 @@ export default function EditablePriceCell({
         return (
             <div className="flex flex-col items-end gap-1">
                 <div className="flex items-center gap-1">
-                    <input
-                        type="number"
+                    <CurrencyInput
                         value={inputVal}
-                        onChange={e => { setInputVal(e.target.value); setError(""); }}
+                        onChange={(v) => { setInputVal(v); setError(""); }}
                         onKeyDown={handleKeyDown}
                         autoFocus
                         className="w-36 h-7 border border-violet-400 rounded-lg px-2 text-xs text-right tabular-nums bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                        min={0}
                     />
                     <button
                         onClick={handleSave}
@@ -99,7 +98,7 @@ export default function EditablePriceCell({
                         )}
                     </button>
                     <button
-                        onClick={() => { setEditing(false); setInputVal(String(value)); setError(""); }}
+                        onClick={() => { setEditing(false); setInputVal(value); setError(""); }}
                         className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg transition"
                         title="Batal"
                     >
@@ -117,7 +116,7 @@ export default function EditablePriceCell({
         <div className="flex items-center justify-end gap-2">
             <span className="text-xs text-gray-700 tabular-nums font-medium">{fmt(value)}</span>
             <button
-                onClick={() => { setEditing(true); setInputVal(String(value)); }}
+                onClick={() => { setEditing(true); setInputVal(value); }}
                 className="inline-flex items-center gap-1 px-2 py-1 bg-violet-50 hover:bg-violet-100 border border-violet-200 hover:border-violet-300 text-violet-600 hover:text-violet-700 rounded-md text-[10px] font-semibold transition-colors"
                 title="Edit harga modal"
             >

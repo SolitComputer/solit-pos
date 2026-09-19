@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRegisterOverlay } from "@/contexts/OverlayContext";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
 
 export interface CreatedLaptop {
     id: string;
@@ -157,20 +158,18 @@ export default function AddLaptopModal({
                             onChange={handleChange}
                             className="border border-gray-200 rounded-xl h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition bg-gray-50"
                         />
-                        <input
-                            type="number"
+                        <CurrencyInput
                             name="purchase_price"
                             placeholder="Harga Modal"
-                            value={form.purchase_price}
-                            onChange={handleChange}
+                            value={Number(form.purchase_price) || 0}
+                            onChange={(v) => setForm({ ...form, purchase_price: String(v) })}
                             className="border border-gray-200 rounded-xl h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition bg-gray-50"
                         />
-                        <input
-                            type="number"
+                        <CurrencyInput
                             name="selling_price"
                             placeholder="Harga Jual"
-                            value={form.selling_price}
-                            onChange={handleChange}
+                            value={Number(form.selling_price) || 0}
+                            onChange={(v) => setForm({ ...form, selling_price: String(v) })}
                             className="border border-gray-200 rounded-xl h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition bg-gray-50"
                         />
                         <input
