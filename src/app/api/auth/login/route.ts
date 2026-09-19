@@ -18,7 +18,7 @@ const supabase = supabaseAdmin;
 // is_active WAJIB ikut di-select — tanpa ini user.is_active selalu undefined
 // dan gate akun nonaktif di bawah tidak akan pernah jalan.
 const USER_SELECT_FIELDS =
-    "id, name, phone_number, email, role, roles, shift, password, password_set, face_embedding, is_active";
+    "id, name, phone_number, email, role, roles, shift, password, password_set, face_embedding, is_active, deleted_at";
 
 function parseDevice(ua: string): string {
     if (!ua) return "Unknown Device";
@@ -227,6 +227,24 @@ export async function POST(request: Request) {
                     message: "Akun Anda dinonaktifkan. Hubungi admin untuk mengaktifkan kembali.",
                 },
                 { status: 403 }
+            );
+        }
+
+        // ── Gate akun yang sudah di-soft-delete ───────────────────────────────────
+        // Sama alasannya kayak gate is_active di atas: dicek SEBELUM password_set
+        // & verifikasi password, dan TIDAK dicatat sebagai FAILED (bukan percobaan
+        // tebak password). Pesannya sengaja disamakan dengan "tidak ditemukan" di
+        // atas — tidak perlu bocorin ke penyerang bahwa nomor/email ini PERNAH
+        // terdaftar tapi sudah dihapus.
+        if (user.deleted_at) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: looksLikePhone
+                        ? "Nomor WA tidak ditemukan"
+                        : "Email tidak ditemukan",
+                },
+                { status: 400 }
             );
         }
 
