@@ -10,22 +10,39 @@ function formatRupiah(n: number): string {
 
 const VISIBLE_LIMIT = 4;
 
+// ── Filter PENERIMA notifikasi: HANYA user ID di bawah ini yang boleh
+// dapat notifikasi Pengajuan Dana (card + suara), walaupun rolenya ADMIN.
+// Beda dengan NOTIFY_SOURCE_IDS di usePengajuanDanaNotify.ts (itu filter
+// berdasarkan SIAPA YANG MENGAJUKAN dana / requester_id; yang ini filter
+// berdasarkan SIAPA YANG SEDANG LOGIN / melihat notifikasi ini).
+const ALLOWED_NOTIFY_LISTENER_IDS: string[] = [
+  "7b56de81-244e-42af-b2f6-0e29631c4114", // Yoga Adi Prakoso
+  "236c08b5-0dd2-4f2f-95d6-286c5b6dd75e", // Reinaldy Olyvierd Sendouw
+];
+
 interface PengajuanDanaNotifierProps {
   /** Role user saat ini — dikirim dari DashboardLayout (sumber: useAuthUser,
    *  supaya tidak fetch /api/auth/me dua kali). Komponen ini SENGAJA tidak
    *  di-gate oleh isSilentAdmin di DashboardLayout, karena target
    *  notifikasinya justru ADMIN — kebalikan dari notifier lain. */
   userRoles: string[];
+  /** ID user yang sedang login — dipakai untuk membatasi notifikasi ini
+   *  supaya HANYA muncul untuk ID yang ada di ALLOWED_NOTIFY_LISTENER_IDS,
+   *  meskipun rolenya ADMIN. Bisa null selagi auth user masih loading —
+   *  konsisten dengan pola MissionSoundNotifier/SellerReminderNotifier. */
+  userId: string | null;
 }
 
-export default function PengajuanDanaNotifier({ userRoles }: PengajuanDanaNotifierProps) {
+export default function PengajuanDanaNotifier({ userRoles, userId }: PengajuanDanaNotifierProps) {
   const router = useRouter();
   const isAdmin = userRoles.includes("ADMIN");
+  const isAllowedListener = !!userId && ALLOWED_NOTIFY_LISTENER_IDS.includes(userId);
+  // enabled = false kalau bukan ADMIN ATAU ID user tidak ada di daftar
+  // penerima -> hook tidak polling sama sekali untuk user selain itu
+  const canReceiveNotif = isAdmin && isAllowedListener;
+  const { alerts, muted, volume, toggleMute, setVolume } = usePengajuanDanaNotify(canReceiveNotif);
 
-  // enabled = false kalau bukan ADMIN -> hook tidak polling sama sekali
-  const { alerts, muted, volume, toggleMute, setVolume } = usePengajuanDanaNotify(isAdmin);
-
-  if (!isAdmin || alerts.length === 0) return null;
+  if (!canReceiveNotif || alerts.length === 0) return null;
 
   const visible = alerts.slice(0, VISIBLE_LIMIT);
   const hiddenCount = alerts.length - visible.length;
