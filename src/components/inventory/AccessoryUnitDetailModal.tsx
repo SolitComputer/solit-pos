@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRegisterOverlay } from "@/contexts/OverlayContext";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
 
 export interface AccessoryUnitDetailData {
     id: string;
@@ -196,12 +197,12 @@ export default function AccessoryUnitDetailModal({
                                 <Section title="Keuangan Unit">
                                     <div className="grid grid-cols-2 gap-3">
                                         <Field label="Harga Modal">
-                                            <input type="number" min={0} value={addForm.buy_price}
-                                                onChange={e => setAdd("buy_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                            <CurrencyInput value={Number(addForm.buy_price) || 0}
+                                                onChange={(v) => setAdd("buy_price", String(v))} className={`${inputCls} tabular-nums`} />
                                         </Field>
                                         <Field label="Harga Jual">
-                                            <input type="number" min={0} value={addForm.selling_price}
-                                                onChange={e => setAdd("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                            <CurrencyInput value={Number(addForm.selling_price) || 0}
+                                                onChange={(v) => setAdd("selling_price", String(v))} className={`${inputCls} tabular-nums`} />
                                         </Field>
                                     </div>
                                 </Section>
@@ -274,16 +275,16 @@ export default function AccessoryUnitDetailModal({
                                         <div className="grid grid-cols-2 gap-3">
                                             <Field label="Harga Modal">
                                                 {isEditing ? (
-                                                    <input type="number" min={0} value={form.buy_price}
-                                                        onChange={e => set("buy_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                    <CurrencyInput value={Number(form.buy_price) || 0}
+                                                        onChange={(v) => set("buy_price", String(v))} className={`${inputCls} tabular-nums`} />
                                                 ) : (
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(buyNow)}</p>
                                                 )}
                                             </Field>
                                             <Field label="Harga Jual">
                                                 {isEditing ? (
-                                                    <input type="number" min={0} value={form.selling_price}
-                                                        onChange={e => set("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                    <CurrencyInput value={Number(form.selling_price) || 0}
+                                                        onChange={(v) => set("selling_price", String(v))} className={`${inputCls} tabular-nums`} />
                                                 ) : (
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(jualNow)}</p>
                                                 )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
 
 export interface LaptopUnit {
     id: string;
@@ -161,8 +162,10 @@ export default function UnitFormModal({
                             <label className="block text-xs font-medium text-gray-500 mb-1.5">
                                 Harga Jual <span className="text-red-400">*</span>
                             </label>
-                            <input name="selling_price" type="number" placeholder="0"
-                                value={formData.selling_price} onChange={handleChange} required
+                            <CurrencyInput name="selling_price"
+                                value={Number(formData.selling_price) || 0}
+                                onChange={(v) => setFormData(prev => ({ ...prev, selling_price: String(v) }))}
+                                required
                                 className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
                             {editingUnit && (
                                 <p className="text-[10px] text-violet-600 mt-1 flex items-center gap-1">
