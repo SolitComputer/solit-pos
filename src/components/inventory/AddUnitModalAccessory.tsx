@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
 
 export interface CreatedAccessoryUnit {
     id: string;
@@ -106,10 +107,12 @@ export default function AddUnitModalAccessory({
 
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Harga Modal">
-                            <input type="number" name="buy_price" value={form.buy_price} onChange={handleChange} className={inputCls} />
+                            <CurrencyInput name="buy_price" value={Number(form.buy_price) || 0}
+                                onChange={(v) => setForm(prev => ({ ...prev, buy_price: String(v) }))} className={inputCls} />
                         </Field>
                         <Field label="Harga Jual">
-                            <input type="number" name="selling_price" value={form.selling_price} onChange={handleChange} className={inputCls} />
+                            <CurrencyInput name="selling_price" value={Number(form.selling_price) || 0}
+                                onChange={(v) => setForm(prev => ({ ...prev, selling_price: String(v) }))} className={inputCls} />
                         </Field>
                     </div>
 
