@@ -375,6 +375,23 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
             return true;
         });
 
+    // ⬅️ FIX: cek invoice yang SUDAH pernah disinkron penuh lewat source_type
+    // TRANSACTION. Tanpa cek ini, baris transaction_payments yang masih ada
+    // (dari backfill lama) bakal terus-menerus bikin entry duplikat baru
+    // setiap kali GET /api/cashflow jalan — persis kasus yang barusan kejadian.
+    const invoiceNumbersToCheck = [...new Set(dedupedPayments.map((p: any) => p.invoice_number as string))];
+    const invoicesAlreadySynced = new Set<string>();
+    if (invoiceNumbersToCheck.length > 0) {
+        const { data: existingTxEntries } = await supabase
+            .from("cashflow_entries")
+            .select("source_id")
+            .eq("source_type", "TRANSACTION")
+            .in("source_id", invoiceNumbersToCheck);
+        for (const e of existingTxEntries ?? []) {
+            invoicesAlreadySynced.add(e.source_id as string);
+        }
+    }
+
     const paymentIds = dedupedPayments.map((p: any) => p.id as string);
     const { data: existing } = await supabase
         .from("cashflow_entries")
@@ -383,7 +400,9 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
         .in("source_id", paymentIds);
 
     const existingIds = new Set((existing ?? []).map((e: any) => e.source_id as string));
-    const missing = dedupedPayments.filter((p: any) => !existingIds.has(p.id as string));
+    const missing = dedupedPayments.filter(
+        (p: any) => !existingIds.has(p.id as string) && !invoicesAlreadySynced.has(p.invoice_number as string)
+    );
     if (missing.length === 0) return;
 
     const invoiceNumbers = [...new Set(missing.map((p: any) => p.invoice_number as string))];
