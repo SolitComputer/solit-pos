@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { expandRolesWithParents } from "@/lib/permissions";
 import { withTimeout } from "@/lib/withTimeout";
-
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 // Sama kayak di middleware.ts / dynamicPermissions.ts — cegah Promise.all
 // nyangkut tanpa batas kalau salah satu dari 4 query shift di bawah hang.
 const SHIFT_CONFIG_TIMEOUT_MS = 5000;
@@ -517,6 +517,25 @@ export function withAuth(
     if (!user) {
       const res = NextResponse.json(
         { success: false, message: "Token tidak valid" },
+        { status: 401 }
+      );
+      res.cookies.delete("token");
+      return res;
+    }
+
+    // ✅ NEW — JWT itu stateless, jadi verifyToken() di atas cuma cek
+    // signature-nya valid, TIDAK pernah cek status akun terbaru di DB.
+    // Tanpa query ini, akun yang baru di-soft-delete tetap bisa lanjut
+    // pakai API selama token lamanya belum expired sendiri.
+    const { data: liveUser } = await supabaseAdmin
+      .from("users")
+      .select("deleted_at")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!liveUser || liveUser.deleted_at) {
+      const res = NextResponse.json(
+        { success: false, message: "Akun tidak ditemukan atau sudah dihapus" },
         { status: 401 }
       );
       res.cookies.delete("token");
