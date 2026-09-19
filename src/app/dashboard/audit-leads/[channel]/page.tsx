@@ -99,6 +99,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   const [editingRow, setEditingRow] = useState<LeadRow | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmAuditId, setConfirmAuditId] = useState<string | null>(null);
+  const [auditFilter, setAuditFilter] = useState<"all" | "audited" | "unaudited">("all");
 
   const canInput = hasAnyRole(userRoles, AUDIT_LEADS_INPUT_ROLES);
   const canAudit = hasAnyRole(userRoles, AUDIT_LEADS_AUDIT_ROLES);
@@ -127,8 +128,18 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
 
   useEffect(() => { fetchRows(); setPage(1); }, [fetchRows]);
 
-  const paginated = useMemo(() => rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [rows, page]);
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  // Reset ke halaman 1 setiap kali filter audit diganti, supaya tidak
+  // nyangkut di halaman kosong kalau hasil filter lebih sedikit.
+  useEffect(() => { setPage(1); }, [auditFilter]);
+
+  const filteredRows = useMemo(() => {
+    if (auditFilter === "audited") return rows.filter((r) => r.audited);
+    if (auditFilter === "unaudited") return rows.filter((r) => !r.audited);
+    return rows;
+  }, [rows, auditFilter]);
+
+  const paginated = useMemo(() => filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filteredRows, page]);
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
 
   // Ringkasan kecil di header — murni tampilan, dihitung dari rows yang
   // sudah dimuat (tidak menambah fetch/panggilan API baru).
@@ -222,14 +233,48 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
           </div>
         </div>
 
-        {canInput && (
-          <button
-            onClick={() => { setEditingRow(null); setShowForm(true); }}
-            className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 active:scale-[0.98] transition-all shadow-sm shadow-violet-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
-          >
-            <Plus className="h-4 w-4" /> Tambah Leads
-          </button>
-        )}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {canInput ? (
+            <button
+              onClick={() => { setEditingRow(null); setShowForm(true); }}
+              className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 active:scale-[0.98] transition-all shadow-sm shadow-violet-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 self-start"
+            >
+              <Plus className="h-4 w-4" /> Tambah Leads
+            </button>
+          ) : (
+            <div />
+          )}
+
+          {/* Filter status audit — biar ketauan berapa yang sudah & belum
+              diaudit tanpa scroll/hitung manual. Filter jalan di rows yang
+              sudah dimuat, tidak nambah request ke API. */}
+          <div className="inline-flex items-center gap-1 rounded-full bg-gray-100 p-1 self-start sm:self-auto overflow-x-auto">
+            <button
+              onClick={() => setAuditFilter("all")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                auditFilter === "all" ? "bg-white text-violet-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Semua <span className="tabular-nums">({stats.total})</span>
+            </button>
+            <button
+              onClick={() => setAuditFilter("audited")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                auditFilter === "audited" ? "bg-white text-emerald-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <ShieldCheck className="w-3 h-3" /> Sudah Diaudit <span className="tabular-nums">({stats.audited})</span>
+            </button>
+            <button
+              onClick={() => setAuditFilter("unaudited")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                auditFilter === "unaudited" ? "bg-white text-amber-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Belum Diaudit <span className="tabular-nums">({stats.total - stats.audited})</span>
+            </button>
+          </div>
+        </div>
 
         {error && (
           <div className="flex items-center gap-2 rounded-xl bg-red-50 text-red-600 px-4 py-3 text-sm">
@@ -292,8 +337,12 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                         <div className="w-11 h-11 rounded-full bg-violet-50 flex items-center justify-center mb-3">
                           <Inbox className="w-5 h-5 text-violet-300" />
                         </div>
-                        <p className="text-sm font-medium text-gray-700">Belum ada data untuk channel {channelLabels[channel]}</p>
-                        <p className="text-xs text-gray-400 mt-1">Leads yang masuk akan muncul di sini.</p>
+                        <p className="text-sm font-medium text-gray-700">
+                          {rows.length === 0 ? `Belum ada data untuk channel ${channelLabels[channel]}` : "Tidak ada leads yang cocok dengan filter ini"}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {rows.length === 0 ? "Leads yang masuk akan muncul di sini." : "Coba ganti filter status audit di atas."}
+                        </p>
                       </div>
                     </td>
                   </tr>
@@ -385,8 +434,12 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                 <div className="w-11 h-11 rounded-full bg-violet-50 flex items-center justify-center mb-3">
                   <Inbox className="w-5 h-5 text-violet-300" />
                 </div>
-                <p className="text-sm font-medium text-gray-700">Belum ada data untuk channel {channelLabels[channel]}</p>
-                <p className="text-xs text-gray-400 mt-1 max-w-[220px]">Leads yang masuk akan muncul di sini.</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {rows.length === 0 ? `Belum ada data untuk channel ${channelLabels[channel]}` : "Tidak ada leads yang cocok dengan filter ini"}
+                </p>
+                <p className="text-xs text-gray-400 mt-1 max-w-[220px]">
+                  {rows.length === 0 ? "Leads yang masuk akan muncul di sini." : "Coba ganti filter status audit di atas."}
+                </p>
               </div>
             ) : (
               paginated.map((row) => (
