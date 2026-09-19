@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from "react";
 import { useRegisterOverlay } from "@/contexts/OverlayContext";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
 
 export interface UnitDetailData {
     id: string;
@@ -316,19 +317,19 @@ export default function UnitDetailModal({
                                         </Field>
                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                             <Field label="Harga Modal">
-                                                <input type="number" min={0} value={addForm.purchase_price}
-                                                    onChange={e => setAdd("purchase_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                <CurrencyInput value={Number(addForm.purchase_price) || 0}
+                                                    onChange={(v) => setAdd("purchase_price", String(v))} className={`${inputCls} tabular-nums`} />
                                             </Field>
                                             <Field label="Biaya Sparepart">
-                                                <input type="number" min={0} value={addForm.sparepart_cost}
-                                                    onChange={e => setAdd("sparepart_cost", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                <CurrencyInput value={Number(addForm.sparepart_cost) || 0}
+                                                    onChange={(v) => setAdd("sparepart_cost", String(v))} className={`${inputCls} tabular-nums`} />
                                             </Field>
                                             <Field label="Harga Setor">
-                                                <input type="number" min={0} value={addForm.selling_price}
-                                                    onChange={e => setAdd("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                <CurrencyInput value={Number(addForm.selling_price) || 0}
+                                                    onChange={(v) => setAdd("selling_price", String(v))} className={`${inputCls} tabular-nums`} />
                                             </Field>
                                             <Field label="Harga Official">
-                                                <input type="number" value={(Number(addForm.selling_price) || 0) + OFFICIAL_PRICE_MARKUP} disabled
+                                                <CurrencyInput value={(Number(addForm.selling_price) || 0) + OFFICIAL_PRICE_MARKUP} onChange={() => {}} disabled
                                                     className={`${inputCls} tabular-nums bg-gray-100 text-gray-500 cursor-not-allowed`} />
                                                 <p className="text-[10px] text-gray-400 mt-1">Otomatis: Harga Setor + Rp 300.000</p>
                                             </Field>
@@ -455,24 +456,24 @@ export default function UnitDetailModal({
                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                             <Field label="Harga Modal">
                                                 {isEditing ? (
-                                                    <input type="number" min={0} value={form.purchase_price}
-                                                        onChange={e => set("purchase_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                    <CurrencyInput value={Number(form.purchase_price) || 0}
+                                                        onChange={(v) => set("purchase_price", String(v))} className={`${inputCls} tabular-nums`} />
                                                 ) : (
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(modalNow)}</p>
                                                 )}
                                             </Field>
                                             <Field label="Biaya Sparepart">
                                                 {isEditing ? (
-                                                    <input type="number" min={0} value={form.sparepart_cost}
-                                                        onChange={e => set("sparepart_cost", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                    <CurrencyInput value={Number(form.sparepart_cost) || 0}
+                                                        onChange={(v) => set("sparepart_cost", String(v))} className={`${inputCls} tabular-nums`} />
                                                 ) : (
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(sparepartNow)}</p>
                                                 )}
                                             </Field>
                                            <Field label="Harga Setor">
                                                 {isEditing ? (
-                                                    <input type="number" min={0} value={form.selling_price}
-                                                        onChange={e => set("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                    <CurrencyInput value={Number(form.selling_price) || 0}
+                                                        onChange={(v) => set("selling_price", String(v))} className={`${inputCls} tabular-nums`} />
                                                 ) : (
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(jualNow)}</p>
                                                 )}

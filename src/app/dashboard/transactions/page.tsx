@@ -2764,7 +2764,7 @@ function EditTransactionModal({
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 pt-2 border-t border-gray-100">
                       {/* Checkbox / Toggle Bonus */}
                       <label className="flex items-center gap-2 cursor-pointer select-none">
                         <input
@@ -2780,7 +2780,7 @@ function EditTransactionModal({
 
                       {/* Input deal price jika bukan bonus */}
                       {!acc.is_bonus ? (
-                        <div className="relative w-36">
+                        <div className="relative w-full sm:w-36">
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
                           <input
                             type="number"
@@ -2903,13 +2903,13 @@ function EditTransactionModal({
           </div>
 
           {/* Link ke halaman edit lengkap */}
-          <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
+          <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 text-xs">
             <span className="text-amber-800 text-[11px] leading-snug">
               Ingin ubah metode bayar, garansi, atau tukar tambah?
             </span>
             <a
               href={`/payment/${item.invoice_number}`}
-              className="font-bold text-amber-700 hover:text-amber-900 underline whitespace-nowrap text-[11px]"
+              className="self-start sm:self-auto font-bold text-amber-700 hover:text-amber-900 underline whitespace-nowrap text-[11px]"
             >
               Halaman Lengkap →
             </a>
