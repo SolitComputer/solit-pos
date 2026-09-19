@@ -221,6 +221,16 @@ export default function CreatePaymentPage() {
     const paymentMethod = watch("payment_method");
     const pickupMethod = watch("pickup_method");
 
+    // FIX: sebelumnya setValue("units", ...) dipanggil manual di banyak tempat
+    // (handleSelectSnResult, handleRemoveUnit, load draft, load scan/prep, dst).
+    // Begitu ada SATU tempat yang lupa manggil (kasusnya: restore draft),
+    // field "units" di form jadi basi/kosong walau selectedUnits di UI sudah
+    // terisi — makanya validasi bisa gagal padahal user sudah pilih unit.
+    // useEffect ini jadi satu-satunya sumber sinkronisasi, tidak akan skip lagi.
+    useEffect(() => {
+        setValue("units", selectedUnits);
+    }, [selectedUnits, setValue]);
+
     const totalInventoryPrice = selectedUnits.reduce((s, u) => s + (u.purchase_price || 0), 0);
     const margin = rawDealPrice - totalInventoryPrice;
     const tradeInReceived = isTradeIn ? (rawDealPrice - tradeInValue) : 0;
@@ -315,6 +325,7 @@ export default function CreatePaymentPage() {
         if (draft._customerType) setCustomerType(draft._customerType);
         if (draft._sellerType) setSellerType(draft._sellerType);
         if (draft._selectedUnits) setSelectedUnits(draft._selectedUnits);
+        if (draft._selectedAccessories) setSelectedAccessories(draft._selectedAccessories);
         if (draft._rawDealPrice) setRawDealPrice(draft._rawDealPrice);
         if (draft._unitPrices) setUnitPrices(draft._unitPrices);
         if (draft._isTradeIn) setIsTradeIn(draft._isTradeIn);
@@ -336,7 +347,7 @@ export default function CreatePaymentPage() {
         saveDraft({
             ...watchedFields,
             _step: step, _customerType: customerType, _sellerType: sellerType,
-            _selectedUnits: selectedUnits, _rawDealPrice: rawDealPrice,
+            _selectedUnits: selectedUnits, _selectedAccessories: selectedAccessories, _rawDealPrice: rawDealPrice,
             _unitPrices: unitPrices,
             _isTradeIn: isTradeIn, _tradeInItem: tradeInItem,
             _tradeInValue: tradeInValue, _tradeInCash: tradeInCash,
@@ -344,7 +355,7 @@ export default function CreatePaymentPage() {
             _customerBirthDate: customerBirthDate,
             _savedAt: new Date().toISOString(),
         });
-    }, [watchedFields, step, customerType, sellerType, selectedUnits, rawDealPrice,
+    }, [watchedFields, step, customerType, sellerType, selectedUnits, selectedAccessories, rawDealPrice,
         unitPrices, isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, isSubmitted]);
 
     // ── Load unit dari scan ───────────────────────────────────────────────────

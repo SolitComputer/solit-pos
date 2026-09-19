@@ -26,6 +26,7 @@ const RAIL_KEY = "solit_sidebar_rail";
 const WIDTH_KEY = "solit_sidebar_width";
 const GROUPS_KEY = "solit_sidebar_groups_open";
 const PINNED_KEY = "solit_sidebar_pinned";
+const CONTRACT_BANNER_DISMISS_KEY = "solit_contract_banner_dismiss_date";
 const MIN_W = 208;
 const MAX_W = 360;
 const DEFAULT_W = 240;
@@ -1568,7 +1569,15 @@ export default function Sidebar() {
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const [reminderDismissed, setReminderDismissed] = useState(false);
-  const [contractDismissed, setContractDismissed] = useState(false);
+  const [contractDismissed, setContractDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const todayWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      return localStorage.getItem(CONTRACT_BANNER_DISMISS_KEY) === todayWIB;
+    } catch {
+      return false;
+    }
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([]);
 
@@ -1960,6 +1969,10 @@ export default function Sidebar() {
               onClick={(e) => {
                 e.stopPropagation();
                 setContractDismissed(true);
+                try {
+                  const todayWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+                  localStorage.setItem(CONTRACT_BANNER_DISMISS_KEY, todayWIB);
+                } catch { }
               }}
               className="w-7 h-7 rounded-full bg-black/20 hover:bg-black/35 active:scale-90 flex items-center justify-center text-white flex-shrink-0 transition"
               title="Tutup notifikasi"
