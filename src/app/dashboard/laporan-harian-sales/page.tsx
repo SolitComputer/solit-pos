@@ -27,15 +27,17 @@ import {
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserClient } from "@/lib/auth-client";
 
-type Channel = "WA" | "FB" | "OLX" | "CAROUSEL" | "MITRA" | "RESELLER";
+type Channel = "WA" | "FB" | "OLX" | "CAROUSEL" | "ECOMMERCE" | "SOSMED" | "MITRA" | "RESELLER";
 
-const CHANNELS: Channel[] = ["WA", "FB", "OLX", "CAROUSEL", "MITRA", "RESELLER"];
+const CHANNELS: Channel[] = ["WA", "FB", "OLX", "CAROUSEL", "ECOMMERCE", "SOSMED", "MITRA", "RESELLER"];
 
 const channelLabels: Record<Channel, string> = {
   WA: "WhatsApp",
   FB: "Facebook",
   OLX: "OLX",
   CAROUSEL: "Carousell",
+  ECOMMERCE: "E-commerce",
+  SOSMED: "Sosmed",
   MITRA: "Mitra",
   RESELLER: "Reseller",
 };
@@ -45,6 +47,8 @@ const channelBadgeClass: Record<Channel, string> = {
   FB: "bg-blue-50 text-blue-600",
   OLX: "bg-orange-50 text-orange-600",
   CAROUSEL: "bg-cyan-50 text-cyan-600",
+  ECOMMERCE: "bg-rose-50 text-rose-600",
+  SOSMED: "bg-indigo-50 text-indigo-600",
   MITRA: "bg-violet-50 text-violet-600",
   RESELLER: "bg-amber-50 text-amber-600",
 };
@@ -56,6 +60,8 @@ const channelDotClass: Record<Channel, string> = {
   FB: "bg-blue-500",
   OLX: "bg-orange-500",
   CAROUSEL: "bg-cyan-500",
+  ECOMMERCE: "bg-rose-500",
+  SOSMED: "bg-indigo-500",
   MITRA: "bg-violet-500",
   RESELLER: "bg-amber-500",
 };
@@ -65,6 +71,8 @@ const channelBorderClass: Record<Channel, string> = {
   FB: "border-l-blue-400",
   OLX: "border-l-orange-400",
   CAROUSEL: "border-l-cyan-400",
+  ECOMMERCE: "border-l-rose-400",
+  SOSMED: "border-l-indigo-400",
   MITRA: "border-l-violet-400",
   RESELLER: "border-l-amber-400",
 };
@@ -75,6 +83,8 @@ const channelActiveCountClass: Record<Channel, string> = {
   FB: "bg-blue-400/25 text-blue-100",
   OLX: "bg-orange-400/25 text-orange-100",
   CAROUSEL: "bg-cyan-400/25 text-cyan-100",
+  ECOMMERCE: "bg-rose-400/25 text-rose-100",
+  SOSMED: "bg-indigo-400/25 text-indigo-100",
   MITRA: "bg-violet-400/25 text-violet-100",
   RESELLER: "bg-amber-400/25 text-amber-100",
 };
@@ -88,6 +98,8 @@ const CHANNEL_CONTACT_MODE: Record<Channel, ContactMode> = {
   FB: "username",
   OLX: "username",
   CAROUSEL: "username",
+  ECOMMERCE: "username",
+  SOSMED: "username",
   MITRA: "partner",
   RESELLER: "partner",
 };
@@ -101,6 +113,12 @@ const contactFieldConfig: Record<"username" | "partner", { label: string; placeh
 // src/lib/permissions.ts (server-side, sumber kebenaran sesungguhnya). Ini
 // cuma dipakai untuk sembunyikan/tampilkan tombol di UI.
 const AUDIT_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_MARKETING", "MARKETING", "PKL_MARKETING"];
+
+// Daftar divisi yang biasa diketik sales di kolom "Sumber" untuk leads WA —
+// dipakai buat sub-filter channel WA, bukan constraint database (kolom
+// `sumber` tetap teks bebas, jadi pencocokan dilakukan case-insensitive).
+const WA_SUMBER_OPTIONS = ["SOLIT", "SOTECH", "ONPOINT", "ZENIT"] as const;
+type WaSumberFilter = "ALL" | (typeof WA_SUMBER_OPTIONS)[number];
 
 interface SalesReportEntry {
   id: string;
@@ -199,6 +217,10 @@ export default function LaporanHarianSalesPage() {
   const [period, setPeriod] = useState<Period>("today");
   const [channelFilter, setChannelFilter] = useState<Channel | "ALL">("ALL");
   const [auditStatusFilter, setAuditStatusFilter] = useState<"all" | "audited" | "unaudited">("all");
+  // Sub-filter khusus channel WA: sebagian leads WA diketik manual sumbernya
+  // oleh sales (SOLIT/SOTECH/ONPOINT/ZENIT) buat nandain leads itu punya divisi
+  // mana. "ALL" = tampilkan semua leads WA tanpa peduli sumbernya.
+  const [waSumberFilter, setWaSumberFilter] = useState<WaSumberFilter>("ALL");
   const [listError, setListError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -235,10 +257,16 @@ export default function LaporanHarianSalesPage() {
     fetchEntries(period);
   }, [period, fetchEntries]);
 
-  // Balik ke halaman 1 setiap ganti periode, tab channel, atau filter status audit.
+  // Balik ke halaman 1 setiap ganti periode, tab channel, filter sumber WA, atau filter status audit.
   useEffect(() => {
     setCurrentPage(1);
-  }, [period, channelFilter, auditStatusFilter]);
+  }, [period, channelFilter, waSumberFilter, auditStatusFilter]);
+
+  // Reset filter sumber WA setiap pindah tab channel — biar gak "nyangkut" pas
+  // balik lagi ke tab WA nanti.
+  useEffect(() => {
+    setWaSumberFilter("ALL");
+  }, [channelFilter]);
 
   // Statistik ringkas dari data yang sedang tampil (sesuai periode aktif, semua channel).
   const stats = useMemo(() => {
@@ -256,6 +284,25 @@ export default function LaporanHarianSalesPage() {
     return map;
   }, [entries]);
 
+  // Jumlah leads WA per sumber (SOLIT/SOTECH/ONPOINT/ZENIT) — dipakai untuk
+  // badge angka di pill sub-filter WA. Satu leads bisa kehitung di lebih dari
+  // satu pill kalau kolom sumbernya kebetulan menyebut lebih dari satu nama
+  // divisi (jarang terjadi, tapi tetap aman karena cuma dipakai buat badge).
+  const waSumberCounts = useMemo(() => {
+    const waEntries = entries.filter((e) => e.channel === "WA");
+    const map = { ALL: waEntries.length } as Record<WaSumberFilter, number>;
+    for (const opt of WA_SUMBER_OPTIONS) map[opt] = 0;
+    for (const e of waEntries) {
+      const s = (e.sumber ?? "").toUpperCase();
+      for (const opt of WA_SUMBER_OPTIONS) {
+        if (s.includes(opt)) map[opt] += 1;
+      }
+    }
+    return map;
+  }, [entries]);
+
+  // Jumlah laporan sudah/belum diaudit — dipakai untuk badge angka di pill
+
   // Jumlah laporan sudah/belum diaudit — dipakai untuk badge angka di pill
   // filter status audit & kartu ringkasan "Diaudit". Dihitung dari semua
   // channel (sesuai periode aktif), sama seperti channelCounts di atas.
@@ -266,10 +313,13 @@ export default function LaporanHarianSalesPage() {
 
   const filteredEntries = useMemo(() => {
     let result = channelFilter === "ALL" ? entries : entries.filter((e) => e.channel === channelFilter);
+    if (channelFilter === "WA" && waSumberFilter !== "ALL") {
+      result = result.filter((e) => (e.sumber ?? "").toUpperCase().includes(waSumberFilter));
+    }
     if (auditStatusFilter === "audited") result = result.filter((e) => e.audited);
     else if (auditStatusFilter === "unaudited") result = result.filter((e) => !e.audited);
     return result;
-  }, [entries, channelFilter, auditStatusFilter]);
+  }, [entries, channelFilter, waSumberFilter, auditStatusFilter]);
 
   // Potongan data untuk halaman aktif.
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / ROWS_PER_PAGE));
@@ -603,7 +653,7 @@ export default function LaporanHarianSalesPage() {
               <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1.5 block">Channel</label>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-4 gap-1.5">
                     {CHANNELS.map((c) => (
                       <button
                         key={c}
@@ -925,15 +975,44 @@ export default function LaporanHarianSalesPage() {
             <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent sm:hidden" />
           </div>
 
+          {/* Sub-filter sumber khusus tab WA — cuma nongol pas tab "WhatsApp"
+              aktif, soalnya leads channel lain gak pakai konvensi ini. */}
+          {channelFilter === "WA" && (
+            <div className="px-4 sm:px-5 py-2.5 border-b border-gray-100 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+              <button
+                onClick={() => setWaSumberFilter("ALL")}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${waSumberFilter === "ALL" ? "bg-sky-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                  }`}
+              >
+                Semua Sumber
+                <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${waSumberFilter === "ALL" ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"}`}>
+                  {waSumberCounts.ALL}
+                </span>
+              </button>
+              {WA_SUMBER_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => setWaSumberFilter(opt)}
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${waSumberFilter === opt ? "bg-sky-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                    }`}
+                >
+                  {opt.charAt(0) + opt.slice(1).toLowerCase()}
+                  <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${waSumberFilter === opt ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"}`}>
+                    {waSumberCounts[opt]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Filter status audit — biar ketauan berapa laporan yang sudah &
-              belum diaudit tanpa hitung manual. Filter ini jalan bareng tab
+              belum diaudit tanpa hitung manual. Filter ini jalan bareng tab s
               channel di atas, semua di sisi client (tidak nambah request API). */}
           <div className="px-4 sm:px-5 py-2.5 border-b border-gray-100 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
             <button
               onClick={() => setAuditStatusFilter("all")}
-              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${
-                auditStatusFilter === "all" ? "bg-fuchsia-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-              }`}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${auditStatusFilter === "all" ? "bg-fuchsia-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                }`}
             >
               Semua Status
               <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${auditStatusFilter === "all" ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"}`}>
@@ -942,9 +1021,8 @@ export default function LaporanHarianSalesPage() {
             </button>
             <button
               onClick={() => setAuditStatusFilter("audited")}
-              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${
-                auditStatusFilter === "audited" ? "bg-fuchsia-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-              }`}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${auditStatusFilter === "audited" ? "bg-fuchsia-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                }`}
             >
               <ShieldCheck className="w-3 h-3" /> Sudah Diaudit
               <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${auditStatusFilter === "audited" ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"}`}>
@@ -953,9 +1031,8 @@ export default function LaporanHarianSalesPage() {
             </button>
             <button
               onClick={() => setAuditStatusFilter("unaudited")}
-              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${
-                auditStatusFilter === "unaudited" ? "bg-fuchsia-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-              }`}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${auditStatusFilter === "unaudited" ? "bg-fuchsia-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                }`}
             >
               Belum Diaudit
               <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${auditStatusFilter === "unaudited" ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"}`}>
