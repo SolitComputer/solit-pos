@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { Inbox, Hash, Pencil, BarChart3, Download, CheckCircle2, Clock } from "lucide-react";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
 
 export default function BulkAddUnitModal({
     laptopId,
@@ -417,12 +418,12 @@ export default function BulkAddUnitModal({
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Modal</label>
-                                    <input type="number" placeholder="0" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)}
+                                    <CurrencyInput value={Number(purchasePrice) || 0} onChange={(v) => setPurchasePrice(String(v))}
                                         className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Jual</label>
-                                    <input type="number" placeholder="0" value={sellingPrice} onChange={e => setSellingPrice(e.target.value)}
+                                    <CurrencyInput value={Number(sellingPrice) || 0} onChange={(v) => setSellingPrice(String(v))}
                                         className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition" />
                                 </div>
                             </div>
