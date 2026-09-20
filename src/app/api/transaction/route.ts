@@ -372,6 +372,22 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
 
       const items = txItemsMap.get(trx.invoice_number) ?? [];
 
+      // ✅ FIX: transaction_items adalah sumber kebenaran paling reliable —
+      // transactions.unit_ids/serial_numbers bisa nyangkut/stale kalau ada
+      // proses (mis. edit "ganti unit") yang cuma menambah baris
+      // transaction_items tanpa ikut menyinkronkan transactions.unit_ids
+      // (lihat komentar "FIX PENCEGAHAN" di putHandler). Tanpa ini, unit
+      // seperti SN 0007208 (restored:true, transaction_items-nya benar)
+      // tidak pernah ikut ter-grouping — SN-nya hilang dari tampilan padahal
+      // search masih bisa menemukannya karena search query transaction_items
+      // langsung.
+      for (const item of items) {
+        if (item.unit_id && !resolvedIdSet.has(item.unit_id)) {
+          resolvedIdSet.add(item.unit_id);
+          unitIds.push(item.unit_id);
+        }
+      }
+
       const itemDealPriceMap = new Map<string, number>();
       const restoredUnitIds = new Set<string>(); // ✅ unit yang sudah direstore sebagian
       for (const item of items) {
