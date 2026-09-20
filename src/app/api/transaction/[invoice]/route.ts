@@ -475,6 +475,17 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
         ? [tx.unit_id]
         : [];
 
+    // ✅ FIX: sama seperti /api/transaction (list) — gabungkan unit_id dari
+    // itemsPayload (transaction_items, sumber paling reliable) supaya unit
+    // yang "invisible" di kolom transactions.unit_ids tetap ikut muncul.
+    const unitIdSetFromTx = new Set(unitIds);
+    for (const it of itemsPayload) {
+      if (it.unit_id && !unitIdSetFromTx.has(it.unit_id)) {
+        unitIdSetFromTx.add(it.unit_id);
+        unitIds.push(it.unit_id);
+      }
+    }
+
     if (unitIds.length > 0) {
       // ── FIX: unit & laptop di-fetch TERPISAH (bukan nested join
       // `laptop:laptops(...)`) supaya tidak tergantung bentuk relasi yang
