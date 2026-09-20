@@ -373,6 +373,22 @@ async function handlePartialRestore({
       0
     );
 
+    // ✅ FIX: inventory_price & other (margin) dulu tidak pernah direcompute
+    // di sini, cuma deal_price/amount. Riwayat Transaksi (list) menghitung
+    // margin fresh jadi kelihatan benar, tapi "Lihat Detail" baca kolom
+    // `other` langsung dari DB, jadi angkanya beda/basi setelah restore-sebagian.
+    let newInventoryPrice = 0;
+    if (remainingUnitIds.length > 0) {
+      const { data: remainingUnits } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price")
+        .in("id", remainingUnitIds);
+      newInventoryPrice = (remainingUnits ?? []).reduce(
+        (sum, u) => sum + Number(u.purchase_price ?? 0),
+        0
+      );
+    }
+
     const oldDealPrice = Number(transaction.deal_price ?? transaction.amount ?? 0);
     // Fallback kalau transaction_items lama tidak simpan deal_price per unit lengkap
     const finalNewTotal = newDealTotal > 0 ? newDealTotal : Math.max(0, oldDealPrice - restoredDealTotal);
@@ -392,6 +408,8 @@ async function handlePartialRestore({
       .update({
         deal_price: finalNewTotal,
         amount: finalNewTotal,
+        inventory_price: newInventoryPrice,
+        other: finalNewTotal - newInventoryPrice,
         last_edited_by: user.name,
         last_edited_at: new Date().toISOString(),
         notes: transaction.notes ? `${transaction.notes} | ${noteAppend}` : noteAppend,

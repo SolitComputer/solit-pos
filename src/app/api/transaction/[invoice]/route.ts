@@ -500,8 +500,18 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
 
         // Deal price per unit — ambil dari transaction_items (fresh), bukan snapshot lama
         const itemDealPriceMap = new Map<string, number>();
+        // ✅ FIX: dulu tidak ada pengecekan `restored` di endpoint ini — beda
+        // dari /api/transaction (list) yang sudah benar exclude unit direstore
+        // dari Modal/Jual/Margin. Akibatnya "Lihat Detail" ikut menghitung
+        // unit yang sudah balik ke stok (persis kasus SN 0007208), dan
+        // frontend-nya sendiri sudah nunggu `restored_serial_numbers` per
+        // group (buat coret SN) yang dari dulu tidak pernah dikirim ke sini.
+        const restoredUnitIds = new Set<string>();
         for (const item of itemsPayload) {
-          if (item.unit_id) itemDealPriceMap.set(item.unit_id, Number(item.deal_price ?? 0));
+          if (item.unit_id) {
+            itemDealPriceMap.set(item.unit_id, Number(item.deal_price ?? 0));
+            if (item.restored) restoredUnitIds.add(item.unit_id);
+          }
         }
 
         // Group ulang berdasarkan laptop_id dari unit_ids transaksi SEKARANG
@@ -509,6 +519,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
         for (const uid of unitIds) {
           const u = unitMap.get(uid);
           if (!u) continue;
+          const isRestored = restoredUnitIds.has(uid);
           const laptopId = u.laptop_id ?? "unknown";
           const specs = laptopSpecMap.get(laptopId);
           if (!groupMap.has(laptopId)) {
@@ -520,6 +531,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
               storage: specs?.storage,
               vga: specs?.gpu,
               serial_numbers: [] as string[],
+              restored_serial_numbers: [] as string[],
               purchase_price_total: 0,
               selling_price_total: 0,
               allocated_deal_price: 0,
@@ -527,11 +539,17 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
             });
           }
           const grp = groupMap.get(laptopId)!;
-          if (u.serial_number) grp.serial_numbers.push(u.serial_number);
-          grp.purchase_price_total += Number(u.purchase_price ?? 0);
-          grp.selling_price_total += Number(u.selling_price ?? 0);
-          grp.allocated_deal_price += itemDealPriceMap.get(uid) ?? 0;
-          grp.unit_count += 1;
+          if (u.serial_number) {
+            grp.serial_numbers.push(u.serial_number);
+            if (isRestored) grp.restored_serial_numbers.push(u.serial_number);
+          }
+          // Unit yang sudah direstore TIDAK ikut dihitung ke Modal/Jual/Deal/unit_count
+          if (!isRestored) {
+            grp.purchase_price_total += Number(u.purchase_price ?? 0);
+            grp.selling_price_total += Number(u.selling_price ?? 0);
+            grp.allocated_deal_price += itemDealPriceMap.get(uid) ?? 0;
+            grp.unit_count += 1;
+          }
         }
 
         // Fallback alokasi deal price kalau transaction_items belum punya
@@ -788,7 +806,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
       // Recompute inventory_price dari SELURUH unit transaksi (bukan cuma yang
       // dikirim), supaya edit sebagian unit tidak menghapus modal unit lain.
-      const txUnitIds: string[] = unitFieldsProvided
+      const rawTxUnitIds: string[] = unitFieldsProvided
         ? finalNewUnitIds
         : (
           Array.isArray(before?.unit_ids)
@@ -797,6 +815,17 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
               ? [before.unit_id]
               : []
         ).filter(Boolean);
+
+      // ✅ FIX: rawTxUnitIds bisa masih berisi unit yang sudah direstore
+      // (memang sengaja tidak di-strip dari transactions.unit_ids). Saring
+      // dulu lewat transaction_items.restored sebelum dipakai hitung modal.
+      const { data: restoredRows } = await supabase
+        .from("transaction_items")
+        .select("unit_id")
+        .eq("invoice_number", invoice)
+        .eq("restored", true);
+      const restoredIdSet = new Set((restoredRows ?? []).map((r) => r.unit_id));
+      const txUnitIds = rawTxUnitIds.filter((id) => !restoredIdSet.has(id));
 
       if (txUnitIds.length > 0) {
         const { data: allUnits } = await supabase
@@ -842,10 +871,15 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
       // Recompute total deal dari SELURUH transaction_items (laptop + aksesori),
       // bukan cuma unit yang dikirim, supaya edit sebagian tidak menjatuhkan total.
+      // ✅ FIX: dulu tidak filter `restored` — jadi setiap kali transaksi ini
+      // diedit lagi (harga/aksesori apa pun), unit yang sudah balik ke stok
+      // ikut ke-hitung ULANG ke total (persis kasus SN 0007208: 29.700.000
+      // yang sudah dibenerin manual balik jadi 32.400.000 gara-gara ini).
       const { data: allItems } = await supabase
         .from("transaction_items")
         .select("deal_price")
-        .eq("invoice_number", invoice);
+        .eq("invoice_number", invoice)
+        .eq("restored", false);
       if (allItems && allItems.length > 0) {
         newDealTotal = allItems.reduce(
           (s, it) => s + (Number(it.deal_price) || 0),
@@ -952,7 +986,8 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       const { data: allItemsAfterAcc } = await supabase
         .from("transaction_items")
         .select("deal_price")
-        .eq("invoice_number", invoice);
+        .eq("invoice_number", invoice)
+        .eq("restored", false);
       if (allItemsAfterAcc && allItemsAfterAcc.length > 0) {
         newDealTotal = allItemsAfterAcc.reduce(
           (s, it) => s + (Number(it.deal_price) || 0),
