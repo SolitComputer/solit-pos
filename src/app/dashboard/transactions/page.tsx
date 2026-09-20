@@ -172,6 +172,129 @@ const formatDateTime = (date: string) =>
     hour: "2-digit", minute: "2-digit",
   });
 
+// ─── ACTIVITY LOG DIFF (Riwayat perubahan transaksi) ──────────────────
+// Field yang boleh dibandingkan before/after di modal "Lihat Riwayat".
+// `tier` menyamakan gating dengan Margin/Modal yang sudah ada di modal ini:
+// "financial" cuma untuk canSeeFinancials, "modal" cuma untuk canSeeModal
+// (ADMIN & KEPALA_PENGELOLA_BARANG) — supaya log tidak membocorkan harga
+// modal/margin ke role yang memang tidak boleh melihatnya.
+const fmtRupiahDiff = (n: any) => {
+  const num = Number(n);
+  return Number.isFinite(num) ? "Rp" + num.toLocaleString("id-ID") : "—";
+};
+
+const TX_DIFF_FIELD_CONFIG: Record<string, { label: string; tier: "public" | "financial" | "modal"; format?: (v: any) => string }> = {
+  status: { label: "Status", tier: "public", format: (v) => (v ? (STATUS_LABEL[v] ?? v) : "—") },
+  customer_name: { label: "Nama Customer", tier: "public" },
+  customer_phone: { label: "No. Telepon", tier: "public" },
+  customer_type: { label: "Tipe Customer", tier: "public" },
+  company_name: { label: "Toko / Perusahaan", tier: "public" },
+  source_platform: { label: "Sumber Platform", tier: "public" },
+  payment_method: { label: "Metode Bayar", tier: "public" },
+  payment_method_2: { label: "Metode Bayar 2", tier: "public" },
+  amount_method_1: { label: "Nominal Metode 1", tier: "financial", format: fmtRupiahDiff },
+  amount_method_2: { label: "Nominal Metode 2", tier: "financial", format: fmtRupiahDiff },
+  deal_price: { label: "Harga Deal", tier: "financial", format: fmtRupiahDiff },
+  amount: { label: "Nominal (amount)", tier: "financial", format: fmtRupiahDiff },
+  dp_amount: { label: "Nominal DP", tier: "financial", format: fmtRupiahDiff },
+  inventory_price: { label: "Harga Modal", tier: "modal", format: fmtRupiahDiff },
+  other: { label: "Margin", tier: "modal", format: fmtRupiahDiff },
+  // ✅ Ini yang paling relevan buat investigasi SN 0007208 — unit_ids/serial_numbers
+  // di sini adalah snapshot MENTAH kolom transactions, jadi Moreno bisa langsung
+  // cek apakah unit_id 6a6aa189-... hilang di antara before → after edit "ganti unit".
+  unit_ids: {
+    label: "Unit Terhubung (ID)", tier: "public",
+    format: (v) => (Array.isArray(v) ? (v.length ? v.join(", ") : "(kosong)") : String(v ?? "—")),
+  },
+  serial_numbers: {
+    label: "Serial Number", tier: "public",
+    format: (v) => (Array.isArray(v) ? (v.length ? v.join(", ") : "(kosong)") : String(v ?? "—")),
+  },
+  item_kind: { label: "Jenis Barang", tier: "public" },
+};
+
+function getTxDiffEntries(before: any, after: any, canSeeFinancials: boolean, canSeeModal: boolean) {
+  if (!before || !after) return [];
+  const entries: { key: string; label: string; before: string; after: string }[] = [];
+  for (const [key, cfg] of Object.entries(TX_DIFF_FIELD_CONFIG)) {
+    if (cfg.tier === "financial" && !canSeeFinancials) continue;
+    if (cfg.tier === "modal" && !canSeeModal) continue;
+    const rawBefore = before[key];
+    const rawAfter = after[key];
+    const changed = JSON.stringify(rawBefore ?? null) !== JSON.stringify(rawAfter ?? null);
+    if (!changed) continue;
+    entries.push({
+      key,
+      label: cfg.label,
+      before: cfg.format ? cfg.format(rawBefore) : String(rawBefore ?? "—"),
+      after: cfg.format ? cfg.format(rawAfter) : String(rawAfter ?? "—"),
+    });
+  }
+  return entries;
+}
+
+function ActivityLogDiff({ entries }: { entries: { key: string; label: string; before: string; after: string }[] }) {
+  if (entries.length === 0) {
+    return <p className="text-[10px] text-gray-400 italic mt-1">Tidak ada field yang berubah (kemungkinan cuma perubahan internal).</p>;
+  }
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      {entries.map((e) => (
+        <div key={e.key} className="text-[10px]">
+          <p className="font-semibold text-gray-500">{e.label}</p>
+          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+            <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 line-through font-mono break-all">{e.before}</span>
+            <span className="text-gray-300">→</span>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono break-all font-semibold">{e.after}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// RESTORE punya bentuk before_data yang beda dari EDIT (lihat restore/route.ts):
+// restore SEBAGIAN nyimpen { restored_units, deal_price_before }, restore
+// PENUH nyimpen snapshot transaksi utuh sebelum dibatalkan.
+function renderActivityDetail(log: any, canSeeFinancials: boolean, canSeeModal: boolean) {
+  if (log.action === "RESTORE") {
+    const restoredUnits = log.before_data?.restored_units;
+    if (Array.isArray(restoredUnits) && restoredUnits.length > 0) {
+      return (
+        <div className="mt-1.5 space-y-1">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Unit yang direstore</p>
+          {restoredUnits.map((u: any, i: number) => (
+            <div key={i} className="flex items-center justify-between gap-2 bg-red-50/60 border border-red-100 rounded px-2 py-1">
+              <span className="font-mono text-[10px] text-gray-700">{u.serial_number || u.unit_id || "—"}</span>
+              <span className="text-[10px] text-gray-500 truncate">{u.laptop_name}</span>
+              {canSeeFinancials && (
+                <span className="text-[10px] font-semibold text-gray-600 flex-shrink-0">
+                  {fmtRupiahDiff(u.deal_price)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    if (log.before_data?.status) {
+      return (
+        <p className="text-[11px] text-gray-500 mt-1">
+          Seluruh transaksi di-restore dari status{" "}
+          <span className="font-semibold">{STATUS_LABEL[log.before_data.status] ?? log.before_data.status}</span>.
+        </p>
+      );
+    }
+    return null;
+  }
+
+  if (log.action === "EDIT" && log.before_data && log.after_data) {
+    return <ActivityLogDiff entries={getTxDiffEntries(log.before_data, log.after_data, canSeeFinancials, canSeeModal)} />;
+  }
+
+  return null;
+}
+
 function getPaymentStyle(method: string): { text: string; icon: React.ReactNode; bg: string } {
   const m = (method ?? "").toUpperCase();
   const hasCash = m.includes("TUNAI") || m.includes("CASH");
@@ -1882,6 +2005,7 @@ function TransactionDetailModal({
   const [showHistory, setShowHistory] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -1981,23 +2105,43 @@ function TransactionDetailModal({
             </div>
 
             {showHistory && (
-              <div className="max-h-48 overflow-y-auto space-y-1.5 pt-1">
+              <div className="max-h-72 overflow-y-auto space-y-1.5 pt-1">
                 {loadingLogs ? (
                   <p className="text-[11px] text-gray-400">Memuat riwayat...</p>
                 ) : activityLogs.length === 0 ? (
                   <p className="text-[11px] text-gray-400">Belum ada riwayat perubahan.</p>
                 ) : (
-                  activityLogs.map((log: any) => (
-                    <div key={log.id} className="bg-white border border-gray-100 rounded-lg px-3 py-2 text-[11px]">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-gray-700">
-                          {log.action === "EDIT" ? "Edit" : log.action === "RESTORE" ? "Restore" : log.action} — {log.user_name}
-                        </span>
-                        <span className="text-gray-400 flex-shrink-0">{formatDateShort(log.created_at)}</span>
+                  activityLogs.map((log: any) => {
+                    const isLogExpanded = expandedLogIds.has(log.id);
+                    const hasDetail = !!(log.before_data || log.after_data);
+                    return (
+                      <div key={log.id} className="bg-white border border-gray-100 rounded-lg px-3 py-2 text-[11px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-gray-700">
+                            {log.action === "EDIT" ? "Edit" : log.action === "RESTORE" ? "Restore" : log.action} — {log.user_name}
+                          </span>
+                          <span className="text-gray-400 flex-shrink-0">{formatDateShort(log.created_at)}</span>
+                        </div>
+                        {log.reason && <p className="text-gray-500 mt-0.5">"{log.reason}"</p>}
+                        {hasDetail && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedLogIds((prev) => {
+                                const next = new Set(prev);
+                                next.has(log.id) ? next.delete(log.id) : next.add(log.id);
+                                return next;
+                              })
+                            }
+                            className="mt-1 text-[10px] font-bold text-blue-600 hover:text-blue-700"
+                          >
+                            {isLogExpanded ? "Sembunyikan rincian" : "Lihat rincian perubahan"}
+                          </button>
+                        )}
+                        {isLogExpanded && renderActivityDetail(log, canSeeFinancials, canSeeModal)}
                       </div>
-                      {log.reason && <p className="text-gray-500 mt-0.5">"{log.reason}"</p>}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -2318,8 +2462,13 @@ function EditTransactionModal({
           const txItems: any[] = tx.transaction_items || [];
 
           // 1. Laptop items
+          // ✅ FIX: unit yang sudah direstore (restored: true) TIDAK boleh
+          // ikut jadi baris "Harga Deal Per Unit" yang editable — unit itu
+          // sudah keluar dari transaksi aktif (balik ke stok SIAP_JUAL).
+          // Kalau ikut ke-hitung di computedLaptopDeal, total deal transaksi
+          // bisa ke-inflate lagi saat disimpan.
           const laptopItemsList: TxLaptopItem[] = txItems
-            .filter((it: any) => it.item_type === "laptop" || (!it.item_type && it.unit_id))
+            .filter((it: any) => (it.item_type === "laptop" || (!it.item_type && it.unit_id)) && !it.restored)
             .map((it: any) => ({
               id: it.id,
               unit_id: it.unit_id,
@@ -2370,6 +2519,20 @@ function EditTransactionModal({
 
   const hasLaptops = items.length > 0;
   const isMultiItem = !loadingItems && items.length > 1;
+
+  // ✅ FIX: item.laptop_name = kolom legacy transactions.laptop_name, di-set
+  // sekali saat create dan TIDAK PERNAH di-sync ulang saat unit ditambah/
+  // diganti/direstore (persis kasus invoice ini — awalnya "Dell Latitude
+  // 5310", sekarang isinya 12 unit Lenovo Thinkpad L13). Label "Barang" di
+  // summary modal ini dihitung dari `items` (sudah fresh, sudah difilter
+  // !restored di atas) supaya selalu menampilkan kondisi terkini.
+  const displayBarangLabel = loadingItems
+    ? "Memuat..."
+    : items.length === 0
+      ? (accessories.length > 0 ? "Aksesoris / Non-Laptop" : (item.laptop_name || "—"))
+      : items.length === 1
+        ? items[0].laptop_name
+        : `${items.length} unit — ${Array.from(new Set(items.map((it) => it.laptop_name))).join(", ")}`;
 
   const computedLaptopDeal = isMultiItem
     ? items.reduce((sum, it) => sum + (Number(unitDealPrices[it.unit_id]) || 0), 0)
@@ -2593,8 +2756,8 @@ function EditTransactionModal({
             </div>
             <div className="flex items-center justify-between px-3.5 py-2">
               <span className="text-[11px] text-gray-400 font-semibold uppercase">Barang</span>
-              <span className="text-xs font-semibold text-gray-800 truncate max-w-[220px] text-right" title={item.laptop_name || "Aksesoris"}>
-                {item.laptop_name || "Aksesoris / Non-Laptop"}
+              <span className="text-xs font-semibold text-gray-800 truncate max-w-[220px] text-right" title={displayBarangLabel}>
+                {displayBarangLabel}
               </span>
             </div>
             {item.sales_name && (
