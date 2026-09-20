@@ -1006,7 +1006,7 @@ export default function LaporanHarianSalesPage() {
           )}
 
           {/* Filter status audit — biar ketauan berapa laporan yang sudah &
-              belum diaudit tanpa hitung manual. Filter ini jalan bareng tab
+              belum diaudit tanpa hitung manual. Filter ini jalan bareng tab s
               channel di atas, semua di sisi client (tidak nambah request API). */}
           <div className="px-4 sm:px-5 py-2.5 border-b border-gray-100 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
             <button
