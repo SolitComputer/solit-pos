@@ -29,6 +29,7 @@ interface JournalLine {
     line_order: number;
     checked?: boolean;
     checked_at?: string | null;
+    checked_by_user?: { id: string; name: string } | null; // ⬅️ BARU: siapa yang mencentang baris ini
 }
 
 interface WarningLog {
@@ -48,7 +49,7 @@ interface JournalEntry {
     source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL";
     source_id: string | null;
     total: number;
-      is_edited: boolean;
+    is_edited: boolean;
     sync_available?: boolean;
     sync_preview?: { keterangan: string; lines: SyncSnapshotLine[] } | null; // ⬅️ BARU: draft hasil sync, buat preview before/after
     lines: JournalLine[];
@@ -56,7 +57,7 @@ interface JournalEntry {
     updated_by_user?: { id: string; name: string } | null;
     created_at?: string;
     updated_at?: string;
-       trx_meta?: {
+    trx_meta?: {
         company_name: string | null;
         cpu: string | null;
         ram: string | null;
@@ -99,6 +100,9 @@ const fmtTgl = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
 const fmtWaktu = (iso?: string) =>
     iso ? new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+// ⬅️ BARU: format jam saja (HH:MM) — dipakai untuk "jam masuk" & "jam dicek" di bawah Tanggal
+const fmtJam = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : null;
 
 const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
     TRANSACTION: { label: "Transaksi", color: "bg-blue-50 text-blue-700 border-blue-200" },
@@ -137,7 +141,7 @@ function computeLineDiff(beforeLines: SyncSnapshotLine[], afterLines: SyncSnapsh
         map.set(k, row);
     }
 
-           return Array.from(map.values())
+    return Array.from(map.values())
         .map((r) => ({ ...r, changed: r.before !== r.after }))
         .sort((a, b) => (a.side === b.side ? a.account_code.localeCompare(b.account_code) : a.side === "DEBIT" ? -1 : 1));
 }
@@ -213,7 +217,7 @@ function AuditLineDiffTable({ diff }: { diff: ReturnType<typeof computeLineDiff>
                             <span className="text-gray-400">{rp(d.after)}</span>
                         )}
                     </span>
-                                </div>
+                </div>
             ))}
         </div>
     );
@@ -825,6 +829,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                     if (!json.success) throw new Error(json.message);
                 })
             );
+            // ⬅️ BARU: refresh dari server supaya nama & jam siapa yang mencentang ikut ter-update
+            load(false);
         } catch {
             load(false);
         }
@@ -1929,7 +1935,7 @@ function SyncHistoryToggle({
             spaceBelow < POPOVER_HEIGHT
                 ? Math.max(8, rect.top - POPOVER_HEIGHT - 6)
                 : rect.bottom + 6;
-                setPopPos({ top, left: Math.max(8, rect.right - 320) });
+        setPopPos({ top, left: Math.max(8, rect.right - 320) });
     };
 
     useEffect(() => {
@@ -1952,8 +1958,8 @@ function SyncHistoryToggle({
         numAccountsChanged > 0 && ketChanged
             ? "Nominal & Keterangan Berubah"
             : numAccountsChanged > 0
-            ? "Nominal Berubah"
-            : "Keterangan Berubah";
+                ? "Nominal Berubah"
+                : "Keterangan Berubah";
 
     const loadLogs = useCallback(async () => {
         setLoadingLogs(true);
@@ -1990,8 +1996,8 @@ function SyncHistoryToggle({
                 numAccountsChanged > 0 && ketChanged
                     ? "Nominal & keterangan jurnal disinkronkan"
                     : numAccountsChanged > 0
-                    ? "Nominal jurnal disinkronkan"
-                    : "Keterangan jurnal disinkronkan"
+                        ? "Nominal jurnal disinkronkan"
+                        : "Keterangan jurnal disinkronkan"
             );
             setShowPopover(false);
             setConfirming(false);
@@ -2099,11 +2105,10 @@ function SyncHistoryToggle({
                                 return (
                                     <div key={l.id} className="text-[11px] border-b border-gray-100 pb-2 last:border-0 last:pb-0">
                                         <div className="flex items-center justify-between gap-1 mb-0.5">
-                                            <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded border ${
-                                                isSync
+                                            <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded border ${isSync
                                                     ? "bg-blue-50 text-blue-700 border-blue-200"
                                                     : "bg-amber-50 text-amber-700 border-amber-200"
-                                            }`}>
+                                                }`}>
                                                 {isSync ? "Sinkronisasi" : "Edit Manual"}
                                             </span>
                                             <span className="text-[9px] text-gray-400 font-mono">{fmtWaktu(l.changed_at)}</span>
@@ -2741,7 +2746,7 @@ function EntryFormModal({
                         className={`rounded-xl border p-3 flex flex-wrap items-center justify-between gap-2 ${balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
                             }`}
                     >
-                                               <span className={`text-xs font-bold inline-flex items-center gap-1 ${balanced ? "text-emerald-700" : "text-red-700"}`}>
+                        <span className={`text-xs font-bold inline-flex items-center gap-1 ${balanced ? "text-emerald-700" : "text-red-700"}`}>
                             {balanced ? <><Check className="w-3.5 h-3.5" /> Balance</> : <><X className="w-3.5 h-3.5" /> Tidak balance</>}
                         </span>
                         {!balanced && (
@@ -2801,7 +2806,7 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-                  <div className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl max-h-[90dvh] flex flex-col overflow-hidden">
+            <div className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl max-h-[90dvh] flex flex-col overflow-hidden">
                 <div className="h-1 bg-gradient-to-r from-[#0f0c29] to-[#1a1545] shrink-0" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
                     <div>
@@ -3143,7 +3148,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     onToggleWarningState,
     setToast,
 }: JournalEntryRowProps) {
-        const badge = SOURCE_BADGE[entry.source_type];
+    const badge = SOURCE_BADGE[entry.source_type];
     const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
     const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
     const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
@@ -3201,6 +3206,16 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
         return timestamps.reduce((max, t) => (t > max ? t : max));
     }, [validLinesForCheck]);
 
+    // ⬅️ BARU: nama yang mencentang (dari checked_by_user hasil GET /api/akutansi/jurnal)
+    const checkedByName = useMemo(() => {
+        const withUser = validLinesForCheck.find((l) => l.checked && l.checked_by_user?.name);
+        return withUser?.checked_by_user?.name ?? null;
+    }, [validLinesForCheck]);
+
+    // ⬅️ BARU: jam entry ini "masuk" ke jurnal — entry.created_at sudah berisi waktu asli dari
+    // transaksi/service/cashflow (di-set = sort_ts draft saat confirm), atau waktu simpan untuk jurnal manual
+    const entryJam = useMemo(() => fmtJam(entry.created_at), [entry.created_at]);
+
     return (
         <Draggable draggableId={entry.id} index={index}>
             {(provided, snapshot) => (
@@ -3232,22 +3247,38 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                             >
                                 <td className="px-4 py-2 align-top">
                                     {first && (
-                                        <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                onChange={() => onToggleSelect(entry.id)}
-                                                className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
-                                                title="Pilih entry ini"
-                                            />
-                                            <div
-                                                className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
-                                                title="Tahan & geser dari sini (bukan dari checkbox)"
-                                            >
-                                                <GripVertical className="w-3 h-3" />
-                                            </div>
-                                            {fmtTgl(entry.tanggal)}
-                                        </span>
+                                        <div className="space-y-1">
+                                            <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => onToggleSelect(entry.id)}
+                                                    className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
+                                                    title="Pilih entry ini"
+                                                />
+                                                <div
+                                                    className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+                                                    title="Tahan & geser dari sini (bukan dari checkbox)"
+                                                >
+                                                    <GripVertical className="w-3 h-3" />
+                                                </div>
+                                                {fmtTgl(entry.tanggal)}
+                                            </span>
+                                            {entryJam && (
+                                                <div className="pl-7 text-[9px] text-gray-400 font-mono" title="Jam data ini masuk ke jurnal">
+                                                    Masuk {entryJam}
+                                                </div>
+                                            )}
+                                            {isEntryChecked && (
+                                                <div
+                                                    className="pl-7 text-[9px] text-emerald-600 font-semibold flex items-center gap-1"
+                                                    title={`Dicek oleh ${checkedByName ?? "—"} pada ${fmtWaktu(latestCheckedAt ?? undefined)}`}
+                                                >
+                                                    <Check className="w-2.5 h-2.5" />
+                                                    {checkedByName ?? "—"} · {fmtJam(latestCheckedAt)}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </td>
 
@@ -3258,7 +3289,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
                                                     {badge.label}
                                                 </span>
-                                                                                               {companyBadge && (
+                                                {companyBadge && (
                                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
                                                         {companyBadge.label}
                                                     </span>
