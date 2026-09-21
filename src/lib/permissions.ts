@@ -936,6 +936,7 @@ export const LAPTOP_VIEW_ROLES: UserRole[] = [
 
 export const LAPTOP_READY_VIEW_ROLES: UserRole[] = [
   ...LAPTOP_VIEW_ROLES,
+  "KEPALA_CC", // khusus: KEPALA_CC hanya boleh lihat Barang Siap Jual, TIDAK boleh akses Data Barang penuh (LAPTOP_VIEW_ROLES)
 ];
 
 export const LAPTOP_DELETE_ROLES: UserRole[] = [
