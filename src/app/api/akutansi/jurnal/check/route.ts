@@ -12,7 +12,7 @@ function getAdmin(): SupabaseClient {
   );
 }
 
-export const PATCH = withAuth(async (req) => {
+export const PATCH = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
   const { line_id, checked } = body as { line_id: string; checked: boolean };
 
@@ -25,7 +25,10 @@ export const PATCH = withAuth(async (req) => {
   if (checked) {
     const { error } = await supabase
       .from("journal_umum_line_checks")
-      .upsert({ line_id, checked_at: new Date().toISOString() }, { onConflict: "line_id" });
+      .upsert(
+        { line_id, checked_at: new Date().toISOString(), checked_by: user.id },
+        { onConflict: "line_id" }
+      );
 
     if (error) {
       console.error("[jurnal/check PATCH upsert]", error);
