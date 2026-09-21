@@ -1005,9 +1005,6 @@ export default function PengajuanDanaPage() {
         formatRupiah(r.amount),
         r.payment_method,
         statusText,
-        r.approved_by_name ?? "",
-        r.executed_by_name ?? "",
-        r.realisasi_by_name ?? "",
         formatDate(r.created_at),
       ].join(" ").toLowerCase();
       if (!haystack.includes(q)) return false;
@@ -1277,12 +1274,13 @@ export default function PengajuanDanaPage() {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto -mx-1 rounded-2xl border border-slate-100">
-              <table className="w-full text-sm min-w-[960px]">
+            <>
+            <div className="hidden md:block overflow-x-auto -mx-1 rounded-2xl border border-slate-100">
+              <table className="w-full text-sm min-w-[1040px]">
                 <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-slate-100">
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider w-10">No</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pengaju</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pengajuan</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kebutuhan</th>
                     <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nominal</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Metode</th>
@@ -1319,18 +1317,18 @@ export default function PengajuanDanaPage() {
                             <div className={`w-8 h-8 rounded-2xl bg-gradient-to-br ${bgGradient} text-white font-bold flex items-center justify-center text-[11px] flex-shrink-0`}>
                               {initials}
                             </div>
-                            <p className="font-bold text-slate-800 text-sm truncate max-w-[120px]">{row.requester_name}</p>
+                            <p className="font-bold text-slate-800 text-sm truncate max-w-[160px]">{row.requester_name}</p>
                           </div>
                         </td>
 
-                        <td className="px-4 py-4 max-w-[220px]">
+                        <td className="px-4 py-4 max-w-[340px]">
                           <button
                             type="button"
                             onClick={() => setDetailTarget(row)}
                             title="Klik untuk lihat detail lengkap"
                             className="text-left w-full"
                           >
-                            <p className="text-slate-600 text-sm line-clamp-2 leading-relaxed">{row.purpose}</p>
+                            <p className="text-slate-600 text-sm line-clamp-3 leading-relaxed">{row.purpose}</p>
                           </button>
                         </td>
 
@@ -1491,8 +1489,124 @@ export default function PengajuanDanaPage() {
                 </tbody>
               </table>
             </div>
-          )}
 
+            {/* ── Kartu Mobile — tampil di HP (< md), gantiin tabel yg susah dibaca di layar kecil ── */}
+            <div className="md:hidden space-y-3">
+              {paginatedData.map((row, idx) => {
+                const busy = actionLoading[row.id] ?? false;
+                const canRealisasiRow = row.executed_by_id === userId || userRoles.includes("ADMIN");
+                const avatarColors = [
+                  "from-indigo-500 to-purple-600",
+                  "from-rose-500 to-amber-500",
+                  "from-blue-500 to-teal-500",
+                  "from-violet-500 to-indigo-600",
+                ];
+                const bgGradient = avatarColors[Math.abs(row.requester_id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)) % avatarColors.length];
+                const initials = row.requester_name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+
+                return (
+                  <div
+                    key={row.id}
+                    className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm space-y-3"
+                    style={{ animation: "pdSlideUp 0.3s ease-out both", animationDelay: `${idx * 40}ms` }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-9 h-9 rounded-2xl bg-gradient-to-br ${bgGradient} text-white font-bold flex items-center justify-center text-[11px] flex-shrink-0`}>
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-800 text-sm truncate">{row.requester_name}</p>
+                          <p className="text-[11px] text-slate-400">{formatDate(row.created_at)}</p>
+                        </div>
+                      </div>
+                      <StatusPill approved={row.is_approved} executed={row.is_executed} rejected={row.is_rejected} />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setDetailTarget(row)}
+                      title="Klik untuk lihat detail lengkap"
+                      className="text-left w-full"
+                    >
+                      <p className="text-slate-600 text-sm line-clamp-2 leading-relaxed">{row.purpose}</p>
+                    </button>
+
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                      <span className="font-extrabold text-slate-900 tabular-nums text-sm">{formatRupiah(row.amount)}</span>
+                      {userRoles.includes("ADMIN") ? (
+                        <button type="button" onClick={() => setEditMetodeTarget(row)} title="Klik untuk ubah metode pembayaran">
+                          <PaymentMethodBadge method={row.payment_method} />
+                        </button>
+                      ) : (
+                        <PaymentMethodBadge method={row.payment_method} />
+                      )}
+                    </div>
+
+                    {row.is_approved ? (
+                      <p className="text-[11px] text-slate-400">
+                        Disetujui oleh <span className="font-semibold text-slate-600">{row.approved_by_name}</span> · {formatDateTime(row.approved_at)}
+                      </p>
+                    ) : row.is_rejected ? (
+                      <p className="text-[11px] text-rose-500">
+                        Ditolak oleh <span className="font-semibold">{row.rejected_by_name}</span>{row.rejection_reason ? ` — "${row.rejection_reason}"` : ""}
+                      </p>
+                    ) : canApprove ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleAction(row.id, "approve")}
+                          disabled={busy}
+                          className="flex-1 h-10 rounded-xl bg-emerald-50 text-emerald-600 text-xs font-bold border border-emerald-200 active:scale-95 transition disabled:opacity-50"
+                        >
+                          {busy ? "Memproses..." : "Setujui"}
+                        </button>
+                        <button
+                          onClick={() => setRejectTarget(row)}
+                          disabled={busy}
+                          className="flex-1 h-10 rounded-xl bg-rose-50 text-rose-600 text-xs font-bold border border-rose-200 active:scale-95 transition disabled:opacity-50"
+                        >
+                          Tolak
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-amber-500 font-semibold">Menunggu persetujuan</p>
+                    )}
+
+                    {row.is_approved && !row.is_executed && canExecute && (
+                      <button
+                        onClick={() => handleAction(row.id, "execute")}
+                        disabled={busy}
+                        className="w-full h-10 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold border border-blue-200 active:scale-95 transition disabled:opacity-50"
+                      >
+                        {busy ? "Memproses..." : "Tandai Sudah Dieksekusi"}
+                      </button>
+                    )}
+
+                    {row.is_executed && !row.realisasi_cashflow_id && (
+                      canRealisasiRow ? (
+                        <button
+                          onClick={() => setRealisasiTarget(row)}
+                          className="w-full h-10 rounded-xl bg-teal-50 text-teal-600 text-xs font-bold border border-teal-200 active:scale-95 transition"
+                        >
+                          Isi Realisasi
+                        </button>
+                      ) : (
+                        <p className="text-[11px] text-amber-500 font-semibold">Menunggu realisasi dari {row.executed_by_name}</p>
+                      )
+                    )}
+
+                    {row.realisasi_cashflow_id && (
+                      <p className="text-[11px] text-teal-600 font-semibold">
+                        Realisasi {formatRupiah(row.realisasi_nominal ?? 0)} · {row.realisasi_by_name} · {formatDateTime(row.realisasi_at)}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            </>
+          )}
+          
           {!loading && filteredData.length > 0 && (
             <Pagination
               currentPage={currentPage}
