@@ -1289,7 +1289,7 @@ export default function UsersPage() {
                 <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight truncate">Manajemen Aktifitas</h1>
                 <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5 truncate">
                   {isAdmin
-                    ? "Kelola akun, role, shift, dan wajah karyawan"
+                    ? "Kelola akun, role, shift, dan wajah karyawan · build-check"
                     : isKepala
                       ? "Lihat detail dan chat dengan anggota tim"
                       : "Lihat dan chat dengan rekan kerja"}
