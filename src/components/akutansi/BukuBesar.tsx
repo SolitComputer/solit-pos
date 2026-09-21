@@ -89,11 +89,11 @@ export default function BukuBesar({ period }: { period: string }) {
     const [accountCode, setAccountCode] = useState<string>(ACCOUNTS[0]?.code ?? "");
     const [tableSearch, setTableSearch] = useState("");
     // Filter status cek: "all" = semua, "checked" = sudah dicek, "unchecked" = belum dicek
-    const [checkFilter, setCheckFilter] = useState<"all" | "checked" | "unchecked">("all"); 
+    const [checkFilter, setCheckFilter] = useState<"all" | "checked" | "unchecked">("all");
     const [data, setData] = useState<LedgerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-      const [showOpeningModal, setShowOpeningModal] = useState(false);
+    const [showOpeningModal, setShowOpeningModal] = useState(false);
     // (fix) baris id yang lagi proses centang (PATCH belum selesai) — dipakai load()
     // supaya auto-refresh nggak nimpa optimistic update yang belum ke-confirm server.
     const pendingChecksRef = useRef<Set<string>>(new Set());
@@ -120,7 +120,7 @@ export default function BukuBesar({ period }: { period: string }) {
                 }
                 return;
             }
-                        setData((prev) => {
+            setData((prev) => {
                 // (fix) kalau ada centang yang masih pending, pertahankan nilai checked
                 // lokal untuk baris itu — jangan biarkan snapshot GET yang datang telat
                 // (diambil sebelum PATCH commit) menimpa balik jadi unchecked.
@@ -148,7 +148,7 @@ export default function BukuBesar({ period }: { period: string }) {
     // Toggle status "sudah dicek" per baris jurnal.
     // Optimistic update dulu (UI langsung berubah), lalu simpan ke server;
     // kalau gagal, rollback ke nilai sebelumnya supaya tidak beda dengan DB.
-       const toggleChecked = useCallback(async (lineId: string, next: boolean) => {
+    const toggleChecked = useCallback(async (lineId: string, next: boolean) => {
         pendingChecksRef.current.add(lineId);
         setData((prev) =>
             prev
@@ -184,7 +184,7 @@ export default function BukuBesar({ period }: { period: string }) {
                         : prev
                 );
             }
-               } catch {
+        } catch {
             setData((prev) =>
                 prev
                     ? {
@@ -503,6 +503,15 @@ export default function BukuBesar({ period }: { period: string }) {
                                                         </div>
                                                         {specParts.length > 0 && (
                                                             <div className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</div>
+                                                        )}
+                                                        {l.checked && (
+                                                            <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                                                                <Check className="w-2.5 h-2.5" />
+                                                                Dicek {l.checked_by_name ?? "—"}
+                                                                {l.checked_at && (
+                                                                    <span className="text-gray-400 font-normal">· {fmtTglJam(l.checked_at)}</span>
+                                                                )}
+                                                            </div>
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-2.5 text-center text-[10px] font-mono font-bold text-gray-400">
