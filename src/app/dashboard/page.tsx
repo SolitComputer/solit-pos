@@ -832,7 +832,7 @@ export default function Page() {
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Profit</span>
                         <span className="text-base font-extrabold text-slate-900 tabular-nums">
                           {fmtShort(stats?.todayProfit || 0)}
-                        </span>
+                        </span> 
                       </div>
                     )}
                   </>
@@ -942,7 +942,7 @@ export default function Page() {
               {topWidgetConfig.source !== "none" && (
               <div
                 onClick={() => topWidgetConfig.source === "sales" && setShowSalesModal(true)}
-                className={`${CARD_STYLE} ${topWidgetConfig.source === "sales" ? "cursor-pointer hover:border-indigo-200" : ""} transition-all flex flex-col justify-between`}
+                className={`${CARD_STYLE} ${topWidgetConfig.source === "sales" ? "cursor-pointer hover:border-indigo-200" : ""} transition-all flex flex-col justify-start`}
                 role={topWidgetConfig.source === "sales" ? "button" : undefined}
                 tabIndex={topWidgetConfig.source === "sales" ? 0 : undefined}
               >
@@ -1006,7 +1006,7 @@ export default function Page() {
               {/* Top Laptop Card */}
               <div
                 onClick={() => setShowLaptopModal(true)}
-                className={`${CARD_STYLE} cursor-pointer hover:border-indigo-200 transition-all flex flex-col justify-between`}
+                className={`${CARD_STYLE} cursor-pointer hover:border-indigo-200 transition-all flex flex-col justify-start`}
                 role="button"
                 tabIndex={0}
               >
