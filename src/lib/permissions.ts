@@ -1201,7 +1201,7 @@ export const SO_HISTORY_VIEW_ROLES: UserRole[] = [
 ];
 
 // ── Data Barang: Role yang boleh melihat tab Data Laptop & Aksesoris ──────────
-// Kepala Sales, Kepala Zenith, Kepala Onpoint, Kepala Sotech, Crew Sales, dan Sales tidak diperbolehkan.
+// Kepala Sales, Kepala Onpoint, Kepala Sotech, Crew Sales, dan Sales tidak diperbolehkan.
 export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "ACCOUNTING",
@@ -1213,6 +1213,8 @@ export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   "KEPALA_TEKNISI",
   "PKL_TEKNISI",
   "KEPALA_ZENITH",
+  "KEPALA_MARKETING",
+  "MARKETING",
 ];
 
 // ── Data Barang: Aksesoris (CRUD) — dipusatkan di sini supaya client
