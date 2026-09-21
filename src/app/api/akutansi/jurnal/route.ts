@@ -210,7 +210,7 @@ export const GET = withAuth(async (req) => {
   );
 
   const allLineIds = entriesWithMeta.flatMap((e: any) => (e.lines ?? []).map((l: any) => l.id));
-  const checkedMap = new Map<string, string>();
+  const checkedMap = new Map<string, { checked_at: string; checked_by_user: { id: string; name: string } | null }>();
 
   if (allLineIds.length > 0) {
     const chunkSize = 200;
@@ -218,11 +218,14 @@ export const GET = withAuth(async (req) => {
       const chunk = allLineIds.slice(i, i + chunkSize);
       const { data: checksData } = await supabase
        .from("journal_umum_line_checks")
-        .select("line_id, checked_at")
+        .select("line_id, checked_at, checked_by_user:users(id, name)")
         .in("line_id", chunk);
 
       for (const c of (checksData ?? []) as any[]) {
-        checkedMap.set(c.line_id, c.checked_at);
+        checkedMap.set(c.line_id, {
+          checked_at: c.checked_at,
+          checked_by_user: c.checked_by_user ?? null,
+        });
       }
     }
   }
@@ -230,11 +233,12 @@ export const GET = withAuth(async (req) => {
   const entriesWithChecks = entriesWithMeta.map((e: any) => ({
     ...e,
     lines: (e.lines ?? []).map((l: any) => {
-      const checkedAt = checkedMap.get(l.id);
+      const checkInfo = checkedMap.get(l.id);
       return {
         ...l,
-        checked: Boolean(checkedAt),
-        checked_at: checkedAt ?? null,
+        checked: Boolean(checkInfo),
+        checked_at: checkInfo?.checked_at ?? null,
+        checked_by_user: checkInfo?.checked_by_user ?? null,
       };
     }),
   }));
