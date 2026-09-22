@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,23 +42,40 @@ export async function POST(request: NextRequest) {
     // Generate nama file unik
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
-    const ext = file.name.split(".").pop() || "jpg";
-    const fileName = `overtime-proof-${timestamp}-${random}.${ext}`;
+    // ✅ NEW — output kompresi selalu JPEG, jadi ekstensi file juga
+    // dipaksa .jpg (bukan ikut ekstensi asli lagi).
+    const fileName = `overtime-proof-${timestamp}-${random}.jpg`;
     const folderPath = `overtime-proofs/${fileName}`;
+
+    // ✅ NEW — kompres & resize foto bukti lembur sebelum diupload biar
+    // kecil di storage. rotate() dulu (baca orientasi EXIF dari kamera HP)
+    // baru resize max 1280px sisi terpanjang, lalu re-encode ke JPEG
+    // quality 65 — dari foto HP 3-8MB biasanya turun jadi ~150-300KB.
+    const originalBuffer = Buffer.from(await file.arrayBuffer());
+    const compressedBuffer = await sharp(originalBuffer)
+      .rotate()
+      .resize({
+        width: 1280,
+        height: 1280,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 65 })
+      .toBuffer();
 
     console.log("📤 Uploading to Supabase:", {
       bucket: "documents",
       path: folderPath,
-      fileSize: file.size,
-      contentType: file.type,
+      originalSize: `${(file.size / 1024).toFixed(1)} KB`,
+      compressedSize: `${(compressedBuffer.length / 1024).toFixed(1)} KB`,
+      contentType: "image/jpeg",
     });
 
     // Upload ke Supabase Storage
-    const buffer = await file.arrayBuffer();
     const { data, error } = await supabase.storage
       .from("documents")
-      .upload(folderPath, buffer, {
-        contentType: file.type,
+      .upload(folderPath, compressedBuffer, {
+        contentType: "image/jpeg",
         upsert: false,
       });
 
