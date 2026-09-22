@@ -1,4 +1,3 @@
-// src/app/api/akutansi/buku-besar/route.ts
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
