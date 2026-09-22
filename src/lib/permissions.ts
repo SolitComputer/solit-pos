@@ -410,6 +410,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
+    "KEPALA_CC", // khusus Barang Siap Jual saja (lihat LAPTOP_READY_VIEW_ROLES)
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"],
   "/dashboard/laptops/monitoring": [
@@ -474,6 +475,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "CUSTOMER_SERVICE",
     "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
+    "KEPALA_CC", // dipakai halaman Barang Siap Jual untuk fetch data
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"],
   "/api/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
@@ -756,6 +758,7 @@ export const PERMISSIONS = {
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "CUSTOMER_SERVICE",
+    "KEPALA_CC", // FIX: sebelumnya belum ditambahkan, padahal LAPTOP_READY_VIEW_ROLES sudah — bikin akses "Barang Siap Jual" untuk KEPALA_CC tetap ketolak
   ] as UserRole[],
   VIEW_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"] as UserRole[],
   EDIT_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"] as UserRole[],
