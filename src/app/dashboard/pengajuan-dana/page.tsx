@@ -1108,7 +1108,7 @@ export default function PengajuanDanaPage() {
             </div>
 
             {/* Stat Cards inside banner */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               <SummaryCard
                 icon={<ClipboardList className="w-4 h-4" />}
                 label="Total Pengajuan"
