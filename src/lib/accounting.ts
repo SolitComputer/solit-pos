@@ -210,6 +210,16 @@ export const CASHFLOW_ACCOUNT: Record<string, string> = {
   PENJUALAN_AKSESORIS: AKUN.PENJUALAN_AKSESORIS,   // 420
   SERVICE_MANUAL: AKUN.JASA_SERVICE,               // 430
 
+  // ⬅️ BARU — 3 kategori Uang KELUAR (cashflow.ts: MANUAL_EXPENSE_ONLY_CATEGORIES),
+  // sengaja diarahkan ke akun PENDAPATAN yang SAMA (410/420/430) — bukan ke akun
+  // Beban. Ini dipakai untuk retur/koreksi yang perlu mengurangi pendapatan
+  // (mis. pembatalan penjualan yang sudah lewat siklus normal), makanya sisi
+  // jurnalnya nanti DEBIT ke 410/420/430 (mengurangi saldo Kredit pendapatan),
+  // bukan bikin baris Beban baru.
+  PENJUALAN_LAPTOP_OUT: AKUN.PENJUALAN_LAPTOP,     // 410
+  PENJUALAN_AKSESORIS_OUT: AKUN.PENJUALAN_AKSESORIS, // 420
+  JASA_SERVICE_OUT: AKUN.JASA_SERVICE,             // 430
+
   // ── Alias key LAMA — JANGAN dihapus, cuma tidak ditawarkan lagi di dropdown ──
   OPERASIONAL_SOTECH: AKUN.OPS_MINGGUAN,
   OPERASIONAL_ONPOINT: AKUN.OPS_MINGGUAN,
