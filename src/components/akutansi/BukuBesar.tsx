@@ -240,6 +240,12 @@ export default function BukuBesar({ period }: { period: string }) {
 
     const normalSide = useMemo(() => getNormalSide(accountCode), [accountCode]);
 
+    // Jumlah baris yang sudah dicek, ditampilkan di header kolom "Cek" (paling atas tabel)
+    const checkedCount = useMemo(
+        () => (data ? data.lines.filter((l) => l.checked).length : 0),
+        [data]
+    );
+
     return (
         <div className="space-y-4">
             {/* ── Account picker ── */}
@@ -410,7 +416,12 @@ export default function BukuBesar({ period }: { period: string }) {
                                     Saldo
                                 </th>
                                 <th rowSpan={2} className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[64px] align-bottom border-l-2 border-gray-200">
-                                    Cek
+                                    <div>Cek</div>
+                                    {data && data.lines.length > 0 && (
+                                        <div className="mt-1 text-[10px] font-bold text-gray-400 normal-case tracking-normal font-mono whitespace-nowrap">
+                                            {checkedCount}/{data.lines.length}
+                                        </div>
+                                    )}
                                 </th>
                             </tr>
                             <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
@@ -581,9 +592,7 @@ export default function BukuBesar({ period }: { period: string }) {
                                     <td className="px-4 py-3 text-right text-sm font-black text-emerald-700 font-mono">
                                         {data.totals.saldo_akhir < 0 ? rp(Math.abs(data.totals.saldo_akhir)) : ""}
                                     </td>
-                                    <td className="px-3 py-3 text-center border-l-2 border-gray-200 text-[10px] font-bold text-gray-400">
-                                        {data.lines.filter((l) => l.checked).length}/{data.lines.length}
-                                    </td>
+                                    <td className="px-3 py-3 text-center border-l-2 border-gray-200" />
                                 </tr>
                             </tfoot>
                         )}
