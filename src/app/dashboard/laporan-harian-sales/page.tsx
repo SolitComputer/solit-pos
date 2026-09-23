@@ -183,6 +183,7 @@ function canAuditRole(user: any): boolean {
 }
 
 function canAddReportRole(user: any): boolean {
+  if (!user) return false; // user belum kebaca (masih loading) -> jangan tampilkan tombol dulu
   const roles: string[] = Array.isArray(user?.roles) && user.roles.length > 0 ? user.roles : (user?.role ? [user.role] : []);
   return !roles.some((r) => NO_ADD_ROLES.includes(r));
 }
