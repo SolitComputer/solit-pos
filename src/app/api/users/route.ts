@@ -6,6 +6,10 @@ import bcrypt from "bcryptjs";
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
+// Hanya akun dengan ID ini yang boleh menghapus user permanen lewat
+// Management User — dikunci per-akun, bukan per-role.
+const DELETE_USER_ALLOWED_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
+
 function isFullAccess(roles: string[]): boolean {
   return roles.some(r => FULL_ACCESS_ROLES.has(r));
 }
@@ -395,6 +399,15 @@ async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) 
   const currentUserRoles: string[] = currentUser.roles ?? [currentUser.role];
   if (!isFullAccess(currentUserRoles)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+  }
+
+  // Hapus akun dikunci khusus 1 ID — admin/programmer lain tetap punya
+  // full access ke fitur lain, tapi tidak bisa menghapus user.
+  if (currentUser.id !== DELETE_USER_ALLOWED_ID) {
+    return NextResponse.json(
+      { success: false, message: "Akses ditolak — hanya akun tertentu yang bisa menghapus user" },
+      { status: 403 }
+    );
   }
 
   const { searchParams } = new URL(req.url);
