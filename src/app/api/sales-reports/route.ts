@@ -12,6 +12,22 @@
   const NO_PHONE_CHANNELS = [...USERNAME_CHANNELS, ...PARTNER_CHANNELS];
   const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta = UTC+7
 
+  // Role yang TIDAK boleh menambah laporan baru — HARUS disamakan dengan
+  // NO_ADD_ROLES di halaman UI (src/app/dashboard/laporan-harian-sales/page.tsx).
+  // Ini pengecekan server-side, sumber kebenaran sesungguhnya — bukan cuma
+  // sembunyikan tombol.
+  const NO_ADD_ROLES = ["MARKETING", "KEPALA_MARKETING", "PKL_MARKETING"];
+
+  function hasNoAddRole(user: AuthUser): boolean {
+    const anyUser = user as any;
+    const roles: string[] = Array.isArray(anyUser?.roles) && anyUser.roles.length > 0
+      ? anyUser.roles
+      : anyUser?.role
+      ? [anyUser.role]
+      : [];
+    return roles.some((r) => NO_ADD_ROLES.includes(r));
+  }
+
   // Bentuk data yang sudah divalidasi & siap insert/update ke tabel.
   interface NormalizedReport {
     channel: string;
@@ -107,6 +123,13 @@
   // POST /api/sales-reports  { channel, phone_number, partner_name, interest, keterangan, purchased }
   async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     try {
+      if (hasNoAddRole(user)) {
+        return NextResponse.json(
+          { success: false, message: "Role Marketing tidak diizinkan menambah laporan" },
+          { status: 403 }
+        );
+      }
+
       const body = await req.json();
       const result = validateAndNormalize(body);
       if (!result.success) {
