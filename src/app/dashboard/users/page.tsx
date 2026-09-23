@@ -154,6 +154,9 @@ const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUN
 const ROLE_MANAGER_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 const USER_ACTION_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
+// Harus SAMA PERSIS dengan DELETE_USER_ALLOWED_ID di src/app/api/users/route.ts
+const DELETE_USER_ALLOWED_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
+
 const KEPALA_ROLES = new Set([
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ZENITH",
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
@@ -1206,6 +1209,8 @@ export default function UsersPage() {
   const inactiveCount = users.filter(u => u.is_active === false).length;
   const totalKaryawan = users.filter(u => !isPKLRole(u.role)).length;
   const totalPKL = users.filter(u => isPKLRole(u.role)).length;
+  // Hapus akun dikunci khusus 1 ID akun, terpisah dari status isAdmin.
+  const canDeleteUsers = currentUserInfo?.id === DELETE_USER_ALLOWED_ID;
   const showOnlinePanel = isAdmin || isKepala;
 
   return (
@@ -1241,7 +1246,7 @@ export default function UsersPage() {
       {isAdmin && confirmLogoutUser && (
         <ConfirmLogoutModal user={confirmLogoutUser} onClose={() => setConfirmLogoutUser(null)} onConfirm={handleForceLogout} loading={loggingOut} />
       )}
-      {isAdmin && confirmDeleteUser && (
+      {canDeleteUsers && confirmDeleteUser && (
         <ConfirmDeleteModal user={confirmDeleteUser} onClose={() => setConfirmDeleteUser(null)} onConfirm={handleDeleteUser} loading={deleting} />
       )}
       {isAdmin && confirmResetPwUser && (
@@ -1751,7 +1756,7 @@ export default function UsersPage() {
                                         : <UserX className="w-3.5 h-3.5" />}
                                     </ActionBtn>
                                   )}
-                                  {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                  {canDeleteUsers && currentUserInfo && user.id !== currentUserInfo.id && (
                                     <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
