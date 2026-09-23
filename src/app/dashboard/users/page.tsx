@@ -16,7 +16,7 @@ import {
   Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
   Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
   ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
-  Mars, Venus, Plus, UserX, UserCheck, Megaphone, RotateCcw,
+  Mars, Venus, Plus, UserX, UserCheck, Megaphone,
 } from "lucide-react";
 
 interface User {
@@ -47,8 +47,6 @@ interface User {
   deactivated_at?: string | null;
     deactivated_by?: string | null;
   deactivated_by_name?: string | null;
-  deleted_at?: string | null;
-  deleted_by_name?: string | null;
 }
 
 interface CustomRoleRow {
@@ -922,44 +920,6 @@ function ConfirmToggleActiveModal({ user, onClose, onConfirm, loading }: {
   );
 }
 
-// ── ConfirmRestoreModal ───────────────────────────────────────────────────────
-function ConfirmRestoreModal({ user, onClose, onConfirm, loading }: {
-  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
-        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-          style={{ background: "#ecfdf5", border: "1px solid #a7f3d0" }}><RotateCcw className="w-8 h-8" style={{ color: "#059669" }} /></div>
-        <h3 className="font-black text-slate-800 text-center text-base mb-1">Restore Akun {user.name}?</h3>
-        <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
-          Akun ini akan dikembalikan dan muncul lagi di daftar user aktif.
-        </p>
-        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
-          style={{ background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" }}>
-          <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" /> Password lama & data tetap sama
-        </div>
-        <div className="flex gap-2.5">
-          <button onClick={onClose} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-            style={{ background: "#f1f5f9", color: "#64748b" }}>
-            Batal
-          </button>
-          <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
-            style={{ background: "linear-gradient(135deg, #10b981, #059669)", boxShadow: "0 4px 14px rgba(16,185,129,0.3)" }}>
-            {loading
-              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-              : <><RotateCcw className="w-4 h-4" /> Ya, Restore</>}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── ActionBtn ─────────────────────────────────────────────────────────────────
 function ActionBtn({ onClick, title, bg, color, children }: {
   onClick: () => void; title: string; bg: string; color: string; children: React.ReactNode;
@@ -1022,9 +982,6 @@ export default function UsersPage() {
   const [isKepala, setIsKepala] = useState(false);
   const [currentUserInfo, setCurrentUserInfo] = useState<{ id: string; name: string; role: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"karyawan" | "pkl">("karyawan");
-  const [viewingTrash, setViewingTrash] = useState(false);
-  const [confirmRestoreUser, setConfirmRestoreUser] = useState<User | null>(null);
-  const [restoring, setRestoring] = useState(false);
 
   const [customRoles, setCustomRoles] = useState<CustomRoleRow[]>([]);
 
@@ -1074,10 +1031,10 @@ export default function UsersPage() {
     return ROLE_BADGE_STYLE[role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
   };
 
-  const fetchUsers = async (trash: boolean = viewingTrash) => {
+  const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await fetch(trash ? "/api/users?trash=1" : "/api/users");
+      const res = await fetch("/api/users");
       const data = await res.json();
       if (data.success) setUsers(data.users);
     } catch { showToast("Gagal memuat data user", "err"); }
@@ -1210,30 +1167,11 @@ export default function UsersPage() {
     finally { setTogglingActive(false); setConfirmToggleActiveUser(null); }
   };
 
-  const handleRestoreUser = async () => {
-    if (!confirmRestoreUser) return;
-    setRestoring(true);
-    try {
-      const res = await fetch("/api/users", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: confirmRestoreUser.id, _restore: true }),
-      });
-      const data = await res.json();
-      if (data.success) { showToast(data.message ?? "Akun berhasil direstore", "ok"); fetchUsers(); }
-      else showToast(data.message ?? "Gagal restore akun", "err");
-    } catch { showToast("Terjadi kesalahan", "err"); }
-    finally { setRestoring(false); setConfirmRestoreUser(null); }
-  };
-
   const filtered = useMemo(() => {
     let result = users.filter(u => {
       const matchSearch = !search
         || u.name.toLowerCase().includes(search.toLowerCase())
         || (u.phone_number ?? "").includes(search);
-      // Mode Sampah: filter role & tab Karyawan/PKL diabaikan (UI-nya juga
-      // disembunyikan saat viewingTrash), cuma pencarian nama/nomor yang tetap jalan.
-      if (viewingTrash) return matchSearch;
       const matchRole = filterRole === "Semua" || u.role === filterRole;
       const matchTab = activeTab === "pkl" ? isPKLRole(u.role) : !isPKLRole(u.role);
       return matchSearch && matchRole && matchTab;
@@ -1243,7 +1181,7 @@ export default function UsersPage() {
       return sortOrder === "asc" ? c : -c;
     });
     return result;
-  }, [users, search, filterRole, sortOrder, activeTab, viewingTrash]);
+  }, [users, search, filterRole, sortOrder, activeTab]);
 
   const tabRoles = useMemo(() => {
     const customKeys = customRoles.filter((r) => !r.is_pkl).map((r) => r.key);
@@ -1320,14 +1258,6 @@ export default function UsersPage() {
           loading={togglingActive}
         />
       )}
-      {isAdmin && confirmRestoreUser && (
-        <ConfirmRestoreModal
-          user={confirmRestoreUser}
-          onClose={() => setConfirmRestoreUser(null)}
-          onConfirm={handleRestoreUser}
-          loading={restoring}
-        />
-      )}
       {isAdmin && showCreate && (
         <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />
       )}
@@ -1381,22 +1311,6 @@ export default function UsersPage() {
               </button>
               {isAdmin && (
                 <button
-                  onClick={() => {
-                    const next = !viewingTrash;
-                    setViewingTrash(next);
-                    setSearch("");
-                    fetchUsers(next);
-                  }}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 sm:px-4 h-10 rounded-full text-xs font-bold transition-all active:scale-95 whitespace-nowrap"
-                  style={viewingTrash
-                    ? { background: "linear-gradient(135deg, #64748b, #334155)", color: "#fff", boxShadow: "0 4px 14px rgba(51,65,85,0.3)" }
-                    : { background: "#fff1f2", color: "#dc2626", border: "1px solid #fecdd3" }}>
-                  <Trash2 className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>{viewingTrash ? "Kembali" : "Sampah"}</span>
-                </button>
-              )}
-              {isAdmin && !viewingTrash && (
-                <button
                   onClick={() => setShowCreate(true)}
                   className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 sm:px-4 h-10 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-full text-xs font-bold shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all whitespace-nowrap">
                   <Plus className="w-4 h-4 flex-shrink-0" />
@@ -1407,7 +1321,7 @@ export default function UsersPage() {
           </div>
 
           {/* ── Hero banner: Ringkasan Tim (pola sama seperti "Distribusi Penjualan" di Dashboard) ── */}
-          {isAdmin && !viewingTrash && (
+           {isAdmin && (
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-100/90 via-indigo-100/80 to-purple-100/90 p-5 sm:p-7 border border-indigo-100/60 shadow-sm">
               <div className="absolute inset-0 pointer-events-none opacity-40 overflow-hidden">
                 <svg className="absolute -right-10 -bottom-10 w-[500px] h-[300px]" viewBox="0 0 500 300" fill="none">
@@ -1490,7 +1404,7 @@ export default function UsersPage() {
             <RoleAccessManager />
           ) : (
             <>
-              {isAdmin && !viewingTrash && (
+              {isAdmin && (
                 <div className="bg-white rounded-2xl p-1.5 border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
                   <div className="flex gap-1.5">
                     {([
@@ -1555,19 +1469,17 @@ export default function UsersPage() {
                         </button>
                       </div>
 
-                      {!viewingTrash && (
-                        <div className="flex gap-1.5 flex-wrap max-h-[5.5rem] sm:max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
-                          {["Semua", ...tabRoles].map(r => (
-                            <button key={r} onClick={() => setFilterRole(r)}
-                              className="px-2.5 py-1 rounded-full text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
-                              style={filterRole === r
-                                ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff" }
-                                : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
-                              {r === "Semua" ? `Semua (${totalInTab})` : <>{getRoleIcon(r)} {getRoleLabel(r)}</>}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <div className="flex gap-1.5 flex-wrap max-h-[5.5rem] sm:max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
+                        {["Semua", ...tabRoles].map(r => (
+                          <button key={r} onClick={() => setFilterRole(r)}
+                            className="px-2.5 py-1 rounded-full text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
+                            style={filterRole === r
+                              ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff" }
+                              : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
+                            {r === "Semua" ? `Semua (${totalInTab})` : <>{getRoleIcon(r)} {getRoleLabel(r)}</>}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -1579,11 +1491,9 @@ export default function UsersPage() {
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
                         <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
-                          {viewingTrash
-                            ? `${filtered.length} akun di Sampah`
-                            : filtered.length === totalInTab
-                              ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
-                              : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
+                          {filtered.length === totalInTab
+                            ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
+                            : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
                         </p>
                       </div>
                       {isAdmin && (
@@ -1635,29 +1545,6 @@ export default function UsersPage() {
                           const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
                           const canChat = currentUserInfo && user.id !== currentUserInfo.id;
                           const isInactive = user.is_active === false;
-
-                          // Mode Sampah: baris disederhanakan — tanpa badge/aksi normal,
-                          // cuma info siapa & kapan menghapus + satu tombol Restore.
-                          if (viewingTrash) {
-                            return (
-                              <div key={user.id} className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center gap-3 sm:gap-3.5">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0"
-                                  style={{ background: `linear-gradient(135deg, ${avatarColor}dd, ${avatarColor})` }}>
-                                  {getInitials(user.name)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{user.name}</p>
-                                  <p className="text-[10.5px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>
-                                    Dihapus oleh <span className="font-bold">{user.deleted_by_name ?? "— tidak tercatat"}</span>
-                                    {user.deleted_at && <> · {formatDateTime(user.deleted_at)}</>}
-                                  </p>
-                                </div>
-                                <ActionBtn onClick={() => setConfirmRestoreUser(user)} title={`Restore ${user.name}`} bg="#ecfdf5" color="#059669">
-                                  <RotateCcw className="w-3.5 h-3.5" />
-                                </ActionBtn>
-                              </div>
-                            );
-                          }
 
                           return (
                             <div key={user.id}
