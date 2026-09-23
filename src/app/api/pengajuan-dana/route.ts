@@ -10,6 +10,11 @@ import {
 // Import variabel dari file baru
 import { FUND_EXECUTOR_IDS, FUND_APPROVER_IDS } from "@/lib/fundConfig";
 
+// Cuma 3 role ini yang boleh lihat pengajuan dana SEMUA orang. Role lain yang
+// tetap punya akses ke halaman ini (lolos gate FUND_REQUEST_VIEW_ROLES di
+// bawah) cuma lihat pengajuan milik mereka sendiri.
+const FUND_REQUEST_FULL_VIEW_ROLES = ["ADMIN", "ACCOUNTING", "PURCHASING"];
+
 function db() {
     return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,11 +37,21 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
 
+    const canViewAll = roles.some((r) => FUND_REQUEST_FULL_VIEW_ROLES.includes(r));
+
     const supabase = db();
-    const { data, error } = await supabase
+    let query = supabase
         .from("fund_requests")
         .select("*")
         .order("created_at", { ascending: false });
+
+    // Role di luar Admin/Accounting/Purchasing cuma boleh lihat pengajuan
+    // yang mereka buat sendiri.
+    if (!canViewAll) {
+        query = query.eq("requester_id", userId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         return NextResponse.json({ success: false, message: error.message }, { status: 500 });
