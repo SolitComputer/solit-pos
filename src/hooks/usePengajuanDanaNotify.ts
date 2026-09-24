@@ -18,6 +18,7 @@ interface FundRequestRow {
   amount: number;
   created_at: string;
   is_approved: boolean;
+  is_rejected: boolean;
 }
 
 const POLL_INTERVAL_MS = 15_000;
@@ -332,7 +333,7 @@ export function usePengajuanDanaNotify(enabled: boolean) {
           if (!seen.has(r.id)) {
             seen.add(r.id);
             seenChanged = true;
-            if (!r.is_approved && NOTIFY_SOURCE_IDS.includes(r.requester_id)) {
+            if (!r.is_approved && !r.is_rejected && NOTIFY_SOURCE_IDS.includes(r.requester_id)) {
               pending.add(r.id);
             }
           }
@@ -340,10 +341,10 @@ export function usePengajuanDanaNotify(enabled: boolean) {
         if (seenChanged) saveSeenIds(seen);
 
         // 2) Re-validasi SEMUA id yang sedang pending terhadap data terbaru:
-        //    kalau sudah is_approved=true, barisnya sudah tidak ada lagi
-        //    (dihapus), ATAU requester_id-nya sudah tidak ada di
-        //    NOTIFY_SOURCE_IDS, keluarkan dari daftar pending. Baris
-        //    terakhir ini penting: kalau browser admin masih menyimpan
+        //    kalau sudah is_approved=true atau is_rejected=true, barisnya
+        //    sudah tidak ada lagi (dihapus), ATAU requester_id-nya sudah
+        //    tidak ada di NOTIFY_SOURCE_IDS, keluarkan dari daftar pending.
+        //    Baris terakhir ini penting: kalau browser admin masih menyimpan
         //    pending lama (dari sebelum filter ini dipasang, mis. dari
         //    akun testing), otomatis "dibersihkan" di poll pertama tanpa
         //    perlu admin clear localStorage manual.
@@ -351,7 +352,7 @@ export function usePengajuanDanaNotify(enabled: boolean) {
         const stillPending: string[] = [];
         for (const id of pending) {
           const row = rowById.get(id);
-          if (row && !row.is_approved && NOTIFY_SOURCE_IDS.includes(row.requester_id)) {
+          if (row && !row.is_approved && !row.is_rejected && NOTIFY_SOURCE_IDS.includes(row.requester_id)) {
             stillPending.push(id);
           }
         }
