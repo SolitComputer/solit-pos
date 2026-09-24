@@ -114,7 +114,7 @@ export async function POST(
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
     // 1. Insert entry Uang Keluar ke Cashflow — inilah yang bikin otomatis sinkron.
-    // ⬅️ BARU: insert SEKALIGUS semua items (1 baris cashflow_entries per kategori),
+    // Insert SEKALIGUS semua items (1 baris cashflow_entries per kategori),
     // semua pakai source_id yang sama (id pengajuan ini) supaya tetap ke-grup.
     const { data: cashflowEntries, error: cfError } = await supabase
         .from("cashflow_entries")
@@ -150,7 +150,9 @@ export async function POST(
     // detail per-kategori tetap bisa dicek lewat cashflow_entries where source_id = id ini.
     const primaryEntry = cashflowEntries[0];
 
-    // 2. Tandai pengajuan sudah direalisasi + simpan link ke entry Cashflow PERTAMA
+    // 2. Tandai pengajuan sudah direalisasi + simpan link ke entry Cashflow PERTAMA.
+    //    .is("realisasi_cashflow_id", null) = kunci anti-dobel: kalau request lain
+    //    sudah lebih dulu menautkan realisasi, update ini tidak mengenai baris apa pun.
     const { data: updated, error: updateErr } = await supabase
         .from("fund_requests")
         .update({
@@ -161,8 +163,9 @@ export async function POST(
             realisasi_at: new Date().toISOString(),
         })
         .eq("id", id)
+        .is("realisasi_cashflow_id", null)
         .select()
-        .single();
+        .maybeSingle();
 
     if (updateErr) {
         // Entry Cashflow-nya sudah kebuat & benar (bagian terpenting), tapi gagal
@@ -173,6 +176,19 @@ export async function POST(
             data: { ...fundRequest, realisasi_cashflow_id: primaryEntry.id },
             warning: "Tersimpan di Cashflow, tapi status Pengajuan Dana gagal ter-update. Refresh halaman.",
         });
+    }
+
+    if (!updated) {
+        // Kalah balapan (double submit): request lain sudah lebih dulu menautkan
+        // realisasi → buang SEMUA entry cashflow yang barusan kita buat sendiri.
+        await supabase
+            .from("cashflow_entries")
+            .delete()
+            .in("id", cashflowEntries.map((e: { id: string }) => e.id));
+        return NextResponse.json(
+            { success: false, message: "Pengajuan ini sudah pernah diisi realisasinya" },
+            { status: 400 }
+        );
     }
 
     return NextResponse.json({ success: true, data: updated }, { status: 201 });
