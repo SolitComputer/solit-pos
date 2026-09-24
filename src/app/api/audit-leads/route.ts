@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyToken } from "@/lib/auth";
 import { AUDIT_LEADS_INPUT_ROLES, hasAnyRole } from "@/lib/permissions";
+import { fetchAllRows } from "@/lib/supabase-paginate";
 
 const VALID_CHANNELS = ["WA", "FB", "OLX", "CAROUSEL", "MITRA", "RESELLER"];
 
@@ -42,21 +43,31 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabase();
 
   // Sumber 1: leads yang diinput manual langsung di halaman Audit Marketing
-  const { data: manualRows, error: manualError } = await supabase
-    .from("audit_leads")
-    .select("*")
-    .eq("channel", channel);
+  const { data: manualRows, error: manualError } = await fetchAllRows((from, to) =>
+    supabase
+      .from("audit_leads")
+      .select("*")
+      .eq("channel", channel)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to)
+  );
 
   if (manualError) {
     console.error("API Error (GET /api/audit-leads, manual):", manualError);
     return NextResponse.json({ success: false, message: "Gagal mengambil data." }, { status: 500 });
   }
 
-    // Sumber 2: leads yang diinput sales lewat Laporan Harian Sales
-  const { data: salesRows, error: salesError } = await supabase
-    .from("sales_online_reports")
-    .select("*")
-    .eq("channel", channel);
+  // Sumber 2: leads yang diinput sales lewat Laporan Harian Sales
+  const { data: salesRows, error: salesError } = await fetchAllRows((from, to) =>
+    supabase
+      .from("sales_online_reports")
+      .select("*")
+      .eq("channel", channel)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to)
+  );
 
   if (salesError) {
     console.error("API Error (GET /api/audit-leads, sales_reports):", salesError);
