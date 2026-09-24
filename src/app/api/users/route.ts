@@ -6,6 +6,10 @@ import bcrypt from "bcryptjs";
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
+// Hanya akun dengan ID ini yang boleh menghapus user permanen lewat
+// Management User — dikunci per-akun, bukan per-role.
+const DELETE_USER_ALLOWED_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
+
 function isFullAccess(roles: string[]): boolean {
   return roles.some(r => FULL_ACCESS_ROLES.has(r));
 }
@@ -45,7 +49,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   // parsing tiap literalnya untuk infer bentuk hasil query. Untuk select-string
   // sepanjang ini, compiler jadi "meledak" — persis error build tadi.
   const selectFields: string = isAdmin
-    ? "id, name, phone_number, email, role, roles, shift, gender, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, biometric_enabled, contract_status, active_contract_id, contract_valid_until, is_active, deactivated_at, deactivated_by, deleted_at, deleted_by"
+    ? "id, name, phone_number, email, role, roles, shift, gender, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, biometric_enabled, contract_status, active_contract_id, contract_valid_until, is_active, deactivated_at, deactivated_by"
     : isKepala
       ? "id, name, phone_number, role, roles, shift, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, is_active"
       : "id, name, role, roles, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, is_active";
@@ -119,10 +123,6 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
             deactivated_by: isAdmin ? (u.deactivated_by ?? null) : null,
       deactivated_by_name: isAdmin && u.deactivated_by
         ? (nameById.get(u.deactivated_by) ?? null)
-        : null,
-      deleted_at: isAdmin ? (u.deleted_at ?? null) : null,
-      deleted_by_name: isAdmin && u.deleted_by
-        ? (nameById.get(u.deleted_by) ?? null)
         : null,
       status_note: noteExpired ? null : (u.status_note ?? null),
       status_note_expires_at: noteExpired ? null : (u.status_note_expires_at ?? null),
@@ -237,7 +237,6 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     _toggleBiometric,
     _resetBiometric,
     _toggleActive,
-    _restore,
   } = body;
 
   if (!id) {
@@ -304,33 +303,6 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
         : "Akun dinonaktifkan & session-nya diakhiri",
     });
   }
-
-  // ── Handle restore akun yang sudah di-soft-delete ──────────────────────────
-  if (_restore === true) {
-    const { data: restored, error } = await supabaseAdmin
-      .from("users")
-      .update({ deleted_at: null, deleted_by: null })
-      .eq("id", id)
-      .not("deleted_at", "is", null)
-      .select("id, name")
-      .maybeSingle();
-
-    if (error) {
-      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-    }
-    if (!restored) {
-      return NextResponse.json(
-        { success: false, message: "User tidak ditemukan di Sampah (mungkin sudah direstore)" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Akun "${restored.name}" berhasil direstore`,
-    });
-  }
-
   // ── Handle toggle eligibility sidik jari/biometrik ─────────────────────────
   if (typeof _toggleBiometric === "boolean") {
     const { error } = await supabaseAdmin
@@ -429,6 +401,15 @@ async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) 
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
   }
 
+  // Hapus akun dikunci khusus 1 ID — admin/programmer lain tetap punya
+  // full access ke fitur lain, tapi tidak bisa menghapus user.
+  if (currentUser.id !== DELETE_USER_ALLOWED_ID) {
+    return NextResponse.json(
+      { success: false, message: "Akses ditolak — hanya akun tertentu yang bisa menghapus user" },
+      { status: 403 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
 
@@ -442,37 +423,24 @@ async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) 
     );
   }
 
-  // Soft delete — row TIDAK dihapus dari database, cuma ditandai deleted_at
-  // + session yang sedang aktif langsung diakhiri paksa. Avatar SENGAJA tidak
-  // dihapus dari storage lagi (beda dari sebelumnya) supaya kalau direstore,
-  // fotonya masih utuh.
-  const nowIso = new Date().toISOString();
-  const { data: deletedUser, error } = await supabaseAdmin
+  const { data: existingUser } = await supabaseAdmin
     .from("users")
-    .update({
-      deleted_at: nowIso,
-      deleted_by: currentUser.id,
-      force_logout_at: nowIso,
-    })
+    .select("profile_photo_url")
     .eq("id", id)
-    .is("deleted_at", null)
-    .select("id, name")
     .maybeSingle();
+
+  const { error } = await supabaseAdmin.from("users").delete().eq("id", id);
 
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
-  if (!deletedUser) {
-    return NextResponse.json(
-      { success: false, message: "User tidak ditemukan atau sudah dihapus sebelumnya" },
-      { status: 404 }
-    );
+
+  const oldAvatarPath = existingUser?.profile_photo_url ? extractAvatarPath(existingUser.profile_photo_url) : null;
+  if (oldAvatarPath) {
+    await supabaseAdmin.storage.from(AVATAR_BUCKET).remove([oldAvatarPath]);
   }
 
-  return NextResponse.json({
-    success: true,
-    message: `Akun "${deletedUser.name}" dipindahkan ke Sampah — masih bisa direstore`,
-  });
+  return NextResponse.json({ success: true });
 }
 
 export const GET = withAuth(getHandler);

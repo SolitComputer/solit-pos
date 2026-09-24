@@ -1066,8 +1066,12 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
 // ── Expense Modal ─────────────────────────────────────────────────────────────
 function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
     const categories = Object.entries(EXPENSE_CATEGORIES);
-    const [category, setCategory] = useState(categories[0]?.[0] ?? "");
-    const [nominal, setNominal] = useState("");
+    type ExpenseItem = { category: string; nominal: string };
+    const [items, setItems] = useState<ExpenseItem[]>([{ category: categories[0]?.[0] ?? "", nominal: "" }]);
+    const addItem = () => setItems((prev) => [...prev, { category: categories[0]?.[0] ?? "", nominal: "" }]);
+    const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
+    const updateItem = (idx: number, patch: Partial<ExpenseItem>) =>
+        setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
     const [keterangan, setKeterangan] = useState("");
     const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
     const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
@@ -1082,9 +1086,9 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         return () => window.removeEventListener("keydown", h);
     }, [onClose]);
 
-    // Entry BARU tetap wajib > 0 (buat entry senilai 0 tidak ada gunanya)
+     // Entry BARU tetap wajib > 0 (buat entry senilai 0 tidak ada gunanya)
     const submit = async () => {
-        if (!nominal || Number(nominal) <= 0) return setError("Nominal harus lebih dari 0");
+        if (items.some((it) => !it.nominal || Number(it.nominal) <= 0)) return setError("Nominal setiap kategori harus lebih dari 0");
         setSaving(true); setError("");
         try {
             let photoUrl: string | null = null;
@@ -1099,12 +1103,16 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                 photoUrl = upJson.url;
                 setUploadProgress("done");
             }
-            const res = await fetch("/api/cashflow", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ direction: "OUT", category, nominal: Number(nominal), keterangan: keterangan.trim() || null, tanggal, payment_method: paymentMethod, photo_url: photoUrl }),
-            });
-            const json = await res.json();
-            if (!json.success) return setError(json.message || "Gagal menyimpan");
+            // ⬅️ BARU: kirim satu request per baris Kategori+Nominal — tiap baris jadi
+            // entry cashflow_entries terpisah, semuanya pakai tanggal/keterangan/metode/foto yang sama.
+            for (const it of items) {
+                const res = await fetch("/api/cashflow", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ direction: "OUT", category: it.category, nominal: Number(it.nominal), keterangan: keterangan.trim() || null, tanggal, payment_method: paymentMethod, photo_url: photoUrl }),
+                });
+                const json = await res.json();
+                if (!json.success) return setError(json.message || "Gagal menyimpan");
+            }
             onSaved(); onClose();
         } catch { setError("Terjadi kesalahan koneksi"); }
         finally { setSaving(false); setUploadProgress("idle"); }
@@ -1139,22 +1147,37 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                             ))}
                         </div>
                     </div>
-                    <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
-                        <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
-                            {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                        </select>
+                     <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-gray-600">Kategori &amp; Nominal</label>
+                            <button type="button" onClick={addItem} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-95 transition">
+                                <IconPlus /> Tambah Kategori
+                            </button>
+                        </div>
+                        <div className="space-y-2">
+                            {items.map((it, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                    <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 1}</span>
+                                    <select value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} className={`${inputCls} bg-white flex-1 min-w-0`}>
+                                        {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                                    </select>
+                                    <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus={idx === 0} />
+                                    <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none">
+                                        <IconX />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        {items.some((it) => it.nominal && Number(it.nominal) > 0) && (
+                            <div className="flex items-center justify-between pt-2.5 border-t border-gray-200">
+                                <span className="text-[11px] font-semibold text-gray-500">Total{items.length > 1 ? ` (${items.length} kategori)` : ""}</span>
+                                <span className="text-sm font-black text-red-600 font-mono tabular-nums">{fmtRupiah(items.reduce((s, it) => s + (Number(it.nominal) || 0), 0))}</span>
+                            </div>
+                        )}
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal <span className="text-red-500">*</span></label>
-                            <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls} font-mono [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus />
-                            {nominal && Number(nominal) > 0 && <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(nominal))}</p>}
-                        </div>
-                        <div>
-                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
-                            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
-                        </div>
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
+                        <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
                     </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>

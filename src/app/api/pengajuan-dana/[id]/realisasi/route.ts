@@ -41,6 +41,7 @@ export async function POST(
         tanggal?: string;
         payment_method?: string;
         photo_url?: string | null;
+        items?: { category: string; nominal: number | string }[]; // ⬅️ BARU: multi-kategori
     };
     try {
         body = await request.json();
@@ -48,15 +49,32 @@ export async function POST(
         return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
     }
 
-    const { category, nominal, keterangan, tanggal, payment_method, photo_url } = body;
+    const { keterangan, tanggal, payment_method, photo_url } = body;
 
-    const nom = Math.round(Number(nominal));
-    if (!Number.isFinite(nom) || nom <= 0) {
-        return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
+    // ⬅️ BARU: dukung multi-kategori (items[]) — tombol "+" di modal Realisasi
+    // bisa nambah berapa pun baris Kategori+Nominal. Tetap backward-compatible:
+    // kalau client lama masih kirim body lama (category/nominal tunggal tanpa
+    // items), otomatis dibungkus jadi array isi 1 item.
+    type RealisasiItem = { category: string; nominal: number };
+
+    const rawItems: { category?: string; nominal?: number | string }[] =
+        Array.isArray(body.items) && body.items.length > 0
+            ? body.items
+            : [{ category: body.category, nominal: body.nominal }];
+
+    const items: RealisasiItem[] = [];
+    for (const it of rawItems) {
+        const nom = Math.round(Number(it.nominal));
+        if (!Number.isFinite(nom) || nom <= 0) {
+            return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
+        }
+        if (!it.category || !isValidCategory("OUT", it.category)) {
+            return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
+        }
+        items.push({ category: it.category, nominal: nom });
     }
-    if (!category || !isValidCategory("OUT", category)) {
-        return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
-    }
+
+    const totalNominal = items.reduce((sum, it) => sum + it.nominal, 0);
     const pm = payment_method === "SALDO" ? "SALDO" : "CASH";
 
     const supabase = db();
@@ -95,27 +113,17 @@ export async function POST(
 
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
-    // 1. Kalau entry Cashflow untuk pengajuan ini sudah ada (percobaan sebelumnya
-    //    sukses insert tapi gagal link balik), pakai ulang — jangan insert lagi.
-    const { data: existingEntry } = await supabase
+    // 1. Insert entry Uang Keluar ke Cashflow — inilah yang bikin otomatis sinkron.
+    // Insert SEKALIGUS semua items (1 baris cashflow_entries per kategori),
+    // semua pakai source_id yang sama (id pengajuan ini) supaya tetap ke-grup.
+    const { data: cashflowEntries, error: cfError } = await supabase
         .from("cashflow_entries")
-        .select("id")
-        .eq("source_type", "PENGAJUAN_DANA")
-        .eq("source_id", id)
-        .limit(1)
-        .maybeSingle();
-
-    let cashflowEntry: { id: string } | null = existingEntry;
-    let createdHere = false;
-
-    if (!cashflowEntry) {
-        const { data: inserted, error: cfError } = await supabase
-            .from("cashflow_entries")
-            .insert({
+        .insert(
+            items.map((it) => ({
                 direction: "OUT",
-                category,
+                category: it.category,
                 nama: userName,
-                nominal: nom,
+                nominal: it.nominal,
                 modal: null,
                 keterangan: keterangan?.trim() || fundRequest.purpose || null,
                 tanggal: tanggal || jakartaToday,
@@ -125,26 +133,31 @@ export async function POST(
                 photo_url: photo_url ?? null,
                 created_by: userId,
                 is_audited: false,
-            })
-            .select()
-            .single();
+            }))
+        )
+        .select();
 
-        if (cfError) {
-            console.error("[pengajuan-dana realisasi] insert cashflow error:", cfError);
-            return NextResponse.json({ success: false, message: cfError.message }, { status: 500 });
-        }
-        cashflowEntry = inserted as { id: string };
-        createdHere = true;
+    if (cfError || !cashflowEntries || cashflowEntries.length === 0) {
+        console.error("[pengajuan-dana realisasi] insert cashflow error:", cfError);
+        return NextResponse.json(
+            { success: false, message: cfError?.message ?? "Gagal menyimpan realisasi" },
+            { status: 500 }
+        );
     }
 
-    // 2. Tandai pengajuan sudah direalisasi + simpan link ke entry Cashflow-nya.
+    // realisasi_cashflow_id tetap nunjuk ke SATU entry (yang pertama) — sesuai
+    // keputusan: gak nambah kolom baru, total tetap kebaca dari realisasi_nominal,
+    // detail per-kategori tetap bisa dicek lewat cashflow_entries where source_id = id ini.
+    const primaryEntry = cashflowEntries[0];
+
+    // 2. Tandai pengajuan sudah direalisasi + simpan link ke entry Cashflow PERTAMA.
     //    .is("realisasi_cashflow_id", null) = kunci anti-dobel: kalau request lain
     //    sudah lebih dulu menautkan realisasi, update ini tidak mengenai baris apa pun.
     const { data: updated, error: updateErr } = await supabase
         .from("fund_requests")
         .update({
-            realisasi_cashflow_id: cashflowEntry.id,
-            realisasi_nominal: nom,
+            realisasi_cashflow_id: primaryEntry.id,
+            realisasi_nominal: totalNominal,
             realisasi_by_id: userId,
             realisasi_by_name: userName,
             realisasi_at: new Date().toISOString(),
@@ -160,16 +173,18 @@ export async function POST(
         console.error("[pengajuan-dana realisasi] gagal update fund_requests:", updateErr);
         return NextResponse.json({
             success: true,
-            data: { ...fundRequest, realisasi_cashflow_id: cashflowEntry.id },
+            data: { ...fundRequest, realisasi_cashflow_id: primaryEntry.id },
             warning: "Tersimpan di Cashflow, tapi status Pengajuan Dana gagal ter-update. Refresh halaman.",
         });
     }
 
     if (!updated) {
-        // Kalah balapan (double submit): buang entry cashflow yang barusan kita buat sendiri
-        if (createdHere) {
-            await supabase.from("cashflow_entries").delete().eq("id", cashflowEntry.id);
-        }
+        // Kalah balapan (double submit): request lain sudah lebih dulu menautkan
+        // realisasi → buang SEMUA entry cashflow yang barusan kita buat sendiri.
+        await supabase
+            .from("cashflow_entries")
+            .delete()
+            .in("id", cashflowEntries.map((e: { id: string }) => e.id));
         return NextResponse.json(
             { success: false, message: "Pengajuan ini sudah pernah diisi realisasinya" },
             { status: 400 }
