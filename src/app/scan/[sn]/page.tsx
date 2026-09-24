@@ -108,6 +108,7 @@ const ACC_STATUS_CONFIG: Record<string, { label: string; color: string; dot: str
   TERSEDIA: { label: "Tersedia", color: "#059669", dot: "#10b981" },
   TERJUAL: { label: "Terjual", color: "#6b7280", dot: "#9ca3af" },
   RUSAK: { label: "Rusak", color: "#dc2626", dot: "#ef4444" },
+  RESERVED: { label: "Reserved", color: "#d97706", dot: "#f59e0b" },
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -461,7 +462,7 @@ function AccessoryScanView({
 
         {/* Actions */}
         <div style={styles.actions}>
-          <Link href={`/dashboard/accessories/${acc.id}`} style={styles.btnView}>
+          <Link href={`/dashboard/accessories/${acc.id}/units`} style={styles.btnView}>
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -472,7 +473,7 @@ function AccessoryScanView({
           </Link>
 
           {user && (
-            <Link href="/dashboard/accessories" style={styles.btnBack}>
+            <Link href="/dashboard/data-barang?tab=barang&tipe=AKSESORIS" style={styles.btnBack}>
               ← Kembali ke Dashboard
             </Link>
           )}

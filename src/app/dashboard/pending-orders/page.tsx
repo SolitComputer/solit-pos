@@ -7,6 +7,13 @@ import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyP
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { compressImage } from "@/lib/imageCompression";
 
+// ── BARU: rincian aksesori per transaksi (dari /api/transaction/pending) ──
+interface TxAccessoryItem {
+    name: string;
+    quantity: number;
+    serial_number: string | null;
+}
+
 interface PendingTransaction {
     id: string;
     invoice_number: string;
@@ -19,6 +26,8 @@ interface PendingTransaction {
     serial_number: string | null;
     unit_id: string | null;
     laptop_id: string | null;
+    accessory_items?: TxAccessoryItem[];   // BARU: rincian aksesori
+    is_accessory_only?: boolean;           // BARU: transaksi isinya cuma aksesori
     deal_price: number;
     dp_amount?: number;
     amount: number;
@@ -122,6 +131,46 @@ function getOriginalStatus(tx: PendingTransaction): "RESERVED" | "HELD" | null {
     return null;
 }
 
+// ── BARU: Filter Toko/Platform — key dinormalisasi (lowercase) supaya
+// "Shopee" & "shopee" tidak terpecah jadi 2 opsi ──
+const NO_PLATFORM = "__none__";
+const platformKey = (v?: string | null) => (v || "").trim().toLowerCase();
+
+// ── BARU: helper tampilan kolom "Laptop" + "SN".
+// REAL      = laptop punya SN asli
+// ACC_SN    = transaksi khusus aksesori, aksesorinya punya SN
+// ACC_NO_SN = transaksi khusus aksesori, dipilih via nama (fitur lama) → memang tanpa SN
+// MISSING   = laptop yang benar-benar belum punya SN ──
+type SnState = "REAL" | "ACC_SN" | "ACC_NO_SN" | "MISSING";
+
+function getItemDisplay(tx: PendingTransaction): { name: string; sn: string; snState: SnState; fullTitle: string } {
+    const accs = tx.accessory_items ?? [];
+    const accLabel = (a: TxAccessoryItem) => `${a.name}${a.quantity > 1 ? ` x${a.quantity}` : ""}`;
+
+    // Nama: pakai laptop_name; kalau kosong (transaksi khusus aksesori) → nama aksesori
+    const laptopName = (tx.laptop_name || "").trim();
+    const name = laptopName || (accs.length > 0
+        ? accLabel(accs[0]) + (accs.length > 1 ? ` (+${accs.length - 1} item)` : "")
+        : "");
+
+    // SN: buang string kosong & placeholder "-"
+    const realSN = (tx.serial_number || "").trim();
+    const accSNs = accs.map(a => (a.serial_number || "").trim()).filter(Boolean);
+
+    let snState: SnState;
+    let sn = "";
+    if (realSN && realSN !== "-") {
+        snState = "REAL"; sn = realSN;
+    } else if (tx.is_accessory_only) {
+        if (accSNs.length > 0) { snState = "ACC_SN"; sn = accSNs.join(", "); }
+        else snState = "ACC_NO_SN";      // aksesori via nama (fitur lama) → memang tanpa SN
+    } else {
+        snState = "MISSING";             // laptop yang benar-benar belum punya SN
+    }
+
+    return { name, sn, snState, fullTitle: accs.length > 0 ? accs.map(accLabel).join(" • ") : name };
+}
+
 // ─── AlertModal ───────────────────────────────────────────────────────────────
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
     useEffect(() => {
@@ -155,6 +204,7 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
     }, [onClose]);
 
     const originalStatus = getOriginalStatus(tx);
+    const item = getItemDisplay(tx);
     const statusLabel = tx.status === "PAID" && originalStatus
         ? `${originalStatus === "RESERVED" ? "DP" : "Ambil Dulu"} → Lunas`
         : (tx.status === "RESERVED" ? "DP" : tx.status === "HELD" ? "Ambil Dulu" : tx.status === "PACKING" ? "Packing" : tx.status);
@@ -165,8 +215,15 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
         { label: "Customer", value: tx.customer_name },
         { label: "No. HP", value: tx.customer_phone || "—" },
         { label: "Perusahaan", value: tx.company_name || "—" },
-        { label: "Laptop", value: tx.laptop_name },
-        { label: "Serial Number", value: tx.serial_number ? <code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{tx.serial_number}</code> : <span className="text-gray-400 text-xs">Belum ditentukan</span> },
+        { label: "Laptop", value: item.name || "—" },
+        {
+            label: "Serial Number", value:
+                item.snState === "REAL" || item.snState === "ACC_SN"
+                    ? <code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{item.sn}</code>
+                    : item.snState === "ACC_NO_SN"
+                        ? <span className="text-gray-400 text-xs">Aksesori — tanpa SN</span>
+                        : <span className="text-gray-400 text-xs">Belum ditentukan</span>
+        },
         { label: "Harga Deal", value: <span className="font-bold text-gray-800">{fmt(tx.deal_price || tx.amount)}</span> },
         { label: "Metode Bayar", value: tx.payment_method },
         { label: "Platform", value: tx.source_platform || "—" },
@@ -246,6 +303,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     const remaining = Math.max(0, dealTotal - paidSoFar);
     const showCicilanForm = payMode === "CICILAN";
     const showSNForm = tx.status === "RESERVED" && payMode === "LUNAS";
+    const itemDisplay = getItemDisplay(tx);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -434,7 +492,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                             // pakai StatusBadge yang sama dengan tabel biar konsisten.
                             { label: "Status", value: <StatusBadge status={tx.status as "RESERVED" | "HELD" | "PENDING" | "PACKING"} /> },
                             { label: "Customer", value: <span className="text-xs font-semibold text-gray-800">{tx.customer_name}</span> },
-                            { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800 truncate max-w-[180px] block">{tx.laptop_name}</span> },
+                            { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800 truncate max-w-[180px] block" title={itemDisplay.fullTitle || itemDisplay.name}>{itemDisplay.name || "—"}</span> },
                             { label: "Harga Deal", value: <span className="text-sm font-bold text-gray-800">{fmt(dealTotal)}</span> },
                         ].map((row, i) => (
                             <div key={i} className="flex items-center justify-between px-4 py-2.5">
@@ -638,6 +696,7 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
     const [items, setItems] = useState<TxLaptopItem[]>([]);
     const [loadingItems, setLoadingItems] = useState(true);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const itemDisplay = getItemDisplay(tx);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -779,7 +838,7 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
                         ) : (
                             <>
                                 <p>• Status → <span className="font-bold text-red-600">BATAL (Tidak Jadi)</span></p>
-                                <p>• Unit <span className="font-semibold">{tx.laptop_name}</span> kembali ke stok <span className="font-bold text-emerald-700">Siap Jual</span> di Data Barang</p>
+                                <p>• Unit <span className="font-semibold">{itemDisplay.name || tx.laptop_name}</span> kembali ke stok <span className="font-bold text-emerald-700">Siap Jual</span> di Data Barang</p>
                                 <p>• Otomatis hilang dari daftar DP &amp; Ambil Dulu</p>
                                 <p>• Tercatat di Riwayat Transaksi dengan status <span className="font-bold text-red-600">Batal</span></p>
                             </>
@@ -834,6 +893,7 @@ function EditPendingModal({ tx, onClose, onSuccess }: {
     const [reason, setReason] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    const itemDisplay = getItemDisplay(tx);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -968,15 +1028,15 @@ function EditPendingModal({ tx, onClose, onSuccess }: {
                         </div>
                         <div className="flex items-center justify-between px-3.5 py-2">
                             <span className="text-[11px] text-gray-400 font-semibold uppercase">Laptop</span>
-                            <span className="text-xs font-semibold text-gray-800 truncate max-w-[220px] text-right" title={tx.laptop_name}>
-                                {tx.laptop_name}
+                            <span className="text-xs font-semibold text-gray-800 truncate max-w-[220px] text-right" title={itemDisplay.fullTitle || itemDisplay.name}>
+                                {itemDisplay.name || "—"}
                             </span>
                         </div>
-                        {tx.serial_number && (
+                        {(itemDisplay.snState === "REAL" || itemDisplay.snState === "ACC_SN") && (
                             <div className="flex items-center justify-between px-3.5 py-2">
                                 <span className="text-[11px] text-gray-400 font-semibold uppercase">Serial Number</span>
                                 <code className="text-[11px] font-mono font-bold text-gray-700 bg-white px-2 py-0.5 rounded border border-gray-200">
-                                    {tx.serial_number}
+                                    {itemDisplay.sn}
                                 </code>
                             </div>
                         )}
@@ -1226,6 +1286,7 @@ function PendingRow({ tx, canConfirm, canCancel, canEdit, onConfirm, onCancel, o
 }) {
     const isOld = Date.now() - new Date(tx.created_at).getTime() > 3 * 86_400_000;
     const age = daysSince(tx.created_at);
+    const item = getItemDisplay(tx);
 
     return (
         <tr className={`group border-b border-gray-100 last:border-0 hover:bg-gray-50/70 transition-colors duration-100 border-l-2 ${isOld ? "border-l-amber-400" : "border-l-transparent"}`}>
@@ -1257,11 +1318,14 @@ function PendingRow({ tx, canConfirm, canCancel, canEdit, onConfirm, onCancel, o
 
             {/* Laptop */}
             <td className="px-3 py-3 min-w-[160px]">
-                <p className="text-xs font-medium text-gray-700 truncate max-w-[200px]" title={tx.laptop_name}>{tx.laptop_name}</p>
-                {tx.serial_number
-                    ? <code className="text-[10px] font-mono text-gray-400 mt-0.5 block">SN: {tx.serial_number}</code>
-                    : <p className="inline-flex items-center gap-1 text-[10px] text-amber-500 mt-0.5"><AlertTriangle size={11} /> SN belum ada</p>
-                }
+                <p className="text-xs font-medium text-gray-700 truncate max-w-[200px]" title={item.fullTitle || item.name}>{item.name || "—"}</p>
+                {item.snState === "REAL" || item.snState === "ACC_SN" ? (
+                    <code className="text-[10px] font-mono text-gray-400 mt-0.5 block">SN: {item.sn}</code>
+                ) : item.snState === "ACC_NO_SN" ? (
+                    <p className="inline-flex items-center gap-1 text-[10px] text-gray-400 mt-0.5"><Package size={11} /> Aksesori · tanpa SN</p>
+                ) : (
+                    <p className="inline-flex items-center gap-1 text-[10px] text-amber-500 mt-0.5"><AlertTriangle size={11} /> SN belum ada</p>
+                )}
             </td>
 
             {/* Harga */}
@@ -1270,9 +1334,10 @@ function PendingRow({ tx, canConfirm, canCancel, canEdit, onConfirm, onCancel, o
                 <p className="text-[10px] text-gray-400 mt-0.5">{tx.payment_method}</p>
             </td>
 
-            {/* Sales + tanggal */}
+            {/* Sales + toko + tanggal */}
             <td className="px-3 py-3 hidden lg:table-cell min-w-[110px]">
                 <p className="text-[11px] text-gray-600 font-medium truncate">{tx.sales_name}</p>
+                {tx.source_platform && <p className="text-[10px] font-bold text-violet-600 mt-0.5 truncate">{tx.source_platform}</p>}
                 <p className="text-[10px] text-gray-400 mt-0.5">{fmtDateShort(tx.created_at)}</p>
             </td>
 
@@ -1525,6 +1590,8 @@ export default function PendingOrdersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [minSisa, setMinSisa] = useState("");
     const [maxSisa, setMaxSisa] = useState("");
+    // BARU: filter toko/platform ("ALL" = semua toko, atau key hasil platformKey())
+    const [platformFilter, setPlatformFilter] = useState<string>("ALL");
 
     const [activeTab, setActiveTab] = useState<"pending" | "history">("pending");
     const [historyTransactions, setHistoryTransactions] = useState<PendingTransaction[]>([]);
@@ -1654,13 +1721,15 @@ export default function PendingOrdersPage() {
         if (!tx.customer_phone) return;
         const phone = tx.customer_phone.replace(/\D/g, "").replace(/^0/, "62");
         const statusLabel = tx.status === "RESERVED" ? "DP" : "Ambil Dulu";
+        // BARU: transaksi khusus aksesori → laptop_name kosong, pakai nama aksesori
+        const item = getItemDisplay(tx);
         const message = [
             `Halo *${tx.customer_name}*,`,
             ``,
             `Kami ingin mengingatkan mengenai transaksi *${statusLabel}* berikut:`,
             ``,
             `Invoice: *${tx.invoice_number}*`,
-            `Laptop: *${tx.laptop_name}*`,
+            `${tx.is_accessory_only ? "Aksesori" : "Laptop"}: *${item.name || tx.laptop_name}*`,
             `Harga Deal: *${fmt(tx.deal_price || tx.amount)}*`,
             ``,
             `Mohon segera lakukan pelunasan. Terima kasih!`,
@@ -1753,8 +1822,28 @@ export default function PendingOrdersPage() {
         document.body.appendChild(iframe);
     };
 
+    // ── BARU: Opsi Filter Toko dibentuk dari data yang ada (+ jumlah per toko) ──
+    const platformOptions = (() => {
+        const map = new Map<string, { label: string; count: number }>();
+        for (const t of transactions) {
+            const key = platformKey(t.source_platform) || NO_PLATFORM;
+            const cur = map.get(key);
+            if (cur) cur.count++;
+            else map.set(key, { label: key === NO_PLATFORM ? "Tanpa Toko" : (t.source_platform || "").trim(), count: 1 });
+        }
+        return Array.from(map.entries()).sort(([ka, a], [kb, b]) => {
+            if (ka === NO_PLATFORM) return 1;
+            if (kb === NO_PLATFORM) return -1;
+            return a.label.localeCompare(b.label, "id-ID");
+        });
+    })();
+    // Kalau toko yang dipilih sudah tidak ada di data (misal semua sudah lunas) → otomatis "Semua"
+    const activePlatform = platformFilter !== "ALL" && !platformOptions.some(([k]) => k === platformFilter)
+        ? "ALL" : platformFilter;
+
     const filtered = transactions.filter(tx => {
         if (filterStatus !== "ALL" && tx.status !== filterStatus) return false;
+        if (activePlatform !== "ALL" && (platformKey(tx.source_platform) || NO_PLATFORM) !== activePlatform) return false;
         const sisa = (tx.deal_price || tx.amount || 0) - (tx.dp_amount || 0);
         if (minSisa && sisa < Number(minSisa)) return false;
         if (maxSisa && sisa > Number(maxSisa)) return false;
@@ -1762,9 +1851,11 @@ export default function PendingOrdersPage() {
             const q = searchQuery.toLowerCase();
             return tx.customer_name.toLowerCase().includes(q) ||
                 tx.invoice_number.toLowerCase().includes(q) ||
-                tx.laptop_name.toLowerCase().includes(q) ||
+                (tx.laptop_name || "").toLowerCase().includes(q) ||
                 (tx.serial_number || "").toLowerCase().includes(q) ||
-                (tx.customer_phone || "").includes(q);
+                (tx.customer_phone || "").includes(q) ||
+                // BARU: bisa cari lewat nama / SN aksesori (penting untuk transaksi khusus aksesori)
+                (tx.accessory_items ?? []).some(a => a.name.toLowerCase().includes(q) || (a.serial_number || "").toLowerCase().includes(q));
         }
         return true;
     });
@@ -1924,6 +2015,18 @@ export default function PendingOrdersPage() {
                                             <span className={`text-[10px] font-bold px-1 rounded-full ${filterStatus === opt.value ? "bg-white/20" : "bg-gray-100 text-gray-500"}`}>{opt.count}</span>
                                         </button>
                                     ))}
+                                    {/* BARU: Filter Toko / Platform */}
+                                    <select
+                                        value={activePlatform}
+                                        onChange={e => setPlatformFilter(e.target.value)}
+                                        title="Filter toko / platform"
+                                        className={`h-7 pl-2.5 pr-6 rounded-full text-[11px] font-bold border bg-white transition focus:outline-none focus:ring-2 focus:ring-[#0f0c29]/10 ${activePlatform !== "ALL" ? "border-[#0f0c29] text-[#0f0c29]" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}
+                                    >
+                                        <option value="ALL">Semua Toko ({counts.all})</option>
+                                        {platformOptions.map(([key, opt]) => (
+                                            <option key={key} value={key}>{opt.label} ({opt.count})</option>
+                                        ))}
+                                    </select>
                                     <div className="flex items-center gap-1 h-7 pl-2.5 pr-1.5 border border-gray-200 rounded-full bg-white">
                                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0">Sisa</span>
                                         <input type="number" placeholder="min" value={minSisa} onChange={e => setMinSisa(e.target.value)}
