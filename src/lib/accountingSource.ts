@@ -307,6 +307,138 @@ export async function getTransactionSyncDraftsByInvoices(
   return result;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Gabung entry cashflow "multi kategori" (1 submit form → banyak baris) jadi 1 jurnal
+// ─────────────────────────────────────────────────────────────────────────────
+type CashflowRow = {
+  id: string;
+  direction: "IN" | "OUT";
+  category: string;
+  nama: string | null;
+  nominal: number | string;
+  keterangan: string | null;
+  tanggal: string;
+  payment_method: string | null;
+  source_type: string;
+  created_at: string | null;
+};
+
+const CASHFLOW_ROW_SELECT =
+  "id, direction, category, nama, nominal, keterangan, tanggal, payment_method, source_type, created_at";
+
+// Jeda maksimal antar-baris (ms) supaya dianggap 1 submit form yang sama.
+const CASHFLOW_GROUP_WINDOW_MS = 10_000;
+
+function cashflowGroupSignature(e: CashflowRow): string {
+  return [
+    e.source_type,
+    e.tanggal,
+    e.payment_method ?? "",
+    (e.nama ?? "").trim().toLowerCase(),
+    (e.keterangan ?? "").trim().toLowerCase(),
+  ].join("|");
+}
+
+/**
+ * Kelompokkan baris cashflow. Hasil: array of group.
+ * - Group berisi >1 baris = digabung jadi 1 jurnal. Urutan: nominal kecil → besar,
+ *   baris TERAKHIR (nominal terbesar) jadi "utama" (dipakai untuk judul & source_id).
+ * - Hanya uang KELUAR (OUT) yang digabung.
+ * - Kalau ada anggota NON-utama yang sudah terlanjur diposting sendiri-sendiri
+ *   (data lama), group dipecah lagi supaya tidak double-post.
+ */
+async function groupCashflowRows(
+  supabase: SupabaseClient,
+  rows: CashflowRow[]
+): Promise<CashflowRow[][]> {
+  const result: CashflowRow[][] = [];
+  const bySignature = new Map<string, CashflowRow[]>();
+
+  for (const r of rows) {
+    if (r.direction !== "OUT") {
+      result.push([r]);
+      continue;
+    }
+    const sig = cashflowGroupSignature(r);
+    const list = bySignature.get(sig) ?? [];
+    list.push(r);
+    bySignature.set(sig, list);
+  }
+
+  // Pecah per signature berdasarkan jeda waktu created_at
+  const candidateGroups: CashflowRow[][] = [];
+  for (const list of bySignature.values()) {
+    list.sort(
+      (a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.id.localeCompare(b.id)
+    );
+    let cur: CashflowRow[] = [];
+    let lastTs = 0;
+    for (const r of list) {
+      const ts = new Date(r.created_at ?? 0).getTime();
+      if (cur.length > 0 && ts - lastTs > CASHFLOW_GROUP_WINDOW_MS) {
+        candidateGroups.push(cur);
+        cur = [];
+      }
+      cur.push(r);
+      lastTs = ts;
+    }
+    if (cur.length > 0) candidateGroups.push(cur);
+  }
+
+  // Cek anggota group yang sudah punya jurnal sendiri (data lama)
+  const multiIds = candidateGroups.filter((g) => g.length > 1).flatMap((g) => g.map((r) => r.id));
+  const postedIds = new Set<string>();
+  let postedCheckFailed = false;
+  for (const batch of chunkArray(multiIds, 150)) {
+    const { data, error } = await supabase
+      .from("journal_entries")
+      .select("source_id")
+      .eq("source_type", "CASHFLOW")
+      .in("source_id", batch);
+    if (error) {
+      console.error("[akuntansi] cek cashflow terposting (group):", error.message);
+      postedCheckFailed = true;
+      break;
+    }
+    for (const e of data ?? []) postedIds.add(String((e as any).source_id));
+  }
+
+  for (const g of candidateGroups) {
+    const sorted = [...g].sort(
+      (a, b) => Number(a.nominal) - Number(b.nominal) || a.id.localeCompare(b.id)
+    );
+    const primary = sorted[sorted.length - 1];
+    const othersPostedSeparately = sorted.some((r) => r.id !== primary.id && postedIds.has(r.id));
+
+    if (sorted.length === 1 || postedCheckFailed || othersPostedSeparately) {
+      for (const r of sorted) result.push([r]); // perilaku lama: 1 baris = 1 jurnal
+    } else {
+      result.push(sorted);
+    }
+  }
+
+  return result;
+}
+
+/** Baris jurnal untuk 1 group cashflow (1 baris = persis logic lama). */
+function cashflowGroupLines(group: CashflowRow[]): DraftLine[] {
+  const lines: DraftLine[] = [];
+  for (const e of group) {
+    const nominal = Math.round(Number(e.nominal ?? 0));
+    if (nominal <= 0) continue;
+
+    const kasAccount = kasAccountFromCashflow(e.payment_method);
+    if (e.direction === "OUT") {
+      lines.push({ account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal });
+      lines.push({ account_code: kasAccount, side: "KREDIT", nominal });
+    } else {
+      lines.push({ account_code: kasAccount, side: "DEBIT", nominal });
+      lines.push({ account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal });
+    }
+  }
+  return mergeLines(lines); // Kas ikut digabung jadi 1 baris (mis. Kas Saldo Rp102.500)
+}
+
 export interface JournalSyncDraft {
   lines: DraftLine[];
   total: number;
@@ -320,6 +452,9 @@ export interface JournalSyncDraft {
  * cashflow_entries dengan source_type "MANUAL" yang pernah diposting ke
  * Jurnal Umum (lihat buildCashflowDrafts di atas) — jadi cuma itu yang
  * dicek di sini.
+ *
+ * Entry multi kategori (beberapa baris cashflow dari 1 submit) dihitung sebagai
+ * 1 jurnal gabungan — lihat groupCashflowRows().
  */
 export async function getCashflowSyncDraftsByIds(
   supabase: SupabaseClient,
@@ -328,38 +463,56 @@ export async function getCashflowSyncDraftsByIds(
   const result = new Map<string, JournalSyncDraft>();
   if (ids.length === 0) return result;
 
-  const rows: any[] = [];
+  const rows: CashflowRow[] = [];
   for (const batch of chunkArray(ids, 150)) {
     const { data, error } = await supabase
       .from("cashflow_entries")
-      .select("id, direction, category, nominal, payment_method, source_type, nama, keterangan")
+      .select(CASHFLOW_ROW_SELECT)
       .in("source_type", ["MANUAL", "PENGAJUAN_DANA"])
       .in("id", batch);
     if (error) {
       console.error("[akuntansi] fetch cashflow (sync):", error.message);
       return result;
     }
-    if (data) rows.push(...data);
+    if (data) rows.push(...(data as unknown as CashflowRow[]));
   }
 
-  for (const e of rows as any[]) {
-    const nominal = Math.round(Number(e.nominal ?? 0));
-    if (nominal <= 0) continue;
+  // Ambil "saudara" (baris lain di tanggal yang sama) supaya gabungan multi kategori terdeteksi
+  const knownIds = new Set(rows.map((r) => r.id));
+  const outDates = [...new Set(rows.filter((r) => r.direction === "OUT").map((r) => r.tanggal))];
+  const siblings: CashflowRow[] = [];
+  for (const batch of chunkArray(outDates, 50)) {
+    const { data, error } = await supabase
+      .from("cashflow_entries")
+      .select(CASHFLOW_ROW_SELECT)
+      .in("source_type", ["MANUAL", "PENGAJUAN_DANA"])
+      .eq("direction", "OUT")
+      .in("tanggal", batch);
+    if (error) {
+      console.error("[akuntansi] fetch cashflow siblings (sync):", error.message);
+      continue;
+    }
+    for (const r of (data ?? []) as unknown as CashflowRow[]) {
+      if (!knownIds.has(r.id)) siblings.push(r);
+    }
+  }
 
-    const kasAccount = kasAccountFromCashflow(e.payment_method);
-    const lines: DraftLine[] =
-      e.direction === "OUT"
-        ? [
-          { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
-          { account_code: kasAccount, side: "KREDIT", nominal },
-        ]
-        : [
-          { account_code: kasAccount, side: "DEBIT", nominal },
-          { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
-        ];
+  const requested = new Set(ids);
+  const groups = await groupCashflowRows(
+    supabase,
+    [...rows, ...siblings].filter((r) => Math.round(Number(r.nominal ?? 0)) > 0)
+  );
 
-       const merged = mergeLines(lines);
-    result.set(String(e.id), { lines: merged, total: totalOf(merged), keterangan: cashflowKeterangan(e) });
+  for (const group of groups) {
+    const primary = group[group.length - 1];
+    if (!requested.has(primary.id)) continue; // hanya entry jurnal yang memang diminta
+
+    const merged = cashflowGroupLines(group);
+    result.set(String(primary.id), {
+      lines: merged,
+      total: totalOf(merged),
+      keterangan: cashflowKeterangan(primary),
+    });
   }
 
   return result;
@@ -1210,6 +1363,9 @@ async function buildServiceDrafts(
 // Entry otomatis lain (TRANSACTION, TRANSACTION_PAYMENT, TRANSACTION_DP,
 // SERVICE, MODAL_AWAL) TETAP TIDAK ikut ke sini — sudah/akan dibukukan lewat
 // jalurnya sendiri, atau memang di luar cakupan Jurnal Umum otomatis (MODAL_AWAL).
+//
+// Baris uang KELUAR multi kategori dari 1 submit (mis. "Penjualan Laptop" +
+// "Biaya Lain-lain" · Balikin DP customer) digabung jadi 1 draft jurnal.
 async function buildCashflowDrafts(
   supabase: SupabaseClient,
   startDate: string,
@@ -1217,7 +1373,7 @@ async function buildCashflowDrafts(
 ): Promise<JournalDraft[]> {
   const { data: rows, error } = await supabase
     .from("cashflow_entries")
-    .select("id, direction, category, nama, nominal, keterangan, tanggal, payment_method, source_type, created_at")
+    .select(CASHFLOW_ROW_SELECT)
     .in("source_type", ["MANUAL", "PENGAJUAN_DANA"])
     .gte("tanggal", startDate)
     .lt("tanggal", endDateExclusive);
@@ -1229,45 +1385,36 @@ async function buildCashflowDrafts(
 
   const drafts: JournalDraft[] = [];
 
-  for (const e of (rows ?? []) as any[]) {
-    const nominal = Math.round(Number(e.nominal ?? 0));
-    if (nominal <= 0) continue;
+  const validRows = ((rows ?? []) as unknown as CashflowRow[]).filter(
+    (e) => Math.round(Number(e.nominal ?? 0)) > 0
+  );
 
-    const kasAccount = kasAccountFromCashflow(e.payment_method);
+  const groups = await groupCashflowRows(supabase, validRows);
 
-    // OUT: Debit akun beban/aset sesuai kategori, Kredit Kas (uang keluar dari kas).
-    // IN : Debit Kas (uang masuk ke kas), Kredit akun sesuai kategori.
-    const lines: DraftLine[] =
-      e.direction === "OUT"
-        ? [
-          { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
-          { account_code: kasAccount, side: "KREDIT", nominal },
-        ]
-        : [
-          { account_code: kasAccount, side: "DEBIT", nominal },
-          { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
-        ];
-
-    const merged = mergeLines(lines);
-
-    const sortTs = (e.created_at as string) || `${e.tanggal}T00:00:00+07:00`;
+  for (const group of groups) {
+    const primary = group[group.length - 1]; // nominal terbesar = judul & source_id
+    const merged = cashflowGroupLines(group);
+    const totalNominal = group.reduce((s, r) => s + Math.round(Number(r.nominal ?? 0)), 0);
+    const sortTs = primary.created_at || `${primary.tanggal}T00:00:00+07:00`;
 
     drafts.push({
       source_type: "CASHFLOW",
-      source_id: String(e.id),
-      source_category: e.category as string,
-      tanggal: e.tanggal as string,
+      source_id: String(primary.id),
+      source_category: primary.category,
+      tanggal: primary.tanggal,
       sort_ts: sortTs,
-      keterangan: cashflowKeterangan(e),
+      keterangan: cashflowKeterangan(primary),
       ref: null,
       lines: merged,
       total: totalOf(merged),
       meta: {
-        category: e.category,
-        payment_method: e.payment_method,
-        nominal,
-        direction: e.direction,
-        source_type: e.source_type,
+        category: primary.category,
+        payment_method: primary.payment_method,
+        nominal: totalNominal,
+        direction: primary.direction,
+        source_type: primary.source_type,
+        merged_ids: group.map((r) => r.id),
+        merged_count: group.length,
       },
     });
   }
