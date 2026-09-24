@@ -100,12 +100,6 @@ export default function EarlyCheckoutPage() {
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            </button>
             <div>
               <h1 className="text-xl font-black text-gray-900">Izin Pulang Cepat</h1>
               <p className="text-xs text-gray-400 mt-0.5">Persetujuan absen pulang sebelum jadwal pulang</p>

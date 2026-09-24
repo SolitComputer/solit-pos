@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
-  ArrowLeft, Trophy, Medal, Award, Users, TrendingUp, Clock, CheckCircle2,
+  Trophy, Medal, Award, Users, TrendingUp, Clock, CheckCircle2,
   Inbox, AlertCircle, ChevronDown, ChevronUp,
   type LucideIcon,
 } from "lucide-react";
@@ -527,10 +527,6 @@ export default function AttendanceLeaderboardPage() {
           {/* ── Header ── */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-2.5 sm:gap-3.5">
-              <button onClick={() => router.push("/dashboard/attendance")}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-800 hover:border-gray-300 hover:shadow-sm transition-all flex-shrink-0 active:scale-95 bg-white">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#1a1545] to-[#0f0c29] flex items-center justify-center flex-shrink-0 shadow-sm shadow-[#1a1545]/20">
                 <Trophy className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-amber-300" />
               </div>
