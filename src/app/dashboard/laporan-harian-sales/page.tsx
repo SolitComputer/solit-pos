@@ -114,6 +114,13 @@ const contactFieldConfig: Record<"username" | "partner", { label: string; placeh
 // cuma dipakai untuk sembunyikan/tampilkan tombol di UI.
 const AUDIT_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_MARKETING", "MARKETING", "PKL_MARKETING"];
 
+// Role yang TIDAK boleh menambah laporan baru — tim Marketing cuma bertugas
+// mengaudit laporan sales, bukan menginput laporan sendiri. HARUS disamakan
+// dengan NO_ADD_ROLES di src/app/api/sales-reports/route.ts (validasi
+// server-side, sumber kebenaran sesungguhnya). Ini cuma untuk sembunyikan
+// tombol di UI.
+const NO_ADD_ROLES = ["MARKETING", "KEPALA_MARKETING", "PKL_MARKETING"];
+
 // Daftar divisi yang biasa diketik sales di kolom "Sumber" untuk leads WA —
 // dipakai buat sub-filter channel WA, bukan constraint database (kolom
 // `sumber` tetap teks bebas, jadi pencocokan dilakukan case-insensitive).
@@ -175,6 +182,12 @@ function canAuditRole(user: any): boolean {
   return roles.some((r) => AUDIT_ROLES.includes(r));
 }
 
+function canAddReportRole(user: any): boolean {
+  if (!user) return false; // user belum kebaca (masih loading) -> jangan tampilkan tombol dulu
+  const roles: string[] = Array.isArray(user?.roles) && user.roles.length > 0 ? user.roles : (user?.role ? [user.role] : []);
+  return !roles.some((r) => NO_ADD_ROLES.includes(r));
+}
+
 export default function LaporanHarianSalesPage() {
   // --- User & permission ---
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -182,6 +195,7 @@ export default function LaporanHarianSalesPage() {
     getCurrentUserClient().then((u) => setCurrentUser(u));
   }, []);
   const canAudit = canAuditRole(currentUser);
+  const canAddReport = canAddReportRole(currentUser);
 
   // Baca ?channel=WA|FB|OLX|CAROUSEL|MITRA|RESELLER dari URL (dikirim oleh
   // link sidebar "Laporan Sales") supaya tab channel langsung ke-preselect
@@ -526,13 +540,15 @@ export default function LaporanHarianSalesPage() {
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
-            <button
-              onClick={openAddModal}
-              className="flex items-center justify-center gap-1.5 h-10 px-3.5 sm:px-4 rounded-full text-xs sm:text-sm font-semibold bg-gradient-to-br from-violet-600 to-violet-500 text-white hover:from-violet-700 hover:to-violet-600 active:scale-[0.97] transition-all shadow-lg shadow-violet-300/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
-            >
-              <Plus className="w-4 h-4" />
-              Tambah Laporan
-            </button>
+            {canAddReport && (
+              <button
+                onClick={openAddModal}
+                className="flex items-center justify-center gap-1.5 h-10 px-3.5 sm:px-4 rounded-full text-xs sm:text-sm font-semibold bg-gradient-to-br from-violet-600 to-violet-500 text-white hover:from-violet-700 hover:to-violet-600 active:scale-[0.97] transition-all shadow-lg shadow-violet-300/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+              >
+                <Plus className="w-4 h-4" />
+                Tambah Laporan
+              </button>
+            )}
           </div>
         </div>
 

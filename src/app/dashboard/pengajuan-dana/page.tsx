@@ -596,8 +596,14 @@ function RealisasiModal({
 }) {
   const isEdit = !!fundRequest.realisasi_cashflow_id;
   const categories = Object.entries(EXPENSE_CATEGORIES);
-  const [category, setCategory] = useState(categories[0]?.[0] ?? "");
-  const [nominal, setNominal] = useState(fundRequest.realisasi_nominal ? String(fundRequest.realisasi_nominal) : "");
+  type RealisasiItem = { category: string; nominal: string };
+  const [items, setItems] = useState<RealisasiItem[]>([
+    { category: categories[0]?.[0] ?? "", nominal: fundRequest.realisasi_nominal ? String(fundRequest.realisasi_nominal) : "" },
+  ]);
+  const addItem = () => setItems((prev) => [...prev, { category: categories[0]?.[0] ?? "", nominal: "" }]);
+  const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
+  const updateItem = (idx: number, patch: Partial<RealisasiItem>) =>
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   const [keterangan, setKeterangan] = useState(fundRequest.purpose);
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(fundRequest.payment_method);
@@ -613,8 +619,10 @@ function RealisasiModal({
   }, [onClose]);
 
   const submit = async () => {
-    const num = Number(nominal);
-    if (!nominal || !Number.isFinite(num) || num <= 0) { setError("Nominal harus lebih dari 0"); return; }
+    if (items.some((it) => !it.nominal || !Number.isFinite(Number(it.nominal)) || Number(it.nominal) <= 0)) {
+      setError("Nominal setiap kategori harus lebih dari 0");
+      return;
+    }
     setSaving(true); setError("");
     try {
       let photoUrl: string | null = null;
@@ -629,12 +637,14 @@ function RealisasiModal({
         photoUrl = upJson.url;
         setUploadProgress("done");
       }
+      // ⬅️ BARU: kirim semua baris Kategori+Nominal sekaligus sebagai items[] —
+      // backend (realisasi/route.ts) insert satu baris cashflow_entries per item,
+      // realisasi_cashflow_id tetap nunjuk ke entry PERTAMA.
       const res = await fetch(`/api/pengajuan-dana/${fundRequest.id}/realisasi`, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          category,
-          nominal: num,
+          items: items.map((it) => ({ category: it.category, nominal: Number(it.nominal) })),
           keterangan: keterangan.trim() || fundRequest.purpose,
           tanggal,
           payment_method: paymentMethod,
@@ -679,22 +689,37 @@ function RealisasiModal({
               ))}
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">Kategori</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
-              {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-            </select>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-700">Kategori &amp; Nominal</label>
+              <button type="button" onClick={addItem} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 active:scale-95 transition">
+                <Plus className="w-3.5 h-3.5" /> Tambah Kategori
+              </button>
+            </div>
+            <div className="space-y-2">
+              {items.map((it, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-slate-200 text-[10px] font-bold text-slate-400">{idx + 1}</span>
+                  <select value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} className={`${inputCls} bg-white flex-1 min-w-0`}>
+                    {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                  </select>
+                  <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right`} autoFocus={idx === 0} />
+                  <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className="shrink-0 w-8 h-8 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {items.some((it) => it.nominal && Number(it.nominal) > 0) && (
+              <div className="flex items-center justify-between pt-2.5 border-t border-slate-200">
+                <span className="text-[11px] font-semibold text-slate-500">Total{items.length > 1 ? ` (${items.length} kategori)` : ""}</span>
+                <span className="text-sm font-black text-teal-600 font-mono tabular-nums">{formatRupiah(items.reduce((s, it) => s + (Number(it.nominal) || 0), 0))}</span>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2">Nominal <span className="text-red-500">*</span></label>
-              <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
-              {nominal && Number(nominal) > 0 && <p className="text-[11px] text-teal-600 mt-1 font-mono font-semibold">{formatRupiah(Number(nominal))}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2">Tanggal</label>
-              <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2">Tanggal</label>
+            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2">Keterangan</label>
