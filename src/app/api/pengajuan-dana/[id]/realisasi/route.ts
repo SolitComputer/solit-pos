@@ -62,7 +62,9 @@ export async function POST(
             ? body.items
             : [{ category: body.category, nominal: body.nominal }];
 
-    const items: RealisasiItem[] = [];
+    // Gabungkan kategori kembar (jumlahkan nominalnya) supaya tidak melanggar
+    // unique index uniq_cashflow_source (source_type, source_id, category).
+    const merged = new Map<string, number>();
     for (const it of rawItems) {
         const nom = Math.round(Number(it.nominal));
         if (!Number.isFinite(nom) || nom <= 0) {
@@ -71,9 +73,10 @@ export async function POST(
         if (!it.category || !isValidCategory("OUT", it.category)) {
             return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
         }
-        items.push({ category: it.category, nominal: nom });
+        merged.set(it.category, (merged.get(it.category) ?? 0) + nom);
     }
 
+    const items: RealisasiItem[] = Array.from(merged, ([category, nominal]) => ({ category, nominal }));
     const totalNominal = items.reduce((sum, it) => sum + it.nominal, 0);
     const pm = payment_method === "SALDO" ? "SALDO" : "CASH";
 
