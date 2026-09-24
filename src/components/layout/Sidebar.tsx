@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { useVehiclePendingBadge } from "@/hooks/useVehiclePendingBadge";
+import { usePengajuanDanaBadge } from "@/hooks/usePengajuanDanaBadge";
 import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
@@ -1157,12 +1158,23 @@ function NavItem({ item, isActive, onClick, badge, rail, isPinned, onTogglePin }
       </span>
       {!rail && <span className="flex-1 truncate">{item.name}</span>}
       {badge && badge > 0 ? (
-        <span
-          style={{ animation: "solitBadgePop 0.3s ease-out both" }}
-          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${rail ? "absolute top-0.5 right-1" : "ml-auto mr-1"} ${isActive ? "bg-white text-indigo-600" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
-        >
-          {badge > 99 ? "99+" : badge}
-        </span>
+        // Badge "Pengajuan Dana" sengaja dibuat lebih besar & berdenyut —
+        // ini notif approval dana, harus jauh lebih mencolok dari badge menu lain.
+        item.href === "/dashboard/pengajuan-dana" ? (
+          <span
+            style={{ animation: "solitBadgePop 0.3s ease-out both" }}
+            className={`inline-flex items-center justify-center min-w-[26px] h-[26px] px-1.5 rounded-full text-sm font-black tabular-nums animate-pulse ${rail ? "absolute -top-1 -right-1" : "ml-auto mr-1"} ${isActive ? "bg-white text-indigo-600" : "bg-red-500 text-white shadow-md shadow-red-500/50 ring-2 ring-red-200"}`}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        ) : (
+          <span
+            style={{ animation: "solitBadgePop 0.3s ease-out both" }}
+            className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${rail ? "absolute top-0.5 right-1" : "ml-auto mr-1"} ${isActive ? "bg-white text-indigo-600" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )
       ) : null}
 
       {/* Tombol Sematkan / Pin */}
@@ -1756,6 +1768,8 @@ export default function Sidebar() {
   const overtimeNotify = useOvertimeNotify(effectiveRoles, user?.id);
   // Badge senyap (tanpa bunyi) untuk admin: pengajuan pinjam kendaraan yang PENDING
   const vehiclePending = useVehiclePendingBadge(userRoles, user?.id);
+  // Badge senyap (tanpa bunyi) untuk admin: jumlah pengajuan dana yang belum di-approve
+  const pengajuanDanaBadge = usePengajuanDanaBadge(userRoles, user?.id);
   const leadsChat = useLeadsChatNotify(effectiveRoles, user?.id);
   const { sound_key: notifSoundKey, custom_sound_url: notifCustomUrl } = useNotificationSettings(user?.id ?? null);
 
@@ -1769,6 +1783,7 @@ export default function Sidebar() {
   const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
   const onOvertimePage = pathname.startsWith("/dashboard/attendance/overtime");
   const onKendaraanPage = pathname.startsWith("/dashboard/kendaraan");
+  const onPengajuanDanaPage = pathname.startsWith("/dashboard/pengajuan-dana");
 
   const isSilentAdmin = isPrepSilent(null, effectiveRoles);
 
@@ -1787,6 +1802,7 @@ export default function Sidebar() {
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
     "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count,
     "/dashboard/kendaraan": onKendaraanPage ? 0 : vehiclePending.count,
+    "/dashboard/pengajuan-dana": onPengajuanDanaPage ? 0 : pengajuanDanaBadge.count,
     "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
     "/dashboard/ai-ceo": aiCeoEscalationCount,
 
