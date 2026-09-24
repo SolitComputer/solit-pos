@@ -95,33 +95,51 @@ export async function POST(
 
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
-    // 1. Insert entry Uang Keluar ke Cashflow — inilah yang bikin otomatis sinkron
-    const { data: cashflowEntry, error: cfError } = await supabase
+    // 1. Kalau entry Cashflow untuk pengajuan ini sudah ada (percobaan sebelumnya
+    //    sukses insert tapi gagal link balik), pakai ulang — jangan insert lagi.
+    const { data: existingEntry } = await supabase
         .from("cashflow_entries")
-        .insert({
-            direction: "OUT",
-            category,
-            nama: userName,
-            nominal: nom,
-            modal: null,
-            keterangan: keterangan?.trim() || fundRequest.purpose || null,
-            tanggal: tanggal || jakartaToday,
-            source_type: "PENGAJUAN_DANA",
-            source_id: id,
-            payment_method: pm,
-            photo_url: photo_url ?? null,
-            created_by: userId,
-            is_audited: false,
-        })
-        .select()
-        .single();
+        .select("id")
+        .eq("source_type", "PENGAJUAN_DANA")
+        .eq("source_id", id)
+        .limit(1)
+        .maybeSingle();
 
-    if (cfError) {
-        console.error("[pengajuan-dana realisasi] insert cashflow error:", cfError);
-        return NextResponse.json({ success: false, message: cfError.message }, { status: 500 });
+    let cashflowEntry: { id: string } | null = existingEntry;
+    let createdHere = false;
+
+    if (!cashflowEntry) {
+        const { data: inserted, error: cfError } = await supabase
+            .from("cashflow_entries")
+            .insert({
+                direction: "OUT",
+                category,
+                nama: userName,
+                nominal: nom,
+                modal: null,
+                keterangan: keterangan?.trim() || fundRequest.purpose || null,
+                tanggal: tanggal || jakartaToday,
+                source_type: "PENGAJUAN_DANA",
+                source_id: id,
+                payment_method: pm,
+                photo_url: photo_url ?? null,
+                created_by: userId,
+                is_audited: false,
+            })
+            .select()
+            .single();
+
+        if (cfError) {
+            console.error("[pengajuan-dana realisasi] insert cashflow error:", cfError);
+            return NextResponse.json({ success: false, message: cfError.message }, { status: 500 });
+        }
+        cashflowEntry = inserted as { id: string };
+        createdHere = true;
     }
 
-    // 2. Tandai pengajuan sudah direalisasi + simpan link ke entry Cashflow-nya
+    // 2. Tandai pengajuan sudah direalisasi + simpan link ke entry Cashflow-nya.
+    //    .is("realisasi_cashflow_id", null) = kunci anti-dobel: kalau request lain
+    //    sudah lebih dulu menautkan realisasi, update ini tidak mengenai baris apa pun.
     const { data: updated, error: updateErr } = await supabase
         .from("fund_requests")
         .update({
@@ -132,8 +150,9 @@ export async function POST(
             realisasi_at: new Date().toISOString(),
         })
         .eq("id", id)
+        .is("realisasi_cashflow_id", null)
         .select()
-        .single();
+        .maybeSingle();
 
     if (updateErr) {
         // Entry Cashflow-nya sudah kebuat & benar (bagian terpenting), tapi gagal
@@ -144,6 +163,17 @@ export async function POST(
             data: { ...fundRequest, realisasi_cashflow_id: cashflowEntry.id },
             warning: "Tersimpan di Cashflow, tapi status Pengajuan Dana gagal ter-update. Refresh halaman.",
         });
+    }
+
+    if (!updated) {
+        // Kalah balapan (double submit): buang entry cashflow yang barusan kita buat sendiri
+        if (createdHere) {
+            await supabase.from("cashflow_entries").delete().eq("id", cashflowEntry.id);
+        }
+        return NextResponse.json(
+            { success: false, message: "Pengajuan ini sudah pernah diisi realisasinya" },
+            { status: 400 }
+        );
     }
 
     return NextResponse.json({ success: true, data: updated }, { status: 201 });
