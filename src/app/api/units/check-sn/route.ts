@@ -45,16 +45,20 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     }
 
     // ── 2) Fallback: accessory_units ──
-    // Normalisasi SN → uppercase (kolom disimpan uppercase), pakai .eq exact.
-    const snUpper = sn.toUpperCase();
+    // Exact match tapi case-insensitive (ilike). Escape \ % _ supaya SN yang
+    // mengandung "_" atau "%" tidak dianggap wildcard oleh LIKE.
+    const snEscaped = sn.replace(/[\\%_]/g, "\\$&");
 
-    const { data: accUnit, error: accErr } = await supabaseAdmin
+    const { data: accRows, error: accErr } = await supabaseAdmin
       .from("accessory_units")
       .select("id, serial_number, condition, selling_price, status, notes, accessory_id")
-      .eq("serial_number", snUpper)
-      .maybeSingle();
+      .ilike("serial_number", snEscaped)
+      .limit(1);
 
     if (accErr) console.error("[check-sn] accessory_units:", accErr);
+
+    const accUnit = accRows?.[0] ?? null;
+    console.log("[check-sn] acc lookup", { sn, rows: accRows?.length ?? 0, err: accErr?.message });
 
     if (accUnit) {
       // Ambil master accessory terpisah (hindari ketergantungan FK embed)
