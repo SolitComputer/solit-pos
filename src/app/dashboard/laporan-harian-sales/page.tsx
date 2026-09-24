@@ -23,6 +23,7 @@ import {
   AtSign,
   MessageSquareText,
   Megaphone,
+  Search,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserClient } from "@/lib/auth-client";
@@ -177,6 +178,36 @@ function initials(name: string) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
+// Pencarian: semua kata yang diketik harus ketemu di salah satu kolom
+// (kontak, minat, keterangan, sumber, nama sales/auditor). Kata yang berupa
+// nomor (mis. "0812-3456") juga dicocokkan versi angka-saja ke nomor telepon,
+// supaya spasi/strip/plus tidak menghalangi hasil.
+function matchesSearch(entry: SalesReportEntry, rawQuery: string): boolean {
+  const tokens = rawQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+
+  const haystack = [
+    entry.phone_number,
+    entry.partner_name,
+    entry.interest,
+    entry.keterangan,
+    entry.sumber,
+    entry.filled_by_name,
+    entry.audited_by_name,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const phoneDigits = (entry.phone_number ?? "").replace(/\D/g, "");
+
+  return tokens.every((token) => {
+    if (haystack.includes(token)) return true;
+    const isPhoneLike = /^[\d+\-().]+$/.test(token);
+    const tokenDigits = token.replace(/\D/g, "");
+    return isPhoneLike && tokenDigits.length >= 3 && phoneDigits.includes(tokenDigits);
+  });
+}
+
 function canAuditRole(user: any): boolean {
   const roles: string[] = Array.isArray(user?.roles) && user.roles.length > 0 ? user.roles : (user?.role ? [user.role] : []);
   return roles.some((r) => AUDIT_ROLES.includes(r));
@@ -235,6 +266,8 @@ export default function LaporanHarianSalesPage() {
   // oleh sales (SOLIT/SOTECH/ONPOINT/ZENIT) buat nandain leads itu punya divisi
   // mana. "ALL" = tampilkan semua leads WA tanpa peduli sumbernya.
   const [waSumberFilter, setWaSumberFilter] = useState<WaSumberFilter>("ALL");
+  // Kata kunci pencarian (client-side, hanya mencari di data periode yang sedang dimuat).
+  const [searchQuery, setSearchQuery] = useState("");
   const [listError, setListError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -271,10 +304,10 @@ export default function LaporanHarianSalesPage() {
     fetchEntries(period);
   }, [period, fetchEntries]);
 
-  // Balik ke halaman 1 setiap ganti periode, tab channel, filter sumber WA, atau filter status audit.
+  // Balik ke halaman 1 setiap ganti periode, tab channel, filter sumber WA, filter status audit, atau kata kunci pencarian.
   useEffect(() => {
     setCurrentPage(1);
-  }, [period, channelFilter, waSumberFilter, auditStatusFilter]);
+  }, [period, channelFilter, waSumberFilter, auditStatusFilter, searchQuery]);
 
   // Reset filter sumber WA setiap pindah tab channel — biar gak "nyangkut" pas
   // balik lagi ke tab WA nanti.
@@ -332,8 +365,9 @@ export default function LaporanHarianSalesPage() {
     }
     if (auditStatusFilter === "audited") result = result.filter((e) => e.audited);
     else if (auditStatusFilter === "unaudited") result = result.filter((e) => !e.audited);
+    if (searchQuery.trim()) result = result.filter((e) => matchesSearch(e, searchQuery));
     return result;
-  }, [entries, channelFilter, waSumberFilter, auditStatusFilter]);
+  }, [entries, channelFilter, waSumberFilter, auditStatusFilter, searchQuery]);
 
   // Potongan data untuk halaman aktif.
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / ROWS_PER_PAGE));
@@ -957,6 +991,34 @@ export default function LaporanHarianSalesPage() {
             </span>
           </div>
 
+          {/* Search — kontak, minat, keterangan, sumber, nama sales/auditor */}
+          <div className="px-4 sm:px-5 py-3 border-b border-gray-100">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setSearchQuery("");
+                }}
+                placeholder="Cari kontak, minat, sumber, atau nama sales..."
+                aria-label="Cari laporan"
+                className="w-full pl-10 pr-10 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-full outline-none placeholder:text-gray-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Hapus pencarian"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Tab channel — fade di kedua ujung sebagai penanda ada konten yang bisa di-scroll */}
           <div className="relative border-b border-gray-100">
             <div
@@ -1085,8 +1147,12 @@ export default function LaporanHarianSalesPage() {
               <p className="text-sm font-medium text-gray-700">
                 {entries.length === 0 ? "Belum ada laporan pada periode ini" : "Tidak ada laporan yang cocok dengan filter ini"}
               </p>
-              <p className="text-xs text-gray-400 mt-1 max-w-[220px]">
-                {entries.length === 0 ? "Laporan leads yang kamu catat akan muncul di sini." : "Coba ganti channel atau filter status audit di atas."}
+              <p className="text-xs text-gray-400 mt-1 max-w-[240px]">
+                {entries.length === 0
+                  ? "Laporan leads yang kamu catat akan muncul di sini."
+                  : searchQuery.trim()
+                    ? `Tidak ada hasil untuk "${searchQuery.trim()}" pada periode ini. Coba kata kunci lain atau ganti periode.`
+                    : "Coba ganti channel atau filter status audit di atas."}
               </p>
               {entries.length === 0 && (
                 <button
