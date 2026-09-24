@@ -388,13 +388,7 @@ export default function CCAnalisaPage() {
 
           {/* ── Header ── */}
           <div className="mb-5 flex flex-wrap items-center gap-3">
-            <Link href="/dashboard/cc-reports"
-              className="rounded-xl border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-900">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </Link>
-<div className="min-w-0">
+            <div className="min-w-0">
               <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">Analisa Konten</h1>
               <p className="text-sm text-gray-500">
                 {data?.rangeLabel ?? "Memuat…"}

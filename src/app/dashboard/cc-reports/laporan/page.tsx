@@ -1,7 +1,6 @@
 // src/app/dashboard/cc-reports/laporan/page.tsx
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   type CCReport, type CCStatus, type CCBrand, type BrandFilter, type CCReportListResponse,
@@ -141,12 +140,6 @@ export default function CCLaporanPage() {
         <div className="mx-auto max-w-6xl">
           {/* Header */}
           <div className="mb-6 flex items-center gap-3">
-            <Link href="/dashboard/cc-reports"
-              className="rounded-xl border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-900">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </Link>
             <div>
               <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">Laporan Kerja</h1>
               <p className="text-sm text-gray-500">

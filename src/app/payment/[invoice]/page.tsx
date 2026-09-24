@@ -109,6 +109,18 @@ export default function EditTransactionPage() {
   const router = useRouter();
   const invoice = params.invoice as string;
 
+  // Halaman ini bisa dibuka langsung lewat link (mis. dikirim ke customer),
+  // jadi tab-nya bisa saja tidak punya history sama sekali — router.back()
+  // polos akan diam saja kalau dipanggil dalam kondisi itu. Fallback ke
+  // /dashboard supaya tombol "Kembali"/"Batal" selalu jalan.
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/dashboard");
+    }
+  };
+
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -607,7 +619,7 @@ export default function EditTransactionPage() {
           bisa mengedit transaksi.
         </p>
         <button
-          onClick={() => router.back()}
+          onClick={handleBack}
           className="mt-5 px-5 py-2.5 bg-gradient-to-br from-[#1a1545] to-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition shadow-lg shadow-[#0f0c29]/20"
         >
           Kembali
@@ -869,7 +881,7 @@ export default function EditTransactionPage() {
         <div className="page-hero pt-1">
           <div className="flex flex-wrap items-start justify-between gap-3 relative z-[1]">
             <div className="min-w-0">
-              <button onClick={() => router.back()} className="hero-back-btn">
+              <button onClick={handleBack} className="hero-back-btn">
                 <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
                 Kembali
               </button>
@@ -1591,7 +1603,7 @@ export default function EditTransactionPage() {
         <div className="mobile-action-bar">
           <div className="flex gap-3">
             <button
-              onClick={() => router.back()}
+              onClick={handleBack}
               className="flex-1 h-11 bg-white text-gray-500 rounded-xl text-sm font-semibold border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition"
             >
               Batal
