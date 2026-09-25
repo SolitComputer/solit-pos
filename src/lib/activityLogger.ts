@@ -22,7 +22,8 @@ export type LogEntity =
   | "preparation"
   | "cashflow"
   | "cashflow_audit_access"
-  | "attendance";
+  | "attendance"
+  | "user";
 
 interface LogActivityParams {
   userId: string;

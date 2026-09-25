@@ -517,14 +517,19 @@ export default function FaceVerifyPage() {
     } else {
       addLog(`Lokasi valid — dalam radius ${MAX_DISTANCE_METERS}m`, "ok");
       if (needEnrollState) {
-        setStage("enroll");
-        setMessage("Lokasi valid. Daftarkan wajah Anda sekarang");
+        if (attendanceDirection === "OUT") {
+          setStage("error");
+          setMessage("Data wajah belum terdaftar. Untuk absen pulang, silakan hubungi Admin.");
+        } else {
+          setStage("enroll");
+          setMessage("Lokasi valid. Daftarkan wajah Anda sekarang");
+        }
       } else {
         setStage("verify");
         setMessage("Lokasi valid. Silakan lakukan verifikasi wajah");
       }
     }
-  }, [addLog, needEnrollState]);
+  }, [addLog, needEnrollState, attendanceDirection]);
 
   const checkLocation = useCallback(async () => {
     setStage("checking");
@@ -699,6 +704,11 @@ export default function FaceVerifyPage() {
         }
 
         if (statusResult.needEnroll) {
+          if (direction === "OUT") {
+            setStage("error");
+            setMessage("Data wajah belum terdaftar untuk akun ini. Untuk absen pulang, hubungi Admin.");
+            return;
+          }
           setStage("location");
           setMessage("Daftarkan wajah — cek lokasi terlebih dahulu");
         } else {
@@ -772,6 +782,11 @@ export default function FaceVerifyPage() {
       for (let d = 0; d < dims; d++) avg[d] += emb[d];
     }
     for (let d = 0; d < dims; d++) avg[d] /= collected.length;
+    // ⛔ KEAMANAN KETAT: L2-Normalize vektor rata-rata sebelum dikirim
+    const norm = Math.sqrt(avg.reduce((s, v) => s + v * v, 0));
+    if (norm > 0) {
+      for (let d = 0; d < dims; d++) avg[d] /= norm;
+    }
     return avg;
   }, [captureEmbedding]);
 
@@ -849,6 +864,14 @@ export default function FaceVerifyPage() {
             if (!embedding) { isCapturingRef.current = false; return; }
 
             if (mode === "enroll") {
+              if (attendanceDirection === "OUT") {
+                addLog("pendaftaran wajah saat jam pulang ditolak", "err");
+                setStage("error");
+                setMessage("Data wajah belum terdaftar. Untuk absen pulang, silakan hubungi Admin.");
+                isCapturingRef.current = false;
+                return;
+              }
+
               setStage("enrolling");
               setMessage("Memproses pendaftaran wajah...");
               addLog("auto-capture — enrolling...", "ok");
@@ -861,7 +884,8 @@ export default function FaceVerifyPage() {
               const enrollData = await enrollRes.json();
 
               if (enrollData.success) {
-                addLog("enrollment berhasil ", "ok");
+                addLog("enrollment berhasil dikunci ke akun", "ok");
+                setNeedEnrollState(false);
                 const vd = await doVerify(embedding, 1, coords);
                 if (vd.success) {
                   setStage("success");
@@ -887,8 +911,9 @@ export default function FaceVerifyPage() {
                   setMessage("Posisikan wajah lagi untuk absen");
                 }
               } else {
-                addLog(`enrollment gagal: ${enrollData.message}`, "err");
-                setStage("enroll");
+                addLog(`enrollment ditolak: ${enrollData.message}`, "err");
+                setMessage(enrollData.message || "Pendaftaran wajah gagal");
+                setStage("error");
               }
             } else {
               const currentAttempt = attemptsRef.current + 1;
@@ -917,20 +942,26 @@ export default function FaceVerifyPage() {
                 });
                 setStage("out-of-time");
               } else if (vd.needEnroll) {
-                addLog("wajah belum terdaftar → enroll", "warn");
-                setStage("enroll");
-                setMessage("Wajah belum terdaftar. Daftarkan sekarang.");
+                if (attendanceDirection === "OUT") {
+                  addLog("wajah belum terdaftar saat jam pulang", "err");
+                  setStage("error");
+                  setMessage("Data wajah belum terdaftar. Untuk absen pulang, silakan hubungi Admin.");
+                } else {
+                  addLog("wajah belum terdaftar → enroll", "warn");
+                  setStage("enroll");
+                  setMessage("Wajah belum terdaftar. Daftarkan sekarang.");
+                }
               } else {
                 addLog(`match gagal [${currentAttempt}/${MAX_ATTEMPTS}] — dist: ${vd.distance?.toFixed(3) ?? "?"}`, "warn");
                 if (currentAttempt >= MAX_ATTEMPTS) {
-                  setAttempts(0);
-                  attemptsRef.current = 0;
+                  setAttempts(MAX_ATTEMPTS);
+                  attemptsRef.current = MAX_ATTEMPTS;
                   setStage("verify");
-                  setMessage("Wajah tidak dikenali. Pastikan pencahayaan cukup dan coba lagi.");
-                  addLog("reset attempts — silakan coba lagi", "warn");
+                  setMessage("Wajah tidak cocok dengan akun ini. Hubungi Admin jika ada kendala.");
+                  addLog("verifikasi terkunci: wajah tidak cocok", "err");
                 } else {
                   setStage("verify");
-                  setMessage(`Gagal (${currentAttempt}/${MAX_ATTEMPTS}) — Coba lagi`);
+                  setMessage(`Wajah tidak cocok (${currentAttempt}/${MAX_ATTEMPTS}) — Coba lagi`);
                 }
               }
             }
@@ -1739,20 +1770,24 @@ export default function FaceVerifyPage() {
               </div>
             )}
 
-            {attempts >= 3 && !isProcessing && (
-              <GhostButton
-                style={{ width: "100%", textAlign: "center", color: "rgba(248,113,113,0.55)", fontSize: 10 }}
-                onClick={async () => {
-                  addLog("re-enrollment requested", "warn");
-                  await fetch("/api/auth/face-enroll", { method: "PUT" });
-                  setAttempts(0);
-                  attemptsRef.current = 0;
-                  setStage("enroll");
-                  setMessage("Daftarkan wajah Anda");
+            {attempts >= MAX_ATTEMPTS && !isProcessing && (
+              <div
+                style={{
+                  background: "rgba(239, 68, 68, 0.12)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  marginTop: 10,
+                  textAlign: "center",
+                  fontSize: 11,
+                  color: "#f87171",
+                  lineHeight: 1.5,
                 }}
               >
-                Wajah tidak dikenali? Daftar ulang →
-              </GhostButton>
+                ⚠️ <b>Wajah Tidak Cocok</b><br />
+                Wajah di kamera tidak sesuai dengan akun <b>{userName || "ini"}</b>.<br />
+                Pendaftaran ulang atau reset data wajah hanya dapat dilakukan oleh <b>Admin</b>.
+              </div>
             )}
           </>
         )}
