@@ -87,6 +87,37 @@ const EMPTY_UNIT_FORM = {
     notes: "",
 };
 
+// Batas per request di /api/accessory-units/bulk. Data lebih dari ini dipecah
+// jadi beberapa batch dan dikirim berurutan (bukan paralel) supaya server
+// tidak kewalahan dan urutan SN placeholder tetap terjaga.
+const MAX_UNITS_PER_BATCH = 500;
+
+async function postUnitsInChunks<T>(
+    accessoryId: string,
+    units: T[],
+): Promise<{ inserted: number; failed: number; message?: string }> {
+    let inserted = 0;
+    for (let i = 0; i < units.length; i += MAX_UNITS_PER_BATCH) {
+        const chunk = units.slice(i, i + MAX_UNITS_PER_BATCH);
+        try {
+            const res = await fetch(`/api/accessory-units/bulk`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ accessory_id: accessoryId, units: chunk }),
+            });
+            const json = await res.json();
+            if (!json.success) {
+                // Berhenti di batch yang gagal; batch sebelumnya sudah tersimpan.
+                return { inserted, failed: units.length - inserted, message: json.message };
+            }
+            inserted += json.count ?? chunk.length;
+        } catch {
+            return { inserted, failed: units.length - inserted, message: "Koneksi gagal" };
+        }
+    }
+    return { inserted, failed: 0 };
+}
+
 // ─── Price Input ─────────────────────────────────────────────────────────────
 function PriceInput({ label, value, onChange, required }: {
     label: string; value: string;
@@ -327,17 +358,16 @@ function BulkAddModal({
         setLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/accessory-units/bulk`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ accessory_id: accessoryId, units }),
-            });
-            const result = await res.json();
-            if (!result.success) {
-                setError(result.message || "Gagal menambahkan units");
+            const { inserted, failed, message } = await postUnitsInChunks(accessoryId, units);
+            if (failed > 0) {
+                if (inserted > 0) onSuccess(); // refresh tabel, unit yang sudah masuk langsung tampil
+                setError(
+                    `${inserted} unit berhasil, ${failed} gagal${message ? `: ${message}` : ""}. ` +
+                    `Unit yang sudah masuk tidak perlu dikirim ulang, sesuaikan SN awal untuk sisanya.`
+                );
                 return;
             }
-            toast.success(`${result.count} unit berhasil ditambahkan`);
+            toast.success(`${inserted} unit berhasil ditambahkan`);
             onSuccess();
             onClose();
         } catch {
@@ -1248,18 +1278,23 @@ export default function AccessoryUnitsPage() {
                 selling_price: accessory?.sell_price ?? 0,
                 notes: "",
             }));
-            const res = await fetch(`/api/accessory-units/bulk`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ accessory_id: accessoryId, units: unitsToCreate }),
-            });
-            const json = await res.json();
-            if (!json.success) {
-                setAutoGenFailed(true);
-                toast.error(json.message || "Gagal migrasi otomatis stok lama");
+            const { inserted, failed, message } = await postUnitsInChunks(accessoryId, unitsToCreate);
+            if (failed > 0) {
+                if (inserted > 0) {
+                    // Sebagian sudah masuk, jadi tabel tidak kosong lagi dan tombol "Coba Lagi"
+                    // tidak akan muncul. Sisa dibuat lewat "Tambah Banyak".
+                    toast.error(
+                        `${inserted} unit berhasil dibuat, ${failed} gagal${message ? ` (${message})` : ""}. ` +
+                        `Tambahkan sisa ${failed} unit lewat "Tambah Banyak".`
+                    );
+                    fetchData();
+                } else {
+                    setAutoGenFailed(true);
+                    toast.error(message || "Gagal migrasi otomatis stok lama");
+                }
                 return;
             }
-            toast.success(`${json.count} unit otomatis dibuat dari stok lama — klik "Edit" tiap unit untuk isi SN aslinya`);
+            toast.success(`${inserted} unit otomatis dibuat dari stok lama — klik "Edit" tiap unit untuk isi SN aslinya`);
             fetchData();
         } catch {
             setAutoGenFailed(true);
