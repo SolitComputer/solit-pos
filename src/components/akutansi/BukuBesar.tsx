@@ -380,7 +380,7 @@ export default function BukuBesar({ period }: { period: string }) {
             )}
             {/* ── Cari baris buku besar ── */}
             {data && (
-                <div className="sticky top-0 z-20 bg-white py-2">
+                <div className="sticky top-0 z-20 bg-white py-2 relative">
                     <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                         value={tableSearch}
@@ -391,8 +391,134 @@ export default function BukuBesar({ period }: { period: string }) {
                 </div>
             )}
 
-            {/* ── Tabel Buku Besar ── */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* ── Mobile: kartu per mutasi, lebih gampang dibaca & tap "Cek" daripada tabel sempit ── */}
+            <div className="md:hidden space-y-2">
+                {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2 animate-pulse">
+                            <div className="h-3 bg-gray-100 rounded w-1/2" />
+                            <div className="h-3 bg-gray-100 rounded w-1/3" />
+                        </div>
+                    ))
+                ) : !data ? (
+                    <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-sm text-gray-400">
+                        Pilih akun untuk melihat buku besar
+                    </div>
+                ) : (
+                    <>
+                        {/* Saldo Awal */}
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-3.5 flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-gray-500 italic">Saldo Awal</span>
+                            <SaldoBadge amount={data.saldo_awal} normalSide={normalSide} />
+                        </div>
+
+                        {data.lines.length === 0 ? (
+                            <div className="bg-white rounded-xl border border-gray-200 py-14 text-center">
+                                <div className="flex justify-center mb-3 opacity-40"><BookOpen className="w-10 h-10" /></div>
+                                <p className="text-sm text-gray-500 font-medium">Belum ada mutasi di periode ini</p>
+                                <p className="text-xs text-gray-400 mt-1 px-6">Konfirmasi data di Jurnal Umum agar muncul di sini.</p>
+                            </div>
+                        ) : filteredLines.length === 0 ? (
+                            <div className="bg-white rounded-xl border border-gray-200 py-14 text-center">
+                                <div className="flex justify-center mb-3 opacity-40"><Search className="w-10 h-10" /></div>
+                                <p className="text-sm text-gray-500 font-medium">Tidak ada baris yang cocok</p>
+                                <p className="text-xs text-gray-400 mt-1 px-6">Coba kata kunci lain untuk keterangan, debit, atau kredit.</p>
+                            </div>
+                        ) : (
+                            filteredLines.map((l) => {
+                                const companyBadge = getCompanyBadge(l.trx_meta?.company_name);
+                                const specParts = [l.trx_meta?.cpu, l.trx_meta?.ram, l.trx_meta?.storage].filter(Boolean) as string[];
+                                return (
+                                    <div key={l.id} className="bg-white rounded-xl border border-gray-200 p-3.5">
+                                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                                            <span className="text-[11px] font-semibold text-gray-500">{fmtTgl(l.tanggal)}</span>
+                                            {l.is_synthetic ? (
+                                                <span
+                                                    title="Baris otomatis (modal belum diinput) — tidak bisa dicek manual"
+                                                    className="w-7 h-7 rounded-md border border-dashed border-gray-200 flex items-center justify-center text-gray-300 shrink-0"
+                                                >
+                                                    —
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => toggleChecked(l.id, !l.checked)}
+                                                    title={
+                                                        l.checked
+                                                            ? `Sudah dicek${l.checked_at ? " · " + fmtTglJam(l.checked_at) : ""} · ${l.checked_by_name ? "oleh " + l.checked_by_name : "pencentang tidak tercatat"}`
+                                                            : "Tandai sudah dicek"
+                                                    }
+                                                    className={`w-7 h-7 rounded-md border flex items-center justify-center active:scale-90 transition-all duration-150 shrink-0 ${l.checked
+                                                        ? "bg-green-600 border-green-600 text-white"
+                                                        : "bg-white border-gray-300 text-gray-300"
+                                                        }`}
+                                                >
+                                                    <Check className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                            {companyBadge && (
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
+                                                    {companyBadge.label}
+                                                </span>
+                                            )}
+                                            {l.is_synthetic && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
+                                                    <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
+                                                </span>
+                                            )}
+                                            {l.ref && <span className="text-[10px] font-mono font-bold text-gray-400">Ref: {l.ref}</span>}
+                                        </div>
+                                        <p className="text-[13px] text-gray-800">{l.keterangan}</p>
+                                        {specParts.length > 0 && (
+                                            <p className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</p>
+                                        )}
+                                        {l.checked && (
+                                            <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                                                <Check className="w-2.5 h-2.5" />
+                                                Dicek {l.checked_by_name ?? "—"}
+                                                {l.checked_at && <span className="text-gray-400 font-normal">· {fmtTglJam(l.checked_at)}</span>}
+                                            </p>
+                                        )}
+
+                                        <div className="mt-2.5 pt-2.5 border-t border-gray-100 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] font-mono">
+                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold">Debit</span>
+                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold text-right">Kredit</span>
+                                            <span className={l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}>
+                                                {l.debit > 0 || (l.is_synthetic && l.side === "DEBIT") ? rp(l.debit) : "—"}
+                                            </span>
+                                            <span className={`text-right ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
+                                                {l.kredit > 0 || (l.is_synthetic && l.side === "KREDIT") ? rp(l.kredit) : "—"}
+                                            </span>
+                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold">Saldo D</span>
+                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold text-right">Saldo K</span>
+                                            <span className="text-blue-700">{l.saldo_debit > 0 ? rp(l.saldo_debit) : "—"}</span>
+                                            <span className="text-emerald-700 text-right">{l.saldo_kredit > 0 ? rp(l.saldo_kredit) : "—"}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+
+                        {data.lines.length > 0 && (
+                            <div className="rounded-xl border-2 border-gray-300 bg-gray-50 p-3.5">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold text-gray-600 uppercase">Total &amp; Saldo Akhir</span>
+                                    <SaldoBadge amount={data.totals.saldo_akhir} size="md" normalSide={normalSide} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-3 text-sm font-black font-mono">
+                                    <span className="text-gray-900">{rp(data.totals.debit)}</span>
+                                    <span className="text-gray-900 text-right">{rp(data.totals.kredit)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* ── Desktop/tablet: Tabel Buku Besar ── */}
+            <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse" style={{ minWidth: "1040px" }}>
                         <thead>
