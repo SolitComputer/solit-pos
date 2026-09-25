@@ -6,7 +6,7 @@ import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { isPKLRole } from "@/lib/permissions";
 import {
-  ArrowLeft, Clock, CheckCircle2, Umbrella, Users, Trophy, Inbox, Sun, Moon,
+  Clock, CheckCircle2, Umbrella, Users, Trophy, Inbox, Sun, Moon,
   Medal, RefreshCw, Activity, CalendarDays, TrendingUp, ChevronRight,
 } from "lucide-react";
 import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
@@ -536,13 +536,6 @@ export default function MonitoringCeoAbsensiPage() {
 
             <div className="relative flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
               <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                <button
-                  onClick={() => router.push("/dashboard")}
-                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white flex items-center justify-center transition flex-shrink-0"
-                  title="Kembali"
-                >
-                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
                 <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
                   <Users className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                 </div>

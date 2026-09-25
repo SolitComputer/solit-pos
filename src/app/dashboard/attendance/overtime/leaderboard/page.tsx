@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
-    ArrowLeft, Trophy, Medal, Award, Users, Clock, Wallet, TrendingUp,
+    Trophy, Medal, Award, Users, Clock, Wallet, TrendingUp,
     Inbox, CalendarDays, type LucideIcon,
 } from "lucide-react";
 
@@ -191,10 +191,6 @@ export default function OvertimeLeaderboardPage() {
                     {/* ── Header ── */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                            <button onClick={() => router.push("/dashboard/attendance/overtime")}
-                                className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all flex-shrink-0 active:scale-95 bg-white">
-                                <ArrowLeft className="w-4 h-4" />
-                            </button>
                             <div>
                                 <div className="flex items-center gap-2.5 mb-1">
                                     <div className="w-1 h-6 rounded-full bg-violet-600 flex-shrink-0" />
