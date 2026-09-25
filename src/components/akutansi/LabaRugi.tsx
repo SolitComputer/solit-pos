@@ -115,8 +115,49 @@ export default function LabaRugi({ period }: { period: string }) {
                 />
             )}
 
-            {/* ── Tabel Laba Rugi ── */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* ── Mobile: kartu per blok, lebih gampang dibaca daripada tabel sempit ── */}
+            <div className="md:hidden space-y-3">
+                {loading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2 animate-pulse">
+                            <div className="h-3 bg-gray-100 rounded w-1/2" />
+                            <div className="h-3 bg-gray-100 rounded w-1/3" />
+                        </div>
+                    ))
+                ) : !data || kosong ? (
+                    <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
+                        <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
+                        <p className="text-sm text-gray-500 font-medium">Belum ada pendapatan / beban di periode ini</p>
+                        <p className="text-xs text-gray-400 mt-1 px-6">Konfirmasi jurnal di tab Jurnal Umum dulu, ya.</p>
+                    </div>
+                ) : (
+                    <>
+                        <SectionMobile title="Total Pendapatan" section={data.pendapatan} tone="emerald" />
+                        <SectionMobile title="Total Modal Keluar" section={data.modal_keluar} tone="red" />
+                        <SectionMobile title="Total Operasional" section={data.operasional} tone="red" />
+                        <SectionMobile title="Total di Luar Operasional" section={data.luar_operasional} tone="red" />
+
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-3.5 flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-600 uppercase">Laba Periode Berjalan</span>
+                            <span className={`text-sm font-black font-mono ${data.laba_operasional >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                                {rp(data.laba_operasional)}
+                            </span>
+                        </div>
+
+                        <SectionMobile title="Total Laba Ditahan" section={data.laba_ditahan} tone="emerald" showRows={false} />
+
+                        <div className="bg-gray-100 rounded-xl border-2 border-[#D9A94A]/50 p-4 flex items-center justify-between">
+                            <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Total Laba</span>
+                            <span className={`text-base font-black font-mono ${data.total_laba >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                                {rp(data.total_laba)}
+                            </span>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* ── Desktop/tablet: Tabel Laba Rugi ── */}
+            <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse" style={{ minWidth: "640px" }}>
                         <thead>
@@ -252,6 +293,49 @@ export default function LabaRugi({ period }: { period: string }) {
                 </td>
             </tr>
         </>
+    );
+}
+
+// ─── Versi kartu dari Section, dipakai di layout mobile ──────────────────────
+function SectionMobile({
+    title,
+    section,
+    tone,
+    emptyLabel,
+    showRows = true,
+}: {
+    title: string;
+    section: LabaRugiSection;
+    tone: "emerald" | "red";
+    emptyLabel?: string;
+    showRows?: boolean;
+}) {
+    const totalColor = tone === "emerald" ? "text-emerald-700" : "text-red-600";
+
+    return (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {showRows && (
+                section.rows.length === 0 ? (
+                    <p className="px-3.5 py-2.5 text-[12px] text-gray-400 italic">{emptyLabel ?? "—"}</p>
+                ) : (
+                    <div className="divide-y divide-gray-50">
+                        {section.rows.map((r) => (
+                            <div key={r.code} className="px-3.5 py-2.5 flex items-center justify-between gap-2">
+                                <span className="text-[12px] text-gray-800 min-w-0 truncate">
+                                    <span className="text-[11px] font-mono font-bold text-gray-400 mr-2">{r.code}</span>
+                                    {r.name}
+                                </span>
+                                <span className="text-[12px] font-bold font-mono text-gray-800 shrink-0">{rp(r.nominal)}</span>
+                            </div>
+                        ))}
+                    </div>
+                )
+            )}
+            <div className="px-3.5 py-2.5 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between">
+                <span className="text-[12px] font-bold text-gray-700">{title}</span>
+                <span className={`text-[13px] font-black font-mono ${totalColor}`}>{rp(section.total)}</span>
+            </div>
+        </div>
     );
 }
 
