@@ -1444,8 +1444,47 @@ export default function JurnalUmum({ period }: { period: string }) {
                 )}
             </div>
 
-            {/* ── Tabel Jurnal Umum ── */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            {/* ── Mobile: kartu per entry — lebih gampang dibaca & di-tap daripada tabel sempit.
+                 Reorder drag-and-drop tetap khusus tampilan tabel desktop di bawah. ── */}
+            <div className="md:hidden space-y-2.5">
+                {loading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2 animate-pulse">
+                            <div className="h-3 bg-gray-100 rounded w-1/3" />
+                            <div className="h-3 bg-gray-100 rounded w-2/3" />
+                            <div className="h-8 bg-gray-50 rounded" />
+                        </div>
+                    ))
+                ) : filtered.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-slate-200/80 py-16 text-center">
+                        <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
+                        <p className="text-sm text-gray-500 font-medium">Belum ada jurnal di periode ini</p>
+                        <p className="text-xs text-gray-400 mt-1 px-6">
+                            Konfirmasi data pending di atas, atau buat jurnal manual.
+                        </p>
+                    </div>
+                ) : (
+                    visibleEntries.map((entry) => (
+                        <JournalEntryCardMobile
+                            key={entry.id}
+                            entry={entry}
+                            isSelected={selectedEntryIds.has(entry.id)}
+                            accountCodeFilter={accountCodeFilter}
+                            onToggleSelect={toggleEntrySelected}
+                            onEdit={setEditEntry}
+                            onLog={setLogEntry}
+                            onDelete={handleDelete}
+                            onToggleChecked={toggleEntryChecked}
+                            onUpdated={handleUpdated}
+                            onToggleWarningState={handleToggleWarningState}
+                            setToast={setToast}
+                        />
+                    ))
+                )}
+            </div>
+
+            {/* ── Desktop/tablet: Tabel Jurnal Umum (drag-and-drop reorder) ── */}
+            <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
                 <div className="overflow-x-auto">
                     <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
                         <Droppable droppableId="journal-entries">
@@ -3133,21 +3172,10 @@ interface JournalEntryRowProps {
     setToast: (msg: string) => void;
 }
 
-const JournalEntryRow = React.memo(function JournalEntryRow({
-    entry,
-    index,
-    isSelected,
-    isDraggingGroup,
-    accountCodeFilter,
-    onToggleSelect,
-    onEdit,
-    onLog,
-    onDelete,
-    onToggleChecked,
-    onUpdated,
-    onToggleWarningState,
-    setToast,
-}: JournalEntryRowProps) {
+// Kalkulasi turunan dari 1 journal entry (badge, baris yang ditampilkan, status cek, dst) —
+// dipakai bareng oleh JournalEntryRow (tampilan tabel desktop) & JournalEntryCardMobile (kartu mobile),
+// supaya logikanya konsisten dan tidak dobel dijaga di 2 tempat.
+function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<string>) {
     const badge = SOURCE_BADGE[entry.source_type];
     const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
     const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
@@ -3215,6 +3243,33 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     // ⬅️ BARU: jam entry ini "masuk" ke jurnal — entry.created_at sudah berisi waktu asli dari
     // transaksi/service/cashflow (di-set = sort_ts draft saat confirm), atau waktu simpan untuk jurnal manual
     const entryJam = useMemo(() => fmtJam(entry.created_at), [entry.created_at]);
+
+    return {
+        badge, companyBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
+        displayLines, linesToRender, validLinesForCheck, isEntryChecked, latestCheckedAt,
+        checkedByName, entryJam,
+    };
+}
+
+const JournalEntryRow = React.memo(function JournalEntryRow({
+    entry,
+    index,
+    isSelected,
+    isDraggingGroup,
+    accountCodeFilter,
+    onToggleSelect,
+    onEdit,
+    onLog,
+    onDelete,
+    onToggleChecked,
+    onUpdated,
+    onToggleWarningState,
+    setToast,
+}: JournalEntryRowProps) {
+    const {
+        badge, companyBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
+        linesToRender, isEntryChecked, latestCheckedAt, checkedByName, entryJam,
+    } = useJournalEntryDerived(entry, accountCodeFilter);
 
     return (
         <Draggable draggableId={entry.id} index={index}>
@@ -3431,5 +3486,189 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                 </tbody>
             )}
         </Draggable>
+    );
+});
+
+// ─── Kartu entry jurnal untuk layout mobile ──────────────────────────────────
+// Sengaja tanpa drag-handle/reorder (susah & rawan salah tap di layar sentuh) —
+// urutan tetap bisa diatur lewat tampilan tabel di desktop/tablet.
+const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
+    entry,
+    isSelected,
+    accountCodeFilter,
+    onToggleSelect,
+    onEdit,
+    onLog,
+    onDelete,
+    onToggleChecked,
+    onUpdated,
+    onToggleWarningState,
+    setToast,
+}: Omit<JournalEntryRowProps, "index" | "isDraggingGroup">) {
+    const {
+        badge, companyBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
+        linesToRender, isEntryChecked, latestCheckedAt, checkedByName, entryJam,
+    } = useJournalEntryDerived(entry, accountCodeFilter);
+
+    return (
+        <div
+            onClick={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest("button, input, a, select, textarea")) return;
+                onToggleSelect(entry.id);
+            }}
+            className={`rounded-xl border p-3.5 transition-colors ${isSelected ? "border-blue-300 bg-blue-50/50" : "border-gray-200 bg-white"}`}
+        >
+            <div className="flex items-start gap-2.5 mb-2">
+                <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onToggleSelect(entry.id)}
+                    className="w-5 h-5 mt-0.5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
+                    title="Pilih entry ini"
+                />
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-semibold text-gray-700">{fmtTgl(entry.tanggal)}</span>
+                        {entryJam && (
+                            <span className="text-[9px] text-gray-400 font-mono" title="Jam data ini masuk ke jurnal">
+                                Masuk {entryJam}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mb-1 mt-1 flex-wrap">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
+                            {badge.label}
+                        </span>
+                        {companyBadge && (
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
+                                {companyBadge.label}
+                            </span>
+                        )}
+                        {isPengajuanDana && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-teal-50 text-teal-700 border-teal-200">
+                                Pengajuan Dana
+                            </span>
+                        )}
+                        {cashflowNama && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200">
+                                {cashflowNama}
+                            </span>
+                        )}
+                        {entry.is_edited && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
+                                diedit · {entry.updated_by_user?.name ?? "—"}
+                            </span>
+                        )}
+                        {entry.has_warning && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1">
+                                <AlertTriangle className="w-2.5 h-2.5 text-red-600" /> Penanda
+                            </span>
+                        )}
+                        {entry.sync_available && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 inline-flex items-center gap-1" title="Nominal berbeda dari data sumber terbaru">
+                                <RefreshCw className="w-2.5 h-2.5 text-blue-600" /> Nominal Berubah
+                            </span>
+                        )}
+                        {modalMissing && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1" title="Harga modal belum diinput di transaksi ini">
+                                <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Modal Rp0
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-sm font-bold text-gray-900 leading-snug break-words">{entry.keterangan}</p>
+                    {specParts.length > 0 && (
+                        <p className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</p>
+                    )}
+                    {entry.ref && (
+                        <p className="text-[9px] text-gray-300 font-mono mt-0.5 break-all">Ref: {entry.ref}</p>
+                    )}
+                    {isEntryChecked && (
+                        <p className="text-[9px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
+                            <Check className="w-2.5 h-2.5" />
+                            Dicek {checkedByName ?? "—"} · {fmtJam(latestCheckedAt)}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-100 divide-y divide-gray-100 overflow-hidden">
+                {linesToRender.map((line) => {
+                    const isKredit = line.side === "KREDIT";
+                    return (
+                        <div key={line.id} className="flex items-start justify-between gap-2 px-2.5 py-1.5 bg-gray-50/40">
+                            <div className="min-w-0">
+                                <div className={`text-[11px] font-medium ${isKredit ? "pl-4 text-emerald-800" : "text-blue-800"}`}>
+                                    <span
+                                        className={`text-[9px] font-mono font-bold rounded px-1 py-0.5 mr-1 ${accountCodeFilter.has(line.account_code) ? "bg-blue-50 text-blue-700" : "text-gray-400"
+                                            }`}
+                                    >
+                                        {line.account_code}
+                                    </span>
+                                    {line.account_name}
+                                </div>
+                                {line.keterangan && (
+                                    <div className={`text-[10px] italic text-gray-400 mt-0.5 ${isKredit ? "pl-4" : ""}`}>
+                                        {line.keterangan}
+                                    </div>
+                                )}
+                            </div>
+                            <span className="text-[12px] font-bold text-gray-900 font-mono shrink-0">
+                                {isKredit ? "K " : "D "}{rp(line.nominal)}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="flex items-center justify-end gap-1 mt-2.5 pt-2.5 border-t border-gray-100">
+                <button
+                    onClick={() => onEdit(entry)}
+                    className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
+                    title="Edit jurnal"
+                >
+                    <Pencil className="w-4 h-4" />
+                </button>
+                <SyncHistoryToggle
+                    entry={entry}
+                    onUpdated={() => onUpdated(false)}
+                    setToast={setToast}
+                />
+                <button
+                    onClick={() => onLog(entry)}
+                    className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
+                    title="Riwayat perubahan"
+                >
+                    <Clock className="w-4 h-4" />
+                </button>
+                <WarningToggle
+                    entry={entry}
+                    onUpdated={() => onUpdated(false)}
+                    onToggleWarningState={onToggleWarningState}
+                    setToast={setToast}
+                />
+                <button
+                    onClick={() => onDelete(entry)}
+                    className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
+                    title="Hapus"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+                <button
+                    onClick={() => onToggleChecked(entry, !isEntryChecked)}
+                    title={
+                        isEntryChecked
+                            ? `Sudah dicek pada ${fmtWaktu(latestCheckedAt ?? undefined)} (Tap untuk batalkan)`
+                            : "Tandai sudah dicek"
+                    }
+                    className={`w-8 h-8 rounded-md border flex items-center justify-center active:scale-90 transition-all duration-150 ${isEntryChecked
+                        ? "bg-green-600 border-green-600 text-white shadow-2xs"
+                        : "bg-white border-gray-300 text-gray-300"
+                        }`}
+                >
+                    <Check className="w-4 h-4 mx-auto" />
+                </button>
+            </div>
+        </div>
     );
 });

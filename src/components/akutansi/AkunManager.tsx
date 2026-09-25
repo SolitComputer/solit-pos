@@ -117,7 +117,62 @@ export default function AkunManager() {
                 </button>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* Mobile: daftar akun berbentuk kartu, lebih gampang dibaca & di-tap daripada tabel sempit */}
+            <div className="md:hidden space-y-2">
+                {loading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2 animate-pulse">
+                            <div className="h-3 bg-gray-100 rounded w-1/3" />
+                            <div className="h-3 bg-gray-100 rounded w-2/3" />
+                        </div>
+                    ))
+                ) : filtered.length === 0 ? (
+                    <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
+                        <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                            <Search className="w-5 h-5 text-gray-300" />
+                        </div>
+                        <p className="text-sm text-gray-400">Tidak ada akun ditemukan</p>
+                    </div>
+                ) : (
+                    filtered.map((a) => (
+                        <div key={a.code} className="bg-white rounded-xl border border-gray-200 p-3.5 active:bg-[#FBF7EC]/60 transition-colors">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                        <span className="inline-block font-mono font-bold text-[11px] text-[#3A3528] bg-[#FBF7EC] border border-[#E4DCC8] rounded px-1.5 py-0.5">
+                                            {a.code}
+                                        </span>
+                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${a.is_builtin ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-violet-50 text-violet-700 border-violet-200"}`}>
+                                            {a.is_builtin ? "Bawaan" : "Custom"}
+                                        </span>
+                                    </div>
+                                    <p className="text-[13px] font-semibold text-gray-800 break-words">{a.name}</p>
+                                    <p className="text-[11px] text-gray-500 mt-0.5">{ACCOUNT_TYPE_LABEL[a.type as keyof typeof ACCOUNT_TYPE_LABEL] ?? a.type}</p>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={() => { setEditing(a); setShowForm(true); }}
+                                        title="Edit akun"
+                                        className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
+                                    >
+                                        <Pencil className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(a)}
+                                        title="Hapus akun"
+                                        className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Desktop/tablet: tabel penuh */}
+            <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
                         <thead>

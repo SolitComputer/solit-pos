@@ -64,17 +64,11 @@ export default function ScanPage() {
                 <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-5 lg:space-y-6">
 
                     {/* ── Top bar ── */}
+                    {/* Tombol back sengaja dihapus — DashboardLayout sudah otomatis
+                        menyediakan tombol back global (dengan fallback kalau tidak ada
+                        history), tombol custom di sini dulu dobel & bisa "mati" kalau
+                        halaman ini dibuka langsung tanpa history browser. */}
                     <div className="flex items-center gap-3 animate-fadeIn">
-                        <button
-                            onClick={() => router.back()}
-                            aria-label="Kembali"
-                            title="Kembali"
-                            className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300 active:scale-95 transition-all duration-150 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
-                        >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M19 12H5M12 5l-7 7 7 7" />
-                            </svg>
-                        </button>
                         <div className="min-w-0">
                             <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight truncate">
                                 Pindai Barcode Unit
