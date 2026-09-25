@@ -95,6 +95,7 @@ const ACC_STATUS_CONFIG: Record<string, { label: string; dot: string; badge: str
     TERSEDIA: { label: "Tersedia", dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
     TERJUAL: { label: "Terjual", dot: "bg-gray-400", badge: "bg-gray-100 text-gray-500 border-gray-200" },
     RUSAK: { label: "Rusak", dot: "bg-red-500", badge: "bg-red-50 text-red-700 border-red-200" },
+    RESERVED: { label: "Reserved", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700 border-amber-200" },
 };
 
 export default function QuickScan({ user }: { user: AuthUser | null }) {
@@ -375,7 +376,7 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
 
                                     <div className="flex gap-2 px-4 pb-4">
                                         <Link
-                                            href={`/dashboard/accessories/${result.accessory.id}`}
+                                            href={`/dashboard/accessories/${result.accessory.id}/units`}
                                             className="flex-1 flex items-center justify-center gap-1.5 h-9 px-3 bg-white text-gray-600 border border-gray-200 rounded-lg text-xs font-medium hover:bg-gray-50 transition whitespace-nowrap"
                                         >
                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
