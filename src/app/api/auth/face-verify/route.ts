@@ -87,24 +87,56 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "Wajah belum terdaftar", needEnroll: true }, { status: 400 });
     }
 
-    // ⛔ KEAMANAN KETAT: L2 Normalize kedua vektor embedding & perketat threshold ke 0.42
+    // ⛔ KEAMANAN KETAT: L2 Normalize + threshold + CROSS-CHECK 1:N (anti tukar wajah)
+    const THRESHOLD = 0.40;      // jarak MAKS ke wajah SENDIRI (turun dari 0.42)
+    const OWNER_MARGIN = 0.03;   // wajah sendiri wajib lebih dekat dari akun lain minimal sekian
+
     const normInput = normalizeEmbedding(embedding);
     const normStored = normalizeEmbedding(userFullData.face_embedding);
-    const THRESHOLD = 0.42;
-    const distance = euclideanDistance(normInput, normStored);
-    const matched = distance < THRESHOLD;
+    const distanceSelf = euclideanDistance(normInput, normStored);
 
-    if (!matched) {
+    // Ambil SEMUA wajah terdaftar milik user LAIN untuk cross-check identitas.
+    // Tujuan: kalau wajah di kamera ternyata lebih cocok ke akun orang lain,
+    // absen ditolak — walau jarak ke akun sendiri kebetulan < THRESHOLD.
+    const { data: otherFaces } = await supabaseAdmin
+      .from("users")
+      .select("id, name, face_embedding")
+      .neq("id", user.id)
+      .not("face_embedding", "is", null);
+
+    let closestOther: { id: string; name: string; distance: number } | null = null;
+    for (const other of otherFaces ?? []) {
+      if (!Array.isArray(other.face_embedding) || other.face_embedding.length !== 128) continue;
+      const d = euclideanDistance(normInput, normalizeEmbedding(other.face_embedding));
+      if (!closestOther || d < closestOther.distance) {
+        closestOther = { id: other.id, name: other.name, distance: d };
+      }
+    }
+
+    // (1) Wajah harus cukup dekat ke akun SENDIRI
+    if (distanceSelf >= THRESHOLD) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Wajah tidak cocok dengan akun ini. Pastikan akun tidak tertukar.",
-          distance,
-          code: "FACE_MISMATCH",
-        },
+        { success: false, message: "Wajah tidak cocok dengan akun ini. Pastikan akun tidak tertukar.", distance: distanceSelf, code: "FACE_MISMATCH" },
         { status: 400 }
       );
     }
+
+    // (2) Wajah TIDAK BOLEH lebih cocok (atau setara) ke akun orang lain
+    if (closestOther && closestOther.distance <= distanceSelf + OWNER_MARGIN) {
+      console.warn(
+        `[face-verify] DITOLAK — wajah lebih cocok ke ${closestOther.name} (${closestOther.distance.toFixed(3)}) daripada pemilik akun (${distanceSelf.toFixed(3)}). userId=${user.id}`
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Wajah ini terdeteksi milik akun lain, bukan akun Anda. Absen wajib memakai wajah pemilik akun.",
+          code: "FACE_BELONGS_TO_OTHER",
+        },
+        { status: 403 }
+      );
+    }
+
+    const distance = distanceSelf; // dipakai lagi di response sukses di bawah
 
     const ua = request.headers.get("user-agent") ?? "";
     const device = parseDevice(ua);

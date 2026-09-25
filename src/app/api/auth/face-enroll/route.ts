@@ -15,6 +15,10 @@ function normalizeEmbedding(arr: number[]): number[] {
   return arr.map((val) => val / norm);
 }
 
+function euclideanDistance(a: number[], b: number[]): number {
+  return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
+}
+
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
@@ -67,6 +71,29 @@ export async function POST(request: Request) {
     }
 
     const normalized = normalizeEmbedding(embedding);
+
+    // ⛔ KEAMANAN: cegah mendaftarkan wajah yang sudah jadi milik akun lain
+    const DUPLICATE_THRESHOLD = 0.40;
+    const { data: otherFaces } = await supabaseAdmin
+      .from("users")
+      .select("id, name, face_embedding")
+      .neq("id", user.id)
+      .not("face_embedding", "is", null);
+
+    for (const other of otherFaces ?? []) {
+      if (!Array.isArray(other.face_embedding) || other.face_embedding.length !== 128) continue;
+      const d = euclideanDistance(normalized, normalizeEmbedding(other.face_embedding));
+      if (d < DUPLICATE_THRESHOLD) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Wajah ini sudah terdaftar pada akun lain (${other.name}). Satu wajah tidak boleh untuk dua akun.`,
+            code: "FACE_DUPLICATE",
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     const { error } = await supabaseAdmin
       .from("users")
