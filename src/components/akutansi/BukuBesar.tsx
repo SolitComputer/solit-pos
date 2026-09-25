@@ -149,6 +149,11 @@ export default function BukuBesar({ period }: { period: string }) {
     // Optimistic update dulu (UI langsung berubah), lalu simpan ke server;
     // kalau gagal, rollback ke nilai sebelumnya supaya tidak beda dengan DB.
     const toggleChecked = useCallback(async (lineId: string, next: boolean) => {
+        // (fix) guard: kalau baris ini masih ada PATCH yang berjalan, abaikan klik baru.
+        // Tanpa ini, klik cepat berturut-turut bisa kirim 2 PATCH bareng untuk line_id
+        // yang sama dan responsnya bisa datang tidak berurutan — ini akar masalah
+        // checklist "kadang kesimpan kadang enggak".
+        if (pendingChecksRef.current.has(lineId)) return;
         pendingChecksRef.current.add(lineId);
         setData((prev) =>
             prev
@@ -185,20 +190,25 @@ export default function BukuBesar({ period }: { period: string }) {
                 );
             }
         } catch {
+            // (fix) hanya balikin flag `checked` ke kebalikan `next` (state sebelum
+            // optimistic update). Sebelumnya di sini juga nebak-nebak checked_at/checked_by_name
+            // secara manual dan hasilnya salah (khusus gagal uncheck, checked_at malah
+            // ditulis ulang ke waktu sekarang, checked_by_name juga tidak dikembalikan).
+            // Solusinya: tarik ulang data asli dari server secara silent supaya kedua
+            // field itu akurat, bukan ditebak di client.
             setData((prev) =>
                 prev
                     ? {
                         ...prev,
-                        lines: prev.lines.map((l) =>
-                            l.id === lineId ? { ...l, checked: !next, checked_at: !next ? new Date().toISOString() : null } : l
-                        ),
+                        lines: prev.lines.map((l) => (l.id === lineId ? { ...l, checked: !next } : l)),
                     }
                     : prev
             );
+            load({ silent: true });
         } finally {
             pendingChecksRef.current.delete(lineId);
         }
-    }, []);
+    }, [load]);
 
     useEffect(() => {
         load();
