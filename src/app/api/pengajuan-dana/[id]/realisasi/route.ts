@@ -4,6 +4,10 @@ import { createClient } from "@supabase/supabase-js";
 import { FUND_EXECUTOR_IDS } from "@/lib/fundConfig";
 import { isValidCategory } from "@/lib/cashflow";
 
+// ⬅️ BARU: role yang boleh membatalkan realisasi — Admin + Purchasing (biasanya
+// juga yang mengeksekusi & mengisi realisasi pengajuan dana).
+const CANCEL_REALISASI_ROLES = ["ADMIN", "PURCHASING"];
+
 function db() {
     return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -198,14 +202,110 @@ export async function POST(
 }
 
 // ── PUT: edit realisasi — SENGAJA DINONAKTIFKAN ───────────────────────────────
-// Realisasi bersifat FINAL: begitu sebuah pengajuan sudah diisi realisasinya
-// (realisasi_cashflow_id terisi), tidak ada cara mengubahnya lagi lewat method
-// ini, berapa pun rolenya (termasuk ADMIN) dan meskipun entry cashflow-nya
-// belum diaudit. Sama seperti pola "unexecute" yang diblokir total di
-// src/app/api/pengajuan-dana/[id]/route.ts.
+// Realisasi tidak bisa DIEDIT isinya (nominal/kategori/tanggal) lewat method ini,
+// berapa pun rolenya (termasuk ADMIN). Kalau realisasinya salah, gunakan DELETE
+// di bawah untuk MEMBATALKAN realisasi sepenuhnya (entry cashflow-nya dihapus,
+// status di fund_requests direset), lalu isi ulang dari awal lewat POST.
 export async function PUT() {
     return NextResponse.json(
-        { success: false, message: "Realisasi tidak bisa diedit setelah diinput" },
+        { success: false, message: "Realisasi tidak bisa diedit langsung. Batalkan realisasi lalu isi ulang." },
         { status: 400 }
     );
+}
+
+// ── DELETE: batalkan realisasi ────────────────────────────────────────────────
+// Menghapus SEMUA entry cashflow_entries yang terkait realisasi ini (source_type
+// PENGAJUAN_DANA, source_id = id pengajuan ini — bisa lebih dari satu baris kalau
+// realisasinya multi-kategori) supaya nominalnya TIDAK LAGI terhitung di Cashflow,
+// lalu reset kolom realisasi_* di fund_requests jadi null supaya pengajuan ini
+// bisa direalisasi ulang dari awal. Hanya ADMIN yang boleh, dan ditolak kalau ada
+// entry yang sudah diaudit (harus batalkan status audit dulu di halaman Cashflow).
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { id } = await params;
+    const userId = request.headers.get("x-user-id");
+    const roles = (request.headers.get("x-user-roles") || "").split(",").filter(Boolean);
+
+    if (!userId) {
+        return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
+    if (!CANCEL_REALISASI_ROLES.some((r) => roles.includes(r))) {
+        return NextResponse.json(
+            { success: false, message: "Hanya Admin atau Purchasing yang bisa membatalkan realisasi" },
+            { status: 403 }
+        );
+    }
+
+    const supabase = db();
+
+    const { data: fundRequest, error: fetchErr } = await supabase
+        .from("fund_requests")
+        .select("id, realisasi_cashflow_id")
+        .eq("id", id)
+        .single();
+
+    if (fetchErr || !fundRequest) {
+        return NextResponse.json({ success: false, message: "Pengajuan tidak ditemukan" }, { status: 404 });
+    }
+    if (!fundRequest.realisasi_cashflow_id) {
+        return NextResponse.json(
+            { success: false, message: "Pengajuan ini belum direalisasi" },
+            { status: 400 }
+        );
+    }
+
+    // Ambil SEMUA entry cashflow yang terkait realisasi ini — bisa lebih dari 1
+    // baris kalau realisasinya pakai multi-kategori (semua share source_id yang sama).
+    const { data: relatedEntries, error: entriesErr } = await supabase
+        .from("cashflow_entries")
+        .select("id, is_audited")
+        .eq("source_type", "PENGAJUAN_DANA")
+        .eq("source_id", id);
+
+    if (entriesErr) {
+        return NextResponse.json({ success: false, message: entriesErr.message }, { status: 500 });
+    }
+
+    const hasAudited = (relatedEntries ?? []).some((e: any) => e.is_audited);
+    if (hasAudited) {
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Salah satu entry cashflow realisasi ini sudah diaudit. Batalkan status audit terlebih dahulu di halaman Cashflow sebelum membatalkan realisasi.",
+            },
+            { status: 400 }
+        );
+    }
+
+    const entryIds = (relatedEntries ?? []).map((e: any) => e.id as string);
+    if (entryIds.length > 0) {
+        const { error: deleteErr } = await supabase
+            .from("cashflow_entries")
+            .delete()
+            .in("id", entryIds);
+        if (deleteErr) {
+            return NextResponse.json({ success: false, message: deleteErr.message }, { status: 500 });
+        }
+    }
+
+    const { data: updated, error: updateErr } = await supabase
+        .from("fund_requests")
+        .update({
+            realisasi_cashflow_id: null,
+            realisasi_nominal: null,
+            realisasi_by_id: null,
+            realisasi_by_name: null,
+            realisasi_at: null,
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+    if (updateErr) {
+        return NextResponse.json({ success: false, message: updateErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data: updated });
 }
