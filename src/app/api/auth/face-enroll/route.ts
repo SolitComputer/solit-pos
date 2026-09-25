@@ -72,27 +72,38 @@ export async function POST(request: Request) {
 
     const normalized = normalizeEmbedding(embedding);
 
-    // ⛔ KEAMANAN: cegah mendaftarkan wajah yang sudah jadi milik akun lain
-    const DUPLICATE_THRESHOLD = 0.40;
+    // ⛔ KEAMANAN: blok hanya kalau wajah HAMPIR IDENTIK dengan akun lain.
+    // Threshold sengaja sangat ketat (0.30) karena embedding tinyFaceDetector
+    // kurang tajam memisah orang — kalau kelewat longgar, orang BERBEDA malah
+    // salah diblokir (contoh: Moreno ke-detect sebagai Fikri).
+    const HARD_DUPLICATE_THRESHOLD = 0.30;
     const { data: otherFaces } = await supabaseAdmin
       .from("users")
       .select("id, name, face_embedding")
       .neq("id", user.id)
       .not("face_embedding", "is", null);
 
+    let closest: { name: string; distance: number } | null = null;
     for (const other of otherFaces ?? []) {
       if (!Array.isArray(other.face_embedding) || other.face_embedding.length !== 128) continue;
       const d = euclideanDistance(normalized, normalizeEmbedding(other.face_embedding));
-      if (d < DUPLICATE_THRESHOLD) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Wajah ini sudah terdaftar pada akun lain (${other.name}). Satu wajah tidak boleh untuk dua akun.`,
-            code: "FACE_DUPLICATE",
-          },
-          { status: 409 }
-        );
-      }
+      if (!closest || d < closest.distance) closest = { name: other.name, distance: d };
+    }
+
+    // Log jarak wajah terdekat — pakai ini untuk kalibrasi threshold.
+    if (closest) {
+      console.log(`[face-enroll] wajah terdekat: ${closest.name} @ ${closest.distance.toFixed(3)} (block bila < ${HARD_DUPLICATE_THRESHOLD})`);
+    }
+
+    if (closest && closest.distance < HARD_DUPLICATE_THRESHOLD) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Wajah ini hampir identik dengan akun lain (${closest.name}, jarak ${closest.distance.toFixed(3)}). Satu wajah tidak boleh untuk dua akun.`,
+          code: "FACE_DUPLICATE",
+        },
+        { status: 409 }
+      );
     }
 
     const { error } = await supabaseAdmin
