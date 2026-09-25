@@ -19,6 +19,12 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function normalizeEmbedding(arr: number[]): number[] {
+  const norm = Math.sqrt(arr.reduce((sum, val) => sum + val * val, 0));
+  if (norm === 0) return arr;
+  return arr.map((val) => val / norm);
+}
+
 function euclideanDistance(a: number[], b: number[]): number {
   return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
 }
@@ -81,12 +87,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "Wajah belum terdaftar", needEnroll: true }, { status: 400 });
     }
 
-    const THRESHOLD = 0.5;
-    const distance = euclideanDistance(embedding, userFullData.face_embedding);
+    // ⛔ KEAMANAN KETAT: L2 Normalize kedua vektor embedding & perketat threshold ke 0.42
+    const normInput = normalizeEmbedding(embedding);
+    const normStored = normalizeEmbedding(userFullData.face_embedding);
+    const THRESHOLD = 0.42;
+    const distance = euclideanDistance(normInput, normStored);
     const matched = distance < THRESHOLD;
 
     if (!matched) {
-      return NextResponse.json({ success: false, message: "Wajah tidak dikenali", distance }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Wajah tidak cocok dengan akun ini. Pastikan akun tidak tertukar.",
+          distance,
+          code: "FACE_MISMATCH",
+        },
+        { status: 400 }
+      );
     }
 
     const ua = request.headers.get("user-agent") ?? "";
