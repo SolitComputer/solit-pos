@@ -106,6 +106,44 @@ type Summary = {
 const BRAND_GRADIENT = "bg-gradient-to-r from-[#1a1545] to-[#0f0c29]";
 const BRAND_GRADIENT_HOVER = "hover:from-[#241c5e] hover:to-[#171040]";
 const BRAND_FOCUS = "focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300";
+// ⬅️ BARU: token tambahan supaya kontrol interaktif (tombol, kartu) konsisten di seluruh
+// halaman — dipakai bareng token di atas, tidak menggantikan.
+const BRAND_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
+// ⬅️ BARU: shadow berlapis (bukan cuma satu shadow rata) + ring tipis buat kedalaman
+// yang lebih halus dibanding border polos — dipakai di semua kartu utama.
+const CARD_BASE = "bg-white rounded-2xl border border-gray-100 ring-1 ring-black/[0.02] shadow-[0_1px_2px_rgba(15,12,41,0.04),0_6px_16px_-8px_rgba(15,12,41,0.08)]";
+
+// ⬅️ BARU: avatar inisial berwarna buat nama pengisi/customer di tabel & kartu mobile —
+// warnanya deterministik dari nama (hash sederhana), murni presentasional, tidak
+// menyentuh data aslinya sama sekali.
+const AVATAR_PALETTE = [
+    { bg: "bg-violet-100", text: "text-violet-700" },
+    { bg: "bg-blue-100", text: "text-blue-700" },
+    { bg: "bg-emerald-100", text: "text-emerald-700" },
+    { bg: "bg-amber-100", text: "text-amber-700" },
+    { bg: "bg-rose-100", text: "text-rose-700" },
+    { bg: "bg-teal-100", text: "text-teal-700" },
+    { bg: "bg-indigo-100", text: "text-indigo-700" },
+    { bg: "bg-orange-100", text: "text-orange-700" },
+];
+const avatarStyle = (name: string) => {
+    const sum = name.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
+    return AVATAR_PALETTE[sum % AVATAR_PALETTE.length];
+};
+const initials = (name: string) =>
+    name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
+
+function NameAvatar({ name, size = 22 }: { name: string; size?: number }) {
+    const style = avatarStyle(name || "?");
+    return (
+        <span
+            className={`inline-flex items-center justify-center rounded-full font-bold shrink-0 ${style.bg} ${style.text}`}
+            style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
+        >
+            {initials(name)}
+        </span>
+    );
+}
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 const IconRefresh = () => (
@@ -404,21 +442,24 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
 }
 
 // ── Source Badge ──────────────────────────────────────────────────────────────
+// ⬅️ BARU: badge status/info sekarang pill (rounded-full) — dibedakan sengaja dari
+// tombol aksi (AuditCell dkk, tetap rounded-lg) supaya bentuk ikut menandai fungsi:
+// pil = informasi, kotak membulat = bisa diklik.
 function SourceBadge({ sourceType }: { sourceType: Entry["source_type"] }) {
     if (sourceType === "TRANSACTION" || sourceType === "TRANSACTION_PAYMENT" || sourceType === "TRANSACTION_DP") return (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap"><ShoppingCart size={11} /> TRX</span>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap"><ShoppingCart size={11} /> TRX</span>
     );
     if (sourceType === "SERVICE") return (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 whitespace-nowrap"><Wrench size={11} /> SVC</span>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100 whitespace-nowrap"><Wrench size={11} /> SVC</span>
     );
     if (sourceType === "MODAL_AWAL") return (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-100 whitespace-nowrap"><Wallet size={11} /> MODAL</span>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-100 whitespace-nowrap"><Wallet size={11} /> MODAL</span>
     );
     if (sourceType === "PENGAJUAN_DANA") return (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap"><Landmark size={11} /> DANA</span>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap"><Landmark size={11} /> DANA</span>
     );
     return (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap"><Pencil size={11} /> MANUAL</span>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap"><Pencil size={11} /> MANUAL</span>
     );
 }
 
@@ -428,39 +469,39 @@ function AuditCell({ entry, onAudit, busy, canAudit = true }: { entry: Entry; on
     // Dipisah dari badge "Dibatalkan" biasa (di bawah) karena kasus ini lebih serius —
     // nominalnya sempat dihitung sebagai terverifikasi, jadi harus mencolok utk ditinjau ulang.
     if (entry.is_voided && entry.is_audited) return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 cursor-not-allowed whitespace-nowrap"
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 cursor-not-allowed whitespace-nowrap"
             title={`Entry ini SUDAH diaudit${entry.audited_at ? ` (${fmtWaktuAudit(entry.audited_at)})` : ""}, tapi transaksi sumbernya kini dibatalkan. Perlu ditinjau ulang.`}>
             <AlertTriangle size={12} /> Diaudit tapi Batal
         </span>
     );
     if (entry.is_voided) return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Transaksi sumber sudah di-restore/dibatalkan — tidak bisa diaudit">
             <Ban size={12} /> Dibatalkan
         </span>
     );
     if (Number(entry.nominal ?? 0) <= 0) return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Nominal 0 — edit nominal terlebih dahulu sebelum audit">
             <AlertTriangle size={12} /> Nominal 0
         </span>
     );
     if (!canAudit) return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Role Anda tidak diizinkan mengaudit uang keluar">
             <Lock size={12} /> {entry.is_audited ? "Sudah Audit" : "Belum Audit"}
         </span>
     );
     if (entry.is_audited) return (
         <button onClick={(ev) => { ev.stopPropagation(); onAudit(); }} disabled={busy}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border transition disabled:opacity-50 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 whitespace-nowrap active:scale-95 group/audited"
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all disabled:opacity-50 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 whitespace-nowrap active:scale-95 group/audited ${BRAND_RING}`}
             title={entry.audited_by_user?.name ? `Diaudit oleh ${entry.audited_by_user.name} — Klik untuk membatalkan audit` : "Sudah diaudit — Klik untuk membatalkan audit"}>
             <IconCheck /> {busy ? "..." : "Sudah Audit"}
         </button>
     );
     return (
         <button onClick={(ev) => { ev.stopPropagation(); onAudit(); }} disabled={busy}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border transition disabled:opacity-50 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 whitespace-nowrap active:scale-95"
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all disabled:opacity-50 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 whitespace-nowrap active:scale-95 ${BRAND_RING}`}
             title="Klik untuk mengaudit">
             <IconClock /> {busy ? "..." : "Belum Audit"}
         </button>
@@ -498,7 +539,7 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         finally { setSaving(false); }
     };
 
-    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 transition";
+    const inputCls = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 transition-all";
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -507,13 +548,13 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                 <div className="h-1 bg-gradient-to-r from-violet-500 to-violet-700" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-base"><Wallet size={16} className="text-violet-600" /></div>
+                        <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center text-base"><Wallet size={17} className="text-violet-600" /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Atur Modal Awal</p>
                             <p className="text-[11px] text-amber-600 font-semibold inline-flex items-center gap-1"><AlertTriangle size={12} /> Hanya bisa diisi satu kali</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                    <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5">
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-700 space-y-1.5">
@@ -535,17 +576,17 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                     </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan <span className="text-gray-400 font-normal">(opsional)</span></label>
-                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Sumber modal awal, catatan, dll..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
+                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Sumber modal awal, catatan, dll..." className={`${inputCls.replace("h-11", "")} py-2.5 resize-none`} />
                     </div>
-                    <label className="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 transition">
+                    <label className="flex items-start gap-2.5 cursor-pointer p-3 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100 transition">
                         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 accent-violet-600 shrink-0" />
                         <span className="text-xs text-gray-700">Saya mengerti bahwa modal awal ini <strong className="text-gray-900">tidak dapat diubah atau dihapus</strong> setelah disimpan.</span>
                     </label>
-                    {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    <button onClick={onClose} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-                    <button onClick={submit} disabled={saving || !confirmed} className="flex-1 h-10 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 transition disabled:opacity-60">
+                    <button onClick={onClose} className={`flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition ${BRAND_RING}`}>Batal</button>
+                    <button onClick={submit} disabled={saving || !confirmed} className={`flex-1 h-10 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition disabled:opacity-60 shadow-sm ${BRAND_RING}`}>
                         {saving ? "Menyimpan..." : "Simpan Modal Awal"}
                     </button>
                 </div>
@@ -593,7 +634,7 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
                         <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1"><IconClock /> Batas waktu: <span className="font-semibold text-gray-600 ml-0.5">09 Jul 2026</span></p>
                     </div>
                 </div>
-                <button onClick={onSet} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 transition shadow-sm active:scale-95 shrink-0">
+                <button onClick={onSet} className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 transition shadow-sm active:scale-95 shrink-0 ${BRAND_RING}`}>
                     <IconPlus /> Atur Sekarang
                 </button>
             </div>
@@ -667,7 +708,7 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
         finally { setSaving(false); }
     };
 
-    const inputCls = `w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none ${BRAND_FOCUS} transition`;
+    const inputCls = `w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -676,22 +717,25 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
                 <div className={`h-1 ${BRAND_GRADIENT}`} />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-base"><Shield size={16} className="text-violet-700" /></div>
+                        <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center text-base"><Shield size={17} className="text-violet-700" /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Manajemen Akses Audit Uang Keluar</p>
                             <p className="text-[11px] text-gray-400">Pilih akun yang diizinkan mengaudit entry Uang Keluar</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                    <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3">
                     <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 text-[11px] text-amber-700">
                         Semua akun bisa diatur di sini, <b>termasuk Admin/Accounting</b>. Badge "Default: Role" hanya penanda default awal — centang/hilangkan tetap berlaku sebagai keputusan final untuk akun tersebut.
                     </div>
-                    <input
-                        type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Cari nama akun…" className={inputCls}
-                    />
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400"><IconSearch /></div>
+                        <input
+                            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Cari nama akun…" className={`${inputCls} pl-9`}
+                        />
+                    </div>
                     <div className="border border-gray-100 rounded-xl max-h-80 overflow-y-auto divide-y divide-gray-50">
                         {loading ? (
                             <div className="p-6 text-center text-sm text-gray-400">Memuat…</div>
@@ -704,7 +748,7 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
                                 return (
                                     <label
                                         key={row.user_id}
-                                        className="flex items-center justify-between gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-gray-50"
+                                        className="flex items-center justify-between gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
                                     >
                                         <div className="min-w-0">
                                             <p className="text-sm font-semibold text-gray-800 truncate">{row.name}</p>
@@ -712,12 +756,12 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             {row.role_grants_access && (
-                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100" title="Role akun ini secara default diizinkan mengaudit — tapi tetap bisa dinonaktifkan di sini">
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100" title="Role akun ini secara default diizinkan mengaudit — tapi tetap bisa dinonaktifkan di sini">
                                                     Default: Role
                                                 </span>
                                             )}
                                             {overridden && (
-                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-100">Override</span>
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-100">Override</span>
                                             )}
                                             <input
                                                 type="checkbox"
@@ -731,12 +775,12 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
                             })
                         )}
                     </div>
-                    {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
-                    {savedOk && !hasChanges && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-700">Perubahan tersimpan.</div>}
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
+                    {savedOk && !hasChanges && <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs text-emerald-700">Perubahan tersimpan.</div>}
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    <button onClick={onClose} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition">Tutup</button>
-                    <button onClick={submit} disabled={saving || !hasChanges} className={`flex-1 h-10 ${BRAND_GRADIENT} ${BRAND_GRADIENT_HOVER} text-white rounded-lg text-sm font-medium transition disabled:opacity-60`}>
+                    <button onClick={onClose} className={`flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition ${BRAND_RING}`}>Tutup</button>
+                    <button onClick={submit} disabled={saving || !hasChanges} className={`flex-1 h-10 ${BRAND_GRADIENT} ${BRAND_GRADIENT_HOVER} text-white rounded-xl text-sm font-medium transition disabled:opacity-60 shadow-sm ${BRAND_RING}`}>
                         {saving ? "Menyimpan..." : "Simpan Perubahan"}
                     </button>
                 </div>
@@ -752,11 +796,11 @@ function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
     const categories = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
     const catEntries = Object.entries(categories) as [string, string][];
     const count = activeFilterCount(filter);
-    const selectCls = `h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
-    const dateCls = `h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
+    const selectCls = `h-10 border border-gray-200 rounded-xl px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
+    const dateCls = `h-10 border border-gray-200 rounded-xl px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
 
     return (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className={`${CARD_BASE} overflow-hidden`}>
             <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <IconFilter />
@@ -862,7 +906,7 @@ function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
                             ["Bulan Ini", () => { const now = new Date(); const y = now.getFullYear(); const m = String(now.getMonth() + 1).padStart(2, "0"); onChange({ ...filter, dateFrom: `${y}-${m}-01`, dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }) }); }],
                             ["Semua", () => { onChange({ ...filter, dateFrom: "", dateTo: "" }); }],
                         ] as [string, () => void][]).map(([label, fn]) => (
-                            <button key={label} onClick={fn} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all">{label}</button>
+                            <button key={label} onClick={fn} className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-gray-200 text-gray-500 bg-white hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 active:scale-95 transition-all">{label}</button>
                         ))}
                     </div>
                 </div>
@@ -929,7 +973,7 @@ function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: Fi
             ) : (
                 <div className="grid grid-cols-2 gap-2">
                     {[{ ref: cameraRef, icon: <Camera size={24} />, label: "Kamera" }, { ref: fileRef, icon: <ImageIcon size={24} />, label: "Galeri" }].map(({ ref, icon, label }) => (
-                        <button key={label} type="button" onClick={() => (ref as React.RefObject<HTMLInputElement>).current?.click()} className="flex flex-col items-center justify-center gap-1.5 h-20 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-600 transition">
+                        <button key={label} type="button" onClick={() => (ref as React.RefObject<HTMLInputElement>).current?.click()} className="flex flex-col items-center justify-center gap-1.5 h-20 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400 hover:border-violet-300 hover:bg-violet-50/40 hover:text-violet-500 transition-all">
                             <span className="text-2xl">{icon}</span>
                             <span className="text-[11px] font-semibold">{label}</span>
                         </button>
@@ -976,40 +1020,42 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                 <div className={`h-1 bg-gradient-to-r ${gradient}`} />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${isOut ? "bg-red-50" : "bg-emerald-50"}`}>{isOut ? <Banknote size={16} className="text-red-600" /> : <Wallet size={16} className="text-emerald-600" />}</div>
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base ${isOut ? "bg-red-50" : "bg-emerald-50"}`}>{isOut ? <Banknote size={17} className="text-red-600" /> : <Wallet size={17} className="text-emerald-600" />}</div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Detail {isOut ? "Uang Keluar" : "Uang Masuk"}</p>
                             <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                    <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
                 <div className="p-5 space-y-1 max-h-[75vh] overflow-y-auto">
                     <div className="text-center py-3 mb-1">
                         <p className={`text-3xl font-black tabular-nums ${nominalColor}`}>{isOut ? "−" : "+"}{fmtRupiah(entry.nominal)}</p>
                     </div>
                     <DetailRow label="Kategori">
-                        <span className="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">{categoryLabel(entry.direction, entry.category)}</span>
+                        <span className="inline-flex text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700">{categoryLabel(entry.direction, entry.category)}</span>
                     </DetailRow>
                     {(entry.source_type === "MANUAL" || entry.source_type === "PENGAJUAN_DANA") && (
                         <DetailRow label="Metode">
                             {entry.payment_method === "SALDO"
-                                ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={12} /> Saldo</span>
-                                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={12} /> Cash</span>}
+                                ? <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={12} /> Saldo</span>
+                                : <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={12} /> Cash</span>}
                         </DetailRow>
                     )}
                     {entry.source_type === "PENGAJUAN_DANA" && (
                         <DetailRow label="Sumber">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">
                                 <Landmark size={12} /> Pengajuan Dana Perdivisi
                             </span>
                         </DetailRow>
                     )}
-                    <DetailRow label="Diinput oleh">{pengisi}</DetailRow>
+                    <DetailRow label="Diinput oleh">
+                        <span className="inline-flex items-center gap-1.5"><NameAvatar name={pengisi} size={18} /> {pengisi}</span>
+                    </DetailRow>
                     <DetailRow label="Status Audit">
                         {entry.is_audited
-                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><IconCheck /> Sudah Audit</span>
-                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><IconClock /> Belum Audit</span>}
+                            ? <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><IconCheck /> Sudah Audit</span>
+                            : <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><IconClock /> Belum Audit</span>}
                     </DetailRow>
                     {entry.is_audited && entry.audited_by_user?.name && (
                         <DetailRow label="Diaudit oleh"><span className="text-emerald-600 font-semibold inline-flex items-center gap-1"><Check size={14} /> {entry.audited_by_user.name}</span></DetailRow>
@@ -1018,7 +1064,7 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                         <DetailRow label="Waktu Audit">{fmtWaktuAudit(entry.audited_at)}</DetailRow>
                     )}
                     {entry.is_voided && entry.is_audited && (
-                        <div className="mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[11px] text-red-700 flex items-start gap-1.5">
+                        <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-[11px] text-red-700 flex items-start gap-1.5">
                             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
                             <span>Entry ini sudah diaudit, tapi transaksi sumbernya kini <b>dibatalkan</b>. Perlu ditinjau ulang.</span>
                         </div>
@@ -1041,16 +1087,16 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
                     {(entry.source_type === "MANUAL" || entry.source_type === "PENGAJUAN_DANA") && (
-                        <button onClick={() => { onClose(); onEdit(entry); }} className={`inline-flex items-center gap-1.5 h-10 px-4 bg-white border text-sm font-medium transition ${entry.direction === "OUT" ? "border-amber-200 text-amber-700 hover:bg-amber-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"} rounded-lg`}>
+                        <button onClick={() => { onClose(); onEdit(entry); }} className={`inline-flex items-center gap-1.5 h-10 px-4 bg-white border text-sm font-medium transition ${entry.direction === "OUT" ? "border-amber-200 text-amber-700 hover:bg-amber-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"} rounded-xl ${BRAND_RING}`}>
                             <IconEdit /> Edit
                         </button>
                     )}
                     {entry.source_type === "MANUAL" && entry.direction === "IN" && (
-                        <button onClick={() => { onClose(); onDelete(entry); }} className="inline-flex items-center gap-1.5 h-10 px-4 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition">
+                        <button onClick={() => { onClose(); onDelete(entry); }} className={`inline-flex items-center gap-1.5 h-10 px-4 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 transition ${BRAND_RING}`}>
                             <IconTrash /> Hapus
                         </button>
                     )}
-                    <button onClick={onClose} className={`flex-1 h-10 ${BRAND_GRADIENT} ${BRAND_GRADIENT_HOVER} text-white rounded-lg text-sm font-medium transition`}>Tutup</button>
+                    <button onClick={onClose} className={`flex-1 h-10 ${BRAND_GRADIENT} ${BRAND_GRADIENT_HOVER} text-white rounded-xl text-sm font-medium transition ${BRAND_RING}`}>Tutup</button>
                 </div>
             </div>
             {zoom && entry.photo_url && (
@@ -1118,7 +1164,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         finally { setSaving(false); setUploadProgress("idle"); }
     };
 
-    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400/30 focus:border-red-400 transition";
+    const inputCls = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400/30 focus:border-red-400 transition-all";
     const savingLabel = uploadProgress === "uploading" ? "Mengupload foto..." : saving ? "Menyimpan..." : "Simpan Pengeluaran";
 
     return (
@@ -1128,13 +1174,13 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                 <div className="h-1 bg-gradient-to-r from-red-400 to-rose-500" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center text-base"><Banknote size={16} /></div>
+                        <div className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-base"><Banknote size={17} /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Tambah Uang Keluar</p>
                             <p className="text-[11px] text-gray-400">Nama pengisi tercatat otomatis</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                    <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
                     <div>
@@ -1181,14 +1227,14 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>
-                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
+                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-11", "")} py-2.5 resize-none`} />
                     </div>
                     <PhotoPicker value={photoFile} onChange={setPhotoFile} />
-                    {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
-                    <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition disabled:opacity-60">{savingLabel}</button>
+                    <button onClick={onClose} disabled={saving} className={`flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50 ${BRAND_RING}`}>Batal</button>
+                    <button onClick={submit} disabled={saving} className={`flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60 shadow-sm ${BRAND_RING}`}>{savingLabel}</button>
                 </div>
             </div>
         </div>
@@ -1310,7 +1356,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
         gradient: "from-emerald-400 to-green-500",
     };
 
-    const inputCls = `w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 ${theme.ring} ${theme.borderFocus} transition`;
+    const inputCls = `w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-white hover:border-gray-300 focus:outline-none focus:ring-2 ${theme.ring} ${theme.borderFocus} transition-all`;
     const showZeroHint = nominal.trim() !== "" && Number(nominal) === 0;
     const savingLabel = uploadProgress === "uploading" ? "Mengupload foto..." : saving ? "Menyimpan..." : "Simpan Perubahan";
 
@@ -1321,7 +1367,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                 <div className={`h-1 bg-gradient-to-r ${theme.gradient}`} />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className={`w-8 h-8 rounded-lg ${theme.bgIcon} ${theme.textIcon} flex items-center justify-center text-base`}><Pencil size={16} /></div>
+                        <div className={`w-9 h-9 rounded-xl ${theme.bgIcon} ${theme.textIcon} flex items-center justify-center text-base`}><Pencil size={17} /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Edit Uang {isOut ? "Keluar" : "Masuk"}</p>
                             <div className="flex items-center gap-2 mt-0.5">
@@ -1334,11 +1380,11 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                             </div>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                    <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
                     {entry.is_audited && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[11px] text-amber-700 flex items-start gap-1.5">
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] text-amber-700 flex items-start gap-1.5">
                             <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                             <span>Entry ini sudah <b>diaudit</b>. Untuk mengubah data, batalkan status audit terlebih dahulu pada tombol audit tabel/detail.</span>
                         </div>
@@ -1373,13 +1419,13 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                         </div>
                     </div>
                     {showZeroHint && (
-                        <div className={`${theme.bgAlert} border ${theme.borderAlert} rounded-lg px-3 py-2 text-[11px] ${theme.textAlert}`}>
+                        <div className={`${theme.bgAlert} border ${theme.borderAlert} rounded-xl px-3 py-2 text-[11px] ${theme.textAlert}`}>
                             Nominal 0 disimpan sebagai koreksi. Entry bernilai 0 <b>tidak bisa diaudit</b> sampai nominalnya diisi kembali.
                         </div>
                     )}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>
-                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
+                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-11", "")} py-2.5 resize-none`} />
                     </div>
                     {currentPhotoUrl ? (
                         <div>
@@ -1396,11 +1442,11 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                     ) : (
                         <PhotoPicker value={photoFile} onChange={setPhotoFile} />
                     )}
-                    {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
-                    <button onClick={submit} disabled={saving || entry.is_audited} className={`flex-1 h-10 ${theme.bgBtn} text-white rounded-lg text-sm font-medium ${theme.hoverBtn} transition disabled:opacity-60`}>{savingLabel}</button>
+                    <button onClick={onClose} disabled={saving} className={`flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50 ${BRAND_RING}`}>Batal</button>
+                    <button onClick={submit} disabled={saving || entry.is_audited} className={`flex-1 h-10 ${theme.bgBtn} text-white rounded-xl text-sm font-medium ${theme.hoverBtn} transition disabled:opacity-60 shadow-sm ${BRAND_RING}`}>{savingLabel}</button>
                 </div>
             </div>
         </div>
@@ -1451,7 +1497,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         finally { setSaving(false); }
     };
 
-    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition";
+    const inputCls = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all";
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -1460,13 +1506,13 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                 <div className="h-1 bg-gradient-to-r from-emerald-400 to-green-500" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-base"><Wallet size={16} /></div>
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base"><Wallet size={17} /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Tambah Uang Masuk</p>
                             <p className="text-[11px] text-gray-400">Nama pengisi tercatat otomatis</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                    <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
                     <div>
@@ -1502,15 +1548,15 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                     </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>
-                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
+                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-11", "")} py-2.5 resize-none`} />
                     </div>
                     {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>
+                        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>
                     )}
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
-                    <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-60">
+                    <button onClick={onClose} disabled={saving} className={`flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50 ${BRAND_RING}`}>Batal</button>
+                    <button onClick={submit} disabled={saving} className={`flex-1 h-10 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-60 shadow-sm ${BRAND_RING}`}>
                         {saving ? "Menyimpan..." : "Simpan"}
                     </button>
                 </div>
@@ -1524,21 +1570,22 @@ function SummaryCard({ label, value, sublabel, color, icon, loading }: {
     label: string; value: string; sublabel?: string;
     color: "emerald" | "red" | "blue" | "violet"; icon: React.ReactNode; loading: boolean;
 }) {
+    // ⬅️ BARU: badge ikon sekarang gradient solid (bukan cuma tint pucat) supaya kartu
+    // ringkasan terasa lebih "berisi" — warna teks nilai tetap sama, cuma kontainer ikonnya.
     const colorMap = {
-        emerald: { bar: "bg-emerald-500", icon: "bg-emerald-50 text-emerald-600", value: "text-emerald-700", sub: "text-emerald-500" },
-        red: { bar: "bg-red-500", icon: "bg-red-50 text-red-600", value: "text-red-700", sub: "text-red-400" },
-        blue: { bar: "bg-blue-500", icon: "bg-blue-50 text-blue-600", value: "text-blue-700", sub: "text-blue-400" },
-        violet: { bar: "bg-violet-500", icon: "bg-violet-50 text-violet-600", value: "text-violet-700", sub: "text-violet-400" },
+        emerald: { iconBg: "bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/30", value: "text-emerald-700", sub: "text-emerald-500", ring: "hover:ring-emerald-100" },
+        red: { iconBg: "bg-gradient-to-br from-rose-400 to-red-600 shadow-red-500/30", value: "text-red-700", sub: "text-red-400", ring: "hover:ring-red-100" },
+        blue: { iconBg: "bg-gradient-to-br from-sky-400 to-blue-600 shadow-blue-500/30", value: "text-blue-700", sub: "text-blue-400", ring: "hover:ring-blue-100" },
+        violet: { iconBg: "bg-gradient-to-br from-violet-400 to-violet-700 shadow-violet-500/30", value: "text-violet-700", sub: "text-violet-400", ring: "hover:ring-violet-100" },
     };
     const c = colorMap[color];
     return (
-        <div className="relative bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-            <div className={`absolute top-0 left-0 h-full w-1 ${c.bar}`} />
-            <div className="pl-5 pr-4 py-4 flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${c.icon}`}>{icon}</div>
+        <div className={`group relative ${CARD_BASE} hover:shadow-lg hover:-translate-y-0.5 hover:ring-2 ${c.ring} transition-all duration-200 overflow-hidden`}>
+            <div className="px-5 py-4 flex items-center gap-3.5">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-lg ${c.iconBg}`}>{icon}</div>
                 <div className="min-w-0">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
-                    {loading ? <div className="h-6 w-28 bg-gray-100 rounded animate-pulse mt-1" /> : <p className={`text-lg font-black tabular-nums tracking-tight ${c.value}`}>{value}</p>}
+                    {loading ? <div className="h-6 w-28 bg-gray-100 rounded animate-pulse mt-1" /> : <p className={`text-xl font-black tabular-nums tracking-tight ${c.value}`}>{value}</p>}
                     {sublabel && !loading && <p className={`text-[10px] ${c.sub} mt-0.5 font-medium`}>{sublabel}</p>}
                 </div>
             </div>
@@ -1774,7 +1821,7 @@ export default function CashflowPage() {
     if (allowed === false) return (
         <DashboardLayout>
             <div className="max-w-md mx-auto mt-24 text-center">
-                <div className="text-5xl mb-3"><Lock size={48} className="mx-auto text-gray-300" /></div>
+                <div className="w-20 h-20 rounded-2xl bg-violet-50/60 border border-violet-100 flex items-center justify-center mx-auto mb-4"><Lock size={32} className="text-violet-200" /></div>
                 <p className="text-gray-600 font-semibold">Halaman ini hanya untuk Admin & Programmer.</p>
             </div>
         </DashboardLayout>
@@ -1913,14 +1960,14 @@ export default function CashflowPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                     <div className="flex items-center gap-3">
-                        <div className={`w-1.5 h-9 ${BRAND_GRADIENT} rounded-full`} />
+                        <div className={`w-11 h-11 rounded-2xl ${BRAND_GRADIENT} shadow-lg shadow-violet-900/25 flex items-center justify-center shrink-0 text-white`}><IconWallet /></div>
                         <div>
-                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">Cashflow</h1>
-                            <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Arus kas masuk & keluar · sejak {startDateFormatted}</p>
+                            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Cashflow</h1>
+                            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Arus kas masuk & keluar · sejak {startDateFormatted}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-700">
+                        <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-700">
                             <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -1933,72 +1980,84 @@ export default function CashflowPage() {
                             </span>
                         )}
                         <button onClick={handleExport} disabled={loading || exporting}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-200 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-200 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${BRAND_RING}`}
                             title="Export semua data cashflow ke Excel (2 sheet)">
                             <IconDownload />
                             <span className="hidden sm:inline text-sm">{exporting ? "Mengekspor..." : "Export Excel"}</span>
                         </button>
-                        <button onClick={() => fetchData()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 hover:border-violet-200 hover:text-violet-700 active:scale-95 transition">
+                        <button onClick={() => fetchData()} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 hover:border-violet-200 hover:text-violet-700 active:scale-95 transition-all ${BRAND_RING}`}>
                             <span className={loading ? "inline-flex animate-spin" : "inline-flex"}><IconRefresh /></span>
                             <span className="hidden sm:inline text-sm">Segarkan</span>
                         </button>
                     </div>
                 </div>
 
-                {/* Saldo Utama */}
-                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                    <div className={`h-1 ${BRAND_GRADIENT.replace("bg-gradient-to-r", "bg-gradient-to-r")} bg-gradient-to-r from-[#1a1545] via-[#150f3d] to-[#0f0c29]`} />
-                    <div className="p-4 sm:p-6">
+                {/* Saldo Utama — kartu saldo bergaya "balance card" fintech: latar gradient gelap
+                    navy-violet (identitas brand), bukan cuma kartu putih dengan garis aksen tipis.
+                    Ini satu-satunya elemen "berani" di halaman — semua yang lain sengaja dibuat tenang. */}
+                <div className="relative rounded-[28px] overflow-hidden bg-gradient-to-br from-[#1e1852] via-[#150f3d] to-[#0a0818] shadow-[0_20px_50px_-20px_rgba(15,12,41,0.55)]">
+                    {/* Dekorasi cahaya — satu titik fokus visual, tetap kalem */}
+                    <div className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full bg-violet-400/[0.12] blur-3xl" />
+                    <div className="pointer-events-none absolute -bottom-28 -left-16 w-64 h-64 rounded-full bg-fuchsia-500/[0.06] blur-3xl" />
+                    <div className="pointer-events-none absolute top-1/3 right-1/3 w-40 h-40 rounded-full bg-emerald-400/[0.05] blur-2xl" />
+                    {/* Pola titik halus ala kertas ledger — nuansa "buku kas" tanpa jadi klise */}
+                    <div
+                        className="pointer-events-none absolute inset-0 opacity-[0.06]"
+                        style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+                    />
+                    <div className="relative p-5 sm:p-7">
                         <div className="flex items-start justify-between gap-4 flex-wrap">
                             <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-8 h-8 rounded-lg bg-violet-50 text-violet-700 flex items-center justify-center"><IconWallet /></div>
-                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{saldoLabel}</span>
+                                <div className="flex items-center gap-2.5 mb-3">
+                                    <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 text-violet-200 flex items-center justify-center"><IconWallet /></div>
+                                    <span className="text-xs font-bold text-violet-300/80 uppercase tracking-widest">{saldoLabel}</span>
                                 </div>
-                                {loading ? <div className="h-10 w-48 bg-gray-100 rounded-xl animate-pulse" /> : <p className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight tabular-nums">{fmtRupiah(dateFilteredSaldo)}</p>}
-                                <p className="text-[11px] text-gray-400 mt-1.5">{saldoSubLabel}</p>
+                                {loading ? <div className="h-10 w-48 bg-white/10 rounded-xl animate-pulse" /> : <p className="text-3xl sm:text-4xl md:text-[2.75rem] font-black text-white tracking-tight tabular-nums">{fmtRupiah(dateFilteredSaldo)}</p>}
+                                <p className="text-[11px] text-violet-300/70 mt-2">{saldoSubLabel}</p>
                                 {!loading && isRangeQuery && (
-                                    <div className="mt-1.5 flex items-center gap-3 flex-wrap">
-                                        <p className="text-[11px] text-gray-500">
-                                            Saldo awal ({fmtTanggalShort(customFrom)}): <span className="font-bold text-gray-700">{fmtRupiah(openingBalance ?? 0)}</span>
+                                    <div className="mt-2 flex items-center gap-3 flex-wrap">
+                                        <p className="text-[11px] text-violet-200/80">
+                                            Saldo awal ({fmtTanggalShort(customFrom)}): <span className="font-bold text-white">{fmtRupiah(openingBalance ?? 0)}</span>
                                         </p>
-                                        <p className={`text-[11px] font-semibold ${(periodChange ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                        <p className={`text-[11px] font-semibold ${(periodChange ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
                                             Perubahan periode: {(periodChange ?? 0) >= 0 ? "+" : ""}{fmtRupiah(periodChange ?? 0)}
                                         </p>
                                     </div>
                                 )}
                                 {!loading && summary.modal_awal_entry && (
-                                    <p className="text-[11px] text-violet-500 mt-1 font-medium inline-flex items-center gap-1"><Wallet size={12} /> Termasuk modal awal <span className="font-bold">{fmtRupiah(summary.modal_awal_entry.nominal)}</span></p>
+                                    <p className="text-[11px] text-violet-200/80 mt-1.5 font-medium inline-flex items-center gap-1"><Wallet size={12} /> Termasuk modal awal <span className="font-bold text-white">{fmtRupiah(summary.modal_awal_entry.nominal)}</span></p>
                                 )}
                                 {!loading && summary.belum_audit > 0 && (
                                     <button
                                         type="button"
                                         onClick={toggleBelumAuditEntries}
-                                        className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg border active:scale-95 transition cursor-pointer ${belumAuditActive ? "bg-amber-100 border-amber-400" : "bg-amber-50 border-amber-200 hover:bg-amber-100 hover:border-amber-300"}`}
+                                        className={`inline-flex items-center gap-1.5 mt-2.5 px-2.5 py-1 rounded-full border backdrop-blur-sm active:scale-95 transition-all ${belumAuditActive ? "bg-amber-400/20 border-amber-300/50 text-amber-100" : "bg-amber-400/10 border-amber-300/30 text-amber-200 hover:bg-amber-400/20 hover:border-amber-300/50"}`}
                                         title={belumAuditActive ? "Klik untuk kembali ke tampilan semula" : "Klik untuk lihat entry yang belum diaudit"}
                                     >
                                         <IconAlertTriangle />
-                                        <p className="text-[11px] text-amber-700 font-semibold">{summary.belum_audit} entry belum diaudit{belumAuditActive ? " · aktif" : ""}</p>
+                                        <p className="text-[11px] font-semibold">{summary.belum_audit} entry belum diaudit{belumAuditActive ? " · aktif" : ""}</p>
                                     </button>
                                 )}
                                 {!loading && (summary.stale ?? 0) > 0 && (
                                     <button
                                         type="button"
                                         onClick={showStaleEntries}
-                                        className="inline-flex items-center gap-1.5 mt-2 ml-2 px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 hover:border-orange-300 active:scale-95 transition cursor-pointer"
+                                        className="inline-flex items-center gap-1.5 mt-2.5 ml-2 px-2.5 py-1 rounded-full bg-orange-400/10 border border-orange-300/30 text-orange-200 hover:bg-orange-400/20 hover:border-orange-300/50 backdrop-blur-sm active:scale-95 transition-all"
                                         title="Klik untuk lihat entry yang sudah diaudit tapi harga transaksinya berubah"
                                     >
                                         <IconAlertTriangle />
-                                        <p className="text-[11px] text-orange-700 font-semibold">{summary.stale} entry sudah diaudit tapi harga transaksinya berubah</p>
+                                        <p className="text-[11px] font-semibold">{summary.stale} entry sudah diaudit tapi harga transaksinya berubah</p>
                                     </button>
                                 )}
                             </div>
                             <div className="flex flex-col items-end gap-2 shrink-0 w-full sm:w-auto">
-                                <InlineDateRange
-                                    from={customFrom}
-                                    to={customTo}
-                                    onChange={handleDateRangeChange}
-                                />
+                                <div className="rounded-xl shadow-2xl shadow-black/40">
+                                    <InlineDateRange
+                                        from={customFrom}
+                                        to={customTo}
+                                        onChange={handleDateRangeChange}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2010,17 +2069,37 @@ export default function CashflowPage() {
                     <SummaryCard label={`Keluar · ${periodLabel}`} value={fmtRupiah(expenseValue)} color="red" icon={<IconTrendDown />} loading={loading} />
                 </div>
 
+                {/* ⬅️ BARU: bar proporsi Masuk vs Keluar — murni tampilan tambahan, dihitung
+                    dari incomeValue/expenseValue yang sudah ada, tidak menambah state baru. */}
+                {!loading && (incomeValue > 0 || expenseValue > 0) && (() => {
+                    const totalFlow = incomeValue + expenseValue;
+                    const incomePct = totalFlow > 0 ? (incomeValue / totalFlow) * 100 : 50;
+                    return (
+                        <div className={`${CARD_BASE} px-4 sm:px-5 py-3.5`}>
+                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mb-2">
+                                <span className="text-emerald-600">Masuk {incomePct.toFixed(0)}%</span>
+                                <span className="text-gray-400">Proporsi periode ini</span>
+                                <span className="text-red-500">Keluar {(100 - incomePct).toFixed(0)}%</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-gray-100 overflow-hidden flex">
+                                <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${incomePct}%` }} />
+                                <div className="h-full bg-red-400 transition-all duration-500" style={{ width: `${100 - incomePct}%` }} />
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {/* Tab + Filter + CTA */}
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap">
+                <div className={`${CARD_BASE} p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap`}>
                     <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                         <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
                             {(["IN", "OUT"] as const).map((t) => (
-                                <button key={t} onClick={() => { setTab(t); setStaleOnly(false); }} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm" : "bg-red-600 text-white shadow-sm" : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
+                                <button key={t} onClick={() => { setTab(t); setStaleOnly(false); }} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm shadow-emerald-500/30" : "bg-red-600 text-white shadow-sm shadow-red-500/30" : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
                                     {t === "IN" ? `↑ Masuk ${!loading ? `(${masuk.length})` : ""}` : `↓ Keluar ${!loading ? `(${keluar.length})` : ""}`}
                                 </button>
                             ))}
                         </div>
-                        <button onClick={() => setShowFilter(!showFilter)} className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold border transition-all shrink-0 ${showFilter ? `${BRAND_GRADIENT} text-white border-transparent shadow-sm` : filterCount > 0 ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"}`}>
+                        <button onClick={() => setShowFilter(!showFilter)} className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold border transition-all shrink-0 ${showFilter ? `${BRAND_GRADIENT} text-white border-transparent shadow-sm` : filterCount > 0 ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"}`}>
                             <IconFilter /> Filter
                             {filterCount > 0 && <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"}`}>{filterCount}</span>}
                         </button>
@@ -2032,25 +2111,25 @@ export default function CashflowPage() {
                                 value={currentFilter.search}
                                 onChange={(e) => handleFilterChange({ ...currentFilter, search: e.target.value })}
                                 placeholder="Cari nama / keterangan / nominal…"
-                                className={`h-9 w-full border border-gray-200 rounded-lg pl-9 pr-8 text-sm bg-gray-50/60 focus:bg-white focus:outline-none ${BRAND_FOCUS} transition-all placeholder:text-gray-400`}
+                                className={`h-9 w-full border border-gray-200 rounded-xl pl-9 pr-8 text-sm bg-gray-50/60 focus:bg-white focus:outline-none ${BRAND_FOCUS} transition-all placeholder:text-gray-400`}
                             />
                             {currentFilter.search && (
                                 <button onClick={() => handleFilterChange({ ...currentFilter, search: "" })} className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-300 hover:text-gray-500 transition"><IconX /></button>
                             )}
                         </div>
                         {canManageAuditAccess && (
-                            <button onClick={() => setShowAuditAccessModal(true)} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all shrink-0">
+                            <button onClick={() => setShowAuditAccessModal(true)} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all shrink-0">
                                 <Shield size={14} /> Akses Audit
                             </button>
                         )}
                     </div>
                     {tab === "IN" && (
-                        <button onClick={() => setShowIncomeModal(true)} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm shrink-0 w-full sm:w-auto">
+                        <button onClick={() => setShowIncomeModal(true)} className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm shadow-emerald-500/30 shrink-0 w-full sm:w-auto ${BRAND_RING}`}>
                             <IconPlus /> Tambah Uang Masuk
                         </button>
                     )}
                     {tab === "OUT" && (
-                        <button onClick={() => setShowModal(true)} className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white ${BRAND_GRADIENT} ${BRAND_GRADIENT_HOVER} active:scale-95 transition-all shadow-sm shrink-0 w-full sm:w-auto`}>
+                        <button onClick={() => setShowModal(true)} className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white ${BRAND_GRADIENT} ${BRAND_GRADIENT_HOVER} active:scale-95 transition-all shadow-sm shadow-violet-900/30 shrink-0 w-full sm:w-auto ${BRAND_RING}`}>
                             <IconPlus /> Tambah Pengeluaran
                         </button>
                     )}
@@ -2095,7 +2174,7 @@ export default function CashflowPage() {
                 )}
 
                 {/* Table */}
-                <div ref={tableRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div ref={tableRef} className={`${CARD_BASE} overflow-hidden`}>
 
                     {/* Mobile card list (< sm) — same data & handlers as the table below */}
                     <div className="sm:hidden divide-y divide-gray-50">
@@ -2112,12 +2191,12 @@ export default function CashflowPage() {
                             ))
                         ) : rows.length === 0 ? (
                             <div className="px-4 py-14 text-center">
-                                <div className="text-4xl mb-2.5 opacity-25 flex justify-center">{filterCount > 0 ? <Search size={36} /> : <Inbox size={36} />}</div>
+                                <div className="w-14 h-14 rounded-2xl bg-violet-50/60 border border-violet-100 flex items-center justify-center mx-auto mb-3 text-violet-200">{filterCount > 0 ? <Search size={26} /> : <Inbox size={26} />}</div>
                                 <p className="text-sm text-gray-400 font-medium">
                                     {filterCount > 0 ? `Tidak ada data yang cocok (${allRows.length} entry tersembunyi).` : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`}
                                 </p>
                                 {filterCount > 0 && (
-                                    <button onClick={handleFilterReset} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                                    <button onClick={handleFilterReset} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
                                         <IconX /> Reset Filter
                                     </button>
                                 )}
@@ -2128,7 +2207,8 @@ export default function CashflowPage() {
                                 const displayName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama;
                                 return (
                                     <div key={e.id} onClick={() => isClickable && handleRowClick(e)}
-                                        className={`p-4 space-y-2.5 transition-colors ${e.is_voided && e.is_audited ? "bg-red-50/70" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "active:bg-blue-50/60" : ""}`}>
+                                        className={`relative p-4 pl-5 space-y-2.5 transition-colors ${e.is_voided && e.is_audited ? "bg-red-50/70" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "active:bg-blue-50/60" : ""}`}>
+                                        <span className={`absolute left-0 top-0 h-full w-1 ${e.is_voided ? "bg-gray-300" : e.direction === "IN" ? "bg-emerald-400" : "bg-red-400"}`} />
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <SourceBadge sourceType={e.source_type} />
@@ -2141,12 +2221,13 @@ export default function CashflowPage() {
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
+                                                    {e.source_type !== "MODAL_AWAL" && <NameAvatar name={displayName} size={20} />}
                                                     <p className="text-sm font-bold text-gray-900 truncate">{displayName}</p>
                                                     {e.source_type === "PENGAJUAN_DANA" && (
-                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 shrink-0">Dana</span>
+                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 shrink-0">Dana</span>
                                                     )}
                                                 </div>
-                                                <span className="inline-flex mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                                                <span className="inline-flex mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
                                                     {e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel(e.direction, e.category)}
                                                 </span>
                                             </div>
@@ -2178,7 +2259,7 @@ export default function CashflowPage() {
                     <div className="hidden sm:block overflow-x-auto">
                         <table className="w-full text-sm" style={{ minWidth: 860 }}>
                             <thead>
-                                <tr className="bg-gray-50 border-b-2 border-gray-100">
+                                <tr className="bg-gray-50/80 border-b-2 border-gray-100">
                                     {[
                                         { label: "Tanggal", align: "left" },
                                         { label: "Sumber", align: "left" },
@@ -2191,7 +2272,7 @@ export default function CashflowPage() {
                                         { label: "Diaudit oleh", align: "left" },
                                         { label: "Waktu Audit", align: "center" },
                                     ].map((h, i) => (
-                                        <th key={i} className={`px-3.5 py-3.5 text-[10px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap text-${h.align} first:pl-5 last:pr-5`}>{h.label}</th>
+                                        <th key={i} className={`px-3.5 py-3.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap text-${h.align} first:pl-5 last:pr-5`}>{h.label}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -2207,23 +2288,26 @@ export default function CashflowPage() {
                                 ) : rows.length === 0 ? (
                                     <tr>
                                         <td colSpan={10} className="px-3.5 py-16 text-center">
-                                            <div className="text-4xl mb-2.5 opacity-25 flex justify-center">{filterCount > 0 ? <Search size={40} /> : <Inbox size={40} />}</div>
+                                            <div className="w-16 h-16 rounded-2xl bg-violet-50/60 border border-violet-100 flex items-center justify-center mx-auto mb-3 text-violet-200">{filterCount > 0 ? <Search size={30} /> : <Inbox size={30} />}</div>
                                             <p className="text-sm text-gray-400 font-medium">
                                                 {filterCount > 0 ? `Tidak ada data yang cocok (${allRows.length} entry tersembunyi).` : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`}
                                             </p>
                                             {filterCount > 0 && (
-                                                <button onClick={handleFilterReset} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                                                <button onClick={handleFilterReset} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
                                                     <IconX /> Reset Filter
                                                 </button>
                                             )}
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginatedRows.map((e) => {
+                                    paginatedRows.map((e, idx) => {
                                         const isClickable = clickable(e);
+                                        // ⬅️ BARU: zebra striping halus buat keterbacaan baris — tetap kalah prioritas
+                                        // dari state voided/audited di bawah, jadi tidak mengubah makna warna yang sudah ada.
+                                        const zebra = idx % 2 === 1 ? "bg-gray-50/40" : "";
                                         return (
                                             <tr key={e.id} onClick={() => isClickable && handleRowClick(e)}
-                                                className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "cursor-pointer hover:bg-violet-50/40" : "hover:bg-gray-50/50"}`}>
+                                                className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : zebra} ${isClickable ? "cursor-pointer hover:bg-violet-50/40" : "hover:bg-gray-50/50"}`}>
                                                 <td className="pl-5 pr-3 py-3 whitespace-nowrap">
                                                     <span className="text-[11px] font-semibold text-gray-600">
                                                         {e.created_at
@@ -2246,20 +2330,28 @@ export default function CashflowPage() {
                                                         </span>
                                                     ) : <span className="text-gray-300 text-[11px]">—</span>}
                                                 </td>
-                                                <td className="px-3 py-3 max-w-[140px]">
-                                                    <p className="text-[12px] font-semibold text-gray-800 truncate">
-                                                        {e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama}
-                                                    </p>
-                                                    {e.source_type === "SERVICE" && <p className="text-[9px] text-orange-500 font-semibold mt-0.5">Teknisi</p>}
-                                                    {e.source_type === "TRANSACTION" && <p className="text-[9px] text-blue-500 font-semibold mt-0.5">Customer</p>}
-                                                    {e.source_type === "MODAL_AWAL" && <p className="text-[9px] text-violet-500 font-semibold mt-0.5">Modal Awal</p>}
-                                                    {e.source_type === "PENGAJUAN_DANA" && <p className="text-[9px] text-teal-600 font-semibold mt-0.5">Pengajuan Dana</p>}
+                                                <td className="px-3 py-3 max-w-[150px]">
+                                                    {(() => {
+                                                        const rowName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama;
+                                                        return (
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                {e.source_type !== "MODAL_AWAL" && <NameAvatar name={rowName} />}
+                                                                <div className="min-w-0">
+                                                                    <p className="text-[12px] font-semibold text-gray-800 truncate">{rowName}</p>
+                                                                    {e.source_type === "SERVICE" && <p className="text-[9px] text-orange-500 font-semibold">Teknisi</p>}
+                                                                    {e.source_type === "TRANSACTION" && <p className="text-[9px] text-blue-500 font-semibold">Customer</p>}
+                                                                    {e.source_type === "MODAL_AWAL" && <p className="text-[9px] text-violet-500 font-semibold">Modal Awal</p>}
+                                                                    {e.source_type === "PENGAJUAN_DANA" && <p className="text-[9px] text-teal-600 font-semibold">Pengajuan Dana</p>}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap">
                                                     {e.source_type === "MODAL_AWAL" ? (
-                                                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-violet-50 text-violet-600 border border-violet-100"><Wallet size={11} /> Modal Awal</span>
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-100"><Wallet size={11} /> Modal Awal</span>
                                                     ) : (
-                                                        <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">{categoryLabel(e.direction, e.category)}</span>
+                                                        <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{categoryLabel(e.direction, e.category)}</span>
                                                     )}
                                                 </td>
                                                 <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.is_voided ? "text-gray-400 line-through decoration-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
@@ -2315,8 +2407,8 @@ export default function CashflowPage() {
                             </p>
                             {totalPages > 1 && (
                                 <div className="flex items-center gap-1">
-                                    <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronsLeft /></button>
-                                    <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronLeft /></button>
+                                    <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="w-7 h-7 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronsLeft /></button>
+                                    <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="w-7 h-7 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronLeft /></button>
                                     {(() => {
                                         const pages: (number | "...")[] = [];
                                         if (totalPages <= 7) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
@@ -2331,11 +2423,11 @@ export default function CashflowPage() {
                                         }
                                         return pages.map((p, i) =>
                                             p === "..." ? <span key={`d-${i}`} className="w-7 h-7 flex items-center justify-center text-[11px] text-gray-400">…</span>
-                                                : <button key={p} onClick={() => setCurrentPage(p as number)} className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-semibold transition-all ${p === safePage ? `${BRAND_GRADIENT} text-white shadow-sm` : "border border-gray-200 text-gray-600 bg-white hover:bg-gray-100 hover:border-gray-300"}`}>{p}</button>
+                                                : <button key={p} onClick={() => setCurrentPage(p as number)} className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-semibold transition-all ${p === safePage ? `${BRAND_GRADIENT} text-white shadow-sm shadow-violet-900/20` : "border border-gray-200 text-gray-600 bg-white hover:bg-gray-100 hover:border-gray-300"}`}>{p}</button>
                                         );
                                     })()}
-                                    <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronRight /></button>
-                                    <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronsRight /></button>
+                                    <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="w-7 h-7 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronRight /></button>
+                                    <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="w-7 h-7 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronsRight /></button>
                                 </div>
                             )}
                         </div>
