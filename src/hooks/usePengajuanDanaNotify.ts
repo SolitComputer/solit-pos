@@ -70,7 +70,12 @@ const SEEN_STORAGE_KEY = "pengajuan_dana_seen_ids";
 // "didismiss" manual oleh admin.
 const PENDING_IDS_STORAGE_KEY = "pengajuan_dana_pending_ids";
 const PENDING_ALERTS_STORAGE_KEY = "pengajuan_dana_pending_alerts";
-const INITIALIZED_STORAGE_KEY = "pengajuan_dana_initialized";
+// Bump ke _v2 (sekali) supaya alarm melakukan baseline ULANG di load
+// berikutnya untuk SEMUA listener. Tanpa ini, browser yang sudah pernah
+// initialize tidak akan membunyikan pengajuan yang statusnya "menunggu"
+// SEBELUM deploy — karena sudah terlanjur tercatat sebagai "seen".
+// Baseline ulang mempromosikan semua yang masih menunggu -> pending -> bunyi.
+const INITIALIZED_STORAGE_KEY = "pengajuan_dana_initialized_v2";
 const MAX_SEEN_IDS = 300;
 const MAX_PENDING_ALERTS = 20;
 const MUTED_STORAGE_KEY = "pengajuan_dana_muted";
