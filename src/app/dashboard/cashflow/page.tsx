@@ -1686,8 +1686,13 @@ export default function CashflowPage() {
     const [auditingId, setAuditingId] = useState<string | null>(null);
     const [staleOnly, setStaleOnly] = useState(false); // ⬅️ BARU: toggle "tampilkan cuma entry stale"
     const tableRef = useRef<HTMLDivElement>(null); // ⬅️ BARU: buat scroll-to-table pas banner diklik
+    // ⬅️ BARU: penanda "user lagi kerja" — dipakai polling buat SKIP auto-refresh.
+    // Pakai ref (bukan state) supaya interval polling di bawah TIDAK dibuat ulang tiap
+    // modal buka/tutup (kalau dibuat ulang, timer 10 detiknya ke-reset dari nol).
+    const isBusyRef = useRef(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const [exporting, setExporting] = useState(false);
+       const [exporting, setExporting] = useState(false);
+    const [refreshing, setRefreshing] = useState(false); // ⬅️ BARU: spinner Segarkan (refresh manual tanpa skeleton)
     const [allowed, setAllowed] = useState<boolean | null>(null);
     const [canAuditOut, setCanAuditOut] = useState(false);
     const [canManageAuditAccess, setCanManageAuditAccess] = useState(false);
@@ -1752,11 +1757,26 @@ export default function CashflowPage() {
 
     useEffect(() => { if (allowed) fetchData(); }, [allowed, fetchData]);
 
+       // ⬅️ BARU: update penanda "lagi kerja" tiap salah satu modal/aksi berubah.
+    // Set ref langsung (bukan setState) jadi TIDAK memicu re-render tambahan.
+    useEffect(() => {
+        isBusyRef.current =
+            showModal || showModalAwal || showIncomeModal ||
+            !!detailEntry || !!editEntry || showAuditAccessModal ||
+            !!auditingId || exporting;
+    }, [showModal, showModalAwal, showIncomeModal, detailEntry, editEntry, showAuditAccessModal, auditingId, exporting]);
+
     useEffect(() => {
         if (!allowed) return;
-        const interval = setInterval(() => { if (document.visibilityState === "visible") fetchData(true); }, 10000);
-        const onFocus = () => fetchData(true);
-        const onVisible = () => { if (document.visibilityState === "visible") fetchData(true); };
+        // ⬅️ FIX: auto-refresh (interval 10 dtk + saat tab difokuskan) sekarang DI-SKIP
+        // kalau user lagi kerja: modal input/edit/detail terbuka, lagi audit, atau export.
+        // Refresh manual (tombol Segarkan) & refresh setelah Simpan TETAP jalan karena itu
+        // dipanggil eksplisit (onSaved → fetchData(true)), bukan lewat polling ini.
+        const interval = setInterval(() => {
+            if (document.visibilityState === "visible" && !isBusyRef.current) fetchData(true);
+        }, 10000);
+        const onFocus = () => { if (!isBusyRef.current) fetchData(true); };
+        const onVisible = () => { if (document.visibilityState === "visible" && !isBusyRef.current) fetchData(true); };
         window.addEventListener("focus", onFocus);
         document.addEventListener("visibilitychange", onVisible);
         return () => { clearInterval(interval); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onVisible); };
@@ -1802,6 +1822,14 @@ export default function CashflowPage() {
         }
     };
 
+
+       // ⬅️ BARU: refresh manual TANPA skeleton. Dulu tombol Segarkan panggil fetchData()
+    // (non-silent) yang nge-blank seluruh tabel jadi skeleton tiap diklik. Sekarang
+    // fetchData(true) (silent): data di-update di tempat, cuma ikon tombol yang muter.
+    const handleManualRefresh = async () => {
+        setRefreshing(true);
+        try { await fetchData(true); } finally { setRefreshing(false); }
+    };
 
     const toggleAudit = async (entry: Entry) => {
         if (entry.direction === "OUT" && !canAuditOut) return;
@@ -2008,8 +2036,8 @@ export default function CashflowPage() {
                             <IconDownload />
                             <span className="hidden sm:inline text-sm">{exporting ? "Mengekspor..." : "Export Excel"}</span>
                         </button>
-                        <button onClick={() => fetchData()} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 hover:border-violet-200 hover:text-violet-700 active:scale-95 transition-all ${BRAND_RING}`}>
-                            <span className={loading ? "inline-flex animate-spin" : "inline-flex"}><IconRefresh /></span>
+                                                <button onClick={handleManualRefresh} disabled={loading || refreshing} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 hover:border-violet-200 hover:text-violet-700 active:scale-95 transition-all disabled:opacity-50 ${BRAND_RING}`}>
+                            <span className={(loading || refreshing) ? "inline-flex animate-spin" : "inline-flex"}><IconRefresh /></span>
                             <span className="hidden sm:inline text-sm">Segarkan</span>
                         </button>
                     </div>
