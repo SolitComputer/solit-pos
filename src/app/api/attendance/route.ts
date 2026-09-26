@@ -111,6 +111,7 @@ export async function GET(request: Request) {
       created_at: item.created_at,
       late_weight: item.late_weight != null ? Number(item.late_weight) : null,
       direction: item.direction ?? "IN", // ✅ NEW — biar frontend bisa pisahin IN vs OUT
+      shift_snapshot: item.shift_snapshot ?? null, // ✅ NEW — shift yg dikunci saat absen (null utk record lama)
     }));
 
     return NextResponse.json({ success: true, data: formattedData });

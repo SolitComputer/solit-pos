@@ -171,6 +171,23 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
 
   const weight = direction === "IN" ? calcAttendanceWeightFromSchedule(nowISO, schedule).weight : null;
 
+  // ✅ FIX: DaySchedule cuma nyimpen JAM (open/late/close/checkout), TIDAK
+  // nyimpen label PAGI/SORE — makanya `schedule.shift` gak ada (error TS2339).
+  // Label shift di-resolve terpisah dgn prioritas yg SAMA persis spt
+  // effectiveShiftFor() di halaman rekap: jadwal tanggal ini > shift default
+  // (user_shift_config) > shift dasar akun (users.shift) > PAGI. Query di
+  // bawah aman-degrade: kalau salah satu tabel kosong/tidak match, jatuh ke
+  // prioritas berikutnya, bukan crash.
+  const [{ data: cfgShiftRow }, { data: userShiftRow }] = await Promise.all([
+    supabaseAdmin.from("user_shift_config").select("shift").eq("user_id", userId).maybeSingle(),
+    supabaseAdmin.from("users").select("shift").eq("id", userId).maybeSingle(),
+  ]);
+  const shiftLabel: "PAGI" | "SORE" =
+    ((scheduleOverride as any)?.shift as "PAGI" | "SORE" | undefined)
+    ?? (cfgShiftRow?.shift as "PAGI" | "SORE" | undefined)
+    ?? (userShiftRow?.shift as "PAGI" | "SORE" | undefined)
+    ?? "PAGI";
+
   const insertPayload: Record<string, any> = {
     user_id: userId,
     status: "SUCCESS",
@@ -180,6 +197,10 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     method: p.method,
     late_weight: weight,
     created_at: nowISO,
+    // ✅ NEW — snapshot shift efektif tanggal ini (dari jadwal/config/base yg
+    // sudah di-resolve di `schedule`). Dikunci saat absen supaya rekap hari
+    // lampau TIDAK ikut berubah kalau shift default diganti belakangan.
+    shift_snapshot: shiftLabel,
   };
   if (p.latitude != null) insertPayload.latitude = p.latitude;
   if (p.longitude != null) insertPayload.longitude = p.longitude;

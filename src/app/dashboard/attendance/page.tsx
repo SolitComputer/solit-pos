@@ -60,6 +60,7 @@ type Attendance = {
     displayStatus?: "PRESENT" | "LATE" | "SKIP";
     source?: "AUTO" | "MANUAL";
     direction?: "IN" | "OUT"; // ✅ NEW
+    shift_snapshot?: "PAGI" | "SORE" | null; // ✅ NEW — shift yg berlaku saat absen (dikunci)
 };
 
 type ManualAttendance = {
@@ -274,7 +275,7 @@ function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" | "SKIP" {
         return "SKIP";
     }
 
-    if (isLate(a.check_in_time || a.created_at, a.user_shift ?? "PAGI")) return "LATE";
+       if (isLate(a.check_in_time || a.created_at, (a.shift_snapshot ?? a.user_shift) ?? "PAGI")) return "LATE";
     return "PRESENT";
 }
 
@@ -5681,13 +5682,18 @@ export default function AttendanceDashboardPage() {
                                                             <td className="px-4 py-4 text-center">
                                                                 {(() => {
                                                                     const eff = effectiveShiftFor(userId, dateKey);
+                                                                    // ✅ FIX: pakai shift SNAPSHOT saat absen (a.shift_snapshot)
+                                                                    // kalau ada, jadi rekap hari lalu TIDAK ikut berubah waktu
+                                                                    // shift default diganti hari ini. effectiveShiftFor() cuma
+                                                                    // dipakai sbg fallback utk record lama yg belum punya snapshot.
+                                                                    const shownShift = (a.shift_snapshot ?? eff.shift) as "PAGI" | "SORE";
                                                                     return (
                                                                         <div className="flex flex-col items-center gap-0.5">
-                                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${eff.shift === "PAGI"
+                                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${shownShift === "PAGI"
                                                                                 ? "bg-amber-50 text-amber-700 border-amber-200"
                                                                                 : "bg-indigo-50 text-indigo-700 border-indigo-200"
                                                                                 }`}>
-                                                                                {eff.shift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {eff.shift}
+                                                                                {shownShift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {shownShift}
                                                                             </span>
                                                                             {eff.fromSchedule && (
                                                                                 <span className="text-[8px] font-bold text-violet-500">jadwal</span>
