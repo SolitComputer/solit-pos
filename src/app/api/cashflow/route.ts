@@ -164,8 +164,12 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
             toInsert.push({ ...desired, is_audited: false });
             continue;
         }
-        if (cur.is_audited) continue;
-
+        // ⬅️ FIX: dulu `if (cur.is_audited) continue;` — entry TRANSACTION yang sudah
+        // diaudit dikunci & tidak pernah ikut turun saat deal_price transaksi diedit,
+        // jadi nominal Cashflow nyangkut di harga lama (mis. 10jt) padahal transaksinya
+        // sudah 9.85jt. Sekarang disamakan dengan SERVICE: entry tetap direkonsiliasi
+        // ke deal_price TERKINI walau sudah diaudit. Status audit (is_audited/audited_at/
+        // audited_by) TIDAK ikut diubah — cuma nominal & field turunan yang disamakan.
         const patch = diffPayload(cur, desired);
         if (Object.keys(patch).length > 0) updates.push({ id: cur.id, patch });
     }
