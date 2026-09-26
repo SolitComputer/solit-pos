@@ -513,13 +513,21 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
 }
 
 // ── GET /api/cashflow ──────────────────────────────────────────────────────
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req) => {
     const supabase = getAdmin();
 
-    try {
-        await syncDerivedEntries(supabase);
-    } catch (e) {
-        console.error("[cashflow sync]", e);
+    // ⬅️ FIX: ?skipSync=1 melewati sinkronisasi berat (scan transactions/
+    // payments/service + reconcile ribuan baris) supaya load PERTAMA halaman
+    // Cashflow cepat — cukup baca cashflow_entries yang sudah ada. Sync penuh
+    // dipicu terpisah di background oleh frontend (lihat fetchData di page.tsx).
+    const skipSync = new URL(req.url).searchParams.get("skipSync") === "1";
+
+    if (!skipSync) {
+        try {
+            await syncDerivedEntries(supabase);
+        } catch (e) {
+            console.error("[cashflow sync]", e);
+        }
     }
 
     // fetchAllRows: hindari truncation 1000 baris yang bikin saldo salah hitung.
