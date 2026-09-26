@@ -675,12 +675,34 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       finalNewUnitIds = await resolveNewUnitIds(newIds, newSNs);
 
       if (newSNs.length > 0 && finalNewUnitIds.length < newSNs.length) {
+        // SN yang MEMANG sudah tercatat di transaksi ini sebelumnya jangan
+        // divalidasi ulang sebagai "typo". Ini menampung SN aksesoris
+        // (mis. HDD-320GB-083) yang tersimpan di transactions.serial_numbers
+        // tapi ada di tabel accessory_units, BUKAN laptop_units — sehingga
+        // edit yang tidak mengubah unit (cuma ganti metode bayar / nominal)
+        // tidak ikut ditolak.
+        const existingSNSet = new Set(
+          (Array.isArray(before?.serial_numbers)
+            ? before.serial_numbers
+            : before?.serial_number
+              ? [before.serial_number]
+              : []
+          )
+            .map((s: string) => (s ?? "").toString().trim())
+            .filter(Boolean)
+        );
+
         const { data: matchedRows } = await supabase
           .from("laptop_units")
           .select("serial_number")
           .in("serial_number", newSNs);
         const matchedSNs = new Set((matchedRows ?? []).map((r) => r.serial_number));
-        const notFound = newSNs.filter((sn) => !matchedSNs.has(sn));
+
+        // Hanya tolak SN yang BENAR-BENAR baru DAN tidak ada di laptop_units.
+        // SN lama yang sudah ada di transaksi di-whitelist.
+        const notFound = newSNs.filter(
+          (sn) => !matchedSNs.has(sn) && !existingSNSet.has(sn.toString().trim())
+        );
         if (notFound.length > 0) {
           return NextResponse.json(
             {
