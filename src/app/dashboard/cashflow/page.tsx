@@ -1716,7 +1716,13 @@ export default function CashflowPage() {
     const fetchData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const res = await fetch("/api/cashflow", { cache: "no-store" });
+            // ⬅️ FIX: dulu selalu panggil /api/cashflow (yang jalanin FULL sync dulu
+            // sebelum balikin data), jadi loading pertama nunggu sinkronisasi ribuan
+            // transaksi selesai — makanya skeleton nyangkut lama. Sekarang load awal
+            // pakai ?skipSync=1 supaya data yang SUDAH ada langsung tampil cepat,
+            // baru sync-nya dipicu di belakang tanpa nahan skeleton.
+            const fastUrl = silent ? "/api/cashflow" : "/api/cashflow?skipSync=1";
+            const res = await fetch(fastUrl, { cache: "no-store" });
             const json = await res.json();
             if (json.success) {
                 setMasuk(sortEntries(json.data.masuk ?? []));
@@ -1724,7 +1730,24 @@ export default function CashflowPage() {
                 setSummary(json.summary);
                 setLastUpdated(new Date());
             }
-        } finally { if (!silent) setLoading(false); }
+        } finally {
+            if (!silent) {
+                setLoading(false);
+                // Skeleton sudah hilang; sekarang picu sync penuh di belakang layar.
+                // Hasilnya masuk lewat fetchData(true) yang refresh data diam-diam.
+                fetch("/api/cashflow", { cache: "no-store" })
+                    .then((r) => r.json())
+                    .then((j) => {
+                        if (j.success) {
+                            setMasuk(sortEntries(j.data.masuk ?? []));
+                            setKeluar(sortEntries(j.data.keluar ?? []));
+                            setSummary(j.summary);
+                            setLastUpdated(new Date());
+                        }
+                    })
+                    .catch(() => { });
+            }
+        }
     }, []);
 
     useEffect(() => { if (allowed) fetchData(); }, [allowed, fetchData]);
