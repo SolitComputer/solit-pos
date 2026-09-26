@@ -675,39 +675,42 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       finalNewUnitIds = await resolveNewUnitIds(newIds, newSNs);
 
       if (newSNs.length > 0 && finalNewUnitIds.length < newSNs.length) {
-        // SN yang MEMANG sudah tercatat di transaksi ini sebelumnya jangan
-        // divalidasi ulang sebagai "typo". Ini menampung SN aksesoris
-        // (mis. HDD-320GB-083) yang tersimpan di transactions.serial_numbers
-        // tapi ada di tabel accessory_units, BUKAN laptop_units — sehingga
-        // edit yang tidak mengubah unit (cuma ganti metode bayar / nominal)
-        // tidak ikut ditolak.
-        const existingSNSet = new Set(
-          (Array.isArray(before?.serial_numbers)
-            ? before.serial_numbers
-            : before?.serial_number
-              ? [before.serial_number]
-              : []
-          )
-            .map((s: string) => (s ?? "").toString().trim())
-            .filter(Boolean)
-        );
+        // Normalisasi biar beda spasi/kapital nggak bikin gagal.
+        const norm = (s: any) => (s ?? "").toString().trim().toUpperCase();
+
+        // SN yang SUDAH tercatat di transaksi ini di-whitelist — termasuk SN
+        // aksesoris (mis. HDD-320GB-083) yang ada di accessory_units, BUKAN
+        // laptop_units. Sumber: kolom transactions + tabel transaction_items.
+        const existingSNSet = new Set<string>();
+        if (Array.isArray(before?.serial_numbers)) {
+          for (const s of before.serial_numbers) if (norm(s)) existingSNSet.add(norm(s));
+        }
+        if (before?.serial_number) existingSNSet.add(norm(before.serial_number));
+
+        const { data: existingItems } = await supabase
+          .from("transaction_items")
+          .select("serial_number")
+          .eq("invoice_number", invoice);
+        for (const it of existingItems ?? []) {
+          if (norm(it.serial_number)) existingSNSet.add(norm(it.serial_number));
+        }
 
         const { data: matchedRows } = await supabase
           .from("laptop_units")
           .select("serial_number")
           .in("serial_number", newSNs);
-        const matchedSNs = new Set((matchedRows ?? []).map((r) => r.serial_number));
+        const matchedSNs = new Set((matchedRows ?? []).map((r) => norm(r.serial_number)));
 
-        // Hanya tolak SN yang BENAR-BENAR baru DAN tidak ada di laptop_units.
-        // SN lama yang sudah ada di transaksi di-whitelist.
+        // Hanya tolak SN yang BENAR-BENAR baru diketik user DAN tidak ada di
+        // laptop_units. SN lama (apa pun jenisnya) selalu lolos.
         const notFound = newSNs.filter(
-          (sn) => !matchedSNs.has(sn) && !existingSNSet.has(sn.toString().trim())
+          (sn) => !matchedSNs.has(norm(sn)) && !existingSNSet.has(norm(sn))
         );
         if (notFound.length > 0) {
           return NextResponse.json(
             {
               success: false,
-              message: `Serial number tidak ditemukan di database: ${notFound.join(", ")}. Periksa kembali penulisan SN — transaksi tidak disimpan.`,
+              message: `[SN-CHECK v2] Serial number tidak ditemukan di database: ${notFound.join(", ")}. Periksa kembali penulisan SN — transaksi tidak disimpan.`,
             },
             { status: 400 }
           );
