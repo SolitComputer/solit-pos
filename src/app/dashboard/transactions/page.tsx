@@ -651,7 +651,7 @@ function ConfirmPaymentModal({
       // (dulu 1MB/1600px → sekarang 0.3MB/1280px, jauh lebih hemat storage)
       const file = await compressImage(rawFile, { maxSizeMB: 0.3, maxWidthOrHeight: 1280 });
       const fd = new FormData();
-      fd.append("file", file);
+    fd.append("file", file);
       fd.append("invoice", item.invoice_number);
       const res = await fetch("/api/receipt/upload-image", { method: "POST", body: fd });
       const r = await res.json();
