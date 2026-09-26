@@ -1,3 +1,4 @@
+// src/hooks/usePengajuanDanaNotify.ts
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -31,15 +32,36 @@ const POLL_INTERVAL_MS = 15_000;
 // ini nyaris tidak kedengaran -> alarm terdengar nonstop "tinuttinuttinut...".
 const LOOP_INTERVAL_MS = 500;
 
-// ── Filter sumber pengajuan: alarm & card notifikasi HANYA dipicu untuk
-// pengajuan dana yang requester_id-nya ada di daftar ini (Yoga & Reinaldy).
-// Pengajuan dari requester lain TETAP muncul di tabel dan tetap bisa
-// di-approve seperti biasa — cuma tidak memicu suara/notifikasi mengambang.
-// GANTI 2 placeholder di bawah dengan UUID asli dari tabel fund_requests.
-const NOTIFY_SOURCE_IDS: string[] = [
-  "7b56de81-244e-42af-b2f6-0e29631c4114", // Yoga Adi Prakoso
-  "236c08b5-0dd2-4f2f-95d6-286c5b6dd75e", // Reinaldy Olyvierd Sendouw
-];
+// ── Filter sumber pengajuan (SIAPA YANG MENGAJUKAN dana).
+// Array KOSONG = alarm bunyi untuk SEMUA requester (siapa pun yang
+// mengajukan — Udin, dll). Kalau suatu saat mau dibatasi ke requester
+// tertentu, tinggal isi UUID-nya lagi di array ini.
+// CATATAN: pembatasan SIAPA YANG DENGAR alarm ada di file terpisah
+// (ALLOWED_NOTIFY_LISTENER_IDS di PengajuanDanaNotifier.tsx) = Yoga &
+// Reinaldy — itu TIDAK diubah, jadi tetap cuma mereka berdua yang bunyi.
+const NOTIFY_SOURCE_IDS: string[] = [];
+
+// Sumber dianggap "boleh memicu alarm" kalau daftar filter kosong (semua
+// boleh) ATAU requester-nya memang terdaftar di NOTIFY_SOURCE_IDS.
+function isNotifiableSource(requesterId: string): boolean {
+  return NOTIFY_SOURCE_IDS.length === 0 || NOTIFY_SOURCE_IDS.includes(requesterId);
+}
+
+// ── Event lintas-komponen untuk MENGHENTIKAN alarm SEKETIKA (tanpa nunggu
+// poll 15 detik). Halaman Pengajuan Dana men-dispatch event ini begitu
+// tombol Setujui/Tolak sukses di server; hook di bawah mendengarnya lalu
+// langsung membuang id itu dari daftar pending + alerts -> loop suara stop.
+const PENGAJUAN_DANA_RESOLVED_EVENT = "pengajuan-dana:resolved";
+
+/** Panggil dari mana pun (mis. halaman Pengajuan Dana) setelah sebuah
+ *  pengajuan BERHASIL disetujui/ditolak di server, supaya alarm untuk id
+ *  tsb berhenti seketika tanpa menunggu siklus polling berikutnya. */
+export function notifyPengajuanDanaResolved(id: string) {
+  if (typeof window === "undefined" || !id) return;
+  window.dispatchEvent(
+    new CustomEvent(PENGAJUAN_DANA_RESOLVED_EVENT, { detail: { id } })
+  );
+}
 
 const SEEN_STORAGE_KEY = "pengajuan_dana_seen_ids";
 // ID pengajuan yang SEDANG aktif menunggu approval — bukan snapshot alert
@@ -313,27 +335,34 @@ export function usePengajuanDanaNotify(enabled: boolean) {
 
         if (!hasInitialized) {
           // Load pertama kali DI BROWSER INI — tandai semua data lama
-          // sebagai "sudah dilihat" supaya tidak memicu alarm untuk
-          // pengajuan yang sudah ada sebelum fitur ini dipasang.
-          rows.forEach((r) => seen.add(r.id));
+          // sebagai "sudah dilihat". TAPI pengajuan yang MASIH menunggu
+          // approval tetap dimasukkan ke `pending` supaya LANGSUNG bunyi
+          // di poll pertama ini. Tanpa ini, pengajuan yang dibuat SEBELUM
+          // approver buka halaman (mis. Udin ngajuin jam 09:00, Yoga baru
+          // buka jam 10:00) tidak pernah bunyi walaupun belum disetujui.
+          for (const r of rows) {
+            seen.add(r.id);
+            if (!r.is_approved && !r.is_rejected && isNotifiableSource(r.requester_id)) {
+              pending.add(r.id);
+            }
+          }
           saveSeenIds(seen);
+          savePendingIds(pending);
           hasInitialized = true;
           saveHasInitialized();
-          return;
+          // TIDAK `return` — lanjut ke re-validasi & setAlerts di bawah.
         }
 
         // 1) Deteksi pengajuan baru (belum pernah "dilihat") yang masih
-        //    menunggu approval DAN requester-nya ada di NOTIFY_SOURCE_IDS
-        //    -> masukkan ke daftar pending. Pengajuan dari requester lain
-        //    tetap ditandai "sudah dilihat" (supaya tidak tiba-tiba memicu
-        //    alarm kalau nanti ID-nya ditambahkan ke daftar), tapi TIDAK
-        //    masuk ke pending -> tidak bunyi, tidak muncul card.
+        //    menunggu approval DAN requester-nya lolos filter sumber
+        //    (isNotifiableSource — sekarang SEMUA requester lolos karena
+        //    NOTIFY_SOURCE_IDS kosong) -> masukkan ke daftar pending.
         let seenChanged = false;
         for (const r of rows) {
           if (!seen.has(r.id)) {
             seen.add(r.id);
             seenChanged = true;
-            if (!r.is_approved && !r.is_rejected && NOTIFY_SOURCE_IDS.includes(r.requester_id)) {
+            if (!r.is_approved && !r.is_rejected && isNotifiableSource(r.requester_id)) {
               pending.add(r.id);
             }
           }
@@ -342,17 +371,15 @@ export function usePengajuanDanaNotify(enabled: boolean) {
 
         // 2) Re-validasi SEMUA id yang sedang pending terhadap data terbaru:
         //    kalau sudah is_approved=true atau is_rejected=true, barisnya
-        //    sudah tidak ada lagi (dihapus), ATAU requester_id-nya sudah
-        //    tidak ada di NOTIFY_SOURCE_IDS, keluarkan dari daftar pending.
-        //    Baris terakhir ini penting: kalau browser admin masih menyimpan
-        //    pending lama (dari sebelum filter ini dipasang, mis. dari
-        //    akun testing), otomatis "dibersihkan" di poll pertama tanpa
-        //    perlu admin clear localStorage manual.
+        //    sudah tidak ada lagi (dihapus), ATAU requester_id-nya tidak
+        //    lagi lolos filter sumber, keluarkan dari daftar pending.
+        //    Inilah yang bikin alarm BERHENTI otomatis begitu Yoga/Reinaldy
+        //    menekan Setujui atau Tolak (is_approved / is_rejected jadi true).
         const rowById = new Map(rows.map((r) => [r.id, r]));
         const stillPending: string[] = [];
         for (const id of pending) {
           const row = rowById.get(id);
-          if (row && !row.is_approved && !row.is_rejected && NOTIFY_SOURCE_IDS.includes(row.requester_id)) {
+          if (row && !row.is_approved && !row.is_rejected && isNotifiableSource(row.requester_id)) {
             stillPending.push(id);
           }
         }
@@ -386,6 +413,29 @@ export function usePengajuanDanaNotify(enabled: boolean) {
       cancelled = true;
       clearInterval(interval);
     };
+  }, [enabled]);
+
+    // ── Stop alarm SEKETIKA saat approve/reject: dengarkan event yang
+  // di-dispatch dari halaman Pengajuan Dana (notifyPengajuanDanaResolved).
+  // Begitu sebuah id "resolved", buang dari pending + alerts tanpa nunggu
+  // poll berikutnya -> alerts.length turun -> loop suara di bawah berhenti.
+  // Poll tetap jadi jaring pengaman: kalau event kelewat (mis. aksi dari
+  // device/tab lain), re-validasi 15 detik-an tetap mengoreksi.
+  useEffect(() => {
+    if (!enabled) return;
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<{ id: string }>).detail?.id;
+      if (!id) return;
+      pendingIdsRef.current.delete(id);
+      savePendingIds(pendingIdsRef.current);
+      setAlerts((prev) => {
+        const next = prev.filter((a) => a.id !== id);
+        savePendingAlerts(next);
+        return next;
+      });
+    };
+    window.addEventListener(PENGAJUAN_DANA_RESOLVED_EVENT, handler);
+    return () => window.removeEventListener(PENGAJUAN_DANA_RESOLVED_EVENT, handler);
   }, [enabled]);
 
   // ── Looping alarm: selama `alerts` masih berisi minimal 1 pengajuan yang

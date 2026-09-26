@@ -4,6 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { EXPENSE_CATEGORIES } from "@/lib/cashflow";
+import { notifyPengajuanDanaResolved } from "@/hooks/usePengajuanDanaNotify";
 import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, X, CheckCheck, RotateCcw, Banknote,
@@ -585,6 +586,8 @@ function RejectModal({
       });
       const json = await res.json();
       if (!json.success) { toast.error(json.message || "Gagal menolak pengajuan"); return; }
+      // Stop alarm SEKETIKA begitu ditolak — tanpa nunggu poll 15 detik.
+      notifyPengajuanDanaResolved(fundRequest.id);
       toast.success("Pengajuan berhasil ditolak");
       onSaved();
       onClose();
@@ -1101,6 +1104,9 @@ export default function PengajuanDanaPage() {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message);
+      // Stop alarm SEKETIKA begitu disetujui — tanpa nunggu poll 15 detik.
+      // (reject punya jalurnya sendiri di RejectModal, lihat di bawah.)
+      if (action === "approve") notifyPengajuanDanaResolved(id);
       const msgs: Record<string, string> = {
         approve: "Pengajuan disetujui", unapprove: "Persetujuan dibatalkan",
         execute: "Ditandai sudah dieksekusi", unexecute: "Status eksekusi dibatalkan",
