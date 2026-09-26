@@ -1064,6 +1064,46 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     allowedFields.last_edited_by = user.name;
     allowedFields.last_edited_at = new Date().toISOString();
 
+    // ── FIX FK transactions_unit_id_fkey ─────────────────────────────
+    // Kolom transactions.unit_id & unit_ids punya foreign key ke laptop_units.
+    // Transaksi aksesoris-only (mis. HDD) mengirim ID "unit hantu" yang TIDAK
+    // ada di laptop_units → Postgres menolak. Di sini kita saring: hanya ID
+    // yang benar-benar ada di laptop_units yang boleh masuk; sisanya di-null-kan.
+    {
+      const candidateIds = new Set<string>();
+      if (typeof allowedFields.unit_id === "string" && allowedFields.unit_id.trim()) {
+        candidateIds.add(allowedFields.unit_id.trim());
+      }
+      if (Array.isArray(allowedFields.unit_ids)) {
+        for (const id of allowedFields.unit_ids) {
+          if (typeof id === "string" && id.trim()) candidateIds.add(id.trim());
+        }
+      }
+
+      let validIdSet = new Set<string>();
+      if (candidateIds.size > 0) {
+        const { data: validUnits } = await supabase
+          .from("laptop_units")
+          .select("id")
+          .in("id", [...candidateIds]);
+        validIdSet = new Set((validUnits ?? []).map((u) => u.id));
+      }
+
+      // unit_id: null kalau bukan unit laptop valid (kasus aksesoris-only)
+      if (allowedFields.unit_id !== undefined) {
+        allowedFields.unit_id =
+          typeof allowedFields.unit_id === "string" && validIdSet.has(allowedFields.unit_id.trim())
+            ? allowedFields.unit_id.trim()
+            : null;
+      }
+      // unit_ids: buang semua ID yang tidak ada di laptop_units
+      if (Array.isArray(allowedFields.unit_ids)) {
+        allowedFields.unit_ids = allowedFields.unit_ids.filter(
+          (id: any) => typeof id === "string" && validIdSet.has(id.trim())
+        );
+      }
+    }
+
     // ── Update tabel transactions ────────────────────────────────────
     const { data, error } = await supabase
       .from("transactions")
