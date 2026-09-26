@@ -744,7 +744,13 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.customer_phone !== undefined) allowedFields.customer_phone = body.customer_phone;
     if (body.company_name !== undefined) allowedFields.company_name = body.company_name;
     if (body.laptop_name !== undefined) allowedFields.laptop_name = body.laptop_name;
-    if (body.laptop_id !== undefined) allowedFields.laptop_id = body.laptop_id;
+    if (body.laptop_id !== undefined) {
+      // FIX uuid "": kolom laptop_id bertipe UUID — string kosong ("") ditolak
+      // Postgres. Transaksi aksesoris-only tidak punya laptop, jadi kosongkan
+      // jadi null, bukan "".
+      const cleanLaptopId = typeof body.laptop_id === "string" ? body.laptop_id.trim() : body.laptop_id;
+      allowedFields.laptop_id = cleanLaptopId ? cleanLaptopId : null;
+    }
     if (body.serial_number !== undefined) allowedFields.serial_number = body.serial_number;
     if (body.unit_id !== undefined) {
       const cleanUnitId = typeof body.unit_id === "string" ? body.unit_id.trim() : body.unit_id;
