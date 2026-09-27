@@ -15,10 +15,11 @@ type QualityInput = {
     user_id: string;
     perfect_days: number;
     manual_days: number;
-    late_days: number;
+    late_days: number; // ✅ total telat (auto + manual) — utk DISPLAY kolom Terlambat Lencana
+    manual_late_days?: number; // ✅ NEW — telat manual saja, utk ranking (hindari dobel hitung)
     absent_days: number;
     total_workdays: number;
-    avg_early_minutes: number; // ✅ NEW — rata-rata menit lebih cepat dari batas telat jadwal masing-masing
+    avg_early_minutes: number;
 };
 
 const LOCK_LEVEL = 3;
@@ -181,8 +182,11 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     // dari jadwal — tiebreak terakhir ini yang menjelaskan "kenapa dia posisi
     // nomor 1" kalau 3 kriteria di atas sama persis.
     const ranked = [...scores].sort((a, b) => {
-        const va = a.manual_days + a.late_days + a.absent_days;
-        const vb = b.manual_days + b.late_days + b.absent_days;
+        // ✅ FIX: late_days sekarang total (auto + manual). Telat manual sudah ikut di
+        // manual_days, jadi dikurangi manual_late_days agar tidak dihitung dobel —
+        // hasil "pelanggaran" ini IDENTIK dgn rumus lama (autoLate + manual + absen).
+        const va = a.manual_days + (a.late_days - (a.manual_late_days || 0)) + a.absent_days;
+        const vb = b.manual_days + (b.late_days - (b.manual_late_days || 0)) + b.absent_days;
         if (va !== vb) return va - vb;
         if (b.perfect_days !== a.perfect_days) return b.perfect_days - a.perfect_days;
         const pctA = a.total_workdays > 0 ? a.perfect_days / a.total_workdays : 0;

@@ -4161,7 +4161,7 @@ export default function AttendanceDashboardPage() {
             absences: AbsenceItem[]; offDates: string[];
             holidayWorkDates: string[];
             pending: number; pendingDates: string[];
-            manualDays: number; perfectDays: number; violations: number;
+            manualDays: number; manualLateDays: number; perfectDays: number; violations: number;
             earlyDaysCount: number; avgEarlyMinutes: number;
         };
 
@@ -4280,7 +4280,7 @@ export default function AttendanceDashboardPage() {
             });
 
             let present = 0, late = 0, score = 0, leave = 0, pending = 0;
-            let manualDays = 0, perfectDays = 0, autoLateDays = 0;
+            let manualDays = 0, perfectDays = 0, autoLateDays = 0, manualLateDays = 0;
             let earlyMinutesSum = 0, earlyDaysCount = 0;
             const absences: AbsenceItem[] = [];
             const offDates: string[] = [];
@@ -4355,6 +4355,7 @@ export default function AttendanceDashboardPage() {
 
                     if (isManualDay) {
                         manualDays++;
+                        if (eff === "LATE") manualLateDays++; // ✅ NEW — telat input manual, dipisah utk sinkron kolom "Terlambat" Lencana
                     } else {
                         const arrivalIso = checkinIsoByName[name]?.[dk];
                         const eff2 = effectiveShiftFor(userId, dk);
@@ -4410,7 +4411,7 @@ export default function AttendanceDashboardPage() {
                 absences, offDates,
                 holidayWorkDates,
                 pending, pendingDates, // ✅ NEW
-                manualDays, perfectDays, violations, // ✅ NEW — untuk leaderboard Kualitas Absensi
+                manualDays, manualLateDays, perfectDays, violations, // ✅ NEW — untuk leaderboard Kualitas Absensi
                 earlyDaysCount, avgEarlyMinutes, // ✅ NEW — rata-rata menit lebih cepat dari jadwal
             });
         });
@@ -4426,12 +4427,17 @@ export default function AttendanceDashboardPage() {
     // lintas perusahaan akan tertimpa data yang tidak lengkap. Tidak ada UI
     // apa pun untuk ini di halaman ini.
     const qualitySyncedRef = useRef<string | null>(null);
+    // ✅ NEW — reset guard tiap ganti bulan, supaya sync quality-rank PASTI jalan
+    // sekali dengan data terbaru saat bulan dibuka (mencegah snapshot Lencana basi).
+    useEffect(() => {
+        qualitySyncedRef.current = null;
+    }, [calYear, calMonth]);
     useEffect(() => {
         const isAdminUser = userIsAdmin(currentUser);
         if (!isAdminUser || loading) return;
         const scores = userSummary.filter(u => u.userId);
         if (scores.length === 0) return;
-        const sig = `${calYear}-${calMonth}-${scores.map(u => `${u.userId}:${u.perfectDays}:${u.violations}`).join("|")}`;
+        const sig = `${calYear}-${calMonth}-${scores.map(u => `${u.userId}:${u.perfectDays}:${u.violations}:${u.late}`).join("|")}`;
         if (qualitySyncedRef.current === sig) return;
         qualitySyncedRef.current = sig;
         fetch("/api/attendance/quality-rank", {
@@ -4444,10 +4450,16 @@ export default function AttendanceDashboardPage() {
                     user_id: u.userId,
                     perfect_days: u.perfectDays,
                     manual_days: u.manualDays,
-                    late_days: Math.max(0, u.violations - u.manualDays - u.absences.length),
+                    // ✅ FIX: kolom "Terlambat" Lencana kini = u.late (auto + manual late),
+                    // biar SAMA persis dgn kolom Terlambat di halaman Absensi.
+                    late_days: u.late,
+                    // ✅ NEW: telat manual dikirim terpisah — dipakai server HANYA utk
+                    // hitung pelanggaran (ranking), supaya tidak dihitung dobel (telat
+                    // manual sudah ikut di manual_days).
+                    manual_late_days: u.manualLateDays,
                     absent_days: u.absences.length,
                     total_workdays: u.totalWorkdays,
-                    avg_early_minutes: u.avgEarlyMinutes, // ✅ NEW
+                    avg_early_minutes: u.avgEarlyMinutes,
                 })),
             }),
         })
