@@ -517,13 +517,8 @@ export default function FaceVerifyPage() {
     } else {
       addLog(`Lokasi valid — dalam radius ${MAX_DISTANCE_METERS}m`, "ok");
       if (needEnrollState) {
-        if (attendanceDirection === "OUT") {
-          setStage("error");
-          setMessage("Data wajah belum terdaftar. Untuk absen pulang, silakan hubungi Admin.");
-        } else {
-          setStage("enroll");
-          setMessage("Lokasi valid. Daftarkan wajah Anda sekarang");
-        }
+        setStage("enroll");
+        setMessage("Lokasi valid. Daftarkan wajah Anda sekarang");
       } else {
         setStage("verify");
         setMessage("Lokasi valid. Silakan lakukan verifikasi wajah");
@@ -704,11 +699,6 @@ export default function FaceVerifyPage() {
         }
 
         if (statusResult.needEnroll) {
-          if (direction === "OUT") {
-            setStage("error");
-            setMessage("Data wajah belum terdaftar untuk akun ini. Untuk absen pulang, hubungi Admin.");
-            return;
-          }
           setStage("location");
           setMessage("Daftarkan wajah — cek lokasi terlebih dahulu");
         } else {
@@ -864,14 +854,6 @@ export default function FaceVerifyPage() {
             if (!embedding) { isCapturingRef.current = false; return; }
 
             if (mode === "enroll") {
-              if (attendanceDirection === "OUT") {
-                addLog("pendaftaran wajah saat jam pulang ditolak", "err");
-                setStage("error");
-                setMessage("Data wajah belum terdaftar. Untuk absen pulang, silakan hubungi Admin.");
-                isCapturingRef.current = false;
-                return;
-              }
-
               setStage("enrolling");
               setMessage("Memproses pendaftaran wajah...");
               addLog("auto-capture — enrolling...", "ok");
@@ -942,15 +924,11 @@ export default function FaceVerifyPage() {
                 });
                 setStage("out-of-time");
               } else if (vd.needEnroll) {
-                if (attendanceDirection === "OUT") {
-                  addLog("wajah belum terdaftar saat jam pulang", "err");
-                  setStage("error");
-                  setMessage("Data wajah belum terdaftar. Untuk absen pulang, silakan hubungi Admin.");
-                } else {
-                  addLog("wajah belum terdaftar → enroll", "warn");
-                  setStage("enroll");
-                  setMessage("Wajah belum terdaftar. Daftarkan sekarang.");
-                }
+                // ✅ FIX: konsisten dgn perubahan di atas — arahkan ke enroll
+                // walau OUT (kasus wajah baru di-reset admin).
+                addLog("wajah belum terdaftar → enroll", "warn");
+                setStage("enroll");
+                setMessage("Wajah belum terdaftar. Daftarkan sekarang.");
               } else {
                 addLog(`match gagal [${currentAttempt}/${MAX_ATTEMPTS}] — dist: ${vd.distance?.toFixed(3) ?? "?"}`, "warn");
                 if (currentAttempt >= MAX_ATTEMPTS) {
