@@ -1,7 +1,7 @@
 "use client";
 // src/app/dashboard/cashflow/page.tsx
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES, humanizeRoleKey } from "@/lib/permissions";
@@ -1676,14 +1676,47 @@ const CASHFLOW_URL: Record<SyncMode, string> = {
     force: "/api/cashflow?forceSync=1",
 };
 const FULL_SYNC_INTERVAL_MS = 120_000;
+// ⬅️ PERF: dulu polling tiap 10 dtk (download & render ULANG seluruh data). 30 dtk sudah
+// cukup "live" untuk Cashflow, dan respons yang isinya sama persis tidak di-render ulang.
+const POLL_INTERVAL_MS = 30_000;
+
+// ⬅️ PERF: cache di memori level modul — bertahan selama tab browser tidak di-reload.
+// Pindah halaman lalu balik ke Cashflow → data LANGSUNG tampil dari cache (tanpa
+// skeleton), lalu diperbarui diam-diam di belakang. Sengaja TIDAK disimpan ke
+// localStorage karena ini data keuangan (bisa kebaca orang lain di komputer bersama).
+type CashflowCache = { masuk: Entry[]; keluar: Entry[]; summary: Summary; raw: string; at: number };
+let cashflowCache: CashflowCache | null = null;
+
+// ⬅️ PERF: nilai efektif entry (harga terkini utk entry stale) — dipindah ke level
+// modul supaya tidak dibuat ulang tiap render & bisa dipakai di dalam useMemo.
+const effectiveNominalOf = (e: Entry) =>
+    e.is_stale && e.source_nominal != null ? Number(e.source_nominal) : Number(e.nominal || 0);
+
+// ⬅️ PERF: render HANYA satu layout (kartu mobile ATAU tabel desktop). Dulu dua-duanya
+// selalu di-render & salah satunya cuma disembunyikan CSS → DOM dobel tiap render.
+// getServerSnapshot = false → saat SSR/hydration selalu desktop, jadi tidak ada
+// hydration mismatch; setelah mount langsung menyesuaikan lebar layar.
+const MOBILE_QUERY = "(max-width: 639px)";
+function useIsMobile(): boolean {
+    return useSyncExternalStore(
+        (onChange) => {
+            const mq = window.matchMedia(MOBILE_QUERY);
+            mq.addEventListener("change", onChange);
+            return () => mq.removeEventListener("change", onChange);
+        },
+        () => window.matchMedia(MOBILE_QUERY).matches,
+        () => false
+    );
+}
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CashflowPage() {
     const router = useRouter();
-    const [loading, setLoading] = useState(true);
-    const [masuk, setMasuk] = useState<Entry[]>([]);
-    const [keluar, setKeluar] = useState<Entry[]>([]);
-    const [summary, setSummary] = useState<Summary>({ total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0, modal_awal_entry: null });
+    // ⬅️ PERF: kalau cache ada, state langsung diisi dari cache → tidak ada skeleton.
+    const [loadingData, setLoadingData] = useState(() => !cashflowCache);
+    const [masuk, setMasuk] = useState<Entry[]>(() => cashflowCache?.masuk ?? []);
+    const [keluar, setKeluar] = useState<Entry[]>(() => cashflowCache?.keluar ?? []);
+    const [summary, setSummary] = useState<Summary>(() => cashflowCache?.summary ?? { total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0, modal_awal_entry: null });
     const [tab, setTab] = useState<"IN" | "OUT">("IN");
     const [customFrom, setCustomFrom] = useState("");
     const [customTo, setCustomTo] = useState("");
@@ -1710,8 +1743,14 @@ export default function CashflowPage() {
     const [canAuditOut, setCanAuditOut] = useState(false);
     const [canManageAuditAccess, setCanManageAuditAccess] = useState(false);
     const [showAuditAccessModal, setShowAuditAccessModal] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(() => (cashflowCache ? new Date(cashflowCache.at) : null));
     const ITEMS_PER_PAGE = 70;
+    // ⬅️ PERF: data (termasuk dari cache) baru boleh tampil setelah akses user dipastikan.
+    // Selama cek akses belum selesai, tetap skeleton — jadi cache tidak pernah bocor ke
+    // akun yang tidak berhak.
+    const loading = loadingData || allowed !== true;
+    const isMobile = useIsMobile();
+    const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         getAuthUser().then(u => ({ success: true, user: u })).then((r) => {
@@ -1731,37 +1770,71 @@ export default function CashflowPage() {
         }).catch(() => setAllowed(false));
     }, []);
 
-    const applyCashflowResponse = useCallback((json: any) => {
+    // ⬅️ PERF: terima respons MENTAH (string). Kalau isinya sama persis dengan yang
+    // terakhir diterima → langsung return: tidak JSON.parse, tidak sort ribuan entry,
+    // tidak re-render. Ini yang bikin polling tidak lagi bikin halaman "nge-lag".
+    const applyCashflowRaw = useCallback((raw: string) => {
+        if (cashflowCache && raw === cashflowCache.raw) return;
+        let json: any;
+        try { json = JSON.parse(raw); } catch { return; }
         if (!json?.success) return;
-        setMasuk(sortEntries(json.data.masuk ?? []));
-        setKeluar(sortEntries(json.data.keluar ?? []));
-        setSummary(json.summary);
-        setLastUpdated(new Date());
+        const next: CashflowCache = {
+            masuk: sortEntries(json.data.masuk ?? []),
+            keluar: sortEntries(json.data.keluar ?? []),
+            summary: json.summary as Summary,
+            raw,
+            at: Date.now(),
+        };
+        cashflowCache = next;
+        setMasuk(next.masuk);
+        setKeluar(next.keluar);
+        setSummary(next.summary);
+        setLastUpdated(new Date(next.at));
     }, []);
 
     // ⬅️ FIX: dulu fetchData(true) (polling/save/audit) SELALU memicu sync penuh di
     // server. Sekarang default "none" = cuma baca data; sync hanya kalau diminta.
     const fetchData = useCallback(async (silent = false, sync: SyncMode = "none") => {
-        if (!silent) setLoading(true);
+        if (!silent) setLoadingData(true);
         try {
             const res = await fetch(CASHFLOW_URL[sync], { cache: "no-store" });
-            applyCashflowResponse(await res.json());
+            applyCashflowRaw(await res.text());
         } catch (err) {
             console.error("[cashflow] fetchData error:", err);
         } finally {
-            if (!silent) {
-                setLoading(false);
-                // Skeleton sudah hilang → sync di belakang layar (throttled di server).
-                lastSyncRef.current = Date.now();
-                fetch(CASHFLOW_URL.auto, { cache: "no-store" })
-                    .then((r) => r.json())
-                    .then(applyCashflowResponse)
-                    .catch(() => { });
-            }
+            if (!silent) setLoadingData(false);
         }
-    }, [applyCashflowResponse]);
+    }, [applyCashflowRaw]);
 
-    useEffect(() => { if (allowed) fetchData(); }, [allowed, fetchData]);
+    // ⬅️ PERF: fetch data DIMULAI SAAT HALAMAN DIBUKA, paralel dengan cek akses user.
+    // Dulu nunggu getAuthUser() selesai dulu baru fetch (dua request berurutan).
+    // Aman: /api/cashflow tetap dijaga withAuth(CASHFLOW_ROLES) di server, dan data
+    // baru ditampilkan setelah `allowed === true` (lihat `loading` di atas).
+    // Setelah data pertama tampil → sync penuh jalan di belakang layar (throttled server).
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            await fetchData(!!cashflowCache, "none");
+            if (cancelled) return;
+            lastSyncRef.current = Date.now();
+            fetchData(true, "auto");
+        })();
+        return () => { cancelled = true; };
+    }, [fetchData]);
+
+    // ⬅️ PERF: refresh di belakang layar yang di-"debounce" — kalau user audit 10 entry
+    // beruntun, cukup 1x fetch setelah dia berhenti klik (bukan 10x fetch data penuh).
+    const scheduleRefresh = useCallback(() => {
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = setTimeout(() => {
+            refreshTimerRef.current = null;
+            fetchData(true);
+        }, 1500);
+    }, [fetchData]);
+
+    useEffect(() => () => {
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    }, []);
 
        // ⬅️ BARU: update penanda "lagi kerja" tiap salah satu modal/aksi berubah.
     // Set ref langsung (bukan setState) jadi TIDAK memicu re-render tambahan.
@@ -1786,7 +1859,7 @@ export default function CashflowPage() {
             if (needSync) lastSyncRef.current = Date.now();
             fetchData(true, needSync ? "auto" : "none");
         };
-        const interval = setInterval(tick, 10000);
+        const interval = setInterval(tick, POLL_INTERVAL_MS);
         const onVisible = () => { if (document.visibilityState === "visible") tick(); };
         window.addEventListener("focus", tick);
         document.addEventListener("visibilitychange", onVisible);
@@ -1818,6 +1891,9 @@ export default function CashflowPage() {
             setKeluar(freshKeluar);
             setSummary(json.summary);
             setLastUpdated(new Date());
+            // ⬅️ PERF: samakan cache dgn snapshot export. raw dikosongkan supaya fetch
+            // berikutnya tetap dianggap "berubah" & diterapkan sekali.
+            cashflowCache = { masuk: freshMasuk, keluar: freshKeluar, summary: json.summary, raw: "", at: Date.now() };
 
             // Modal Awal & filter tetap dikecualikan/diterapkan di sini sebagai jaga-jaga
             // ke depan (mis. kalau nanti Modal Awal diisi, atau kamu lagi apply filter
@@ -1848,7 +1924,20 @@ export default function CashflowPage() {
         try {
             const res = await fetch(`/api/cashflow/${entry.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "toggle_audit" }) });
             const json = await res.json();
-            if (json.success) fetchData(true);
+            if (json.success) {
+                // ⬅️ PERF: update baris itu LANGSUNG di layar (optimistic) pakai data balasan
+                // PATCH, tidak nunggu download ulang seluruh Cashflow. Data lengkap (mis.
+                // hitungan "belum diaudit") disegarkan sekali di belakang layar.
+                const patch: Partial<Entry> = {
+                    is_audited: !!json.data?.is_audited,
+                    audited_at: json.data?.audited_at ?? null,
+                    audited_by_user: json.data?.audited_by_user ?? null,
+                };
+                const apply = (list: Entry[]) => list.map((x) => (x.id === entry.id ? { ...x, ...patch } : x));
+                if (entry.direction === "IN") setMasuk(apply);
+                else setKeluar(apply);
+                scheduleRefresh();
+            }
             else alert(json.message || "Gagal mengubah status audit");
         } finally { setAuditingId(null); }
     };
@@ -1880,6 +1969,76 @@ export default function CashflowPage() {
         }
     };
 
+    // ── ⬅️ PERF: semua hitungan berat di-memo ──────────────────────────────────
+    // Dulu dihitung ulang di SETIAP render (buka modal, hover, ketik 1 huruf di search,
+    // tick polling) — filter + sort + beberapa kali reduce atas ribuan entry. Sekarang
+    // hanya dihitung ulang kalau datanya/filternya benar-benar berubah.
+    // (Harus di atas `if (allowed === false) return` karena ini hooks.)
+    const currentFilter = tab === "IN" ? filterIn : filterOut;
+    const allRows = tab === "IN" ? masuk : keluar;
+    // ⬅️ PERF: search di-"defer" → kotak search tetap responsif saat mengetik,
+    // filtering ribuan baris jalan dengan prioritas rendah di belakangnya.
+    const deferredSearch = useDeferredValue(currentFilter.search);
+    const rowFilter = useMemo(() => ({ ...currentFilter, search: deferredSearch }), [currentFilter, deferredSearch]);
+
+    const nameOptions = useMemo(
+        () => Array.from(new Set(allRows.map((e) => getEntryDisplayNama(e)).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+        [allRows]
+    ); // ⬅️ FIX: hitung opsi dropdown Nama dari data tab aktif
+    const baseRows = useMemo(() => applyFilters(allRows, rowFilter), [allRows, rowFilter]);
+    const rows = useMemo(() => (staleOnly ? baseRows.filter((e) => e.is_stale) : baseRows), [baseRows, staleOnly]); // ⬅️ BARU
+    const { voidedCount, voidedAuditedCount } = useMemo(() => {
+        let v = 0;
+        let va = 0;
+        for (const e of allRows) {
+            if (e.is_voided) {
+                v++;
+                if (e.is_audited) va++;
+            }
+        }
+        return { voidedCount: v, voidedAuditedCount: va };
+    }, [allRows]);
+
+    const { incomeValue, expenseValue, dateFilteredSaldo, openingBalance, periodChange } = useMemo(() => {
+        const inPeriod = (tanggal: string) => {
+            if (customFrom && tanggal < customFrom) return false;
+            if (customTo && tanggal > customTo) return false;
+            return true;
+        };
+        const income = masuk.reduce((s, e) => e.source_type !== "MODAL_AWAL" && !e.is_voided && inPeriod(e.tanggal) ? s + effectiveNominalOf(e) : s, 0);
+        // ✅ FIX: dulu total "Keluar" tidak cek is_voided (beda dari incomeValue di
+        // atas yang sudah benar) — entri yang sudah di-void ikut kehitung, jadi
+        // totalnya lebih besar dari yang seharusnya.
+        const expense = keluar.reduce((s, e) => !e.is_voided && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
+
+        // ⬅️ BARU: saldo KUMULATIF (running balance) sampai tanggal tertentu — beda dari
+        // incomeValue/expenseValue di atas yang cuma jumlah transaksi DALAM periode, ini
+        // include SEMUA transaksi dari awal (termasuk Modal Awal) s/d tanggal target.
+        const cumulativeSaldoUpTo = (dateStr: string) => {
+            const inSum = masuk.reduce((s, e) => (!e.is_voided && e.tanggal <= dateStr) ? s + effectiveNominalOf(e) : s, 0);
+            const outSum = keluar.reduce((s, e) => (!e.is_voided && e.tanggal <= dateStr) ? s + Number(e.nominal || 0) : s, 0);
+            return inSum - outSum;
+        };
+        // H-1 dari sebuah tanggal (buat saldo awal periode) — pakai UTC murni biar gak
+        // kepengaruh timezone browser, karena dateStr di sini cuma "YYYY-MM-DD" tanpa jam.
+        const dayBefore = (dateStr: string) => {
+            const [y, m, d] = dateStr.split("-").map(Number);
+            const dt = new Date(Date.UTC(y, m - 1, d));
+            dt.setUTCDate(dt.getUTCDate() - 1);
+            return dt.toISOString().slice(0, 10);
+        };
+
+        // targetDate = tanggal acuan. Kalau baru salah satu (from ATAU to) yang keisi
+        // (misal user baru klik 1 tanggal, belum pilih tanggal ke-2), tetap dianggap
+        // query "saldo per tanggal itu" — supaya langsung ada preview.
+        const target = customTo || customFrom || "";
+        const isRange = !!(customFrom && customTo && customFrom !== customTo);
+        const saldo = target ? cumulativeSaldoUpTo(target) : summary.saldo;
+        const opening = isRange ? cumulativeSaldoUpTo(dayBefore(customFrom)) : null;
+        const change = isRange && opening !== null ? saldo - opening : null;
+        return { incomeValue: income, expenseValue: expense, dateFilteredSaldo: saldo, openingBalance: opening, periodChange: change };
+    }, [masuk, keluar, customFrom, customTo, summary.saldo]);
+
     if (allowed === false) return (
         <DashboardLayout>
             <div className="max-w-md mx-auto mt-24 text-center">
@@ -1889,15 +2048,8 @@ export default function CashflowPage() {
         </DashboardLayout>
     );
 
-    const currentFilter = tab === "IN" ? filterIn : filterOut;
-    const allRows = tab === "IN" ? masuk : keluar;
-    const nameOptions = Array.from(new Set(allRows.map((e) => getEntryDisplayNama(e)).filter(Boolean))).sort((a, b) => a.localeCompare(b)); // ⬅️ FIX: hitung opsi dropdown Nama dari data tab aktif
-    const baseRows = applyFilters(allRows, currentFilter);
-    const rows = staleOnly ? baseRows.filter((e) => e.is_stale) : baseRows; // ⬅️ BARU
     const filterCount = activeFilterCount(currentFilter);
     const belumAuditActive = filterIn.audit === "NOT_AUDITED" && filterOut.audit === "NOT_AUDITED"; // ⬅️ BARU
-    const voidedCount = allRows.filter((e) => e.is_voided).length;
-    const voidedAuditedCount = allRows.filter((e) => e.is_voided && e.is_audited).length; // ⬅️ BARU
     const totalPages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
     const safePage = Math.min(currentPage, totalPages);
     const paginatedRows = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
@@ -1956,47 +2108,12 @@ export default function CashflowPage() {
         requestAnimationFrame(() => tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     };
 
-    const inPeriod = (tanggal: string) => {
-        if (customFrom && tanggal < customFrom) return false;
-        if (customTo && tanggal > customTo) return false;
-        return true;
-    };
-
-    const effectiveNominal = (e: Entry) =>
-        e.is_stale && e.source_nominal != null ? Number(e.source_nominal) : Number(e.nominal || 0);
-    const incomeValue = masuk.reduce((s, e) => e.source_type !== "MODAL_AWAL" && !e.is_voided && inPeriod(e.tanggal) ? s + effectiveNominal(e) : s, 0);
-    // ✅ FIX: dulu total "Keluar" tidak cek is_voided (beda dari incomeValue di
-    // atas yang sudah benar) — entri yang sudah di-void ikut kehitung, jadi
-    // totalnya lebih besar dari yang seharusnya.
-    const expenseValue = keluar.reduce((s, e) => !e.is_voided && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
     const periodLabel = (customFrom || customTo) ? `${customFrom ? fmtTanggalShort(customFrom) : "..."} — ${customTo ? fmtTanggalShort(customTo) : "..."}` : "Semua Waktu";
 
-    // ⬅️ BARU: saldo KUMULATIF (running balance) sampai tanggal tertentu — beda dari
-    // incomeValue/expenseValue di atas yang cuma jumlah transaksi DALAM periode, ini
-    // include SEMUA transaksi dari awal (termasuk Modal Awal) s/d tanggal target.
-    const cumulativeSaldoUpTo = (dateStr: string) => {
-        const inSum = masuk.reduce((s, e) => (!e.is_voided && e.tanggal <= dateStr) ? s + effectiveNominal(e) : s, 0);
-        const outSum = keluar.reduce((s, e) => (!e.is_voided && e.tanggal <= dateStr) ? s + Number(e.nominal || 0) : s, 0);
-        return inSum - outSum;
-    };
-
-    // H-1 dari sebuah tanggal (buat saldo awal periode) — pakai UTC murni biar gak
-    // kepengaruh timezone browser, karena dateStr di sini cuma "YYYY-MM-DD" tanpa jam.
-    const dayBefore = (dateStr: string) => {
-        const [y, m, d] = dateStr.split("-").map(Number);
-        const dt = new Date(Date.UTC(y, m - 1, d));
-        dt.setUTCDate(dt.getUTCDate() - 1);
-        return dt.toISOString().slice(0, 10);
-    };
-
-    // targetDate = tanggal acuan. Kalau baru salah satu (from ATAU to) yang keisi
-    // (misal user baru klik 1 tanggal, belum pilih tanggal ke-2), tetap dianggap
-    // query "saldo per tanggal itu" — supaya langsung ada preview.
+    // targetDate/isRangeQuery masih dipakai label & JSX di bawah — hitungan beratnya
+    // (saldo kumulatif, saldo awal, perubahan periode) sudah di useMemo di atas.
     const targetDate = customTo || customFrom || "";
     const isRangeQuery = !!(customFrom && customTo && customFrom !== customTo);
-    const dateFilteredSaldo = targetDate ? cumulativeSaldoUpTo(targetDate) : summary.saldo;
-    const openingBalance = isRangeQuery ? cumulativeSaldoUpTo(dayBefore(customFrom)) : null;
-    const periodChange = isRangeQuery && openingBalance !== null ? dateFilteredSaldo - openingBalance : null;
     const saldoLabel = !targetDate
         ? "Saldo Cashflow · Semua Waktu"
         : `Saldo Cashflow · per ${fmtTanggal(targetDate)}`;
@@ -2257,6 +2374,8 @@ export default function CashflowPage() {
                 <div ref={tableRef} className={`${CARD_BASE} overflow-hidden`}>
 
                     {/* Mobile card list (< sm) — same data & handlers as the table below */}
+                    {/* ⬅️ PERF: cuma di-render di layar HP (dulu selalu di-render lalu disembunyikan CSS) */}
+                    {isMobile && (
                     <div className="sm:hidden divide-y divide-gray-50">
                         {loading ? (
                             Array.from({ length: 5 }).map((_, i) => (
@@ -2334,8 +2453,11 @@ export default function CashflowPage() {
                             })
                         )}
                     </div>
+                    )}
 
                     {/* Desktop / tablet table (sm and up) */}
+                    {/* ⬅️ PERF: cuma di-render di layar tablet/desktop */}
+                    {!isMobile && (
                     <div className="hidden sm:block overflow-x-auto">
                         <table className="w-full text-sm" style={{ minWidth: 860 }}>
                             <thead>
@@ -2476,6 +2598,7 @@ export default function CashflowPage() {
                             </tbody>
                         </table>
                     </div>
+                    )}
 
                     {/* Pagination */}
                     {!loading && rows.length > 0 && (
