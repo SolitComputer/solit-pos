@@ -512,7 +512,7 @@ function AuditCell({ entry, onAudit, busy, canAudit = true }: { entry: Entry; on
 function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
     const [nominal, setNominal] = useState("");
     const [keterangan, setKeterangan] = useState("");
-    const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
+    const [tanggal, setTanggal] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [confirmed, setConfirmed] = useState(false);

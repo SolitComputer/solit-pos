@@ -42,6 +42,44 @@ async function selectInChunks<T>(
     return { rows, ok };
 }
 
+// ⬅️ FIX: pengganti .upsert(..., { onConflict: "source_type,source_id", ignoreDuplicates: true }).
+// Unique index di cashflow_entries sekarang PARSIAL (WHERE source_type <> 'PENGAJUAN_DANA' /
+// WHERE source_id IS NOT NULL). Postgres TIDAK BISA memakai index parsial untuk
+// ON CONFLICT (source_type, source_id) tanpa klausa WHERE — dan PostgREST tidak bisa
+// mengirim klausa itu. Hasilnya SETIAP upsert error 42P10 ("there is no unique or
+// exclusion constraint matching the ON CONFLICT specification") → entry TRANSACTION /
+// TRANSACTION_DP / TRANSACTION_PAYMENT tidak pernah masuk sejak index diganti.
+// Solusi: insert biasa (baris yang sudah ada sudah difilter lewat lookup sebelumnya).
+// Kalau batch ditolak karena ada 1+ baris dobel (23505, mis. dua request sync balapan),
+// ulangi per baris & lewati yang dobel — index unik tetap jadi pengaman anti-dobel.
+async function insertIgnoreDuplicates(
+    supabase: SupabaseClient,
+    rows: Record<string, any>[],
+    label: string
+): Promise<void> {
+    if (rows.length === 0) return;
+
+    const { error } = await supabase.from("cashflow_entries").insert(rows);
+    if (!error) {
+        console.log(`[cashflow sync] inserted ${rows.length} ${label} entries`);
+        return;
+    }
+    if (error.code !== "23505") {
+        console.error(`[cashflow sync] insert ${label} error:`, error.code, error.message);
+        return;
+    }
+
+    let inserted = 0;
+    let skipped = 0;
+    for (const row of rows) {
+        const { error: rowErr } = await supabase.from("cashflow_entries").insert(row);
+        if (!rowErr) inserted++;
+        else if (rowErr.code === "23505") skipped++;
+        else console.error(`[cashflow sync] insert ${label} (per baris) error:`, rowErr.code, rowErr.message);
+    }
+    console.log(`[cashflow sync] inserted ${inserted} ${label} entries (${skipped} dobel dilewati)`);
+}
+
 function getAdmin(): SupabaseClient {
     return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -117,23 +155,31 @@ function diffPayload(existing: any, desired: Record<string, any>): Record<string
 }
 
 async function syncTransactionEntries(supabase: SupabaseClient) {
-    const { data: transactions, error } = await supabase
-        .from("transactions")
-        .select("invoice_number, customer_name, sales_name, laptop_name, deal_price, amount, created_at, paid_at, status")
-        .eq("status", "PAID")
-        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
-
-    if (error) {
-        console.error("[cashflow sync] fetch transactions error:", error.message);
+    // ⬅️ FIX: pagination + order — dulu kena limit 1000 baris PostgREST,
+    // transaksi yang paling baru PAID kepotong & tidak pernah masuk Cashflow.
+    let transactions: any[];
+    try {
+        transactions = await fetchAllRows<any>((from, to) =>
+            supabase
+                .from("transactions")
+                .select("id, invoice_number, customer_name, sales_name, laptop_name, deal_price, amount, created_at, paid_at, status")
+                .eq("status", "PAID")
+                .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`)
+                .order("id", { ascending: true })
+                .range(from, to)
+        );
+    } catch (e: any) {
+        console.error("[cashflow sync] fetch transactions error:", e?.message ?? e);
         return;
     }
-    if (!transactions || transactions.length === 0) return;
+    if (transactions.length === 0) return;
 
-    const { data: paidInvoicesWithPayments } = await supabase
-        .from("transaction_payments")
-        .select("invoice_number")
-        .in("invoice_number", transactions.map((t: any) => t.invoice_number as string));
-    const invoicesWithPayments = new Set((paidInvoicesWithPayments ?? []).map((p: any) => p.invoice_number as string));
+    const { rows: paidInvoicesWithPayments, ok: okPayments } = await selectInChunks<any>(
+        transactions.map((t: any) => t.invoice_number as string),
+        (chunk) => supabase.from("transaction_payments").select("invoice_number").in("invoice_number", chunk)
+    );
+    if (!okPayments) return; // ⬅️ fail-closed: kalau cek gagal, jangan sync (bisa dobel-hitung)
+    const invoicesWithPayments = new Set(paidInvoicesWithPayments.map((p: any) => p.invoice_number as string));
 
     // ✅ FIX: dulu transaksi BARU (dibuat >= cutoff) SELALU di-sync PENUH saat PAID
     // walau sudah ada baris transaction_payments (DP/cicilan). Sekarang DP/cicilan
@@ -153,23 +199,24 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
     // FULL — padahal DP-nya sudah masuk & diaudit duluan sebagai entry terpisah. Efeknya
     // dobel-hitung ("transaksi sudah diaudit kok muncul lagi"). Map ini dipakai buat
     // mengurangi nominal yang akan di-insert dengan DP yang sudah tercatat.
-    const { data: legacyDpEntries } = await supabase
-        .from("cashflow_entries")
-        .select("source_id, nominal")
-        .eq("source_type", "TRANSACTION_DP")
-        .in("source_id", invoices);
-    const dpNominalMap = new Map<string, number>(
-        (legacyDpEntries ?? []).map((e: any) => [e.source_id as string, Number(e.nominal ?? 0)])
+    const { rows: legacyDpEntries, ok: okDp } = await selectInChunks<any>(invoices, (chunk) =>
+        supabase.from("cashflow_entries").select("source_id, nominal").eq("source_type", "TRANSACTION_DP").in("source_id", chunk)
     );
+    const { rows: existing, ok: okExisting } = await selectInChunks<any>(invoices, (chunk) =>
+        supabase
+            .from("cashflow_entries")
+            .select("id, source_id, nominal, nama, keterangan, tanggal, category, is_audited")
+            .eq("source_type", "TRANSACTION")
+            .in("source_id", chunk)
+    );
+    // ⬅️ fail-closed: kalau DP gagal dibaca, nominal bisa ter-insert FULL (dobel sama DP)
+    if (!okDp || !okExisting) return;
 
-    const { data: existing } = await supabase
-        .from("cashflow_entries")
-        .select("id, source_id, nominal, nama, keterangan, tanggal, category, is_audited")
-        .eq("source_type", "TRANSACTION")
-        .in("source_id", invoices);
-
+    const dpNominalMap = new Map<string, number>(
+        legacyDpEntries.map((e: any) => [e.source_id as string, Number(e.nominal ?? 0)])
+    );
     const existingMap = new Map<string, any>(
-        (existing ?? []).map((e: any) => [e.source_id as string, e])
+        existing.map((e: any) => [e.source_id as string, e])
     );
 
     const toInsert: any[] = [];
@@ -204,13 +251,8 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
         if (Object.keys(patch).length > 0) updates.push({ id: cur.id, patch });
     }
 
-    if (toInsert.length > 0) {
-        const { error: insErr } = await supabase
-            .from("cashflow_entries")
-            .upsert(toInsert, { onConflict: "source_type,source_id", ignoreDuplicates: true });
-        if (insErr) console.error("[cashflow sync] insert transactions error:", insErr.message);
-        else console.log(`[cashflow sync] inserted ${toInsert.length} transaction entries`);
-    }
+    // ⬅️ FIX: dulu .upsert(onConflict) → selalu error 42P10 (lihat insertIgnoreDuplicates)
+    await insertIgnoreDuplicates(supabase, toInsert, "transaction");
 
     if (updates.length > 0) {
         const results = await Promise.allSettled(
@@ -233,14 +275,19 @@ async function syncServiceEntries(
 
     const serviceIds = services.map((s: any) => String(s.id));
 
-    const { data: existing } = await supabase
-        .from("cashflow_entries")
-        .select("id, source_id, nominal, nama, keterangan, tanggal, category, is_audited")
-        .eq("source_type", "SERVICE")
-        .in("source_id", serviceIds);
+    const { rows: existing, ok } = await selectInChunks<any>(serviceIds, (chunk) =>
+        supabase
+            .from("cashflow_entries")
+            .select("id, source_id, nominal, nama, keterangan, tanggal, category, is_audited")
+            .eq("source_type", "SERVICE")
+            .in("source_id", chunk)
+    );
+    // ⬅️ FIX: kalau lookup gagal, semua service dianggap baru → batch insert
+    // bentrok unique constraint → service BARU ikut gagal masuk.
+    if (!ok) return;
 
     const existingMap = new Map<string, any>(
-        (existing ?? []).map((e: any) => [e.source_id as string, e])
+        existing.map((e: any) => [e.source_id as string, e])
     );
 
     const toInsert: any[] = [];
@@ -283,11 +330,9 @@ async function syncServiceEntries(
         if (Object.keys(patch).length > 0) updates.push({ id: cur.id, patch });
     }
 
-    if (toInsert.length > 0) {
-        const { error: insErr } = await supabase.from("cashflow_entries").insert(toInsert);
-        if (insErr) console.error("[cashflow sync] insert service entries error:", insErr.message);
-        else console.log(`[cashflow sync] inserted ${toInsert.length} service entries`);
-    }
+    // ⬅️ FIX: insert biasa + fallback per baris kalau ada yang dobel (lihat insertIgnoreDuplicates).
+    // JANGAN pakai .upsert(onConflict) di sini — index unik-nya parsial, pasti error 42P10.
+    await insertIgnoreDuplicates(supabase, toInsert, "service");
 
     if (updates.length > 0) {
         const results = await Promise.allSettled(
@@ -340,64 +385,70 @@ function buildDpPayload(t: any) {
 // nanti transaksi itu dapat cicilan baru (menambah dp_amount di transactions),
 // tidak dobel-hitung dengan cicilan baru yang tercatat terpisah lewat transaction_payments.
 async function syncLegacyDpEntries(supabase: SupabaseClient) {
-    const { data: pendingTx, error } = await supabase
-        .from("transactions")
-        .select("id, invoice_number, customer_name, sales_name, laptop_name, dp_amount, status, created_at")
-        .in("status", ["RESERVED", "HELD", "PACKING"])
-        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
-        // ✅ FIX: dulu ada .lt("created_at", CASHFLOW_HOLD_UNTIL_PAID_CUTOFF_ISO) di sini,
-        // jadi transaksi DP yang dibuat >= 10 Agu 2026 tidak pernah ikut ke-backfill.
-        // Filter cutoff dihapus — berlaku utk SEMUA transaksi DP/Ambil-Dulu/Packing.
-
-    if (error) {
-        console.error("[cashflow sync] fetch legacy DP transactions error:", error.message);
+    // ✅ FIX: dulu ada .lt("created_at", CASHFLOW_HOLD_UNTIL_PAID_CUTOFF_ISO) di sini,
+    // jadi transaksi DP yang dibuat >= 10 Agu 2026 tidak pernah ikut ke-backfill.
+    // Filter cutoff dihapus — berlaku utk SEMUA transaksi DP/Ambil-Dulu/Packing.
+    // ⬅️ FIX: pagination + order — dulu kena limit 1000 baris PostgREST.
+    let pendingTx: any[];
+    try {
+        pendingTx = await fetchAllRows<any>((from, to) =>
+            supabase
+                .from("transactions")
+                .select("id, invoice_number, customer_name, sales_name, laptop_name, dp_amount, status, created_at")
+                .in("status", ["RESERVED", "HELD", "PACKING"])
+                .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`)
+                .order("id", { ascending: true })
+                .range(from, to)
+        );
+    } catch (e: any) {
+        console.error("[cashflow sync] fetch legacy DP transactions error:", e?.message ?? e);
         return;
     }
-    if (!pendingTx || pendingTx.length === 0) return;
+    if (pendingTx.length === 0) return;
 
     const withDp = pendingTx.filter((t: any) => Number(t.dp_amount) > 0);
     if (withDp.length === 0) return;
 
     const invoices = withDp.map((t: any) => t.invoice_number as string);
 
-    const { data: paymentRows } = await supabase
-        .from("transaction_payments")
-        .select("invoice_number")
-        .in("invoice_number", invoices);
-    const hasPaymentRow = new Set((paymentRows ?? []).map((p: any) => p.invoice_number as string));
-
-    const { data: existingDpEntries } = await supabase
-        .from("cashflow_entries")
-        .select("source_id")
-        .eq("source_type", "TRANSACTION_DP")
-        .in("source_id", invoices);
-    const hasDpEntry = new Set((existingDpEntries ?? []).map((e: any) => e.source_id as string));
+    // ⬅️ FIX: .in() dipecah per batch — dulu URL kepanjangan & error-nya tidak dicek.
+    const { rows: paymentRows, ok: okPay } = await selectInChunks<any>(invoices, (chunk) =>
+        supabase.from("transaction_payments").select("invoice_number").in("invoice_number", chunk)
+    );
+    const { rows: existingDpEntries, ok: okDp } = await selectInChunks<any>(invoices, (chunk) =>
+        supabase.from("cashflow_entries").select("source_id").eq("source_type", "TRANSACTION_DP").in("source_id", chunk)
+    );
+    if (!okPay || !okDp) return; // ⬅️ fail-closed: jangan insert DP kalau cek dobel gagal
+    const hasPaymentRow = new Set(paymentRows.map((p: any) => p.invoice_number as string));
+    const hasDpEntry = new Set(existingDpEntries.map((e: any) => e.source_id as string));
 
     const toInsert = withDp
         .filter((t: any) => !hasPaymentRow.has(t.invoice_number as string) && !hasDpEntry.has(t.invoice_number as string))
         .map((t: any) => ({ ...buildDpPayload(t), is_audited: false }))
         .filter((e) => e.nominal > 0 && e.tanggal >= CASHFLOW_START_DATE);
 
-    if (toInsert.length > 0) {
-        const { error: insErr } = await supabase
-            .from("cashflow_entries")
-            .upsert(toInsert, { onConflict: "source_type,source_id", ignoreDuplicates: true });
-        if (insErr) console.error("[cashflow sync] insert legacy DP entries error:", insErr.message);
-        else console.log(`[cashflow sync] backfilled ${toInsert.length} legacy DP entries`);
-    }
+    // ⬅️ FIX: dulu .upsert(onConflict) → selalu error 42P10 (lihat insertIgnoreDuplicates)
+    await insertIgnoreDuplicates(supabase, toInsert, "legacy DP");
 }
 
 async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
-    const { data: payments, error } = await supabase
-        .from("transaction_payments")
-        .select("id, invoice_number, amount, payment_type, created_at")
-        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
-
-    if (error) {
-        console.error("[cashflow sync] fetch transaction_payments error:", error.message);
+    // ⬅️ FIX: pagination + order — dulu kena limit 1000 baris PostgREST.
+    let payments: any[];
+    try {
+        payments = await fetchAllRows<any>((from, to) =>
+            supabase
+                .from("transaction_payments")
+                .select("id, invoice_number, amount, payment_type, created_at")
+                .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`)
+                .order("created_at", { ascending: true })
+                .order("id", { ascending: true })
+                .range(from, to)
+        );
+    } catch (e: any) {
+        console.error("[cashflow sync] fetch transaction_payments error:", e?.message ?? e);
         return;
     }
-    if (!payments || payments.length === 0) return;
+    if (payments.length === 0) return;
 
     const seenDpInvoices = new Set<string>();
     const dedupedPayments = [...payments]
@@ -416,43 +467,43 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
     const invoiceNumbersToCheck = [...new Set(dedupedPayments.map((p: any) => p.invoice_number as string))];
     const invoicesAlreadySynced = new Set<string>();
     if (invoiceNumbersToCheck.length > 0) {
-        const { data: existingTxEntries } = await supabase
-            .from("cashflow_entries")
-            .select("source_id")
-            .eq("source_type", "TRANSACTION")
-            .in("source_id", invoiceNumbersToCheck);
-        for (const e of existingTxEntries ?? []) {
+        const { rows: existingTxEntries, ok } = await selectInChunks<any>(invoiceNumbersToCheck, (chunk) =>
+            supabase.from("cashflow_entries").select("source_id").eq("source_type", "TRANSACTION").in("source_id", chunk)
+        );
+        if (!ok) return; // ⬅️ fail-closed: kalau gagal cek, bisa dobel-hitung
+        for (const e of existingTxEntries) {
             invoicesAlreadySynced.add(e.source_id as string);
         }
     }
 
     const paymentIds = dedupedPayments.map((p: any) => p.id as string);
-    const { data: existing } = await supabase
-        .from("cashflow_entries")
-        .select("id, source_id")
-        .eq("source_type", "TRANSACTION_PAYMENT")
-        .in("source_id", paymentIds);
+    const { rows: existing, ok: okExisting } = await selectInChunks<any>(paymentIds, (chunk) =>
+        supabase.from("cashflow_entries").select("id, source_id").eq("source_type", "TRANSACTION_PAYMENT").in("source_id", chunk)
+    );
+    if (!okExisting) return;
 
-    const existingIds = new Set((existing ?? []).map((e: any) => e.source_id as string));
+    const existingIds = new Set(existing.map((e: any) => e.source_id as string));
     const missing = dedupedPayments.filter(
         (p: any) => !existingIds.has(p.id as string) && !invoicesAlreadySynced.has(p.invoice_number as string)
     );
     if (missing.length === 0) return;
 
     const invoiceNumbers = [...new Set(missing.map((p: any) => p.invoice_number as string))];
-    const { data: txRows } = await supabase
-        .from("transactions")
-        .select("invoice_number, customer_name, sales_name, laptop_name, created_at")
-        .in("invoice_number", invoiceNumbers);
+    // ⬅️ FIX: .in() dipecah per batch. Kalau gagal tidak fatal — nama customer/sales
+    // cuma jatuh ke fallback "—"/"Sales", entry tetap masuk.
+    const { rows: txRows } = await selectInChunks<any>(invoiceNumbers, (chunk) =>
+        supabase
+            .from("transactions")
+            .select("invoice_number, customer_name, sales_name, laptop_name, created_at")
+            .in("invoice_number", chunk)
+    );
     const txInfoMap = new Map<string, { customer_name: string; sales_name: string; laptop_name: string; created_at: string }>(
-        (txRows ?? []).map((t: any) => [t.invoice_number as string, t])
+        txRows.map((t: any) => [t.invoice_number as string, t])
     );
 
     // ✅ FIX: dulu di sini di-filter ke missingForLegacyOnly (cuma transaksi dibuat
     // < 10 Agu 2026), jadi DP/cicilan transaksi BARU tidak pernah masuk Cashflow.
     // Sekarang SEMUA transaction_payments yang belum tercatat ikut disinkronkan.
-    if (missing.length === 0) return;
-
     const toInsert = missing
         .map((p: any) => {
             const info = txInfoMap.get(p.invoice_number as string);
@@ -461,13 +512,8 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
         .filter((e) => e.nominal > 0 && e.tanggal >= CASHFLOW_START_DATE)
         .map((e) => ({ ...e, is_audited: false }));
 
-    if (toInsert.length > 0) {
-        const { error: insErr } = await supabase
-            .from("cashflow_entries")
-            .upsert(toInsert, { onConflict: "source_type,source_id", ignoreDuplicates: true });
-        if (insErr) console.error("[cashflow sync] insert payment entries error:", insErr.message);
-        else console.log(`[cashflow sync] inserted ${toInsert.length} payment entries`);
-    }
+    // ⬅️ FIX: dulu .upsert(onConflict) → selalu error 42P10 (lihat insertIgnoreDuplicates)
+    await insertIgnoreDuplicates(supabase, toInsert, "payment");
 }
 
 async function syncDerivedEntries(supabase: SupabaseClient) {
@@ -566,7 +612,6 @@ async function runSyncThrottled(supabase: SupabaseClient, force = false): Promis
     return syncInFlight;
 }
 
-// ── GET /api/cashflow ──────────────────────────────────────────────────────
 // ── GET /api/cashflow ──────────────────────────────────────────────────────
 export const GET = withAuth(async (req) => {
     const supabase = getAdmin();
