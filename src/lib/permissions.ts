@@ -1166,15 +1166,20 @@ export const SO_LIMITED_USER_IDS: string[] = [
 ];
 
 // ── Checklist Tes Kondisi (Laptop & Monitor) ─────────────────────────────
-// Akun spesifik yang boleh ISI/UBAH checklist tes kondisi di form Data Barang.
+// Yang boleh ISI/UBAH checklist tes kondisi di form Data Barang: akun spesifik
+// (Rafi Salim, Fikri Aryansyah) + semua role di CONDITION_CHECK_EDITOR_ROLES.
 // User lain tetap bisa LIHAT hasilnya (read-only).
-// Rafi Salim, Fikri Aryansyah.
 export const CONDITION_CHECK_EDITOR_USER_IDS: string[] = [
   "7594367d-b27b-49a8-a427-5ecb7fa2d21f",
   "20c4df76-db02-4e36-977b-27b76c7fa803",
 ];
+export const CONDITION_CHECK_EDITOR_ROLES: UserRole[] = ["ADMIN"];
 
-export function canEditConditionChecks(userId: string | null | undefined): boolean {
+export function canEditConditionChecks(
+  userId: string | null | undefined,
+  userRoles: string[]
+): boolean {
+  if (hasAnyRole(userRoles, CONDITION_CHECK_EDITOR_ROLES)) return true;
   return !!userId && CONDITION_CHECK_EDITOR_USER_IDS.includes(userId);
 }
 

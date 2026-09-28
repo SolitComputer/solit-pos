@@ -21,7 +21,7 @@ export default function ConditionChecklist({ value, onChange, readOnly = false }
     if (readOnly && filledCount === 0) {
         return (
             <p className="text-xs text-zinc-400 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2.5">
-                Belum ada hasil tes. Hanya bisa diisi oleh Rafi Salim &amp; Fikri Aryansyah.
+                Belum ada hasil tes. Hanya bisa diisi oleh Rafi Salim, Fikri Aryansyah &amp; Admin.
             </p>
         );
     }
@@ -39,7 +39,7 @@ export default function ConditionChecklist({ value, onChange, readOnly = false }
         <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100">
             {readOnly && (
                 <p className="text-[11px] text-zinc-400 px-3 py-2 bg-zinc-50 rounded-t-xl">
-                    Hanya bisa diubah oleh Rafi Salim &amp; Fikri Aryansyah.
+                    Hanya bisa diubah oleh Rafi Salim, Fikri Aryansyah &amp; Admin.
                 </p>
             )}
             {CONDITION_CHECK_ITEMS.map(item => {

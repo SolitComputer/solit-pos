@@ -37,8 +37,8 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         status: "BELUM_SIAP",
         condition_note: body.condition_note,
         notes: body.notes,
-        // Checklist tes kondisi cuma boleh diisi akun di CONDITION_CHECK_EDITOR_USER_IDS.
-        ...(canEditConditionChecks(user.id) && body.condition_checks !== undefined && {
+        // Checklist tes kondisi cuma boleh diisi editor (lihat canEditConditionChecks).
+        ...(canEditConditionChecks(user.id, user.roles ?? [user.role]) && body.condition_checks !== undefined && {
           condition_checks: sanitizeConditionChecks(body.condition_checks),
         }),
       })

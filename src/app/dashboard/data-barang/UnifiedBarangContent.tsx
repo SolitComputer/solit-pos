@@ -727,7 +727,7 @@ export default function UnifiedBarangContent() {
     //  Dipakai sebagai prop canEdit UnitDetailModal — menggerbangi tombol
     //  "+ Tambah Unit" & "Edit Data" di dalam pop-up detail unit (stok 1).
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
-    const canEditChecklist = canEditConditionChecks(userId);
+    const canEditChecklist = canEditConditionChecks(userId, userRoles);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     // SO untuk AKSESORIS belum punya aturan role khusus seperti canSoLaptop
     // (yang mempertimbangkan siap_jual) — sementara pakai gate stok > 0.

@@ -88,7 +88,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
     // Checklist tes kondisi: dari akun selain editor diabaikan (bukan 403),
     // supaya edit field lain oleh user biasa tetap jalan.
-    if (body.condition_checks !== undefined && canEditConditionChecks(user.id)) {
+    if (body.condition_checks !== undefined && canEditConditionChecks(user.id, user.roles ?? [user.role])) {
       updatePayload.condition_checks = sanitizeConditionChecks(body.condition_checks);
     }
     if (body.selling_price !== undefined && body.selling_price !== null) {
