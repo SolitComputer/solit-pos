@@ -16,10 +16,10 @@ type QualityInput = {
     perfect_days: number;
     manual_days: number;
     late_days: number; // ✅ total telat (auto + manual) — utk DISPLAY kolom Terlambat Lencana
-    manual_late_days?: number; // ✅ NEW — telat manual saja, utk ranking (hindari dobel hitung)
+    manual_late_days?: number; // ✅ telat manual saja, utk ranking (hindari dobel hitung)
     absent_days: number;
     total_workdays: number;
-    avg_early_minutes: number;
+    avg_early_minutes: number; // ✅ rata-rata jarak (menit) ke jam buka jadwal efektif masing-masing
 };
 
 const LOCK_LEVEL = 3;
@@ -183,8 +183,9 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     // nomor 1" kalau 3 kriteria di atas sama persis.
     const ranked = [...scores].sort((a, b) => {
         // ✅ FIX: late_days sekarang total (auto + manual). Telat manual sudah ikut di
-        // manual_days, jadi dikurangi manual_late_days agar tidak dihitung dobel —
-        // hasil "pelanggaran" ini IDENTIK dgn rumus lama (autoLate + manual + absen).
+        // manual_days, jadi dikurangi manual_late_days agar tidak dihitung dobel.
+        // Kalau client tidak kirim manual_late_days (versi lama) → dianggap 0,
+        // hasilnya sama persis dengan rumus lama (manual + late + absen).
         const va = a.manual_days + (a.late_days - (a.manual_late_days || 0)) + a.absent_days;
         const vb = b.manual_days + (b.late_days - (b.manual_late_days || 0)) + b.absent_days;
         if (va !== vb) return va - vb;

@@ -851,9 +851,9 @@ function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
                             onChange={(e) => onChange({ ...filter, status: e.target.value as StatusFilter })}
                             className={`${selectCls} w-full`}
                         >
-                            <option value="ALL">Semua Status</option>
-                            <option value="ACTIVE">Aktif</option>
-                            <option value="VOIDED">Dibatalkan</option>
+                            <option value="ACTIVE">Aktif (tanpa Batal)</option>
+                            <option value="ALL">Semua (termasuk Batal)</option>
+                            <option value="VOIDED">Dibatalkan saja</option>
                         </select>
                     </div>
                 )}
@@ -1665,6 +1665,18 @@ function InlineDateRange({ from, to, onChange }: { from: string, to: string, onC
     );
 }
 
+// ⬅️ BARU: 3 mode fetch —
+// none  = cuma baca data (cepat, dipakai polling/save/audit)
+// auto  = sync di server tapi di-throttle 30 dtk (dipakai sync berkala)
+// force = paksa sync penuh (Segarkan manual & Export)
+type SyncMode = "none" | "auto" | "force";
+const CASHFLOW_URL: Record<SyncMode, string> = {
+    none: "/api/cashflow?skipSync=1",
+    auto: "/api/cashflow",
+    force: "/api/cashflow?forceSync=1",
+};
+const FULL_SYNC_INTERVAL_MS = 120_000;
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CashflowPage() {
     const router = useRouter();
@@ -1690,6 +1702,7 @@ export default function CashflowPage() {
     // Pakai ref (bukan state) supaya interval polling di bawah TIDAK dibuat ulang tiap
     // modal buka/tutup (kalau dibuat ulang, timer 10 detiknya ke-reset dari nol).
     const isBusyRef = useRef(false);
+    const lastSyncRef = useRef(0); // ⬅️ BARU: kapan terakhir minta sync penuh
     const [currentPage, setCurrentPage] = useState(1);
        const [exporting, setExporting] = useState(false);
     const [refreshing, setRefreshing] = useState(false); // ⬅️ BARU: spinner Segarkan (refresh manual tanpa skeleton)
@@ -1718,42 +1731,35 @@ export default function CashflowPage() {
         }).catch(() => setAllowed(false));
     }, []);
 
-    const fetchData = useCallback(async (silent = false) => {
+    const applyCashflowResponse = useCallback((json: any) => {
+        if (!json?.success) return;
+        setMasuk(sortEntries(json.data.masuk ?? []));
+        setKeluar(sortEntries(json.data.keluar ?? []));
+        setSummary(json.summary);
+        setLastUpdated(new Date());
+    }, []);
+
+    // ⬅️ FIX: dulu fetchData(true) (polling/save/audit) SELALU memicu sync penuh di
+    // server. Sekarang default "none" = cuma baca data; sync hanya kalau diminta.
+    const fetchData = useCallback(async (silent = false, sync: SyncMode = "none") => {
         if (!silent) setLoading(true);
         try {
-            // ⬅️ FIX: dulu selalu panggil /api/cashflow (yang jalanin FULL sync dulu
-            // sebelum balikin data), jadi loading pertama nunggu sinkronisasi ribuan
-            // transaksi selesai — makanya skeleton nyangkut lama. Sekarang load awal
-            // pakai ?skipSync=1 supaya data yang SUDAH ada langsung tampil cepat,
-            // baru sync-nya dipicu di belakang tanpa nahan skeleton.
-            const fastUrl = silent ? "/api/cashflow" : "/api/cashflow?skipSync=1";
-            const res = await fetch(fastUrl, { cache: "no-store" });
-            const json = await res.json();
-            if (json.success) {
-                setMasuk(sortEntries(json.data.masuk ?? []));
-                setKeluar(sortEntries(json.data.keluar ?? []));
-                setSummary(json.summary);
-                setLastUpdated(new Date());
-            }
+            const res = await fetch(CASHFLOW_URL[sync], { cache: "no-store" });
+            applyCashflowResponse(await res.json());
+        } catch (err) {
+            console.error("[cashflow] fetchData error:", err);
         } finally {
             if (!silent) {
                 setLoading(false);
-                // Skeleton sudah hilang; sekarang picu sync penuh di belakang layar.
-                // Hasilnya masuk lewat fetchData(true) yang refresh data diam-diam.
-                fetch("/api/cashflow", { cache: "no-store" })
+                // Skeleton sudah hilang → sync di belakang layar (throttled di server).
+                lastSyncRef.current = Date.now();
+                fetch(CASHFLOW_URL.auto, { cache: "no-store" })
                     .then((r) => r.json())
-                    .then((j) => {
-                        if (j.success) {
-                            setMasuk(sortEntries(j.data.masuk ?? []));
-                            setKeluar(sortEntries(j.data.keluar ?? []));
-                            setSummary(j.summary);
-                            setLastUpdated(new Date());
-                        }
-                    })
+                    .then(applyCashflowResponse)
                     .catch(() => { });
             }
         }
-    }, []);
+    }, [applyCashflowResponse]);
 
     useEffect(() => { if (allowed) fetchData(); }, [allowed, fetchData]);
 
@@ -1772,14 +1778,19 @@ export default function CashflowPage() {
         // kalau user lagi kerja: modal input/edit/detail terbuka, lagi audit, atau export.
         // Refresh manual (tombol Segarkan) & refresh setelah Simpan TETAP jalan karena itu
         // dipanggil eksplisit (onSaved → fetchData(true)), bukan lewat polling ini.
-        const interval = setInterval(() => {
-            if (document.visibilityState === "visible" && !isBusyRef.current) fetchData(true);
-        }, 10000);
-        const onFocus = () => { if (!isBusyRef.current) fetchData(true); };
-        const onVisible = () => { if (document.visibilityState === "visible" && !isBusyRef.current) fetchData(true); };
-        window.addEventListener("focus", onFocus);
+        // ⬅️ FIX: dulu tiap 10 dtk = sync PENUH di server (scan semua transaksi/service).
+        // Sekarang tiap 10 dtk cuma baca data; sync penuh maksimal 1x per 2 menit.
+        const tick = () => {
+            if (document.visibilityState !== "visible" || isBusyRef.current) return;
+            const needSync = Date.now() - lastSyncRef.current > FULL_SYNC_INTERVAL_MS;
+            if (needSync) lastSyncRef.current = Date.now();
+            fetchData(true, needSync ? "auto" : "none");
+        };
+        const interval = setInterval(tick, 10000);
+        const onVisible = () => { if (document.visibilityState === "visible") tick(); };
+        window.addEventListener("focus", tick);
         document.addEventListener("visibilitychange", onVisible);
-        return () => { clearInterval(interval); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onVisible); };
+        return () => { clearInterval(interval); window.removeEventListener("focus", tick); document.removeEventListener("visibilitychange", onVisible); };
     }, [allowed, fetchData]);
 
     useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut]);
@@ -1794,7 +1805,7 @@ export default function CashflowPage() {
             // lihat. Sekarang Export SELALU fetch data paling baru dulu, lalu
             // menyamakan juga angka yang tampil di layar ke snapshot yang sama —
             // supaya card "Masuk/Keluar/Saldo" dan file Excel dijamin identik.
-            const res = await fetch("/api/cashflow", { cache: "no-store" });
+            const res = await fetch(CASHFLOW_URL.force, { cache: "no-store" });
             const json = await res.json();
             if (!json.success) {
                 alert(json.message || "Gagal mengambil data terbaru untuk export");
@@ -1828,7 +1839,7 @@ export default function CashflowPage() {
     // fetchData(true) (silent): data di-update di tempat, cuma ikon tombol yang muter.
     const handleManualRefresh = async () => {
         setRefreshing(true);
-        try { await fetchData(true); } finally { setRefreshing(false); }
+        try { await fetchData(true, "force"); } finally { setRefreshing(false); }
     };
 
     const toggleAudit = async (entry: Entry) => {
@@ -1886,6 +1897,7 @@ export default function CashflowPage() {
     const filterCount = activeFilterCount(currentFilter);
     const belumAuditActive = filterIn.audit === "NOT_AUDITED" && filterOut.audit === "NOT_AUDITED"; // ⬅️ BARU
     const voidedCount = allRows.filter((e) => e.is_voided).length;
+    const voidedAuditedCount = allRows.filter((e) => e.is_voided && e.is_audited).length; // ⬅️ BARU
     const totalPages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
     const safePage = Math.min(currentPage, totalPages);
     const paginatedRows = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
@@ -2146,7 +2158,7 @@ export default function CashflowPage() {
                         <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
                             {(["IN", "OUT"] as const).map((t) => (
                                 <button key={t} onClick={() => { setTab(t); setStaleOnly(false); }} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm shadow-emerald-500/30" : "bg-red-600 text-white shadow-sm shadow-red-500/30" : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
-                                    {t === "IN" ? `↑ Masuk ${!loading ? `(${masuk.length})` : ""}` : `↓ Keluar ${!loading ? `(${keluar.length})` : ""}`}
+                                    {t === "IN" ? `↑ Masuk ${!loading ? `(${masuk.filter((e) => !e.is_voided).length})` : ""}` : `↓ Keluar ${!loading ? `(${keluar.length})` : ""}`}
                                 </button>
                             ))}
                         </div>
@@ -2191,7 +2203,24 @@ export default function CashflowPage() {
                 {!loading && voidedCount > 0 && (
                     <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 shadow-sm text-[12px] text-gray-600">
                         <IconInfo />
-                        <span>Ada <b>{voidedCount} entry dibatalkan</b> di tab ini — ditandai abu-abu &amp; nominalnya dicoret. Entry ini <b>tidak dihitung</b> ke saldo maupun total periode, dan tidak bisa diaudit.</span>
+                        {currentFilter.status === "ACTIVE" ? (
+                            <span>
+                                <b>{voidedCount} entry dari transaksi Batal</b> disembunyikan &amp; tidak dihitung ke saldo maupun total periode
+                                {voidedAuditedCount > 0 && (
+                                    <> — <b className="text-red-600">{voidedAuditedCount} di antaranya sudah diaudit</b>, perlu ditinjau ulang</>
+                                )}.
+                            </span>
+                        ) : (
+                            <span>Ada <b>{voidedCount} entry dibatalkan</b> di tab ini — ditandai abu-abu &amp; nominalnya dicoret. Entry ini <b>tidak dihitung</b> ke saldo maupun total periode, dan tidak bisa diaudit.</span>
+                        )}
+                        {currentFilter.status === "ACTIVE" && (
+                            <button
+                                onClick={() => handleFilterChange({ ...currentFilter, status: "VOIDED" })}
+                                className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition shrink-0"
+                            >
+                                Lihat
+                            </button>
+                        )}
                     </div>
                 )}
 

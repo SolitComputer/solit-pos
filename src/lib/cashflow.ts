@@ -170,7 +170,7 @@ export function defaultCashflowFilter(): CashflowFilter {
     audit: "ALL",
     source: "ALL",
     paymentMethod: "ALL", // ⬅️ BARU
-    status: "ALL", // ⬅️ BARU: filter Batal
+    status: "ACTIVE", // ⬅️ UPDATE: default sembunyikan entry dari transaksi BATAL
         incomeMethod: "ALL", // ⬅️ BARU
     nama: "ALL", // ⬅️ BARU
     search: "",
@@ -200,7 +200,7 @@ export function activeFilterCount(f: CashflowFilter): number {
   if (f.audit !== "ALL") c++;
   if (f.source !== "ALL") c++;
   if (f.paymentMethod !== "ALL") c++; // ⬅️ BARU
-  if (f.status !== "ALL") c++; // ⬅️ BARU
+  if (f.status !== defaultCashflowFilter().status) c++; // ⬅️ UPDATE: default ACTIVE tidak dihitung filter aktif
    if (f.incomeMethod !== "ALL") c++; // ⬅️ BARU
   if (f.nama !== "ALL") c++; // ⬅️ BARU
    if (f.search.trim()) c++;
