@@ -2,6 +2,7 @@
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { EXPENSE_CATEGORIES } from "@/lib/cashflow";
 import { notifyPengajuanDanaResolved } from "@/hooks/usePengajuanDanaNotify";
@@ -9,7 +10,7 @@ import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, X, CheckCheck, RotateCcw, Banknote,
   ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon, Pencil,
-  Search, ChevronLeft, ChevronRight,
+  Search, ChevronLeft, ChevronRight, Bell, BellRing,
 } from "lucide-react";
 
 interface FundRequest {
@@ -1028,6 +1029,205 @@ function Pagination({
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  NOTIFICATION BELL — lonceng + daftar pengajuan yang masih menunggu ACC.
+ *  Desktop: dropdown di bawah lonceng. HP: bottom sheet via portal, hanya
+ *  muncul saat lonceng di-tap (tidak menutupi halaman terus-terusan).
+ * ════════════════════════════════════════════════════════════════════════════ */
+function NotificationBell({
+  items, canAct, busyMap, onApprove, onReject, onOpenDetail, onViewAll,
+}: {
+  items: FundRequest[];
+  canAct: boolean;
+  busyMap: Record<string, boolean>;
+  onApprove: (id: string) => void;
+  onReject: (row: FundRequest) => void;
+  onOpenDetail: (row: FundRequest) => void;
+  onViewAll: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const count = items.length;
+
+  // Tutup panel kalau klik/tap di luar (desktop & HP) atau tekan Escape
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (wrapRef.current?.contains(t) || sheetRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Tutup panel dulu sebelum buka modal lain (Tolak / Detail / Lihat semua)
+  const closeThen = (fn: () => void) => { setOpen(false); fn(); };
+
+  const panelBody = (
+    <>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <BellRing className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-sm font-extrabold text-slate-900">Menunggu Persetujuan</p>
+            <p className="text-[11px] text-slate-400">
+              {count > 0 ? `${count} pengajuan belum di-ACC` : "Semua pengajuan sudah diproses"}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Tutup notifikasi"
+          className={`w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition ${FOCUS_RING}`}
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {count === 0 ? (
+        <div className="py-10 text-center px-4">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-emerald-50 flex items-center justify-center">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+          </div>
+          <p className="text-sm font-bold text-slate-600">Tidak ada pengajuan yang menunggu</p>
+        </div>
+      ) : (
+        <ul className="flex-1 overflow-y-auto overscroll-contain divide-y divide-slate-50">
+          {items.map((r) => {
+            const busy = busyMap[r.id] ?? false;
+            return (
+              <li key={r.id} className="px-4 py-3 hover:bg-slate-50/70 transition-colors">
+                <div className="flex items-start gap-3">
+                  <RequesterAvatar id={r.requester_id} name={r.requester_name} size="w-9 h-9" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-800 truncate">{r.requester_name}</p>
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">{formatDateTime(r.created_at)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => closeThen(() => onOpenDetail(r))}
+                      title="Lihat detail lengkap"
+                      className="text-left w-full"
+                    >
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mt-0.5">{r.purpose}</p>
+                    </button>
+                    <div className="flex items-center justify-between gap-2 mt-2">
+                      <span className="text-sm font-extrabold text-slate-900 tabular-nums">{formatRupiah(r.amount)}</span>
+                      {canAct && (
+                        <div className="flex gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => onApprove(r.id)}
+                            disabled={busy}
+                            className={`h-8 px-3 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 text-[11px] font-bold hover:bg-emerald-100 active:scale-95 transition disabled:opacity-50 ${FOCUS_RING}`}
+                          >
+                            {busy ? "Memproses..." : "Setujui"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => closeThen(() => onReject(r))}
+                            disabled={busy}
+                            className={`h-8 px-3 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold hover:bg-rose-100 active:scale-95 transition disabled:opacity-50 ${FOCUS_RING}`}
+                          >
+                            Tolak
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {count > 0 && (
+        <div className="px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-slate-100 bg-slate-50/60">
+          <button
+            type="button"
+            onClick={() => closeThen(onViewAll)}
+            className={`w-full h-10 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition ${FOCUS_RING}`}
+          >
+            Lihat semua di tabel
+          </button>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={`Notifikasi pengajuan dana${count > 0 ? `, ${count} menunggu persetujuan` : ""}`}
+        aria-expanded={open}
+        className={`relative w-10 h-10 rounded-full flex items-center justify-center border transition-all ${FOCUS_RING} ${count > 0
+          ? "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
+          : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+          }`}
+      >
+        {count > 0 ? <BellRing className="w-[18px] h-[18px] pd-bell-shake" /> : <Bell className="w-[18px] h-[18px]" />}
+        {count > 0 && (
+          <span className="absolute -top-1 -right-1 flex">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60 animate-ping" />
+            <span className="relative min-w-[20px] h-5 px-1 rounded-full bg-rose-500 text-white text-[10px] font-extrabold flex items-center justify-center ring-2 ring-white tabular-nums">
+              {count > 99 ? "99+" : count}
+            </span>
+          </span>
+        )}
+      </button>
+
+      {/* Desktop: dropdown di bawah lonceng */}
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Notifikasi pengajuan dana"
+          className="hidden md:flex flex-col absolute right-0 top-full mt-2 w-[380px] max-h-[480px] bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-100 overflow-hidden"
+          style={{ animation: "pdSlideUp 0.2s ease-out both" }}
+        >
+          {panelBody}
+        </div>
+      )}
+
+      {/* HP: bottom sheet via portal supaya tidak ketimpa elemen lain */}
+      {open && createPortal(
+        <div className="md:hidden">
+          <div
+            className="fixed inset-0 z-[65] bg-slate-900/40 backdrop-blur-[2px]"
+            style={{ animation: "pdBackdropIn 0.2s ease-out both" }}
+          />
+          <div
+            ref={sheetRef}
+            role="dialog"
+            aria-label="Notifikasi pengajuan dana"
+            className="fixed inset-x-0 bottom-0 z-[66] flex flex-col max-h-[80vh] bg-white rounded-t-3xl shadow-2xl border-t border-slate-100"
+            style={{ animation: "pdSlideUp 0.25s ease-out both" }}
+          >
+            <div className="flex justify-center pt-2.5 pb-1">
+              <span className="w-10 h-1 rounded-full bg-slate-200" />
+            </div>
+            {panelBody}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  MAIN PAGE
  * ════════════════════════════════════════════════════════════════════════════ */
 export default function PengajuanDanaPage() {
@@ -1047,6 +1247,8 @@ export default function PengajuanDanaPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  // ⬅️ BARU: target scroll dari tombol "Lihat semua di tabel" di panel lonceng
+  const tableRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -1059,7 +1261,9 @@ export default function PengajuanDanaPage() {
       .catch(() => { });
   }, []);
 
-  const fetchData = useCallback(async () => {
+  // ⬅️ BARU: parameter `silent` — dipakai polling supaya tidak spam toast error
+  // kalau koneksi HP lagi jelek.
+  const fetchData = useCallback(async (silent = false) => {
     try {
       const res = await fetch("/api/pengajuan-dana");
       const json = await res.json();
@@ -1067,15 +1271,26 @@ export default function PengajuanDanaPage() {
         setData(json.data ?? []);
         if (json.meta) setMeta(json.meta);
       }
-    } catch { toast.error("Gagal memuat data"); }
+    } catch { if (!silent) toast.error("Gagal memuat data"); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // ⬅️ BARU: refresh tiap 30 detik (hanya saat tab aktif) supaya badge lonceng
+  // ikut update kalau ada pengajuan baru masuk, tanpa reload halaman.
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") fetchData(true);
+    }, 30_000);
+    return () => clearInterval(t);
+  }, [fetchData]);
+
   const canCreate = userRoles.some((r) => CREATE_ROLES.includes(r));
   const canApprove = userId ? meta.approverIds.includes(userId) : false;
   const canExecute = userId ? (meta.executorIds.includes(userId) || userRoles.includes("ADMIN")) : false;
+  // ⬅️ BARU: lonceng untuk approver + ADMIN (tombol Setujui/Tolak tetap ikut canApprove)
+  const showBell = canApprove || userRoles.includes("ADMIN");
 
   const handleSubmit = async (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO") => {
     setSubmitting(true);
@@ -1132,6 +1347,14 @@ export default function PengajuanDanaPage() {
     finally { setActionLoading((p) => ({ ...p, [id]: false })); }
   };
 
+  // ⬅️ BARU: dari panel lonceng → filter tabel ke "Belum Disetujui" lalu scroll ke tabel
+  const handleViewAllPending = () => {
+    setStatusFilter("not_approved");
+    setSearchQuery("");
+    setCurrentPage(1);
+    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const totalNominal = data.reduce((s, r) => s + r.amount, 0);
   const totalRealisasi = data.reduce((s, r) => s + (r.realisasi_nominal ?? 0), 0);
   const totalApproved = data.filter((r) => r.is_approved).length;
@@ -1141,6 +1364,11 @@ export default function PengajuanDanaPage() {
   const totalNotExecuted = data.length - totalExecuted;
   const totalRealized = data.filter((r) => r.realisasi_cashflow_id).length;
   const totalNotRealized = data.length - totalRealized;
+
+  // ⬅️ BARU: pengajuan status "Menunggu" (belum di-ACC & belum ditolak), terbaru di atas
+  const pendingApprovalData = data
+    .filter((r) => !r.is_approved && !r.is_rejected)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const filteredData = data.filter((r) => {
     if (statusFilter === "approved" && !r.is_approved) return false;
@@ -1201,6 +1429,9 @@ export default function PengajuanDanaPage() {
         @keyframes pdModalIn { from { opacity: 0; transform: scale(0.95) translateY(10px) } to { opacity: 1; transform: scale(1) translateY(0) } }
         @keyframes pdSlideUp { from { opacity: 0; transform: translateY(16px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes pdFadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes pdBellShake { 0%, 50%, 100% { transform: rotate(0) } 10%, 30% { transform: rotate(-14deg) } 20%, 40% { transform: rotate(14deg) } }
+        .pd-bell-shake { animation: pdBellShake 2.2s ease-in-out infinite; transform-origin: 50% 0; }
+        @media (prefers-reduced-motion: reduce) { .pd-bell-shake { animation: none; } }
         .animate-shimmer { animation: shimmer 1.5s ease-in-out infinite; background-size: 200% 100%; }
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
       `}} />
@@ -1208,7 +1439,8 @@ export default function PengajuanDanaPage() {
       <div className="space-y-6 max-w-[1400px] mx-auto px-2 sm:px-4 py-2">
 
         {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2"
+        {/* ⬅️ BARU: relative z-30 supaya dropdown lonceng tidak tertimpa hero banner */}
+        <div className="relative z-30 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2"
           style={{ animation: "pdFadeIn 0.3s ease-out both" }}>
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 items-center justify-center shadow-lg shadow-indigo-500/30 flex-shrink-0">
@@ -1221,15 +1453,29 @@ export default function PengajuanDanaPage() {
               </p>
             </div>
           </div>
-          {canCreate && (
-            <button
-              onClick={() => setShowModal(true)}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm rounded-full shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all ${FOCUS_RING}`}
-            >
-              <Plus className="w-4 h-4" />
-              Ajukan Dana
-            </button>
-          )}
+          {/* ⬅️ BARU: lonceng notifikasi + tombol Ajukan Dana dalam satu baris */}
+          <div className="flex items-center gap-2 self-end md:self-auto">
+            {showBell && (
+              <NotificationBell
+                items={pendingApprovalData}
+                canAct={canApprove}
+                busyMap={actionLoading}
+                onApprove={(id) => handleAction(id, "approve")}
+                onReject={setRejectTarget}
+                onOpenDetail={setDetailTarget}
+                onViewAll={handleViewAllPending}
+              />
+            )}
+            {canCreate && (
+              <button
+                onClick={() => setShowModal(true)}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm rounded-full shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all ${FOCUS_RING}`}
+              >
+                <Plus className="w-4 h-4" />
+                Ajukan Dana
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Hero Banner — sekarang gradient indigo/ungu pekat (bukan pastel tipis),
@@ -1351,7 +1597,8 @@ export default function PengajuanDanaPage() {
 
         {/* ── Table ─────────────────────────────────────────────────────────── */}
         <div
-          className={CARD_STYLE}
+          ref={tableRef}
+          className={`${CARD_STYLE} scroll-mt-24`}
           style={{ animation: "pdSlideUp 0.5s ease-out both" }}
         >
           <div className="flex items-center justify-between mb-4">
@@ -1790,7 +2037,7 @@ export default function PengajuanDanaPage() {
             </div>
             </>
           )}
-          
+
           {!loading && filteredData.length > 0 && (
             <Pagination
               currentPage={currentPage}
