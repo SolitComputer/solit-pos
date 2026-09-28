@@ -379,6 +379,59 @@ function SoConfirmModal({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Konfirmasi Audit — kembar dengan SoConfirmModal, tapi konteks Audit.
+// Dipakai laptop & aksesoris; catatan opsional, ikut tercatat ke riwayat.
+// ═══════════════════════════════════════════════════════════════════════════
+function AuditConfirmModal({
+    row, notes, onNotesChange, onConfirm, onCancel, loading,
+}: {
+    row: UnifiedRow; notes: string; onNotesChange: (v: string) => void;
+    onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel, loading]);
+
+    const isActive = isAuditActive(row);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !loading && onCancel()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className={`h-1 w-full bg-gradient-to-r ${isActive ? "from-amber-400 via-amber-600 to-amber-800" : "from-emerald-400 via-emerald-600 to-emerald-800"}`} />
+                <div className={`px-5 py-4 ${isActive ? "bg-amber-600" : "bg-emerald-600"}`}>
+                    <p className="font-bold text-white text-sm">{isActive ? "Batalkan Audit" : "Tandai Sudah Diaudit"}</p>
+                    <p className="text-xs text-white/70 mt-0.5 truncate">{row.nama}</p>
+                </div>
+                <div className="p-5">
+                    <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
+                        Catatan Audit (opsional)
+                    </label>
+                    <textarea
+                        autoFocus
+                        rows={3}
+                        placeholder="Kondisi barang, hasil audit, dll"
+                        value={notes}
+                        onChange={e => onNotesChange(e.target.value)}
+                        className={`w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:bg-white transition resize-none ${isActive ? "focus:ring-amber-500/20 focus:border-amber-400" : "focus:ring-emerald-500/20 focus:border-emerald-400"}`}
+                    />
+                    <div className="flex gap-3 mt-5">
+                        <button onClick={onCancel} disabled={loading} className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 transition disabled:opacity-50">Batal</button>
+                        <button onClick={onConfirm} disabled={loading}
+                            className={`flex-1 h-10 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isActive ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Konfirmasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MODAL: Perbaiki Tipe — konversi Laptop yang salah tipe jadi Aksesoris
 // ═══════════════════════════════════════════════════════════════════════════
 function ConvertToAccessoryModal({
@@ -616,6 +669,8 @@ export default function UnifiedBarangContent() {
     const [soingId, setSoingId] = useState<string | null>(null);
     const [soConfirmTarget, setSoConfirmTarget] = useState<UnifiedRow | null>(null);
     const [soConfirmNotes, setSoConfirmNotes] = useState("");
+    const [auditConfirmTarget, setAuditConfirmTarget] = useState<UnifiedRow | null>(null);
+    const [auditConfirmNotes, setAuditConfirmNotes] = useState("");
     const [pedagangSavingId, setPedagangSavingId] = useState<string | null>(null);
     // Target row yang mau di-"Perbaiki Tipe"-nya (Laptop → Aksesoris) — lihat
     // convertToAccessory() & ConvertToAccessoryModal di bawah.
@@ -1055,12 +1110,16 @@ export default function UnifiedBarangContent() {
     }, [filteredRows]);
 
     // ── Audit toggle ───────────────────────────────────────────────────────
-    const toggleAudit = async (row: UnifiedRow) => {
+    const toggleAudit = async (row: UnifiedRow, note: string = "") => {
         if (!canToggleAudit(row)) return;
         setAuditingId(row.id);
         try {
             const url = row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/audit` : `/api/accessories/${row.id}/audit`;
-            const res = await fetch(url, { method: "PATCH" });
+            const res = await fetch(url, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ notes: note }),
+            });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal update audit");
             setRows(prev => {
@@ -1781,7 +1840,7 @@ export default function UnifiedBarangContent() {
                                                     {/* (1) BARIS STATUS: Audit + SO */}
                                                     <div className="flex items-stretch gap-1.5">
                                                         <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${auditActive ? "bg-emerald-50 border-emerald-200" : "bg-zinc-50 border-zinc-200"}`}>
-                                                            <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                            <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
                                                                title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin/Accounting yang bisa mengubah status audit" : "Tidak punya akses") : ""}
                                                                 className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${auditActive ? "text-emerald-700" : "text-zinc-400"}`}>
                                                                 {auditActive ? "Teraudit" : "Audit"}
@@ -1963,7 +2022,7 @@ export default function UnifiedBarangContent() {
                                                             </td>
                                                             <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                                 <div className="flex items-center justify-center gap-1">
-                                                                    <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                                   <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
                                                                         title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
                                                                         className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
                                                                         {auditActive ? "Teraudit" : "Audit"}
@@ -2155,6 +2214,20 @@ export default function UnifiedBarangContent() {
                     onConfirm={async () => {
                         await toggleSo(soConfirmTarget, soConfirmNotes);
                         setSoConfirmTarget(null);
+                    }}
+                />
+            )}
+
+            {auditConfirmTarget && (
+                <AuditConfirmModal
+                    row={auditConfirmTarget}
+                    notes={auditConfirmNotes}
+                    onNotesChange={setAuditConfirmNotes}
+                    loading={auditingId === auditConfirmTarget.id}
+                    onCancel={() => { if (auditingId !== auditConfirmTarget.id) setAuditConfirmTarget(null); }}
+                    onConfirm={async () => {
+                        await toggleAudit(auditConfirmTarget, auditConfirmNotes);
+                        setAuditConfirmTarget(null);
                     }}
                 />
             )}

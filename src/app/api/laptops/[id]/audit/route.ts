@@ -15,6 +15,12 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
 
+    // Catatan audit (opsional) — sama seperti SO. Body bisa kosong saat
+    // dipanggil tanpa catatan, makanya di-catch ke {} biar tidak error.
+    const body = await req.json().catch(() => ({}));
+    const notes: string | null =
+      typeof body?.notes === "string" && body.notes.trim() !== "" ? body.notes.trim() : null;
+
     // Cek status audit sekarang untuk memutuskan set atau clear
     const { data: current, error: readErr } = await supabase
       .from("laptops")
@@ -68,6 +74,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       action: isActive ? "UNAUDIT" : "AUDIT",
       audited_by: user.name,
       audited_at: new Date().toISOString(),
+      notes,
     });
 
     return NextResponse.json({ success: true, data });
@@ -96,7 +103,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
     // Riwayat lengkap (AUDIT & UNAUDIT), terbaru dulu — tidak terpengaruh TTL.
     const { data: history, error: historyErr } = await supabase
       .from("laptop_audit_logs")
-      .select("id, action, audited_by, audited_at")
+      .select("id, action, audited_by, audited_at, notes")
       .eq("laptop_id", id)
       .order("audited_at", { ascending: false })
       .limit(20);
