@@ -12,6 +12,36 @@ import {
 } from "@/lib/cashflow";
 import { fetchAllRows } from "@/lib/supabaseFetch";
 
+// ⬅️ BARU: .in() dengan ratusan/ribuan nilai bikin URL ke PostgREST kepanjangan
+// (414 URI Too Long) & hasilnya juga kepotong max-rows 1000. Dipecah per batch,
+// dijalankan paralel, dan error-nya dicatat (dulu error diam-diam → txMap kosong
+// → semua transaksi BATAL tidak pernah terdeteksi is_voided).
+const IN_CHUNK_SIZE = 150;
+
+async function selectInChunks<T>(
+    values: string[],
+    run: (chunk: string[]) => PromiseLike<{ data: any; error: { message: string } | null }>
+): Promise<{ rows: T[]; ok: boolean }> {
+    const unique = Array.from(new Set(values.filter(Boolean)));
+    const chunks: string[][] = [];
+    for (let i = 0; i < unique.length; i += IN_CHUNK_SIZE) {
+        chunks.push(unique.slice(i, i + IN_CHUNK_SIZE));
+    }
+
+    const results = await Promise.all(chunks.map((c) => run(c)));
+    const rows: T[] = [];
+    let ok = true;
+    for (const r of results) {
+        if (r.error) {
+            ok = false;
+            console.error("[cashflow] selectInChunks error:", r.error.message);
+            continue;
+        }
+        rows.push(...((r.data ?? []) as T[]));
+    }
+    return { rows, ok };
+}
+
 function getAdmin(): SupabaseClient {
     return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -512,6 +542,31 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
     }
 }
 
+// ⬅️ BARU: cegah sync berat jalan dobel/bertumpuk (banyak tab, polling, banyak user).
+// - Kalau sync sedang jalan → request lain NUNGGU sync yang sama, bukan bikin baru.
+// - Kalau sync baru selesai < 30 dtk lalu → skip (kecuali forceSync=1).
+let syncInFlight: Promise<void> | null = null;
+let lastSyncAt = 0;
+const SYNC_MIN_INTERVAL_MS = 30_000;
+
+async function runSyncThrottled(supabase: SupabaseClient, force = false): Promise<void> {
+    if (syncInFlight) return syncInFlight;
+    if (!force && Date.now() - lastSyncAt < SYNC_MIN_INTERVAL_MS) return;
+
+    syncInFlight = (async () => {
+        try {
+            await syncDerivedEntries(supabase);
+        } catch (e) {
+            console.error("[cashflow sync]", e);
+        } finally {
+            lastSyncAt = Date.now();
+            syncInFlight = null;
+        }
+    })();
+    return syncInFlight;
+}
+
+// ── GET /api/cashflow ──────────────────────────────────────────────────────
 // ── GET /api/cashflow ──────────────────────────────────────────────────────
 export const GET = withAuth(async (req) => {
     const supabase = getAdmin();
@@ -520,16 +575,13 @@ export const GET = withAuth(async (req) => {
     // payments/service + reconcile ribuan baris) supaya load PERTAMA halaman
     // Cashflow cepat — cukup baca cashflow_entries yang sudah ada. Sync penuh
     // dipicu terpisah di background oleh frontend (lihat fetchData di page.tsx).
-    const skipSync = new URL(req.url).searchParams.get("skipSync") === "1";
+    const url = new URL(req.url);
+    const skipSync = url.searchParams.get("skipSync") === "1";
+    const forceSync = url.searchParams.get("forceSync") === "1";
 
     if (!skipSync) {
-        try {
-            await syncDerivedEntries(supabase);
-        } catch (e) {
-            console.error("[cashflow sync]", e);
-        }
+        await runSyncThrottled(supabase, forceSync);
     }
-
     // fetchAllRows: hindari truncation 1000 baris yang bikin saldo salah hitung.
     let rawAll: any[];
     try {
@@ -571,11 +623,10 @@ export const GET = withAuth(async (req) => {
     // ke invoice_number-nya sebelum bisa cek status transaksi induk.
     const paymentInvoiceMap = new Map<string, string>();
     if (paymentSourceIds.length > 0) {
-        const { data: paymentRows } = await supabase
-            .from("transaction_payments")
-            .select("id, invoice_number")
-            .in("id", paymentSourceIds);
-        for (const p of paymentRows ?? []) {
+        const { rows: paymentRows } = await selectInChunks<any>(paymentSourceIds, (chunk) =>
+            supabase.from("transaction_payments").select("id, invoice_number").in("id", chunk)
+        );
+        for (const p of paymentRows) {
             paymentInvoiceMap.set(p.id as string, p.invoice_number as string);
         }
     }
@@ -586,12 +637,14 @@ export const GET = withAuth(async (req) => {
 
     const txMap = new Map<string, { status: string; nominal: number; paymentMethod: string }>();
     if (allInvoiceNumbers.length > 0) {
-        const { data: linkedTx } = await supabase
-            .from("transactions")
-            .select("invoice_number, status, deal_price, amount, payment_method, payment_method_2")
-            .in("invoice_number", allInvoiceNumbers);
+        const { rows: linkedTx } = await selectInChunks<any>(allInvoiceNumbers, (chunk) =>
+            supabase
+                .from("transactions")
+                .select("invoice_number, status, deal_price, amount, payment_method, payment_method_2")
+                .in("invoice_number", chunk)
+        );
 
-        for (const t of linkedTx ?? []) {
+        for (const t of linkedTx) {
             // formatTxPaymentMethod scan payment_method + payment_method_2 langsung
             // (sama seperti getPaymentStyle di Riwayat Transaksi) — tidak butuh cek
             // amount_method_1/2 lagi, karena itu bukan penentu split yang sebenarnya.

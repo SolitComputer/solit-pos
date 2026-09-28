@@ -17,10 +17,9 @@ type QualityInput = {
     manual_days: number;
     late_days: number; // ✅ total telat (auto + manual) — utk DISPLAY kolom Terlambat Lencana
     manual_late_days?: number; // ✅ telat manual saja, utk ranking (hindari dobel hitung)
-    absent_days: number;
+    absent_days?: number; // ✅ FIX: sebelumnya tidak dideklarasikan → TS error "Property 'absent_days' does not exist"
     total_workdays: number;
     avg_early_minutes: number; // ✅ rata-rata jarak (menit) ke jam buka jadwal efektif masing-masing
-
 };
 
 const LOCK_LEVEL = 3;
@@ -187,8 +186,10 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
         // manual_days, jadi dikurangi manual_late_days agar tidak dihitung dobel.
         // Kalau client tidak kirim manual_late_days (versi lama) → dianggap 0,
         // hasilnya sama persis dengan rumus lama (manual + late + absen).
-        const va = a.manual_days + (a.late_days - (a.manual_late_days || 0)) + a.absent_days;
-        const vb = b.manual_days + (b.late_days - (b.manual_late_days || 0)) + b.absent_days;
+        // ✅ FIX: absent_days pakai fallback 0 — kalau client tidak kirim,
+        // hasil hitungan jadi NaN dan urutan sort jadi acak.
+        const va = a.manual_days + (a.late_days - (a.manual_late_days || 0)) + (a.absent_days || 0);
+        const vb = b.manual_days + (b.late_days - (b.manual_late_days || 0)) + (b.absent_days || 0);
         if (va !== vb) return va - vb;
         if (b.perfect_days !== a.perfect_days) return b.perfect_days - a.perfect_days;
         const pctA = a.total_workdays > 0 ? a.perfect_days / a.total_workdays : 0;
@@ -199,7 +200,9 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
         // 0 makin bagus, diurutkan ASCENDING.
         return (a.avg_early_minutes || 0) - (b.avg_early_minutes || 0);
     });
-    const rows = ranked.map((s) => {
+
+    const computedAt = new Date().toISOString();
+    const rows = ranked.map((s, i) => {
         const pctRaw = s.total_workdays > 0 ? (s.perfect_days / s.total_workdays) * 100 : 0;
         return {
             user_id: s.user_id,
@@ -208,19 +211,15 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
             perfect_days: s.perfect_days,
             manual_days: s.manual_days,
             late_days: s.late_days,
-            absent_days: s.absent_days,
+            absent_days: s.absent_days || 0,
             total_workdays: s.total_workdays,
             // ✅ NEW — presisi dinaikkan jadi 4 desimal (sebelumnya 2)
             quality_pct: Math.round(pctRaw * 10000) / 10000,
             // ✅ FIXED — presisi dinaikkan ke 4 desimal (sebelumnya 2)
             avg_early_minutes: Math.round((s.avg_early_minutes || 0) * 10000) / 10000,
-            rank: 0, // diisi di bawah
-            computed_at: new Date().toISOString(),
+            rank: i + 1,
+            computed_at: computedAt,
         };
-    });
-
-    rows.forEach((cur, i) => {
-        cur.rank = i + 1;
     });
 
     const { error } = await supabase
