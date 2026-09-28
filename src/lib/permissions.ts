@@ -1165,6 +1165,19 @@ export const SO_LIMITED_USER_IDS: string[] = [
   "203810b5-f9e0-4de4-9495-e1378451fa29",
 ];
 
+// ── Checklist Tes Kondisi (Laptop & Monitor) ─────────────────────────────
+// Akun spesifik yang boleh ISI/UBAH checklist tes kondisi di form Data Barang.
+// User lain tetap bisa LIHAT hasilnya (read-only).
+// Rafi Salim, Fikri Aryansyah.
+export const CONDITION_CHECK_EDITOR_USER_IDS: string[] = [
+  "7594367d-b27b-49a8-a427-5ecb7fa2d21f",
+  "20c4df76-db02-4e36-977b-27b76c7fa803",
+];
+
+export function canEditConditionChecks(userId: string | null | undefined): boolean {
+  return !!userId && CONDITION_CHECK_EDITOR_USER_IDS.includes(userId);
+}
+
 /** Cek apakah user boleh SO baris laptop ini:
  *  - Role di SO_ROLES        → bebas, boleh SO model apa saja.
  *  - User id di SO_LIMITED_USER_IDS → HANYA boleh kalau siap_jual > 0. */

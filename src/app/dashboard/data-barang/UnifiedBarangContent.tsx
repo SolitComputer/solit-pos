@@ -9,6 +9,8 @@ import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import AddUnitModalAccessory from "@/components/inventory/AddUnitModalAccessory";
 import AccessoryUnitDetailModal, { AccessoryUnitDetailData } from "@/components/inventory/AccessoryUnitDetailModal";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, isConditionCheckCategory, sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { usePagePermission } from "@/hooks/usePagePermission";
 import * as XLSX from "xlsx-js-style";
@@ -17,6 +19,7 @@ import {
     LAPTOP_DELETE_ROLES, ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES, ACCESSORY_DELETE_ROLES,
     ACCESSORY_AUDIT_ROLES,
     BARANG_PRIVATE_VIEW_ROLES, BARANG_FULL_ACCESS_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop,
+    canEditConditionChecks,
 } from "@/lib/permissions";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -33,6 +36,7 @@ interface LaptopRaw {
     id: string; laptop_name: string; category_id?: string | null; category_name?: string | null;
     brand: string; cpu: string; ram: string; storage: string; gpu: string; display: string;
     condition_note: string; selling_price: number; notes: string; created_at: string;
+    condition_checks?: ConditionChecks | null;
     audited_at?: string | null; audited_by?: string | null;
     so_at?: string | null; so_by?: string | null;
     laptop_units?: LaptopUnitLite[];
@@ -659,6 +663,8 @@ export default function UnifiedBarangContent() {
     // Laptop/Aksesoris yang lama.
     const [selectedCategoryId, setSelectedCategoryId] = useState("");
     const [laptopForm, setLaptopForm] = useState(EMPTY_LAPTOP_FORM);
+    // Checklist tes kondisi — khusus kategori Laptop & Monitor.
+    const [conditionChecks, setConditionChecks] = useState<ConditionChecks>({});
     const [accForm, setAccForm] = useState(EMPTY_ACC_FORM);
     const [saving, setSaving] = useState(false);
 
@@ -721,6 +727,7 @@ export default function UnifiedBarangContent() {
     //  Dipakai sebagai prop canEdit UnitDetailModal — menggerbangi tombol
     //  "+ Tambah Unit" & "Edit Data" di dalam pop-up detail unit (stok 1).
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
+    const canEditChecklist = canEditConditionChecks(userId);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     // SO untuk AKSESORIS belum punya aturan role khusus seperti canSoLaptop
     // (yang mempertimbangkan siap_jual) — sementara pakai gate stok > 0.
@@ -861,6 +868,10 @@ export default function UnifiedBarangContent() {
         if ((cat.type ?? "").trim().toUpperCase() === "PC") return true;
         return (cat.name ?? "").trim().toUpperCase() === "PC";
     }, [categories, selectedCategoryId]);
+    const selectedCategoryHasChecklist = useMemo(
+        () => isConditionCheckCategory(categories.find(c => c.id === selectedCategoryId)?.name),
+        [categories, selectedCategoryId],
+    );
     // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
     const filterCategories = tipeFilter === "LAPTOP" ? laptopCategories
         : tipeFilter === "AKSESORIS" ? accessoryCategories
@@ -1323,6 +1334,7 @@ export default function UnifiedBarangContent() {
     // ── Create / Edit form ───────────────────────────────────────────────────
     const openCreate = () => {
         setLaptopForm(EMPTY_LAPTOP_FORM);
+        setConditionChecks({});
         setAccForm(EMPTY_ACC_FORM);
         setSelectedCategoryId("");
         setFormModal({ mode: "create", tipe: null }); // tipe baru terisi setelah pilih Kategori
@@ -1355,6 +1367,7 @@ export default function UnifiedBarangContent() {
                 cpu: l.cpu || "", ram: l.ram || "", storage: l.storage || "", gpu: l.gpu || "", display: l.display || "",
                 selling_price: String(l.selling_price || ""), condition_note: l.condition_note || "", notes: l.notes || "",
             });
+            setConditionChecks(sanitizeConditionChecks(l.condition_checks));
             setSelectedCategoryId(l.category_id || "");
         } else {
             const a = row.raw as AccessoryRaw;
@@ -1383,7 +1396,12 @@ export default function UnifiedBarangContent() {
         try {
             if (formModal.tipe === "LAPTOP") {
                 if (!laptopForm.laptop_name.trim()) { toast.error("Nama laptop wajib diisi"); return; }
-                const body = { ...laptopForm, selling_price: Number(laptopForm.selling_price) || 0 };
+                const body = {
+                    ...laptopForm,
+                    selling_price: Number(laptopForm.selling_price) || 0,
+                    // Hanya dikirim oleh editor checklist — server juga cek ulang.
+                    ...(canEditChecklist && selectedCategoryHasChecklist && { condition_checks: conditionChecks }),
+                };
                 const url = formModal.mode === "edit" ? `/api/laptops/${formModal.row!.id}` : "/api/laptops/create";
                 const res = await fetch(url, {
                     method: formModal.mode === "edit" ? "PUT" : "POST",
@@ -2162,6 +2180,11 @@ export default function UnifiedBarangContent() {
                                     </div>
                                     <Field label="Harga Store" required><input type="number" inputMode="numeric" className={inputCls} value={laptopForm.selling_price} onChange={e => setLaptopForm(p => ({ ...p, selling_price: e.target.value }))} /></Field>
                                     <Field label="Kondisi Umum"><input className={inputCls} value={laptopForm.condition_note} onChange={e => setLaptopForm(p => ({ ...p, condition_note: e.target.value }))} /></Field>
+                                    {selectedCategoryHasChecklist && (
+                                        <Field label="Tes Kondisi">
+                                            <ConditionChecklist value={conditionChecks} onChange={setConditionChecks} readOnly={!canEditChecklist} />
+                                        </Field>
+                                    )}
                                     <Field label="Catatan"><textarea rows={2} className={inputCls} value={laptopForm.notes} onChange={e => setLaptopForm(p => ({ ...p, notes: e.target.value }))} /></Field>
                                 </>
                             ) : (

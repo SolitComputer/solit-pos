@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
-import { LAPTOP_DELETE_ROLES, LAPTOP_VIEW_ROLES, BARANG_PRIVATE_VIEW_ROLES, expandRolesWithParents, hasAnyRole } from "@/lib/permissions";
+import { LAPTOP_DELETE_ROLES, LAPTOP_VIEW_ROLES, BARANG_PRIVATE_VIEW_ROLES, expandRolesWithParents, hasAnyRole, canEditConditionChecks } from "@/lib/permissions";
+import { sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 interface Props {
@@ -84,6 +85,11 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     // sebagai string kosong "" (kolom ini FK ke laptop_categories.id).
     if (body.category_id !== undefined) {
       updatePayload.category_id = body.category_id || null;
+    }
+    // Checklist tes kondisi: dari akun selain editor diabaikan (bukan 403),
+    // supaya edit field lain oleh user biasa tetap jalan.
+    if (body.condition_checks !== undefined && canEditConditionChecks(user.id)) {
+      updatePayload.condition_checks = sanitizeConditionChecks(body.condition_checks);
     }
     if (body.selling_price !== undefined && body.selling_price !== null) {
       const price = Math.round(Number(body.selling_price));

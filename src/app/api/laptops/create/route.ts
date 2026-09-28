@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
-import { expandRolesWithParents } from "@/lib/permissions";
+import { expandRolesWithParents, canEditConditionChecks } from "@/lib/permissions";
+import { sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 import { logActivity } from "@/lib/activityLogger";
 
@@ -36,6 +37,10 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         status: "BELUM_SIAP",
         condition_note: body.condition_note,
         notes: body.notes,
+        // Checklist tes kondisi cuma boleh diisi akun di CONDITION_CHECK_EDITOR_USER_IDS.
+        ...(canEditConditionChecks(user.id) && body.condition_checks !== undefined && {
+          condition_checks: sanitizeConditionChecks(body.condition_checks),
+        }),
       })
       .select()
       .single();
