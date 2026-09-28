@@ -516,7 +516,10 @@ export default function LaporanHarianSalesPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "Gagal mengaudit laporan");
-      setEntries((prev) => prev.map((e) => (e.id === auditTarget.id ? json.data : e)));
+      const auditedId = auditTarget.id;
+      // Paksa `audited: true` di state, apa pun bentuk response server —
+      // ini yang menjamin tombol Audit langsung hilang & tidak muncul lagi.
+      setEntries((prev) => prev.map((e) => (e.id === auditedId ? { ...e, ...json.data, audited: true } : e)));
       setAuditTarget(null);
       setAuditStep(1);
     } catch (err: any) {
