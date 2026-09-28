@@ -11,7 +11,8 @@ type Stage =
   | "enrolling" | "verifying" | "success" | "error"
   | "out-of-range" | "out-of-time" | "no-camera" | "day-off" | "gps-denied"
   | "gps-weak"
-  | "early-checkout-request";
+  | "early-checkout-request"
+  | "face-conflict";
 
 const MAX_ATTEMPTS = 5;
 const AUTO_CAPTURE_CONFIDENCE = 0.75;
@@ -473,6 +474,7 @@ export default function FaceVerifyPage() {
   const [biometricDeviceSupported, setBiometricDeviceSupported] = useState<boolean | null>(null);
   const [bioBusy, setBioBusy] = useState(false);
   const [bioError, setBioError] = useState<string | null>(null);
+  const [faceConflict, setFaceConflict] = useState<{ code: string; conflictName: string | null } | null>(null);
 
   const addLog = useCallback((msg: string, type: LogType = "info") => {
     setLogs(p => [...p.slice(-30), { time: ts(), msg, type }]);
@@ -895,7 +897,13 @@ export default function FaceVerifyPage() {
               } else {
                 addLog(`enrollment ditolak: ${enrollData.message}`, "err");
                 setMessage(enrollData.message || "Pendaftaran wajah gagal");
-                setStage("error");
+                if (enrollData.code === "FACE_DUPLICATE" || enrollData.code === "ALREADY_ENROLLED") {
+                  // Refresh tidak akan menyelesaikan kasus ini — butuh reset dari Admin.
+                  setFaceConflict({ code: enrollData.code, conflictName: enrollData.conflictUserName ?? null });
+                  setStage("face-conflict");
+                } else {
+                  setStage("error");
+                }
               }
             } else {
               const currentAttempt = attemptsRef.current + 1;
@@ -975,7 +983,7 @@ export default function FaceVerifyPage() {
         }
       });
     }
-    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera", "day-off", "gps-denied", "gps-weak"].includes(stage)) {
+    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera", "day-off", "gps-denied", "gps-weak", "face-conflict"].includes(stage)) {
       stopCamera();
     }
   }, [stage]);
@@ -1453,6 +1461,43 @@ export default function FaceVerifyPage() {
               busy={bioBusy} enrolled={biometricEnrolled} error={bioError}
               onClick={handleBiometricAttendance}
             />
+          </div>
+        )}
+
+        {/* Face conflict — wajah bentrok dengan akun lain / sudah terdaftar */}
+        {stage === "face-conflict" && (
+          <div style={{ padding: "8px 0 0" }}>
+            <StatusPanel
+              tone="red"
+              icon={<IconAlertCircle />}
+              title={faceConflict?.code === "ALREADY_ENROLLED" ? "Wajah Sudah Terdaftar" : "Wajah Terdeteksi di Akun Lain"}
+              body={message}
+            >
+              <div style={{ textAlign: "left", background: "rgba(255,255,255,0.03)", border: "0.5px solid var(--line)", borderRadius: 11, padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
+                  Yang perlu dilakukan
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.7 }}>
+                  Hubungi <b>Admin</b>. Admin cek di <b>Management User</b>
+                  {faceConflict?.conflictName && <> apakah data wajah akun <b>{faceConflict.conflictName}</b> benar milik orangnya</>}
+                  , lalu tekan <b>Reset Wajah</b> pada akun yang datanya salah. Setelah itu kamu bisa daftar ulang.
+                </div>
+              </div>
+            </StatusPanel>
+
+            <BiometricButton
+              eligible={biometricEligible} supported={biometricDeviceSupported}
+              busy={bioBusy} enrolled={biometricEnrolled} error={bioError}
+              onClick={handleBiometricAttendance}
+            />
+
+            <GhostButton
+              style={{ marginTop: 10, width: "100%", textAlign: "center", color: "rgba(248,113,113,0.55)" }}
+              onClick={handleRejectAttendance}
+              disabled={skipping}
+            >
+              {skipping ? "Mengalihkan..." : "Lewati absen →"}
+            </GhostButton>
           </div>
         )}
 

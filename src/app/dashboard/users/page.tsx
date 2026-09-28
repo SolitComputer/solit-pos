@@ -607,7 +607,9 @@ function MultiRoleSelect({
 }
 
 // ── EditUserModal ─────────────────────────────────────────────────────────────
-function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => void; onSaved: () => void }) {
+function EditUserModal({ user, onClose, onSaved, onResetFace }: {
+  user: User; onClose: () => void; onSaved: () => void; onResetFace?: () => void;
+}) {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone_number ?? "");
   const [birthDate, setBirthDate] = useState(user.birth_date ?? "");
@@ -690,6 +692,30 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
         <Field label="Role (bisa pilih lebih dari 1)">
           <MultiRoleSelect values={roles} onChange={setRoles} />
         </Field>
+        {onResetFace && (
+          <Field label="Data Wajah (Absensi)">
+            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl"
+              style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold"
+                style={{ color: user.face_embedding ? "#059669" : "#94a3b8" }}>
+                <ScanFace className="w-3.5 h-3.5" />
+                {user.face_embedding ? "Sudah terdaftar" : "Belum scan wajah"}
+              </span>
+              {user.face_embedding && (
+                <button type="button" onClick={onResetFace}
+                  className="h-8 px-3 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 transition-all active:scale-95"
+                  style={{ background: "#fff1f2", color: "#dc2626", border: "1px solid #fecdd3" }}>
+                  <ScanFace className="w-3.5 h-3.5" /> Reset Wajah
+                </button>
+              )}
+            </div>
+            {user.face_embedding && user.face_enrolled_at && (
+              <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>
+                Didaftarkan {formatDateTime(user.face_enrolled_at)}
+              </p>
+            )}
+          </Field>
+        )}
         <Field label="Shift">
           <div className="flex gap-2">
             {(["PAGI", "SORE"] as const).map(s => (
@@ -1267,7 +1293,12 @@ export default function UsersPage() {
         <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />
       )}
       {isAdmin && editUser && (
-        <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }} />
+        <EditUserModal
+          user={editUser}
+          onClose={() => setEditUser(null)}
+          onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }}
+          onResetFace={() => { const u = editUser; setEditUser(null); setConfirmReset(u); }}
+        />
       )}
       {isAdmin && sendContractUser && (
         <SendContractModal
@@ -1707,10 +1738,8 @@ export default function UsersPage() {
                                     </ActionBtn>
                                   )}
                                   {isAdmin && user.face_embedding && (
-                                    <ActionBtn onClick={() => setConfirmReset(user)} title="Reset wajah" bg="#fff1f2" color="#dc2626">
-                                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                      </svg>
+                                    <ActionBtn onClick={() => setConfirmReset(user)} title={`Reset wajah ${user.name}`} bg="#fff1f2" color="#dc2626">
+                                      <ScanFace className="w-3.5 h-3.5" />
                                     </ActionBtn>
                                   )}
                                   {isAdmin && user.biometric_enrolled && (
@@ -1822,7 +1851,7 @@ export default function UsersPage() {
                                         : <UserX className="w-3.5 h-3.5" />}
                                     </ActionBtn>
                                   )}
-                                  {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                  {canDeleteUsers && currentUserInfo && user.id !== currentUserInfo.id && (
                                     <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

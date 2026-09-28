@@ -81,13 +81,14 @@ export async function POST(request: Request) {
       .from("users")
       .select("id, name, face_embedding")
       .neq("id", user.id)
+      .is("deleted_at", null) // akun yang sudah dihapus tidak boleh ikut memblokir
       .not("face_embedding", "is", null);
 
-    let closest: { name: string; distance: number } | null = null;
+    let closest: { id: string; name: string; distance: number } | null = null;
     for (const other of otherFaces ?? []) {
       if (!Array.isArray(other.face_embedding) || other.face_embedding.length !== 128) continue;
       const d = euclideanDistance(normalized, normalizeEmbedding(other.face_embedding));
-      if (!closest || d < closest.distance) closest = { name: other.name, distance: d };
+      if (!closest || d < closest.distance) closest = { id: other.id, name: other.name, distance: d };
     }
 
     // Log jarak wajah terdekat — pakai ini untuk kalibrasi threshold.
@@ -96,11 +97,16 @@ export async function POST(request: Request) {
     }
 
     if (closest && closest.distance < HARD_DUPLICATE_THRESHOLD) {
+      // Detail teknis (ID + jarak) cukup di log server, tidak perlu ke user.
+      console.warn(
+        `[face-enroll] DITOLAK: ${currentUser.name} (${user.id}) bentrok dengan ${closest.name} (${closest.id}) @ ${closest.distance.toFixed(3)}`
+      );
       return NextResponse.json(
         {
           success: false,
-          message: `Wajah ini hampir identik dengan akun lain (${closest.name}, jarak ${closest.distance.toFixed(3)}). Satu wajah tidak boleh untuk dua akun.`,
+          message: `Wajah ini sudah terdaftar di akun lain (${closest.name}). Satu wajah tidak boleh dipakai untuk dua akun.`,
           code: "FACE_DUPLICATE",
+          conflictUserName: closest.name,
         },
         { status: 409 }
       );
