@@ -1895,14 +1895,17 @@ export default function CashflowPage() {
             // berikutnya tetap dianggap "berubah" & diterapkan sekali.
             cashflowCache = { masuk: freshMasuk, keluar: freshKeluar, summary: json.summary, raw: "", at: Date.now() };
 
-            // Modal Awal & filter tetap dikecualikan/diterapkan di sini sebagai jaga-jaga
-            // ke depan (mis. kalau nanti Modal Awal diisi, atau kamu lagi apply filter
-            // tanggal/kategori) — meski untuk gap hari ini penyebabnya murni soal timing di atas.
-            const exportMasuk = applyFilters(
-                freshMasuk.filter((e) => !e.is_voided && e.source_type !== "MODAL_AWAL"),
-                filterIn
-            );
-            const exportKeluar = applyFilters(freshKeluar.filter((e) => !e.is_voided), filterOut);
+            // ⬅️ FIX: dulu di sini masih applyFilters(..., filterIn/filterOut) — jadi
+            // filter yang lagi aktif di layar (tanggal, kategori, search, dst) ikut
+            // kepakai ke Excel juga. Efeknya: kalau kamu lagi filter tanggal ≤ 1 Sep,
+            // Excel Uang Keluar cuma berisi sampai 1 Sep, tanggal 2-dst "hilang" —
+            // padahal cuma tersembunyi oleh filter, bukan benar-benar hilang dari
+            // database. Export sekarang SELALU ambil SEMUA data terbaru, TIDAK
+            // peduli filter apa pun yang sedang aktif di layar. Modal Awal & entry
+            // yang di-void tetap dikecualikan — itu bukan filter dari kamu, tapi
+            // memang tidak relevan dimasukkan ke laporan Uang Masuk/Keluar.
+            const exportMasuk = freshMasuk.filter((e) => !e.is_voided && e.source_type !== "MODAL_AWAL");
+            const exportKeluar = freshKeluar.filter((e) => !e.is_voided);
             await exportCashflowExcel(exportMasuk, exportKeluar);
         } finally {
             setExporting(false);
