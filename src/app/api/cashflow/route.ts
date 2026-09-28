@@ -704,10 +704,20 @@ export const GET = withAuth(async (req) => {
         }
     }
 
+    // Invoice yang SUDAH punya entry refund otomatis (uang keluar saat batal).
+    // Kalau refund-nya ada → pemasukan asli TIDAK di-void lagi (tetap dihitung di
+    // tanggal aslinya), dan entry TRANSACTION_REFUND yang jadi penyeimbang di
+    // tanggal cancel. Kalau BELUM ada refund (cancel lama) → perilaku lama dipakai.
+    const refundedInvoices = new Set<string>(
+        rawAll
+            .filter((e: any) => e.source_type === "TRANSACTION_REFUND" && e.source_id)
+            .map((e: any) => e.source_id as string)
+    );
+
     const all = rawAll.map((e: any) => {
         if (e.source_type === "TRANSACTION" && e.source_id) {
             const tx = txMap.get(e.source_id as string);
-            const isVoided = !!tx && tx.status !== "PAID";
+            const isVoided = !!tx && tx.status !== "PAID" && !refundedInvoices.has(e.source_id as string);
             const isStale =
                 !!tx &&
                 !isVoided &&
@@ -720,14 +730,20 @@ export const GET = withAuth(async (req) => {
         if (e.source_type === "TRANSACTION_PAYMENT" && e.source_id) {
             const invoiceNumber = paymentInvoiceMap.get(e.source_id as string);
             const tx = invoiceNumber ? txMap.get(invoiceNumber) : undefined;
-            const isVoided = !!tx && tx.status === "CANCELLED";
+            const isVoided = !!tx && tx.status === "CANCELLED" && !(invoiceNumber && refundedInvoices.has(invoiceNumber));
             return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null, invoice_number: invoiceNumber ?? null };
         }
 
         if (e.source_type === "TRANSACTION_DP" && e.source_id) {
             const tx = txMap.get(e.source_id as string);
-            const isVoided = !!tx && tx.status === "CANCELLED";
+            const isVoided = !!tx && tx.status === "CANCELLED" && !refundedInvoices.has(e.source_id as string);
             return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null, invoice_number: e.source_id as string };
+        }
+
+        // Refund otomatis: uang keluar penyeimbang saat transaksi dibatalkan.
+        // Selalu dihitung (tidak pernah di-void), source_id = invoice.
+        if (e.source_type === "TRANSACTION_REFUND" && e.source_id) {
+            return { ...e, is_voided: false, is_stale: false, source_nominal: null, tx_payment_method: null, invoice_number: e.source_id as string };
         }
 
         return { ...e, is_voided: false, is_stale: false };

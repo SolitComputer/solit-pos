@@ -1422,6 +1422,94 @@ async function buildCashflowDrafts(
   return drafts;
 }
 
+// ── REVERSAL: transaksi yang DIBATALKAN (restore penuh → CANCELLED) ──────────
+// Membalik SEMUA jurnal yang sudah terlanjur diposting untuk invoice itu
+// (penjualan, modal/HPP, piutang, pembayaran) di TANGGAL PEMBATALAN
+// (restored_at). Jadi penjualan lama tetap di tanggal aslinya, pembatalannya
+// jadi jurnal balik di tanggal cancel — sinkron dengan refund di Cashflow.
+// Muncul sebagai draft PENDING untuk dikonfirmasi, sama seperti draft lainnya.
+async function buildTransactionReversalDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: trxs, error } = await supabase
+    .from("transactions")
+    .select("invoice_number, customer_name, laptop_name, restored_at")
+    .eq("status", "CANCELLED")
+    .not("restored_at", "is", null)
+    .gte("restored_at", startISO)
+    .lt("restored_at", endISO)
+    .order("restored_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch transactions (reversal):", error.message);
+    return [];
+  }
+  if (!trxs || trxs.length === 0) return [];
+
+  const invoices = (trxs as any[]).map((t) => t.invoice_number as string);
+  const trxByInvoice = new Map<string, any>((trxs as any[]).map((t) => [t.invoice_number as string, t]));
+
+  // Ambil semua entry jurnal ASLI yang sudah diposting untuk invoice ini,
+  // KECUALI entry reversal itu sendiri (biar tidak balik-membalik).
+  const entryMap = new Map<string, { lines: any[] }[]>();
+  for (const batch of chunkArray(invoices, 75)) {
+    const orFilter = batch.map((inv) => `source_id.eq.${inv},source_id.like.${inv}__*`).join(",");
+    const { data: existing } = await supabase
+      .from("journal_entries")
+      .select("source_id, lines:journal_lines(account_code, side, nominal)")
+      .eq("source_type", "TRANSACTION")
+      .or(orFilter);
+
+    for (const e of (existing ?? []) as any[]) {
+      const rawSourceId = e.source_id as string;
+      if (rawSourceId.includes("__REVERSAL")) continue;
+      const baseInvoice = rawSourceId.split("__")[0];
+      if (!trxByInvoice.has(baseInvoice)) continue;
+      const list = entryMap.get(baseInvoice) ?? [];
+      list.push({ lines: e.lines ?? [] });
+      entryMap.set(baseInvoice, list);
+    }
+  }
+
+  const drafts: JournalDraft[] = [];
+  for (const [invoice, entries] of entryMap.entries()) {
+    const t = trxByInvoice.get(invoice);
+    const tanggal = jakartaDate(t.restored_at as string);
+
+    const flipped: DraftLine[] = [];
+    for (const en of entries) {
+      for (const l of en.lines) {
+        const nominal = Math.round(Number(l.nominal));
+        if (nominal <= 0) continue;
+        flipped.push({
+          account_code: l.account_code as string,
+          side: l.side === "DEBIT" ? "KREDIT" : "DEBIT", // ← balik sisi
+          nominal,
+        });
+      }
+    }
+    if (flipped.length === 0) continue;
+
+    const merged = mergeLines(flipped);
+    drafts.push({
+      source_type: "TRANSACTION",
+      source_id: `${invoice}__REVERSAL`,
+      source_category: "PEMBATALAN_TRANSAKSI",
+      tanggal,
+      sort_ts: (t.restored_at as string) || `${tanggal}T00:00:00+07:00`,
+      keterangan: `Pembatalan/Refund · ${t.laptop_name ?? "Laptop"} - ${t.customer_name ?? "—"}`,
+      ref: invoice,
+      lines: merged,
+      total: totalOf(merged),
+      meta: { invoice, is_reversal: true, modal_missing: false, company_name: null },
+    });
+  }
+
+  return drafts;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 export async function buildDraftsForPeriod(
   supabase: SupabaseClient,
@@ -1429,15 +1517,16 @@ export async function buildDraftsForPeriod(
 ): Promise<JournalDraft[]> {
   const { startISO, endISO, startDate, endDateExclusive } = periodRange(period);
 
-  const [tx, accrual, pay, svc, cf] = await Promise.all([
+  const [tx, accrual, pay, svc, cf, reversal] = await Promise.all([
     buildTransactionDrafts(supabase, startISO, endISO),
     buildTransactionAccrualDrafts(supabase, startISO, endISO),
     buildTransactionPaymentDrafts(supabase, startISO, endISO),
     buildServiceDrafts(supabase, period),
     buildCashflowDrafts(supabase, startDate, endDateExclusive),
+    buildTransactionReversalDrafts(supabase, startISO, endISO),
   ]);
 
-  return [...tx, ...accrual, ...pay, ...svc, ...cf].sort((a, b) => {
+  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal].sort((a, b) => {
     if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
     return a.sort_ts.localeCompare(b.sort_ts);
   });

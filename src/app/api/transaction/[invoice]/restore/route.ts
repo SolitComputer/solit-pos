@@ -204,6 +204,73 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
+    // ── 5a2. REFUND OTOMATIS ke Cashflow (uang keluar di TANGGAL CANCEL) ────
+    // Total refund = total uang yang BENAR-BENAR tercatat masuk untuk invoice
+    // ini di Cashflow (TRANSACTION + TRANSACTION_DP + TRANSACTION_PAYMENT),
+    // supaya net-nya nol tanpa selisih. Pemasukan aslinya sengaja DIBIARKAN
+    // di tanggal aslinya — GET /api/cashflow tidak lagi men-void pemasukan
+    // yang invoice-nya sudah punya entry TRANSACTION_REFUND.
+    try {
+      const { data: directIn } = await supabase
+        .from("cashflow_entries")
+        .select("nominal")
+        .in("source_type", ["TRANSACTION", "TRANSACTION_DP"])
+        .eq("source_id", invoice);
+      let totalReceived = (directIn ?? []).reduce(
+        (s, r: any) => s + Math.round(Number(r.nominal ?? 0)),
+        0
+      );
+
+      // Cicilan: TRANSACTION_PAYMENT.source_id = id baris transaction_payments,
+      // jadi harus di-resolve dulu dari invoice → id pembayaran.
+      const { data: payRows } = await supabase
+        .from("transaction_payments")
+        .select("id")
+        .eq("invoice_number", invoice);
+      const payIds = (payRows ?? []).map((p: any) => p.id as string);
+      if (payIds.length > 0) {
+        const { data: payIn } = await supabase
+          .from("cashflow_entries")
+          .select("nominal")
+          .eq("source_type", "TRANSACTION_PAYMENT")
+          .in("source_id", payIds);
+        totalReceived += (payIn ?? []).reduce(
+          (s, r: any) => s + Math.round(Number(r.nominal ?? 0)),
+          0
+        );
+      }
+
+      // Idempotent: jangan bikin refund dobel kalau sudah ada.
+      const { data: existingRefund } = await supabase
+        .from("cashflow_entries")
+        .select("id")
+        .eq("source_type", "TRANSACTION_REFUND")
+        .eq("source_id", invoice)
+        .maybeSingle();
+
+      if (totalReceived > 0 && !existingRefund) {
+        const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+        const refundCategory =
+          transaction.item_kind === "accessory" ? "PENJUALAN_AKSESORIS_OUT" : "PENJUALAN_LAPTOP_OUT";
+        const { error: refundErr } = await supabase.from("cashflow_entries").insert({
+          direction: "OUT",
+          category: refundCategory,
+          nama: user.name,
+          nominal: totalReceived,
+          modal: null,
+          keterangan: `Refund transaksi batal · ${transaction.customer_name ?? "—"} · ${transaction.laptop_name ?? "—"}`,
+          tanggal: jakartaToday,
+          source_type: "TRANSACTION_REFUND",
+          source_id: invoice,
+          payment_method: null,
+          is_audited: false,
+        });
+        if (refundErr) console.error("[RESTORE] buat entry refund cashflow gagal:", refundErr.message);
+      }
+    } catch (refundEx: any) {
+      console.error("[RESTORE] refund cashflow exception:", refundEx?.message ?? refundEx);
+    }
+
     // 5b. Batalkan catatan outflow aksesoris jika ada
     await cancelOutflowByInvoice(invoice);
 
