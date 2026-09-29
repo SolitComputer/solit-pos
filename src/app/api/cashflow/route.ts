@@ -522,7 +522,7 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
     // setiap kali GET /api/cashflow jalan — persis kasus yang barusan kejadian.
     const invoiceNumbersToCheck = [...new Set(dedupedPayments.map((p: any) => p.invoice_number as string))];
     const invoicesAlreadySynced = new Set<string>();
-    const invoicesWithLegacyDp = new Set<string>(); // ⬅️ BARU
+    const dpPostedByInvoice = new Map<string, number>(); // ⬅️ nominal TRANSACTION_DP per invoice
     if (invoiceNumbersToCheck.length > 0) {
         const { rows: existingTxEntries, ok } = await selectInChunks<any>(invoiceNumbersToCheck, (chunk) =>
             supabase.from("cashflow_entries").select("source_id").eq("source_type", "TRANSACTION").in("source_id", chunk)
@@ -534,58 +534,73 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
 
         // ⬅️ BARU: invoice yang DP-nya sudah tercatat sebagai TRANSACTION_DP
         const { rows: existingDpEntries, ok: okDp } = await selectInChunks<any>(invoiceNumbersToCheck, (chunk) =>
-            supabase.from("cashflow_entries").select("source_id").eq("source_type", "TRANSACTION_DP").in("source_id", chunk)
+            supabase.from("cashflow_entries").select("source_id, nominal").eq("source_type", "TRANSACTION_DP").in("source_id", chunk)
         );
         if (!okDp) return; // fail-closed
         for (const e of existingDpEntries) {
-            invoicesWithLegacyDp.add(e.source_id as string);
+            dpPostedByInvoice.set(e.source_id as string, Number(e.nominal ?? 0));
         }
     }
 
     const paymentIds = dedupedPayments.map((p: any) => p.id as string);
     const { rows: existing, ok: okExisting } = await selectInChunks<any>(paymentIds, (chunk) =>
-        supabase.from("cashflow_entries").select("id, source_id").eq("source_type", "TRANSACTION_PAYMENT").in("source_id", chunk)
+        supabase.from("cashflow_entries").select("id, source_id, nominal").eq("source_type", "TRANSACTION_PAYMENT").in("source_id", chunk)
     );
     if (!okExisting) return;
 
     const existingIds = new Set(existing.map((e: any) => e.source_id as string));
+
+    // ⬅️ BARU: total nominal yang SUDAH tercatat per invoice (TRANSACTION_DP + TRANSACTION_PAYMENT lama)
+    const invoiceByPaymentId = new Map<string, string>(
+        dedupedPayments.map((p: any) => [p.id as string, p.invoice_number as string])
+    );
+    const postedByInvoice = new Map<string, number>(dpPostedByInvoice);
+    for (const e of existing) {
+        const inv = invoiceByPaymentId.get(e.source_id as string);
+        if (!inv) continue;
+        postedByInvoice.set(inv, (postedByInvoice.get(inv) ?? 0) + Number(e.nominal ?? 0));
+    }
+
     const missing = dedupedPayments.filter(
         (p: any) =>
             !existingIds.has(p.id as string) &&
             !invoicesAlreadySynced.has(p.invoice_number as string) &&
-            // ⬅️ BARU: baris payment bertipe DP tidak dicatat lagi kalau DP-nya
-            // sudah masuk lewat TRANSACTION_DP. Cicilan non-DP tetap masuk normal.
-            !(p.payment_type === "DP" && invoicesWithLegacyDp.has(p.invoice_number as string))
+            !(p.payment_type === "DP" && dpPostedByInvoice.has(p.invoice_number as string))
     );
     if (missing.length === 0) return;
 
     const invoiceNumbers = [...new Set(missing.map((p: any) => p.invoice_number as string))];
-    // ⬅️ FIX: .in() dipecah per batch. Kalau gagal tidak fatal — nama customer/sales
-    // cuma jatuh ke fallback "—"/"Sales", entry tetap masuk.
-    const { rows: txRows } = await selectInChunks<any>(invoiceNumbers, (chunk) =>
+    // ⬅️ UBAH: ambil deal_price/amount untuk batas total, dan fail-closed
+    // (tanpa harga, batas tidak bisa dicek → jangan insert daripada berisiko dobel)
+    const { rows: txRows, ok: okTx } = await selectInChunks<any>(invoiceNumbers, (chunk) =>
         supabase
             .from("transactions")
-            .select("invoice_number, customer_name, sales_name, laptop_name, created_at")
+            .select("invoice_number, customer_name, sales_name, laptop_name, created_at, deal_price, amount")
             .in("invoice_number", chunk)
     );
-    const txInfoMap = new Map<string, { customer_name: string; sales_name: string; laptop_name: string; created_at: string }>(
-        txRows.map((t: any) => [t.invoice_number as string, t])
-    );
+    if (!okTx) return;
+    const txInfoMap = new Map<string, any>(txRows.map((t: any) => [t.invoice_number as string, t]));
 
-    // ✅ FIX: dulu di sini di-filter ke missingForLegacyOnly (cuma transaksi dibuat
-    // < 10 Agu 2026), jadi DP/cicilan transaksi BARU tidak pernah masuk Cashflow.
-    // Sekarang SEMUA transaction_payments yang belum tercatat ikut disinkronkan.
-    const toInsert = missing
-        .map((p: any) => {
-            const info = txInfoMap.get(p.invoice_number as string);
-            return buildPaymentPayload(p, info?.customer_name ?? "—", info?.sales_name ?? "Sales", info?.laptop_name ?? "");
-        })
-        .filter((e) => e.nominal > 0 && e.tanggal >= CASHFLOW_START_DATE)
-        .map((e) => ({ ...e, is_audited: false }));
+    const toInsert: any[] = [];
+    for (const p of missing) {
+        const inv = p.invoice_number as string;
+        const info = txInfoMap.get(inv);
+        const payload = buildPaymentPayload(p, info?.customer_name ?? "—", info?.sales_name ?? "Sales", info?.laptop_name ?? "");
+        if (payload.nominal <= 0 || payload.tanggal < CASHFLOW_START_DATE) continue;
 
-    // ⬅️ FIX: dulu .upsert(onConflict) → selalu error 42P10 (lihat insertIgnoreDuplicates)
+        // ⬅️ BARU: total Cashflow satu invoice tidak boleh melebihi harga transaksi
+        const price = info ? Math.round(Number(info.deal_price ?? info.amount ?? 0)) : 0;
+        const posted = postedByInvoice.get(inv) ?? 0;
+        if (price > 0 && posted + payload.nominal > price) {
+            console.warn(`[cashflow sync] payment ${p.id} (${inv}) dilewati: ${posted}+${payload.nominal} > harga ${price}`);
+            continue;
+        }
+        postedByInvoice.set(inv, posted + payload.nominal);
+        toInsert.push({ ...payload, is_audited: false });
+    }
+
     await insertIgnoreDuplicates(supabase, toInsert, "payment");
-}
+} // ⬅️ FIX: kurung penutup fungsi yang tadinya hilang
 
 async function syncDerivedEntries(supabase: SupabaseClient) {
     await syncLegacyDpEntries(supabase);
@@ -966,6 +981,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
                 tanggal: tanggal || jakartaToday,
                 source_type: "MANUAL",
                 payment_method: pm,
+                photo_url: (body.photo_url as string | undefined) ?? null, // ⬅️ BARU: foto bukti Uang Masuk
                 created_by: user.id,
             })
             .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)
