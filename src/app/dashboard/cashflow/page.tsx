@@ -1975,7 +1975,7 @@ export default function CashflowPage() {
         if (e.source_type === "SERVICE") {
             // ⬅️ FIX: kirim id service order lewat query param, supaya halaman History
             // langsung buka detail modal 1 baris itu saja — bukan daftar penuh.
-            if (e.source_id) router.push(`/dashboard/service/history?id=${encodeURIComponent(e.source_id)}`);
+            if (e.source_id) router.push(`/dashboard/service/history?id=${encodeURIComponent(e.source_id.split("__")[0])}`);
             else router.push("/dashboard/service/history");
             return;
         }

@@ -91,6 +91,11 @@ function getAdmin(): SupabaseClient {
 const jakartaDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
+// Order service yang DIBUAT mulai tanggal ini memakai sistem DP baru (DP masuk Cashflow
+// begitu diterima). Order sebelum tanggal ini TIDAK berubah, tetap sistem lama
+// (masuk hanya kalau SUDAH_DIAMBIL). Ubah tanggal ini sesuai hari kamu deploy.
+const SERVICE_DP_START_DATE = "2026-09-29";
+
 
 function getJoinedName(joined: any): string | null {
     if (!joined) return null;
@@ -125,18 +130,21 @@ function buildTxPayload(t: any) {
     };
 }
 
-function buildSvcPayload(s: any, techName: string) {
-    const refDate = (s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
+function buildSvcPayload(
+    s: any,
+    techName: string,
+    opts: { nominal: number; sourceId: string; label: string; refDate: string }
+) {
     return {
         direction: "IN",
         category: "SERVICE",
         nama: techName,
-        nominal: Math.round(Number(s.payment_amount ?? 0)),
+        nominal: Math.round(opts.nominal),
         modal: null,
-        keterangan: `Service · ${(s.nama as string) || "—"} · ${(s.payment_method as string) || "—"}`,
-        tanggal: jakartaDate(refDate),
+        keterangan: `Service · ${(s.nama as string) || "—"} · ${(s.payment_method as string) || "—"}${opts.label}`,
+        tanggal: jakartaDate(opts.refDate),
         source_type: "SERVICE",
-        source_id: String(s.id),
+        source_id: opts.sourceId,
         payment_method: null,
     };
 }
@@ -265,7 +273,11 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
         if (failed > 0) console.error(`[cashflow sync] ${failed} reconcile transaksi GAGAL`);
     }
 }
-
+// Service → Cashflow. Mengikuti aturan buildServiceDrafts() di lib/accountingSource.ts:
+// - order dibuat SEBELUM SERVICE_DP_START_DATE → data lama, perilaku lama (hanya SUDAH_DIAMBIL, DP diabaikan)
+// - payment_status "DP"  → masuk begitu diterima, status servis apa pun (order baru saja)
+// - lunas langsung       → hanya kalau SUDAH_DIAMBIL (perilaku lama, direkonsiliasi)
+// - DP bertahap dicatat per SELISIH: id__DP1, id__DP2, id__PELUNASAN
 async function syncServiceEntries(
     supabase: SupabaseClient,
     services: any[],
@@ -275,25 +287,34 @@ async function syncServiceEntries(
 
     const serviceIds = services.map((s: any) => String(s.id));
 
-    const { rows: existing, ok } = await selectInChunks<any>(serviceIds, (chunk) =>
-        supabase
+    // Ambil semua entry cashflow service: id polos + id__DP1 / id__PELUNASAN
+    const existingByService = new Map<string, any[]>();
+    for (let i = 0; i < serviceIds.length; i += 75) {
+        const batch = serviceIds.slice(i, i + 75);
+        const orFilter = batch.map((sid) => `source_id.eq.${sid},source_id.like.${sid}__*`).join(",");
+        const { data, error } = await supabase
             .from("cashflow_entries")
-            .select("id, source_id, nominal, nama, keterangan, tanggal, category, is_audited")
+            .select("id, source_id, nominal, nama, keterangan, tanggal, category")
             .eq("source_type", "SERVICE")
-            .in("source_id", chunk)
-    );
-    // ⬅️ FIX: kalau lookup gagal, semua service dianggap baru → batch insert
-    // bentrok unique constraint → service BARU ikut gagal masuk.
-    if (!ok) return;
-
-    const existingMap = new Map<string, any>(
-        existing.map((e: any) => [e.source_id as string, e])
-    );
+            .or(orFilter);
+        if (error) {
+            console.error("[cashflow sync] lookup service entries error:", error.message);
+            return; // fail-closed: jangan insert kalau cek dobel gagal
+        }
+        for (const e of (data ?? []) as any[]) {
+            const baseId = String(e.source_id).split("__")[0];
+            const list = existingByService.get(baseId) ?? [];
+            list.push(e);
+            existingByService.set(baseId, list);
+        }
+    }
 
     const toInsert: any[] = [];
     const updates: { id: string; patch: Record<string, any> }[] = [];
 
     for (const s of services) {
+        const idStr = String(s.id);
+
         let techName = "Teknisi";
         if (s.dikerjakan_by && technicianNameMap.has(s.dikerjakan_by as string)) {
             techName = technicianNameMap.get(s.dikerjakan_by as string)!;
@@ -302,32 +323,68 @@ async function syncServiceEntries(
             if (joinedName) techName = joinedName;
         }
 
-        const desired = buildSvcPayload(s, techName);
+        const bayar = Math.round(Number(s.payment_amount ?? 0));
+        const isDp = s.payment_status === "DP";
+        const entries = existingByService.get(idStr) ?? [];
+        const hasSplit = entries.some((e) => e.source_id !== idStr);
 
-        // ⬅️ FIX: dulu baris ini nge-skip TOTAL (insert & update) kalau nominal <= 0 —
-        // jadi waktu payment_amount di Riwayat Servis diedit JADI 0 setelah entry-nya
-        // sudah ada di Cashflow, reconcile ikut ke-skip & nominal lama tetap "nyangkut".
-        // Sekarang tanggal tetap wajib valid, tapi nominal 0 tetap lanjut diproses —
-        // aturan insert-vs-update-nya dipisah di bawah.
-        if (desired.tanggal < CASHFLOW_START_DATE) continue;
+        // Order dibuat sebelum SERVICE_DP_START_DATE = data lama, JANGAN pakai sistem DP baru
+        const isNewSystem =
+            !!s.tanggal_masuk && jakartaDate(s.tanggal_masuk as string) >= SERVICE_DP_START_DATE;
 
-        const cur = existingMap.get(String(s.id));
+        // ── JALUR A: data lama, ATAU lunas langsung & belum pernah dipecah → PERILAKU LAMA ──
+        if (!isNewSystem || (!isDp && !hasSplit)) {
+            if (isDp) continue; // data lama yang masih DP: abaikan, tunggu lunas & diambil
+            if (s.status !== "SUDAH_DIAMBIL") continue;
 
-        if (!cur) {
-            // Entry BARU (belum pernah tercatat di Cashflow) hanya dibuat kalau nominal > 0.
-            // Servis yang dari AWAL memang gratis (payment_amount 0, tidak pernah diedit)
-            // tidak perlu bikin entry Rp0 baru — biar Cashflow tidak penuh entry kosong.
-            if (desired.nominal <= 0) continue;
-            toInsert.push({ ...desired, is_audited: false });
+            const desired = buildSvcPayload(s, techName, {
+                nominal: bayar,
+                sourceId: idStr,
+                label: "",
+                refDate: (s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string,
+            });
+            if (desired.tanggal < CASHFLOW_START_DATE) continue;
+
+            // ⬅️ FIX (perilaku lama): nominal 0 tetap direkonsiliasi kalau entry sudah ada
+            // (payment_amount diedit jadi 0), tapi entry BARU tidak dibuat untuk servis gratis.
+            const cur = entries.find((e) => e.source_id === idStr);
+            if (!cur) {
+                if (desired.nominal <= 0) continue;
+                toInsert.push({ ...desired, is_audited: false });
+                continue;
+            }
+            // is_audited/audited_at/audited_by TIDAK ikut berubah — cuma nominal & field turunan.
+            const patch = diffPayload(cur, desired);
+            if (Object.keys(patch).length > 0) updates.push({ id: cur.id, patch });
             continue;
         }
 
-        // Entry SUDAH ADA di Cashflow — direkonsiliasi APA ADANYA mengikuti payment_amount
-        // TERKINI di service_orders, TERMASUK kalau turun jadi 0. Berlaku juga walau
-        // entry-nya sudah diaudit (beda dari TRANSACTION yang sengaja dikunci pas diaudit).
-        // is_audited, audited_at, audited_by TIDAK ikut berubah — status audit tetap sama.
-        const patch = diffPayload(cur, desired);
-        if (Object.keys(patch).length > 0) updates.push({ id: cur.id, patch });
+        // ── JALUR B: order baru dengan DP → catat hanya SELISIH yang belum dibukukan ──
+        const posted = entries.reduce((sum, e) => sum + Math.round(Number(e.nominal ?? 0)), 0);
+        const delta = bayar - posted;
+        if (delta <= 0) continue;
+
+        let sourceId: string;
+        let label: string;
+        if (isDp) {
+            const sisa = Math.max(Number(s.total_tagihan ?? 0) - bayar, 0);
+            sourceId = `${idStr}__DP${entries.length + 1}`;
+            label = ` · DP (sisa Rp${Math.round(sisa).toLocaleString("id-ID")})`;
+        } else {
+            const hasPelunasan = entries.some((e) => e.source_id === `${idStr}__PELUNASAN`);
+            sourceId = hasPelunasan ? `${idStr}__PELUNASAN${entries.length + 1}` : `${idStr}__PELUNASAN`;
+            label = " · Pelunasan";
+        }
+
+        const desired = buildSvcPayload(s, techName, {
+            nominal: delta,
+            sourceId,
+            label,
+            // payment_confirmed_at = kapan uang benar-benar diterima (sama seperti Jurnal)
+            refDate: (s.payment_confirmed_at || s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string,
+        });
+        if (desired.tanggal < CASHFLOW_START_DATE) continue;
+        toInsert.push({ ...desired, is_audited: false });
     }
 
     // ⬅️ FIX: insert biasa + fallback per baris kalau ada yang dobel (lihat insertIgnoreDuplicates).
@@ -345,7 +402,6 @@ async function syncServiceEntries(
         if (failed > 0) console.error(`[cashflow sync] ${failed} reconcile service GAGAL`);
     }
 }
-
 function buildPaymentPayload(p: any, customerName: string, salesName: string, laptopName: string) {
     return {
         direction: "IN",
@@ -542,10 +598,13 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
                     tanggal_diambil,
                     tanggal_masuk,
                     status,
+                    payment_status,
+                    payment_confirmed_at,
+                    total_tagihan,
                     dikerjakan_by,
                     dikerjakan_by_user:users!service_orders_dikerjakan_by_fkey(id, name)
                 `)
-                .in("status", ["SUDAH_DIAMBIL"])
+                .or("payment_status.eq.DP,status.eq.SUDAH_DIAMBIL,and(payment_status.eq.LUNAS,tanggal_masuk.gte.2026-09-28T17:00:00Z)")
                 .not("payment_amount", "is", null)
                 .gte("payment_amount", 0)   // ⬅️ FIX: dulu .gt(0) — service yang payment_amount-nya
                 // diedit JADI 0 tidak pernah ke-fetch sama sekali, jadi
@@ -560,8 +619,8 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
             const servicesFallback = await fetchAllRows<any>((from, to) =>
                 supabase
                     .from("service_orders")
-                    .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, tanggal_masuk, status, dikerjakan_by")
-                    .in("status", ["SUDAH_DIAMBIL"])
+                    .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, tanggal_masuk, status, payment_status, payment_confirmed_at, total_tagihan, dikerjakan_by")
+                    .or("payment_status.eq.DP,status.eq.SUDAH_DIAMBIL,and(payment_status.eq.LUNAS,tanggal_masuk.gte.2026-09-28T17:00:00Z)")
                     .not("payment_amount", "is", null)
                     .gte("payment_amount", 0)   // ⬅️ FIX: sama seperti query utama di atas
                     .order("id", { ascending: true })
