@@ -602,10 +602,128 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
     await insertIgnoreDuplicates(supabase, toInsert, "payment");
 } // ⬅️ FIX: kurung penutup fungsi yang tadinya hilang
 
+
+// ⬅️ BARU: entri TRANSACTION_PAYMENT dibuat SEKALI dari transaction_payments.amount dan tidak
+// pernah dikoreksi. Kalau harga deal transaksi diedit setelah pembayaran tercatat (mis. salah
+// input 20.712 → 207.712), baris pembayaran tetap nominal lama, syncTransactionEntries men-skip
+// invoice yang punya baris pembayaran, dan syncTransactionPaymentEntries hanya insert yang belum
+// ada → Cashflow nyangkut di nominal lama. Di sini selisih (harga deal − total tercatat)
+// ditambahkan ke entri pembayaran TERAKHIR. Idempotent: setelah dikoreksi selisih jadi 0.
+async function syncEditedDealPaymentEntries(supabase: SupabaseClient) {
+    let paidTx: any[];
+    try {
+        paidTx = await fetchAllRows<any>((from, to) =>
+            supabase
+                .from("transactions")
+                .select("id, invoice_number, deal_price, amount")
+                .eq("status", "PAID")
+                .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`)
+                .order("id", { ascending: true })
+                .range(from, to)
+        );
+    } catch (e: any) {
+        console.error("[cashflow sync] fetch paid transactions (edited deal) error:", e?.message ?? e);
+        return;
+    }
+    if (paidTx.length === 0) return;
+
+    const dealByInvoice = new Map<string, number>(
+        paidTx.map((t: any) => [t.invoice_number as string, Math.round(Number(t.deal_price ?? t.amount ?? 0))])
+    );
+
+    const { rows: payRows, ok: okPay } = await selectInChunks<any>(
+        Array.from(dealByInvoice.keys()),
+        (chunk) => supabase.from("transaction_payments").select("id, invoice_number, created_at").in("invoice_number", chunk)
+    );
+    if (!okPay || payRows.length === 0) return;
+
+    const invoiceOfPayment = new Map<string, string>();
+    const paymentCreatedAt = new Map<string, string>();
+    const paymentCountByInvoice = new Map<string, number>();
+    for (const p of payRows) {
+        invoiceOfPayment.set(p.id as string, p.invoice_number as string);
+        paymentCreatedAt.set(p.id as string, p.created_at as string);
+        paymentCountByInvoice.set(p.invoice_number as string, (paymentCountByInvoice.get(p.invoice_number as string) ?? 0) + 1);
+    }
+
+    const [payEntriesRes, invEntriesRes] = await Promise.all([
+        selectInChunks<any>(
+            payRows.map((p: any) => p.id as string),
+            (chunk) =>
+                supabase
+                    .from("cashflow_entries")
+                    .select("id, source_id, nominal")
+                    .eq("source_type", "TRANSACTION_PAYMENT")
+                    .in("source_id", chunk)
+        ),
+        selectInChunks<any>(
+            Array.from(paymentCountByInvoice.keys()),
+            (chunk) =>
+                supabase
+                    .from("cashflow_entries")
+                    .select("source_type, source_id, nominal")
+                    .in("source_type", ["TRANSACTION_DP", "TRANSACTION", "TRANSACTION_REFUND"])
+                    .in("source_id", chunk)
+        ),
+    ]);
+    if (!payEntriesRes.ok || !invEntriesRes.ok) return; // ⬅️ fail-closed
+
+    const skipInvoices = new Set<string>(); // sudah ada entri TRANSACTION / REFUND → jangan disentuh
+    const dpNominal = new Map<string, number>();
+    for (const e of invEntriesRes.rows) {
+        if (e.source_type === "TRANSACTION_DP") {
+            dpNominal.set(e.source_id as string, (dpNominal.get(e.source_id as string) ?? 0) + Math.round(Number(e.nominal ?? 0)));
+        } else {
+            skipInvoices.add(e.source_id as string);
+        }
+    }
+
+    const entriesByInvoice = new Map<string, any[]>();
+    for (const e of payEntriesRes.rows) {
+        const inv = invoiceOfPayment.get(e.source_id as string);
+        if (!inv) continue;
+        const list = entriesByInvoice.get(inv) ?? [];
+        list.push(e);
+        entriesByInvoice.set(inv, list);
+    }
+
+    const updates: { id: string; nominal: number }[] = [];
+    for (const [inv, list] of entriesByInvoice) {
+        if (skipInvoices.has(inv)) continue;
+        // pengaman: jumlah entri harus sama dengan jumlah baris pembayaran (kalau belum, tunggu sinkron berikutnya)
+        if (list.length !== (paymentCountByInvoice.get(inv) ?? 0)) continue;
+
+        const deal = dealByInvoice.get(inv) ?? 0;
+        if (deal <= 0) continue;
+
+        const posted =
+            (dpNominal.get(inv) ?? 0) + list.reduce((s: number, e: any) => s + Math.round(Number(e.nominal ?? 0)), 0);
+        const gap = deal - posted;
+        if (gap === 0) continue;
+
+        const sorted = [...list].sort((a, b) =>
+            String(paymentCreatedAt.get(a.source_id as string)) < String(paymentCreatedAt.get(b.source_id as string)) ? -1 : 1
+        );
+        const last = sorted[sorted.length - 1];
+        const current = Math.round(Number(last.nominal ?? 0));
+        const next = Math.max(0, current + gap);
+        if (next !== current) updates.push({ id: last.id as string, nominal: next });
+    }
+
+    if (updates.length === 0) return;
+    const results = await Promise.allSettled(
+        updates.map((u) => supabase.from("cashflow_entries").update({ nominal: u.nominal }).eq("id", u.id))
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    console.log(`[cashflow sync] reconciled ${updates.length - failed} edited-deal payment entries`);
+    if (failed > 0) console.error(`[cashflow sync] ${failed} reconcile edited-deal payment GAGAL`);
+}
+
 async function syncDerivedEntries(supabase: SupabaseClient) {
     await syncLegacyDpEntries(supabase);
     await syncTransactionEntries(supabase);
     await syncTransactionPaymentEntries(supabase);
+    await syncEditedDealPaymentEntries(supabase); // ⬅️ BARU
 
     // ⬅️ FIX: dulu pakai .select() biasa tanpa pagination → PostgREST default
     // limit 1000 baris/query, jadi kalau service SUDAH_DIAMBIL + payment_amount>0
