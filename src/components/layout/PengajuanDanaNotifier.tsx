@@ -46,12 +46,43 @@ export default function PengajuanDanaNotifier({ userRoles, userId }: PengajuanDa
 
   const visible = alerts.slice(0, VISIBLE_LIMIT);
   const hiddenCount = alerts.length - visible.length;
+  const totalAmount = alerts.reduce((sum, a) => sum + a.amount, 0);
+  const compactLabel =
+    alerts.length === 1
+      ? `${alerts[0].requester_name} · ${alerts[0].purpose}`
+      : `${alerts.length} pengajuan menunggu`;
 
   return (
-    <div className="fixed top-4 inset-x-0 z-[100] flex flex-col items-center gap-2 px-4 pointer-events-none">
+    <div className="fixed top-3 sm:top-4 inset-x-0 z-[100] flex flex-col items-center gap-2 px-16 sm:px-4 pointer-events-none">
+      {/* Versi RINGKAS untuk HP: 1 baris kecil, tidak menutupi konten.
+          Di sm ke atas disembunyikan — diganti kontrol + card penuh di bawah. */}
+      <div className="sm:hidden pointer-events-auto flex items-center gap-1.5 max-w-full">
+        <button
+          type="button"
+          onClick={toggleMute}
+          aria-label={muted ? "Bunyikan lagi" : "Bisukan sementara"}
+          className="w-8 h-8 rounded-full bg-white/95 shadow-md border border-slate-200 flex items-center justify-center flex-shrink-0"
+        >
+          {muted ? <VolumeX className="w-4 h-4 text-slate-400" /> : <Volume2 className="w-4 h-4 text-indigo-600" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/pengajuan-dana")}
+          className="min-w-0 flex items-center gap-1.5 bg-white/95 backdrop-blur-sm shadow-md border border-indigo-100 rounded-full pl-1.5 pr-3 py-1"
+        >
+          <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+            <CircleDollarSign className="w-3.5 h-3.5" />
+          </span>
+          <span className="truncate text-[11px] font-bold text-slate-800">{compactLabel}</span>
+          <span className="text-[11px] font-extrabold text-indigo-600 whitespace-nowrap">
+            {formatRupiah(totalAmount)}
+          </span>
+        </button>
+      </div>
+
       {/* Kontrol mute & volume — mengatur SUARA saja, card tetap tampil
           apapun statusnya, supaya admin tetap ingat ada yang menunggu. */}
-      <div className="pointer-events-auto flex items-center gap-2 bg-white/95 backdrop-blur-sm shadow-md border border-slate-200 rounded-full px-3 py-1.5">
+      <div className="hidden sm:flex pointer-events-auto items-center gap-2 bg-white/95 backdrop-blur-sm shadow-md border border-slate-200 rounded-full px-3 py-1.5">
         <button
           type="button"
           onClick={toggleMute}
@@ -80,7 +111,7 @@ export default function PengajuanDanaNotifier({ userRoles, userId }: PengajuanDa
           type="button"
           onClick={() => router.push("/dashboard/pengajuan-dana")}
           title="Klik untuk membuka & menyetujui pengajuan ini"
-          className="pointer-events-auto w-full max-w-sm text-left overflow-hidden rounded-2xl bg-white shadow-2xl shadow-black/15 border border-indigo-100 hover:-translate-y-0.5 transition-transform"
+          className="hidden sm:block pointer-events-auto w-full max-w-sm text-left overflow-hidden rounded-2xl bg-white shadow-2xl shadow-black/15 border border-indigo-100 hover:-translate-y-0.5 transition-transform"
           style={{ animation: "pdnDropIn 0.35s cubic-bezier(0.16,1,0.3,1) both" }}
         >
           <div className="h-1 bg-gradient-to-r from-indigo-500 to-purple-600" />
@@ -105,7 +136,7 @@ export default function PengajuanDanaNotifier({ userRoles, userId }: PengajuanDa
       ))}
 
       {hiddenCount > 0 && (
-        <p className="pointer-events-none text-[11px] font-semibold text-slate-500 bg-white/90 backdrop-blur px-2.5 py-1 rounded-full shadow-sm">
+        <p className="hidden sm:block pointer-events-none text-[11px] font-semibold text-slate-500 bg-white/90 backdrop-blur px-2.5 py-1 rounded-full shadow-sm">
           +{hiddenCount} pengajuan lain menunggu persetujuan
         </p>
       )}
