@@ -522,6 +522,7 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
     // setiap kali GET /api/cashflow jalan — persis kasus yang barusan kejadian.
     const invoiceNumbersToCheck = [...new Set(dedupedPayments.map((p: any) => p.invoice_number as string))];
     const invoicesAlreadySynced = new Set<string>();
+    const invoicesWithLegacyDp = new Set<string>(); // ⬅️ BARU
     if (invoiceNumbersToCheck.length > 0) {
         const { rows: existingTxEntries, ok } = await selectInChunks<any>(invoiceNumbersToCheck, (chunk) =>
             supabase.from("cashflow_entries").select("source_id").eq("source_type", "TRANSACTION").in("source_id", chunk)
@@ -529,6 +530,15 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
         if (!ok) return; // ⬅️ fail-closed: kalau gagal cek, bisa dobel-hitung
         for (const e of existingTxEntries) {
             invoicesAlreadySynced.add(e.source_id as string);
+        }
+
+        // ⬅️ BARU: invoice yang DP-nya sudah tercatat sebagai TRANSACTION_DP
+        const { rows: existingDpEntries, ok: okDp } = await selectInChunks<any>(invoiceNumbersToCheck, (chunk) =>
+            supabase.from("cashflow_entries").select("source_id").eq("source_type", "TRANSACTION_DP").in("source_id", chunk)
+        );
+        if (!okDp) return; // fail-closed
+        for (const e of existingDpEntries) {
+            invoicesWithLegacyDp.add(e.source_id as string);
         }
     }
 
@@ -540,7 +550,12 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
 
     const existingIds = new Set(existing.map((e: any) => e.source_id as string));
     const missing = dedupedPayments.filter(
-        (p: any) => !existingIds.has(p.id as string) && !invoicesAlreadySynced.has(p.invoice_number as string)
+        (p: any) =>
+            !existingIds.has(p.id as string) &&
+            !invoicesAlreadySynced.has(p.invoice_number as string) &&
+            // ⬅️ BARU: baris payment bertipe DP tidak dicatat lagi kalau DP-nya
+            // sudah masuk lewat TRANSACTION_DP. Cicilan non-DP tetap masuk normal.
+            !(p.payment_type === "DP" && invoicesWithLegacyDp.has(p.invoice_number as string))
     );
     if (missing.length === 0) return;
 
