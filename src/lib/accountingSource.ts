@@ -1422,8 +1422,14 @@ async function buildCashflowDrafts(
   return drafts;
 }
 
-// ── REVERSAL: transaksi yang DIBATALKAN (restore penuh → CANCELLED) ──────────
-// Membalik SEMUA jurnal yang sudah terlanjur diposting untuk invoice itu
+// Fitur jurnal balik (reversal) transaksi batal mulai berlaku 29 Sep 2026
+// (tanggal fitur ini dipasang). Transaksi yang dibatalkan SEBELUM tanggal ini
+// sengaja TIDAK dibuatkan jurnal balik — biar data akuntansi lama tidak ikut
+// berubah belakangan. Kalau mau geser ke waktu deploy yang lebih tepat,
+// ganti saja nilai jam-nya (mis. "2026-09-29T15:30:00+07:00").
+const REVERSAL_FEATURE_CUTOFF_ISO = "2026-09-29T00:00:00+07:00";
+
+// ── REVERSAL: transaksi yang DIBATALKAN (restore penuh → CANCELLED) ──────────// Membalik SEMUA jurnal yang sudah terlanjur diposting untuk invoice itu
 // (penjualan, modal/HPP, piutang, pembayaran) di TANGGAL PEMBATALAN
 // (restored_at). Jadi penjualan lama tetap di tanggal aslinya, pembatalannya
 // jadi jurnal balik di tanggal cancel — sinkron dengan refund di Cashflow.
@@ -1439,6 +1445,7 @@ async function buildTransactionReversalDrafts(
     .eq("status", "CANCELLED")
     .not("restored_at", "is", null)
     .gte("restored_at", startISO)
+    .gte("restored_at", REVERSAL_FEATURE_CUTOFF_ISO) // ⬅️ cuma cancel sejak fitur ini ada
     .lt("restored_at", endISO)
     .order("restored_at", { ascending: true });
 
