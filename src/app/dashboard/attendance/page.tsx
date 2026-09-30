@@ -275,7 +275,7 @@ function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" | "SKIP" {
         return "SKIP";
     }
 
-       if (isLate(a.check_in_time || a.created_at, (a.shift_snapshot ?? a.user_shift) ?? "PAGI")) return "LATE";
+    if (isLate(a.check_in_time || a.created_at, (a.shift_snapshot ?? a.user_shift) ?? "PAGI")) return "LATE";
     return "PRESENT";
 }
 
@@ -6054,7 +6054,7 @@ export default function AttendanceDashboardPage() {
                             <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-20 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm min-w-[1200px] border-collapse">
+                                <table className="w-full text-sm border-collapse table-fixed">
                                     <thead>
                                         <tr className="border-2 border-gray-300 bg-gray-50/60 sticky top-0">
                                             <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300">Karyawan</th>
