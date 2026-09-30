@@ -687,7 +687,7 @@ export default function UnifiedBarangContent() {
     const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
 
-    const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
+    const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string; type: ItemType } | null>(null);
     //  Tambah unit pertama untuk laptop stok 0 — dibuka dari tombol "Tambah Unit"
     //  di kolom Aksi (mobile & desktop) ATAU dari klik baris/kartu itu sendiri
     //  (lihat handleRowClick di bawah), saat row.unit_count === 0.
@@ -1916,7 +1916,16 @@ export default function UnifiedBarangContent() {
                                                             </Link>
                                                         )}
                                                         {row.tipe === "LAPTOP" && canViewBarcode && (
-                                                            <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })}
+                                                            <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "LAPTOP" })}
+                                                                className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                Barcode
+                                                            </button>
+                                                        )}
+                                                        {/* Aksesoris cuma bisa dibarcode kalau SUDAH punya unit SN
+                                                            (accAction "units"/"detail"). Kalau masih "add" (belum ada SN),
+                                                            tidak ada SN untuk di-encode → Tambah Unit dulu. */}
+                                                        {row.tipe === "AKSESORIS" && canViewBarcode && accAction !== "add" && (
+                                                            <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "AKSESORIS" })}
                                                                 className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
                                                                 Barcode
                                                             </button>
@@ -2079,7 +2088,10 @@ export default function UnifiedBarangContent() {
                                                                         </Link>
                                                                     )}
                                                                     {row.tipe === "LAPTOP" && canViewBarcode && (
-                                                                        <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
+                                                                        <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "LAPTOP" })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
+                                                                    )}
+                                                                    {row.tipe === "AKSESORIS" && canViewBarcode && accAction !== "add" && (
+                                                                        <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "AKSESORIS" })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
                                                                     )}
                                                                     {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count <= 1 && (
                                                                         <button onClick={() => setConvertTarget(row)}
@@ -2224,7 +2236,12 @@ export default function UnifiedBarangContent() {
             )}
 
             {barcodeTarget && (
-                <BarcodeModal laptopId={barcodeTarget.id} laptopName={barcodeTarget.name} onClose={() => setBarcodeTarget(null)} />
+                <BarcodeModal
+                    laptopId={barcodeTarget.id}
+                    laptopName={barcodeTarget.name}
+                    itemType={barcodeTarget.type === "AKSESORIS" ? "ACCESSORY" : "LAPTOP"}
+                    onClose={() => setBarcodeTarget(null)}
+                />
             )}
 
             {soConfirmTarget && (
