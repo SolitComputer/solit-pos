@@ -5,6 +5,7 @@
 import { useChatContext } from "@/contexts/ChatContext";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
+import { useChatUnread } from "@/hooks/useChatUnread";
 
 const BTN_SIZE = 48;
 const MARGIN = 12;
@@ -36,6 +37,9 @@ const lastSeenLabel = (s: number | null) => {
 export default function ChatBarBackground() {
     const chatCtx = useChatContext();
     const { setOpenGroupChat, openGroupChat, activeChats, setExpandedChatId } = chatCtx;
+
+    // Angka unread total (DM + grup) untuk bubble di FAB, + rincian per user
+    const { total: unreadTotal, dmBySender } = useChatUnread();
 
     const [ready, setReady] = useState(false);
     const [meId, setMeId] = useState<string | null>(null);
@@ -320,6 +324,11 @@ export default function ChatBarBackground() {
                                             {online ? "online" : lastSeenLabel(pr?.seconds_ago ?? null)}
                                         </p>
                                     </div>
+                                    {(dmBySender[u.id] ?? 0) > 0 && (
+                                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center flex-shrink-0">
+                                            {dmBySender[u.id] > 9 ? "9+" : dmBySender[u.id]}
+                                        </span>
+                                    )}
                                     <svg className="w-3.5 h-3.5 text-indigo-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                             d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -362,9 +371,9 @@ export default function ChatBarBackground() {
                             d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                 )}
-                {!showMenu && totalActive > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-white text-[8px] font-black flex items-center justify-center" style={{ background: "#ef4444" }}>
-                        {totalActive}
+                {!showMenu && unreadTotal > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center" style={{ background: "#ef4444", border: "2px solid #14141f", boxShadow: "0 2px 6px rgba(239,68,68,0.5)" }}>
+                        {unreadTotal > 99 ? "99+" : unreadTotal}
                     </span>
                 )}
             </button>

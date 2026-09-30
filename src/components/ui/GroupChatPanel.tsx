@@ -316,6 +316,85 @@ function AttachmentDisplay({ url, type, name, size, isMine }: {
     );
 }
 
+// ─── ReadByModal: daftar siapa yang sudah baca 1 pesan grup ─────────────────────
+interface Reader { id: string; name: string; role: string; read_at: string; }
+
+function ReadByModal({ messageId, onClose }: { messageId: string; onClose: () => void }) {
+    const [readers, setReaders] = useState<Reader[] | null>(null);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const res = await fetch(`/api/group-chat/read?message_id=${encodeURIComponent(messageId)}`);
+                const data = await res.json();
+                if (!alive) return;
+                if (data.success) setReaders(data.readers);
+                else setError(true);
+            } catch { if (alive) setError(true); }
+        })();
+        return () => { alive = false; };
+    }, [messageId]);
+
+    useEffect(() => {
+        const h = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", h);
+        return () => document.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
+            style={{ background: "rgba(15,23,42,0.55)", backdropFilter: "blur(6px)" }}
+            onClick={onClose}>
+            <div className="bg-white w-full max-w-[300px] max-h-[70vh] overflow-hidden flex flex-col"
+                style={{ borderRadius: 18, boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}
+                onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+                    style={{ borderBottom: "1px solid #e5e7eb" }}>
+                    <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <p className="text-[13px] font-bold text-slate-800">Dibaca oleh</p>
+                    </div>
+                    <button onClick={onClose}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg transition hover:bg-slate-100"
+                        style={{ color: "#94a3b8" }}>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="overflow-y-auto flex-1 py-1">
+                    {readers === null && !error && (
+                        <div className="flex items-center justify-center py-8">
+                            <div className="w-5 h-5 rounded-full animate-spin" style={{ border: "2px solid #e2e8f0", borderTopColor: "#2563eb" }} />
+                        </div>
+                    )}
+                    {error && <p className="text-[11px] text-slate-400 text-center py-8">Gagal memuat daftar pembaca</p>}
+                    {readers !== null && readers.length === 0 && (
+                        <p className="text-[11px] text-slate-400 text-center py-8">Belum ada yang membaca</p>
+                    )}
+                    {readers?.map(r => (
+                        <div key={r.id} className="flex items-center gap-2.5 px-4 py-2">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                                style={{ backgroundColor: getAvatarColor(r.role) }}>
+                                {getInitials(r.name)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[12px] font-semibold text-slate-800 truncate">{r.name}</p>
+                                <p className="text-[9.5px] text-slate-400">{ROLE_LABEL[r.role] ?? r.role}</p>
+                            </div>
+                            <span className="text-[9.5px] text-slate-400 flex-shrink-0">{formatTime(r.read_at)}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 interface BubbleProps {
     msg: GroupMessage;
     isMine: boolean;
@@ -330,6 +409,7 @@ interface BubbleProps {
 
 const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, currentUserName, senderPhotoUrl, onReply, onDelete, onEdit, onScrollToReply }: BubbleProps) {
     const [showMenu, setShowMenu] = useState(false);
+    const [showReads, setShowReads] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(msg.content);
     const [saving, setSaving] = useState(false);
@@ -402,10 +482,11 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
     }
 
     const hasAttachment = !!msg.attachment_url && !!msg.attachment_type;
-    const hasContent = !!msg.content;
+    const hasContent = !!msg.content;   
 
     return (
         <div id={`msg-${msg.id}`} className={`flex gap-2.5 group ${isMine ? "justify-end" : "justify-start"}`}>
+            {showReads && <ReadByModal messageId={msg.id} onClose={() => setShowReads(false)} />}
             {!isMine && (
                 <div className="flex-shrink-0 self-end mb-1">
                     <Avatar name={msg.sender_name} role={msg.sender_role} size={30} photoUrl={senderPhotoUrl} />
@@ -526,6 +607,14 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                 style={{ color: "#94a3b8" }}>
                                 {msg.edited_at && <span className="text-[9px] italic">diedit ·</span>}
                                 <span className="text-[9.5px]">{formatTime(msg.created_at)}</span>
+                                {isMine && !msg.id.startsWith("temp-") && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowReads(true); }}
+                                        className="text-[9px] font-semibold text-blue-500 hover:text-blue-600 ml-0.5 transition"
+                                        title="Lihat siapa yang sudah baca">
+                                        · Dilihat
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1450,6 +1539,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+       const markedReadRef = useRef<Set<string>>(new Set());
+    const touchedGroupRef = useRef<string | null>(null);
     const isAdmin = FULL_ACCESS.has(currentUser.role);
     const [memberSearch, setMemberSearch] = useState("");
     const [embeddedDMUser, setEmbeddedDMUser] = useState<UserOption | null>(null);
@@ -1604,6 +1695,38 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
         prevMsgCount.current = messages.length;
     }, [messages, currentUser.id, isScrolledUp]);
+
+    // ── Reset penanda "sudah dikirim baca" saat pindah grup ──
+    useEffect(() => {
+        markedReadRef.current = new Set();
+    }, [activeGroupId]);
+
+     // ── Receipt "dibaca" (#2) + majukan watermark badge (#1) ──
+    // POST juga saat grup baru dibuka meski tak ada receipt baru,
+    // supaya badge unread grup itu langsung 0.
+    useEffect(() => {
+        if (loading) return;
+        if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+
+        const toMark = messages
+            .filter(m => !m.id.startsWith("temp-") && !m.is_deleted && m.sender_id !== currentUser.id)
+            .map(m => m.id)
+            .filter(id => !markedReadRef.current.has(id));
+
+        const groupJustOpened = touchedGroupRef.current !== activeGroupId;
+        if (toMark.length === 0 && !groupJustOpened) return;
+
+        touchedGroupRef.current = activeGroupId;
+        toMark.forEach(id => markedReadRef.current.add(id));
+
+        fetch("/api/group-chat/read", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ group_id: activeGroupId, message_ids: toMark }),
+        }).catch(() => {
+            toMark.forEach(id => markedReadRef.current.delete(id));
+        });
+    }, [messages, loading, activeGroupId, currentUser.id]);
 
     const handleScroll = useCallback(() => {
         const el = messagesRef.current;
