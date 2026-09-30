@@ -6057,7 +6057,7 @@ export default function AttendanceDashboardPage() {
                                 <table className="w-full text-sm border-collapse table-fixed">
                                     <thead>
                                         <tr className="border-2 border-gray-300 bg-gray-50/60 sticky top-0">
-                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300">Karyawan</th>
+                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300 w-[160px]">Karyawan</th>
 
                                             {/* PENGHASILAN SECTION */}
                                             <th colSpan={5} className="px-4 py-4 text-center text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/40 border-2 border-gray-300">
@@ -6125,7 +6125,7 @@ export default function AttendanceDashboardPage() {
                                                                     {initials(u.name)}
                                                                 </div>
                                                                 <div className="min-w-0">
-                                                                    <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
+                                                                    <span className="font-bold text-gray-800 block text-sm leading-tight break-words">{u.name}</span>
                                                                     <span className="text-[10px] text-gray-400">
                                                                         {sal ? (sal.salary_type === "FIXED" ? "Tetap" : "% Absen") : "—"}
                                                                     </span>
