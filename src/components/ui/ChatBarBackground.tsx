@@ -372,7 +372,9 @@ export default function ChatBarBackground() {
                     </svg>
                 )}
                 {!showMenu && unreadTotal > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center" style={{ background: "#ef4444", border: "2px solid #14141f", boxShadow: "0 2px 6px rgba(239,68,68,0.5)" }}>
+                    <span
+                        className={`absolute -top-1 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center ${alignRight ? "-left-1" : "-right-1"}`}
+                        style={{ background: "#ef4444", border: "2px solid #14141f", boxShadow: "0 2px 6px rgba(239,68,68,0.5)" }}>
                         {unreadTotal > 99 ? "99+" : unreadTotal}
                     </span>
                 )}
