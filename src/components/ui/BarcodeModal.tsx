@@ -17,6 +17,10 @@ interface BarcodeModalProps {
   // BARU: default "LAPTOP" biar pemanggil lama tetap jalan. "ACCESSORY" →
   // fetch dari accessory-units & pakai badge Kondisi, bukan Grade.
   itemType?: "LAPTOP" | "ACCESSORY";
+  // BARU: kalau diisi, modal TIDAK fetch — langsung pakai unit ini. Dipakai
+  // halaman Kelola Unit yang sudah punya data per baris (termasuk RESERVED,
+  // yang tak akan muncul kalau di-fetch dgn filter TERSEDIA).
+  presetUnit?: UnitBarcode;
   onClose: () => void;
 }
 
@@ -27,13 +31,15 @@ const GRADE_COLOR = {
   B: { bg: "#fef3c7", text: "#78350f", border: "#fcd34d" },
   C: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
 };
-export default function BarcodeModal({ laptopId, laptopName, itemType = "LAPTOP", onClose }: BarcodeModalProps) {
+export default function BarcodeModal({ laptopId, laptopName, itemType = "LAPTOP", presetUnit, onClose }: BarcodeModalProps) {
   const isAccessory = itemType === "ACCESSORY";
-  const [units, setUnits] = useState<UnitBarcode[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [units, setUnits] = useState<UnitBarcode[]>(presetUnit ? [presetUnit] : []);
+  const [loading, setLoading] = useState(!presetUnit);
   const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
+    // Unit sudah dikirim langsung (halaman Kelola Unit) → tak perlu fetch.
+    if (presetUnit) { setUnits([presetUnit]); setLoading(false); return; }
     const fetchUnits = async () => {
       try {
         // Endpoint & status "siap jual" beda antara 2 tipe:
@@ -57,7 +63,11 @@ export default function BarcodeModal({ laptopId, laptopName, itemType = "LAPTOP"
       }
     };
     fetchUnits();
-  }, [laptopId, isAccessory]);
+    // Pakai serial_number, BUKAN objek presetUnit, sebagai dependency.
+    // Kalau pakai objeknya, tiap render induk bikin referensi objek baru →
+    // effect jalan ulang → setUnits → render lagi → LOOP tak berhenti.
+    // serial_number berupa string yang stabil, jadi aman.
+  }, [laptopId, isAccessory, presetUnit?.serial_number]);
 
   // Escape key
   useEffect(() => {

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import BarcodeModal from "@/components/ui/BarcodeModal";
 import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS } from "@/lib/permissions";
 import {
     HardDrive, MemoryStick, Plug, BatteryFull, Keyboard, Monitor,
@@ -1223,6 +1224,10 @@ export default function AccessoryUnitsPage() {
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
+    const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
+    // Unit yang barcodenya sedang dibuka (null = tidak ada). Simpan objeknya
+    // di state supaya referensinya stabil untuk BarcodeModal.
+    const [barcodeUnit, setBarcodeUnit] = useState<AccessoryUnit | null>(null);
 
     useEffect(() => {
         getAuthUser().then(u => {
@@ -1850,6 +1855,14 @@ export default function AccessoryUnitsPage() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-end gap-1">
+                                                    {/* Barcode hanya untuk unit yang SN-nya asli. SN placeholder
+                                                        "ISI-SN-..." belum boleh dibarcode — isi SN dulu. */}
+                                                    {canViewBarcode && !unit.serial_number.startsWith("ISI-SN-") && (
+                                                        <button onClick={() => setBarcodeUnit(unit)} title="Cetak Barcode"
+                                                            className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
+                                                            Barcode
+                                                        </button>
+                                                    )}
                                                     {unit.status !== "TERJUAL" && canManageUnits && (
                                                         <button onClick={() => openEdit(unit)}
                                                                     className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
@@ -2053,6 +2066,22 @@ export default function AccessoryUnitsPage() {
 
             {soHistoryTarget && (
                 <SoHistoryModal unit={soHistoryTarget} onClose={() => setSoHistoryTarget(null)} />
+            )}
+
+            {barcodeUnit && (
+                <BarcodeModal
+                    laptopId={accessoryId}
+                    laptopName={accessory?.name ?? "Aksesoris"}
+                    itemType="ACCESSORY"
+                    presetUnit={{
+                        id: barcodeUnit.id,
+                        serial_number: barcodeUnit.serial_number,
+                        selling_price: barcodeUnit.selling_price,
+                        status: barcodeUnit.status,
+                        condition: barcodeUnit.condition,
+                    }}
+                    onClose={() => setBarcodeUnit(null)}
+                />
             )}
 
             {soConfirmTarget && (
