@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { useRouter } from "next/navigation";
 
 export default function CameraScanPage() {
@@ -21,12 +21,39 @@ export default function CameraScanPage() {
 
     const startScanner = async () => {
         try {
-            const scanner = new Html5Qrcode("reader");
+            const scanner = new Html5Qrcode("reader", {
+                // Pakai BarcodeDetector native browser — jauh lebih akurat baca
+                // barcode 1D (Code128/Code39) dibanding decoder JS bawaan.
+                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+                // WAJIB daftarkan format 1D. SN aksesoris dicetak sebagai
+                // barcode garis (Code128), bukan QR seperti laptop.
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.ITF,
+                    Html5QrcodeSupportedFormats.CODABAR,
+                ],
+                verbose: false,
+            });
             scannerRef.current = scanner;
 
             await scanner.start(
                 { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 120 } },
+                {
+                    fps: 10,
+                    // Kotak 250x120 lama memotong barcode 1D yang panjang seperti
+                    // "CHARGER-DELL-071". Sekarang kotak ikut lebar viewport
+                    // (maks 320px) supaya barcode garis muat penuh & ke-decode.
+                    qrbox: (viewfinderWidth: number) => {
+                        const width = Math.min(viewfinderWidth - 40, 320);
+                        return { width, height: Math.max(120, Math.floor(width * 0.5)) };
+                    },
+                    aspectRatio: 1.0,
+                },
                 async (decodedText) => {
                     setDecoded(decodedText);
                     await stopScanner();
@@ -49,7 +76,9 @@ export default function CameraScanPage() {
     };
 
     const handleSearch = async (raw: string) => {
-        const sn = raw.trim();
+         // Buang karakter kontrol/non-printable (mis. Enter dari scanner) lalu
+        // trim, supaya SN persis sama dengan yang tersimpan di database.
+        const sn = raw.replace(/[\u0000-\u001F\u007F]/g, "").trim();
         setLoading(true);
         setDebug(null);
 
