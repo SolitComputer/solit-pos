@@ -2321,6 +2321,7 @@ export default function UnifiedBarangContent() {
                     //  yang backend-nya SUDAH izinkan (mis. KEPALA_TEKNISI) tidak bisa nambah/
                     //  edit unit dari sini, padahal bisa lewat tombol "Tambah Unit" saat stok 0.
                     canManageUnit={canAddUnit}
+                    canEditChecklist={canEditChecklist}
                     canSeePrivate={canSeePrivate}
                     defaultSellingPrice={unitDetailTarget.row.harga_jual}
                     onClose={() => setUnitDetailTarget(null)}

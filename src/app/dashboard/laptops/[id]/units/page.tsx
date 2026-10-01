@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
-import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, OFFICIAL_PRICE_EDIT_ROLES } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, OFFICIAL_PRICE_EDIT_ROLES, canEditConditionChecks } from "@/lib/permissions";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
 import { Trash2, Package, CheckCircle2, Wrench, Wallet } from "lucide-react";
@@ -253,6 +253,7 @@ export default function UnitsPage() {
     const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
 
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canAuditUnits = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canSOUnits = hasAnyRole(userRoles, SO_ROLES);
@@ -269,6 +270,8 @@ export default function UnitsPage() {
     ] as UserRole[]);
     //  Full Access → boleh toggle mode Edit di Pop-up Detail unit
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
+    //  Boleh isi/ubah checklist Tes Kondisi per unit (Rafi Salim, Fikri Aryansyah & Admin)
+    const canEditChecklist = canEditConditionChecks(userId, userRoles);
     //  Unit yang sedang dibuka di Pop-up Detail
     const [detailUnit, setDetailUnit] = useState<LaptopUnit | null>(null);
 
@@ -313,6 +316,7 @@ export default function UnitsPage() {
                         ? r.user.roles
                         : r.user?.role ? [r.user.role] : [];
                 setUserRoles(roles as UserRole[]);
+                setUserId((r.user as { id?: string } | null)?.id ?? null);
             })
             .catch(() => setUserRoles([]));
     }, []);
@@ -1219,6 +1223,7 @@ export default function UnitsPage() {
                     laptopId={laptopId}
                     defaultSellingPrice={laptop?.selling_price ?? 0}
                     editingUnit={editingUnit}
+                    canEditChecklist={canEditChecklist}
                     onClose={closeForm}
                     onSuccess={handleFormSuccess}
                     onError={(msg) => setAlertModal(msg)}
@@ -1232,6 +1237,7 @@ export default function UnitsPage() {
                     laptopName={laptop?.laptop_name}
                     laptopMeta={[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage].filter(Boolean).join(" · ")}
                     canEdit={canFullAccessBarang}
+                    canEditChecklist={canEditChecklist}
                     canSeePrivate={canSeePriceInfo}
                     onClose={() => setDetailUnit(null)}
                     onSaved={(updated) => {

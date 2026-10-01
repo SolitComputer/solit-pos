@@ -12,6 +12,8 @@
 import { useEffect, useState } from "react";
 import { useRegisterOverlay } from "@/contexts/OverlayContext";
 import { CurrencyInput } from "@/components/ui/CurrencyInputField";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 
 export interface UnitDetailData {
     id: string;
@@ -26,6 +28,7 @@ export interface UnitDetailData {
     official_price?: number;
     status: string;
     notes: string;
+    condition_checks?: ConditionChecks | null;
     created_at: string;
 }
 
@@ -43,6 +46,8 @@ interface Props {
     canManageUnit?: boolean;
     /** Boleh lihat Sumber, Harga Modal, Margin, Tanggal Masuk */
     canSeePrivate: boolean;
+    /** Boleh isi/ubah checklist Tes Kondisi unit (default false kalau tidak dikirim) */
+    canEditChecklist?: boolean;
     onClose: () => void;
     onSaved: (updated: UnitDetailData) => void;
     /** Opsional: tombol "Info Laptop" (nama/CPU/RAM) — hanya dari Data Barang */
@@ -97,7 +102,7 @@ const inputCls =
 const OFFICIAL_PRICE_MARKUP = 300_000;
 
 export default function UnitDetailModal({
-    unit, laptopName, laptopMeta, laptopSpecs, canEdit, canManageUnit, canSeePrivate, onClose, onSaved, onEditLaptop,
+    unit, laptopName, laptopMeta, laptopSpecs, canEdit, canManageUnit, canSeePrivate, canEditChecklist = false, onClose, onSaved, onEditLaptop,
     defaultSellingPrice, onCreated, onBack,
 }: Props) {
     useRegisterOverlay();
@@ -121,6 +126,9 @@ export default function UnitDetailModal({
         notes: unit.notes ?? "",
         received_at: toDateInput(unit.created_at),
     });
+    const [conditionChecks, setConditionChecks] = useState<ConditionChecks>(
+        () => sanitizeConditionChecks(unit.condition_checks)
+    );
 
     //  Mode "Tambah Unit" — supaya menambah unit baru tetap terjadi DI DALAM
     //  pop-up ini (tidak pindah halaman), khusus untuk kasus stok = 1 yang
@@ -182,6 +190,7 @@ export default function UnitDetailModal({
                     official_price: (Number(form.selling_price) || 0) + OFFICIAL_PRICE_MARKUP,
                     status: form.status,
                     notes: form.notes,
+                    ...(canEditChecklist ? { condition_checks: conditionChecks } : {}),
                     received_at: form.received_at ? new Date(form.received_at).toISOString() : undefined,
                 }),
             });
@@ -542,6 +551,16 @@ export default function UnitDetailModal({
                                 </p>
                             )}
 
+                            {/* Tes Kondisi per unit — tampil untuk semua role (read-only),
+                                hanya bisa diisi/diubah kalau canEditChecklist & mode edit */}
+                            <Section title="Tes Kondisi Unit">
+                                <ConditionChecklist
+                                    value={conditionChecks}
+                                    onChange={setConditionChecks}
+                                    readOnly={!isEditing || !canEditChecklist}
+                                />
+                            </Section>
+
                             {error && (
                                 <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2">
                                     <p className="text-xs text-red-700">{error}</p>
@@ -568,7 +587,7 @@ export default function UnitDetailModal({
                         </>
                     ) : isEditing ? (
                         <>
-                            <button onClick={() => { setIsEditing(false); setError(""); }} disabled={saving}
+                            <button onClick={() => { setIsEditing(false); setError(""); setConditionChecks(sanitizeConditionChecks(unit.condition_checks)); }} disabled={saving}
                                 className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">
                                 Batal
                             </button>

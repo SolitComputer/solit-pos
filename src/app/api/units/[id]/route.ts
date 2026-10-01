@@ -3,7 +3,7 @@ import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
-import { BARANG_FULL_ACCESS_ROLES, LAPTOP_DELETE_ROLES, hasAnyRole, expandRolesWithParents } from "@/lib/permissions";
+import { BARANG_FULL_ACCESS_ROLES, LAPTOP_DELETE_ROLES, hasAnyRole, expandRolesWithParents, canEditConditionChecks, type UserRole } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 interface Props {
@@ -30,6 +30,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const {
       serial_number, grade, condition_note, source,
       purchase_price, selling_price, status, notes,
+      condition_checks, // ← tes kondisi per unit (per SN)
     } = body;
 
     // Cek duplicate SN.
@@ -101,6 +102,11 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         ...(body.official_price !== undefined && { official_price: Math.round(Number(body.official_price)) }),
         ...(status !== undefined && { status }),
         ...(notes !== undefined && { notes }),
+        //  Tes kondisi per unit — hanya ikut ter-update kalau pengirim memang
+        //  berhak isi checklist (Rafi Salim, Fikri Aryansyah & Admin). Kalau
+        //  tidak, field ini di-drop diam-diam, edit field lain tetap jalan.
+        ...(condition_checks !== undefined &&
+          canEditConditionChecks(user.id, actorRoles as UserRole[]) && { condition_checks }),
         ...(body.received_at !== undefined && body.received_at !== "" && {
           created_at: body.received_at,
         }),

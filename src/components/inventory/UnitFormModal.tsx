@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { CurrencyInput } from "@/components/ui/CurrencyInputField";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 
 export interface LaptopUnit {
     id: string;
@@ -13,6 +15,7 @@ export interface LaptopUnit {
     selling_price: number;
     status: string;
     notes: string;
+    condition_checks?: ConditionChecks | null;
     received_at?: string;
     created_at: string;
 }
@@ -76,6 +79,7 @@ export default function UnitFormModal({
     onClose,
     onSuccess,
     onError,
+    canEditChecklist = true,
 }: {
     laptopId: string;
     defaultSellingPrice: number;
@@ -83,11 +87,15 @@ export default function UnitFormModal({
     onClose: () => void;
     onSuccess: () => void;
     onError: (message: string) => void;
+    canEditChecklist?: boolean;
 }) {
     const [formData, setFormData] = useState<Record<string, string>>(() =>
         buildInitialFormData(editingUnit, defaultSellingPrice)
     );
     const [formLoading, setFormLoading] = useState(false);
+    const [conditionChecks, setConditionChecks] = useState<ConditionChecks>(
+        () => sanitizeConditionChecks(editingUnit?.condition_checks)
+    );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -100,6 +108,7 @@ export default function UnitFormModal({
                 ...formData,
                 purchase_price: Number(formData.purchase_price),
                 selling_price: Number(formData.selling_price),
+                ...(canEditChecklist ? { condition_checks: conditionChecks } : {}),
                 ...(formData.received_at
                     ? { received_at: new Date(formData.received_at).toISOString() }
                     : { received_at: undefined }),
@@ -314,6 +323,19 @@ export default function UnitFormModal({
                                 />
                             </div>
                         )}
+
+                        {/* Tes Kondisi per unit — tiap SN dites sendiri, bukan sekaligus 1 model */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                Tes Kondisi
+                                <span className="text-gray-400 font-normal ml-1">(per unit / SN)</span>
+                            </label>
+                            <ConditionChecklist
+                                value={conditionChecks}
+                                onChange={setConditionChecks}
+                                readOnly={!canEditChecklist}
+                            />
+                        </div>
 
                         {/* Tanggal Masuk */}
                         <div>
