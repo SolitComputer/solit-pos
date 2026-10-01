@@ -276,11 +276,11 @@ export default function UnitsPage() {
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
     //  Boleh isi/ubah checklist Tes Kondisi per unit (Rafi Salim, Fikri Aryansyah & Admin)
     const canEditChecklist = canEditConditionChecks(userId, userRoles);
-    //  Tombol "Tes Kondisi" per unit: butuh full-access barang (karena PUT
-    //  /api/units/[id] di-gate BARANG_FULL_ACCESS_ROLES) DAN hak checklist
-    //  (karena backend cuma simpan condition_checks kalau canEditConditionChecks).
-    //  Dua-duanya harus kepenuhan supaya tidak kena 403 / tersimpan diam-diam.
-    const canQuickCondition = !!canEditChecklist && canFullAccessBarang;
+    //  Tombol "Tes Kondisi" per unit: cukup hak checklist (canEditChecklist).
+    //  Simpannya lewat endpoint khusus PATCH /api/units/[id]/condition-checks
+    //  yang di-gate canEditConditionChecks saja — TIDAK butuh full-access barang,
+    //  jadi PKL Pengelola Barang pun bisa isi tes kondisi di sini.
+    const canQuickCondition = !!canEditChecklist;
     //  Unit yang sedang dibuka di Pop-up Detail
     const [detailUnit, setDetailUnit] = useState<LaptopUnit | null>(null);
     //  Target & draft modal "Tes Kondisi" per unit
@@ -484,8 +484,8 @@ export default function UnitsPage() {
         if (!conditionTarget) return;
         setConditionSaving(true);
         try {
-            const res = await fetch(`/api/units/${conditionTarget.id}`, {
-                method: "PUT",
+            const res = await fetch(`/api/units/${conditionTarget.id}/condition-checks`, {
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ condition_checks: conditionDraft }),
             });

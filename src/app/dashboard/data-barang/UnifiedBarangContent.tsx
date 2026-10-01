@@ -1287,8 +1287,8 @@ export default function UnifiedBarangContent() {
         if (!conditionChecksTarget) return;
         setConditionChecksSaving(true);
         try {
-            const res = await fetch(`/api/laptops/${conditionChecksTarget.id}`, {
-                method: "PUT",
+            const res = await fetch(`/api/laptops/${conditionChecksTarget.id}/condition-checks`, {
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ condition_checks: conditionChecksDraft }),
             });

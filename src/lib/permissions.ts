@@ -1173,7 +1173,7 @@ export const CONDITION_CHECK_EDITOR_USER_IDS: string[] = [
   "7594367d-b27b-49a8-a427-5ecb7fa2d21f",
   "20c4df76-db02-4e36-977b-27b76c7fa803",
 ];
-export const CONDITION_CHECK_EDITOR_ROLES: UserRole[] = ["ADMIN"];
+export const CONDITION_CHECK_EDITOR_ROLES: UserRole[] = ["ADMIN", "PKL_PENGELOLA_BARANG"];
 
 export function canEditConditionChecks(
   userId: string | null | undefined,
