@@ -7,6 +7,8 @@ import Link from "next/link";
 import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, OFFICIAL_PRICE_EDIT_ROLES, canEditConditionChecks } from "@/lib/permissions";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { Trash2, Package, CheckCircle2, Wrench, Wallet } from "lucide-react";
 import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
 import UnitFormModal from "@/components/inventory/UnitFormModal";
@@ -27,6 +29,7 @@ interface LaptopUnit {
     official_price?: number;
     status: string;
     notes: string;
+    condition_checks?: ConditionChecks | null;
     kelengkapan?: string | null;
     received_at?: string;
     created_at: string;
@@ -273,8 +276,17 @@ export default function UnitsPage() {
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
     //  Boleh isi/ubah checklist Tes Kondisi per unit (Rafi Salim, Fikri Aryansyah & Admin)
     const canEditChecklist = canEditConditionChecks(userId, userRoles);
+    //  Tombol "Tes Kondisi" per unit: butuh full-access barang (karena PUT
+    //  /api/units/[id] di-gate BARANG_FULL_ACCESS_ROLES) DAN hak checklist
+    //  (karena backend cuma simpan condition_checks kalau canEditConditionChecks).
+    //  Dua-duanya harus kepenuhan supaya tidak kena 403 / tersimpan diam-diam.
+    const canQuickCondition = !!canEditChecklist && canFullAccessBarang;
     //  Unit yang sedang dibuka di Pop-up Detail
     const [detailUnit, setDetailUnit] = useState<LaptopUnit | null>(null);
+    //  Target & draft modal "Tes Kondisi" per unit
+    const [conditionTarget, setConditionTarget] = useState<LaptopUnit | null>(null);
+    const [conditionDraft, setConditionDraft] = useState<ConditionChecks>({});
+    const [conditionSaving, setConditionSaving] = useState(false);
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -455,6 +467,37 @@ export default function UnitsPage() {
             setAlertModal(e instanceof Error ? e.message : "Gagal update status pedagang");
         } finally {
             setPedagangSavingId(null);
+        }
+    };
+
+    //  Buka modal Tes Kondisi untuk 1 unit — prefill dari condition_checks unit itu.
+    const openCondition = (unit: LaptopUnit) => {
+        setConditionDraft(sanitizeConditionChecks(unit.condition_checks));
+        setConditionTarget(unit);
+    };
+
+    //  Simpan checklist per unit lewat PUT /api/units/[id] (endpoint yang SAMA
+    //  dengan mode Edit di UnitDetailModal — sudah terima condition_checks).
+    //  Payload sengaja cuma condition_checks: status/harga TIDAK ikut dikirim,
+    //  jadi tidak ada side-effect sync qty/harga.
+    const saveCondition = async () => {
+        if (!conditionTarget) return;
+        setConditionSaving(true);
+        try {
+            const res = await fetch(`/api/units/${conditionTarget.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ condition_checks: conditionDraft }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan tes kondisi");
+            setUnits(prev => prev.map(u => u.id === conditionTarget.id ? { ...u, condition_checks: conditionDraft } : u));
+            setToast("Tes kondisi berhasil diperbarui!");
+            setConditionTarget(null);
+        } catch (e) {
+            setAlertModal(e instanceof Error ? e.message : "Gagal menyimpan tes kondisi");
+        } finally {
+            setConditionSaving(false);
         }
     };
 
@@ -1191,12 +1234,28 @@ export default function UnitsPage() {
                                 } : undefined}
                                 renderActions={(row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
-                                    if (!u || !canManageUnits) return null;
+                                    if (!u) return null;
+                                    //  Dulu: `if (!u || !canManageUnits) return null` — kolom Aksi
+                                    //  nutup penuh kalau bukan pengelola unit, jadi editor checklist
+                                    //  yang bukan EDIT_UNITS tidak kebagian tombol apa pun. Sekarang
+                                    //  dipisah per-tombol sesuai gate masing-masing.
+                                    if (!canQuickCondition && !canManageUnits) return null;
                                     return (
-                                        <button onClick={() => handleDelete(u)}
-                                            className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        <>
+                                            {canQuickCondition && (
+                                                <button onClick={() => openCondition(u)}
+                                                    className="h-8 px-2 rounded-lg text-[11px] font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 transition flex items-center justify-center whitespace-nowrap"
+                                                    title="Edit tes kondisi unit ini tanpa buka mode Edit">
+                                                    Tes Kondisi
+                                                </button>
+                                            )}
+                                            {canManageUnits && (
+                                                <button onClick={() => handleDelete(u)}
+                                                    className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </>
                                     );
                                 }}
                             />
@@ -1248,6 +1307,17 @@ export default function UnitsPage() {
                         setDetailUnit(null);
                         setToast("Data unit berhasil diperbarui!");
                     }}
+                />
+            )}
+
+            {conditionTarget && (
+                <ConditionChecksModal
+                    label={`SN: ${conditionTarget.serial_number}`}
+                    value={conditionDraft}
+                    onChange={setConditionDraft}
+                    loading={conditionSaving}
+                    onClose={() => { if (!conditionSaving) setConditionTarget(null); }}
+                    onConfirm={saveCondition}
                 />
             )}
 
@@ -1722,6 +1792,51 @@ function AuditHistoryModal({ unitId, unitLabel, onClose }: {
                     <button onClick={onClose}
                         className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
                         Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+//  Modal "Tes Kondisi" per unit — checklist kondisi per SN, edit langsung dari
+//  kolom Aksi tabel tanpa buka pop-up Detail → mode Edit. Simpan ke
+//  PUT /api/units/[id] (lihat saveCondition di UnitsPage).
+function ConditionChecksModal({ label, value, onChange, loading, onClose, onConfirm }: {
+    label: string;
+    value: ConditionChecks;
+    onChange: (v: ConditionChecks) => void;
+    loading: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[85vh] flex flex-col animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-sky-400 via-sky-600 to-sky-800 flex-shrink-0" />
+                <div className="px-5 py-4 bg-sky-600 flex-shrink-0">
+                    <p className="font-bold text-white text-sm">Tes Kondisi Unit</p>
+                    <p className="text-xs text-white/70 mt-0.5 truncate">{label}</p>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    <ConditionChecklist value={value} onChange={onChange} readOnly={false} />
+                </div>
+                <div className="flex gap-3 px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} disabled={loading}
+                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button onClick={onConfirm} disabled={loading}
+                        className="flex-1 h-10 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                        {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        Simpan
                     </button>
                 </div>
             </div>
