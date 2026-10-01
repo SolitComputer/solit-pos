@@ -1441,7 +1441,7 @@ async function buildTransactionReversalDrafts(
 ): Promise<JournalDraft[]> {
   const { data: trxs, error } = await supabase
     .from("transactions")
-    .select("invoice_number, customer_name, laptop_name, restored_at")
+    .select("invoice_number, customer_name, laptop_name, serial_number, serial_numbers, unit_id, unit_ids, restored_at")
     .eq("status", "CANCELLED")
     .not("restored_at", "is", null)
     .gte("restored_at", startISO)
@@ -1480,6 +1480,44 @@ async function buildTransactionReversalDrafts(
     }
   }
 
+  // Resolve SN laptop per invoice (dari unit_ids → laptop_units), supaya
+  // keterangan ikut menampilkan serial number seperti draft transaksi normal.
+  const reversalUnitIds = new Set<string>();
+  for (const t of trxs as any[]) {
+    if (t.unit_id) reversalUnitIds.add(t.unit_id as string);
+    if (Array.isArray(t.unit_ids)) for (const u of t.unit_ids) if (u) reversalUnitIds.add(u as string);
+  }
+  const snByUnitId = new Map<string, string>();
+  if (reversalUnitIds.size > 0) {
+    for (const batch of chunkArray(Array.from(reversalUnitIds), 150)) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, serial_number")
+        .in("id", batch);
+      for (const u of units ?? []) {
+        if (u.serial_number) snByUnitId.set(u.id as string, u.serial_number as string);
+      }
+    }
+  }
+  const snTextByInvoice = new Map<string, string>();
+  for (const t of trxs as any[]) {
+    const ids: string[] =
+      Array.isArray(t.unit_ids) && t.unit_ids.length > 0 ? t.unit_ids : t.unit_id ? [t.unit_id] : [];
+    const sns: string[] = [];
+    for (const id of ids) {
+      const sn = snByUnitId.get(id);
+      if (sn) sns.push(sn);
+    }
+    let snText = sns.join(", ");
+    if (!snText) {
+      // fallback ke kolom transactions kalau unit tidak ketemu (data lama)
+      snText = Array.isArray(t.serial_numbers) && t.serial_numbers.length > 0
+        ? t.serial_numbers.filter(Boolean).join(", ")
+        : (t.serial_number as string) || "";
+    }
+    snTextByInvoice.set(t.invoice_number as string, snText || "—");
+  }
+
   const drafts: JournalDraft[] = [];
   for (const [invoice, entries] of entryMap.entries()) {
     const t = trxByInvoice.get(invoice);
@@ -1506,7 +1544,7 @@ async function buildTransactionReversalDrafts(
       source_category: "PEMBATALAN_TRANSAKSI",
       tanggal,
       sort_ts: (t.restored_at as string) || `${tanggal}T00:00:00+07:00`,
-      keterangan: `Pembatalan/Refund · ${t.laptop_name ?? "Laptop"} - ${t.customer_name ?? "—"}`,
+      keterangan: `Pembatalan/Refund · ${t.laptop_name ?? "Laptop"} - ${snTextByInvoice.get(invoice) ?? "—"} - ${t.customer_name ?? "—"}`,
       ref: invoice,
       lines: merged,
       total: totalOf(merged),
