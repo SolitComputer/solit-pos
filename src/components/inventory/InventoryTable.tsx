@@ -49,6 +49,9 @@ export interface InventoryRow {
     sn: string | null;
     sn_note?: string;
 
+    /** Kelengkapan unit (teks bebas, mis. "Dus, charger, tas") — opt-in via showKelengkapan */
+    kelengkapan?: string | null;
+
     stok_tersisa: number;
     siap_jual: number;
     minus: number;
@@ -86,6 +89,8 @@ interface Props {
     showSparepart?: boolean;
     /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
     showTotalJual?: boolean;
+    /** Tampilkan kolom Kelengkapan unit (opt-in — halaman Units) */
+    showKelengkapan?: boolean;
     /** Label kolom tanggal — default "Tanggal Masuk", dipakai "Tanggal Terjual" di tab Terjual */
     dateColumnLabel?: string;
     onRowClick?: (row: InventoryRow) => void;
@@ -144,7 +149,7 @@ const BelumLunasBadge = ({ label }: { label?: string }) => (
 
 
 export default function InventoryTable({
-    rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual, dateColumnLabel,
+    rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual, showKelengkapan, dateColumnLabel,
     onRowClick, renderActions, renderAudit, renderSo, renderPedagang, sortBy, onSort,
 }: Props) {
     const [localSort, setLocalSort] = useState<{ col: SortKey; dir: "asc" | "desc" } | null>(null);
@@ -220,6 +225,7 @@ export default function InventoryTable({
                         {canSeePrivate && <Th sortKey="SUMBER" activeSort={sortBy} onSort={onSort}>Sumber</Th>}
                         {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>{dateColumnLabel ?? "Tanggal Masuk"}</Th>}
                         <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
+                        {showKelengkapan && <Th>Kelengkapan</Th>}
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                         <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
@@ -356,6 +362,14 @@ export default function InventoryTable({
                                     <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{row.sn}</code>
                                 ) : row.sn_note ? <Note>{row.sn_note}</Note> : <Dash />}
                             </td>
+
+                            {showKelengkapan && (
+                                <td className="px-3.5 py-3.5 max-w-[160px]">
+                                    {row.kelengkapan ? (
+                                        <span className="block text-xs text-gray-600 truncate" title={row.kelengkapan}>{row.kelengkapan}</span>
+                                    ) : <Dash />}
+                                </td>
+                            )}
 
                             {canSeeStock && (
                                 <td className="px-3 py-3.5 text-center whitespace-nowrap">

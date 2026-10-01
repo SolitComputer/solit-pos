@@ -29,6 +29,7 @@ export interface UnitDetailData {
     status: string;
     notes: string;
     condition_checks?: ConditionChecks | null;
+    kelengkapan?: string | null;
     created_at: string;
 }
 
@@ -124,6 +125,7 @@ export default function UnitDetailModal({
         official_price: String(unit.official_price ?? 0),
         status: unit.status ?? "SIAP_JUAL",
         notes: unit.notes ?? "",
+        kelengkapan: unit.kelengkapan ?? "",
         received_at: toDateInput(unit.created_at),
     });
     const [conditionChecks, setConditionChecks] = useState<ConditionChecks>(
@@ -147,6 +149,7 @@ export default function UnitDetailModal({
         official_price: "0",
         status: "SIAP_JUAL",
         notes: "",
+        kelengkapan: "",
     });
     const [addForm, setAddForm] = useState(emptyAddForm);
 
@@ -190,6 +193,7 @@ export default function UnitDetailModal({
                     official_price: (Number(form.selling_price) || 0) + OFFICIAL_PRICE_MARKUP,
                     status: form.status,
                     notes: form.notes,
+                    kelengkapan: form.kelengkapan,
                     ...(canEditChecklist ? { condition_checks: conditionChecks } : {}),
                     received_at: form.received_at ? new Date(form.received_at).toISOString() : undefined,
                 }),
@@ -225,6 +229,7 @@ export default function UnitDetailModal({
                     official_price: (Number(addForm.selling_price) || 0) + OFFICIAL_PRICE_MARKUP,
                     status: addForm.status,
                     notes: addForm.notes,
+                    kelengkapan: addForm.kelengkapan,
                 }),
             });
             const result = await res.json();
@@ -346,6 +351,11 @@ export default function UnitDetailModal({
                                     </div>
                                 </Section>
                             )}
+
+                            <Section title="Kelengkapan">
+                                <input value={addForm.kelengkapan} onChange={e => setAdd("kelengkapan", e.target.value)}
+                                    placeholder="Contoh: Dus, charger, tas, mouse..." className={inputCls} />
+                            </Section>
 
                             <Section title="Catatan Tambahan">
                                 <textarea rows={2} value={addForm.notes} onChange={e => setAdd("notes", e.target.value)}
@@ -550,6 +560,18 @@ export default function UnitDetailModal({
                                     Sumber barang, harga modal, dan tanggal masuk hanya dapat diakses oleh Pengelola Barang.
                                 </p>
                             )}
+
+                            {/* Kelengkapan unit — teks bebas, tampil untuk semua role */}
+                            <Section title="Kelengkapan">
+                                {isEditing ? (
+                                    <input value={form.kelengkapan} onChange={e => set("kelengkapan", e.target.value)}
+                                        placeholder="Contoh: Dus, charger, tas, mouse..." className={inputCls} />
+                                ) : (
+                                    <p className="text-sm text-gray-700 leading-relaxed">
+                                        {unit.kelengkapan || <span className="text-gray-300">Belum diisi</span>}
+                                    </p>
+                                )}
+                            </Section>
 
                             {/* Tes Kondisi per unit — tampil untuk semua role (read-only),
                                 hanya bisa diisi/diubah kalau canEditChecklist & mode edit */}

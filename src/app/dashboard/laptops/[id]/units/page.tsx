@@ -27,6 +27,7 @@ interface LaptopUnit {
     official_price?: number;
     status: string;
     notes: string;
+    kelengkapan?: string | null;
     received_at?: string;
     created_at: string;
     audited_at?: string | null;
@@ -602,6 +603,7 @@ export default function UnitsPage() {
         sumber: u.source ?? null,
         tanggal_masuk: u.created_at ?? null,
         sn: u.serial_number,
+        kelengkapan: u.kelengkapan ?? null,
         stok_tersisa: u.status !== "SOLD" ? 1 : 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
         minus: (u.status === "SERVICE" || u.status === "BELUM_SIAP") ? 1 : 0,
@@ -1119,6 +1121,7 @@ export default function UnitsPage() {
                                 canSeeStock={canSeePriceInfo}
                                 showSparepart
                                 showTotalJual
+                                showKelengkapan
                                 sortBy={sortBy}
                                 onSort={handleSort}
                                 onRowClick={(row) => {
@@ -1223,7 +1226,7 @@ export default function UnitsPage() {
                     laptopId={laptopId}
                     defaultSellingPrice={laptop?.selling_price ?? 0}
                     editingUnit={editingUnit}
-                    canEditChecklist={canEditChecklist}
+                    canEditChecklist={!!canEditChecklist}
                     onClose={closeForm}
                     onSuccess={handleFormSuccess}
                     onError={(msg) => setAlertModal(msg)}
@@ -1237,7 +1240,7 @@ export default function UnitsPage() {
                     laptopName={laptop?.laptop_name}
                     laptopMeta={[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage].filter(Boolean).join(" · ")}
                     canEdit={canFullAccessBarang}
-                    canEditChecklist={canEditChecklist}
+                    canEditChecklist={!!canEditChecklist}
                     canSeePrivate={canSeePriceInfo}
                     onClose={() => setDetailUnit(null)}
                     onSaved={(updated) => {

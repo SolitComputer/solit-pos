@@ -31,6 +31,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       serial_number, grade, condition_note, source,
       purchase_price, selling_price, status, notes,
       condition_checks, // ← tes kondisi per unit (per SN)
+      kelengkapan,      // ← keterangan kelengkapan unit (teks bebas)
     } = body;
 
     // Cek duplicate SN.
@@ -107,6 +108,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         //  tidak, field ini di-drop diam-diam, edit field lain tetap jalan.
         ...(condition_checks !== undefined &&
           canEditConditionChecks(user.id, actorRoles as UserRole[]) && { condition_checks }),
+        ...(kelengkapan !== undefined && { kelengkapan: kelengkapan === "" ? null : kelengkapan }),
         ...(body.received_at !== undefined && body.received_at !== "" && {
           created_at: body.received_at,
         }),

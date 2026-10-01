@@ -16,6 +16,7 @@ export interface LaptopUnit {
     status: string;
     notes: string;
     condition_checks?: ConditionChecks | null;
+    kelengkapan?: string | null;
     received_at?: string;
     created_at: string;
 }
@@ -41,6 +42,7 @@ const EMPTY_FORM = {
     selling_price: "",
     status: "SIAP_JUAL",
     notes: "",
+    kelengkapan: "",
     received_at: "",
 };
 
@@ -68,6 +70,7 @@ function buildInitialFormData(editingUnit: LaptopUnit | null, defaultSellingPric
         selling_price: String(editingUnit.selling_price || ""),
         status: editableStatus,
         notes: editingUnit.notes || "",
+        kelengkapan: editingUnit.kelengkapan || "",
         received_at: editingUnit.created_at ? new Date(editingUnit.created_at).toISOString().split("T")[0] : "",
     };
 }
@@ -161,7 +164,7 @@ export default function UnitFormModal({
                                         window.open(`https://www.google.com/search?q=${encodeURIComponent(formData.serial_number + " laptop")}`, "_blank");
                                     }}
                                     className="px-3 h-9 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">
-                                     Cek
+                                    Cek
                                 </button>
                             </div>
                         </div>
@@ -349,6 +352,17 @@ export default function UnitFormModal({
                             {formData.received_at && (
                                 <p className="text-[10px] text-gray-400 mt-1">Barang masuk: {fmtDate(formData.received_at)}</p>
                             )}
+                        </div>
+
+                        {/* Kelengkapan — teks bebas, mis. "Dus, charger, tas" */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                Kelengkapan
+                                <span className="text-gray-400 font-normal ml-1">(opsional)</span>
+                            </label>
+                            <input name="kelengkapan" placeholder="Contoh: Dus, charger, tas, mouse..."
+                                value={formData.kelengkapan} onChange={handleChange}
+                                className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
                         </div>
 
                         {/* Notes Internal */}
