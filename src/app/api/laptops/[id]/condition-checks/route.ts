@@ -8,13 +8,13 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-// ── PATCH: Update HANYA condition_checks (tes kondisi) satu UNIT (per SN) ──────
+// ── PATCH: Update HANYA condition_checks (tes kondisi) satu MODEL laptop ───────
 //
-// Terpisah dari PUT /api/units/[id] yang di-gate BARANG_FULL_ACCESS_ROLES. Di
-// sini gerbangnya CUMA canEditConditionChecks, supaya role editor checklist
-// (mis. PKL_PENGELOLA_BARANG / PENYEDIA_BARANG) bisa isi tes kondisi TANPA
-// full-access. Hanya menyentuh condition_checks → tidak ada efek samping ke
-// sync qty parent / harga.
+// Terpisah dari PUT /api/laptops/[id] yang di-gate full-access laptop. Di sini
+// gerbangnya CUMA canEditConditionChecks, supaya role editor checklist (mis.
+// PKL_PENGELOLA_BARANG / PENYEDIA_BARANG) bisa isi tes kondisi di Data Barang
+// TANPA full-access. Hanya menyentuh condition_checks → tidak ada efek samping
+// ke harga/stok.
 async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const actorRoles: string[] =
@@ -25,7 +25,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     if (!canEditConditionChecks(user.id, actorRoles as UserRole[])) {
       return NextResponse.json(
-        { success: false, message: "Tidak punya izin mengubah tes kondisi unit ini" },
+        { success: false, message: "Tidak punya izin mengubah tes kondisi barang ini" },
         { status: 403 }
       );
     }
@@ -46,20 +46,20 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     const { data: before } = await supabase
-      .from("laptop_units")
-      .select("id, serial_number, condition_checks")
+      .from("laptops")
+      .select("id, laptop_name, condition_checks")
       .eq("id", id)
       .single();
 
     if (!before) {
       return NextResponse.json(
-        { success: false, message: "Unit tidak ditemukan" },
+        { success: false, message: "Barang tidak ditemukan" },
         { status: 404 }
       );
     }
 
     const { data, error } = await supabase
-      .from("laptop_units")
+      .from("laptops")
       .update({
         condition_checks: body.condition_checks,
         condition_checked_by: user.name,          // ← siapa yang mengisi
@@ -76,16 +76,16 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       userName: user.name,
       userRole: user.role,
       action: "EDIT",
-      entity: "unit",
+      entity: "laptop",
       entityId: id,
-      entityLabel: `SN: ${before.serial_number} — tes kondisi`,
+      entityLabel: `${before.laptop_name} — tes kondisi`,
       beforeData: { condition_checks: before.condition_checks },
       afterData: { condition_checks: data.condition_checks },
     });
 
     return NextResponse.json({ success: true, data });
   } catch (err) {
-    console.error("[PATCH /api/units/[id]/condition-checks]", err);
+    console.error("[PATCH /api/laptops/[id]/condition-checks]", err);
     return NextResponse.json(
       { success: false, message: "Gagal menyimpan tes kondisi" },
       { status: 500 }

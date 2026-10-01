@@ -4,9 +4,11 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { compressImage } from "@/lib/imageCompression";
-import { Trophy, ThumbsUp, AlertTriangle, Wrench, Laptop, CheckCircle2, Lock, Camera } from "lucide-react";
+import { Trophy, ThumbsUp, AlertTriangle, Wrench, Laptop, CheckCircle2, Lock, Camera, ClipboardList } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface LaptopUnit {
@@ -20,6 +22,9 @@ interface LaptopUnit {
     selling_price: number;
     status: string;
     notes: string;
+    condition_checks?: ConditionChecks | null;
+    condition_checked_by?: string | null;
+    condition_checked_at?: string | null;
     created_at: string;
     reserved_by?: string;
     reserved_invoice?: string;
@@ -157,6 +162,68 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
                             </div>
                         ))}
                     </div>
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Tutup</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── ConditionViewModal — "Cek Kondisi" read-only untuk sales (per SN) ─────────
+function ConditionViewModal({ unit, checks, checkedBy, checkedAt, loading, onClose }: {
+    unit: LaptopUnit;
+    checks: ConditionChecks;
+    checkedBy?: string | null;
+    checkedAt?: string | null;
+    loading: boolean;
+    onClose: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center animate-fadeIn">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
+                <div className="bg-gradient-to-br from-[#1a1545] to-[#0f0c29] px-5 py-4 flex-shrink-0">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <h3 className="font-bold text-white truncate">Cek Kondisi</h3>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className="text-xs text-gray-200 truncate">{unit.laptop?.laptop_name || "—"}</span>
+                                <code className="font-mono text-[11px] text-gray-200 bg-white/10 px-2 py-0.5 rounded-md">{unit.serial_number}</code>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+                    {loading ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Memuat kondisi...</p>
+                    ) : (
+                        <>
+                            {checkedBy ? (
+                                <p className="text-[11px] text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                                    Diisi oleh <span className="font-semibold text-gray-700">{checkedBy}</span>
+                                    {checkedAt && <> · {new Date(checkedAt).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</>}
+                                </p>
+                            ) : (
+                                <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                                    Tes kondisi unit ini belum diisi oleh penanggung jawab.
+                                </p>
+                            )}
+                            <ConditionChecklist value={checks} onChange={() => {}} readOnly />
+                        </>
+                    )}
                 </div>
 
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
@@ -421,6 +488,38 @@ function ReadyContent() {
 
     const isPKL = userRole ? (userRole === "PKL" || userRole.startsWith("PKL_") || userRole.startsWith("PKL-")) : false;
     const canConfirmTx = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) && !isPKL : false;
+    // Sales & role lain yang boleh lihat unit → boleh buka "Cek Kondisi".
+    // Juga jadi gate tombolnya: role di luar VIEW_UNITS tidak bisa fetch unit-nya
+    // (GET /api/laptops/[id]/units di-gate VIEW_UNITS), jadi tombolnya disembunyikan.
+    const canViewUnits = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_UNITS) : false;
+
+    // Modal "Cek Kondisi" (read-only) — kondisi per SN untuk sales.
+    const [conditionUnit, setConditionUnit] = useState<LaptopUnit | null>(null);
+    const [conditionData, setConditionData] = useState<{ checks: ConditionChecks; by?: string | null; at?: string | null } | null>(null);
+    const [conditionLoading, setConditionLoading] = useState(false);
+
+    // Ambil kondisi unit on-demand saat tombol diklik — reuse GET
+    // /api/laptops/[id]/units (select * → bawa condition_checks + siapa pengisi,
+    // sudah menyaring harga modal untuk non-private). Tidak perlu endpoint baru.
+    const openCondition = async (u: LaptopUnit) => {
+        setConditionUnit(u);
+        setConditionData(null);
+        setConditionLoading(true);
+        try {
+            const res = await fetch(`/api/laptops/${u.laptop_id}/units`);
+            const json = await res.json();
+            const found = (json.data ?? []).find((x: { id: string }) => x.id === u.id);
+            setConditionData({
+                checks: sanitizeConditionChecks(found?.condition_checks),
+                by: found?.condition_checked_by ?? null,
+                at: found?.condition_checked_at ?? null,
+            });
+        } catch {
+            setConditionData({ checks: {}, by: null, at: null });
+        } finally {
+            setConditionLoading(false);
+        }
+    };
 
     useEffect(() => {
         getAuthUser().then(u => ({ success: true, user: u }))
@@ -981,6 +1080,15 @@ function ReadyContent() {
                                         const isPending = u.status === "RESERVED";
                                         return (
                                             <div className="flex items-center gap-1.5">
+                                                {canViewUnits && (
+                                                    <button
+                                                        onClick={() => openCondition(u)}
+                                                        title="Lihat hasil tes kondisi unit ini"
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition active:scale-95 whitespace-nowrap"
+                                                    >
+                                                        <ClipboardList size={12} /> Cek Kondisi
+                                                    </button>
+                                                )}
                                                 {st && (
                                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap ${st.badge}`}>
                                                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.dot}`} />
@@ -1049,6 +1157,17 @@ function ReadyContent() {
             {alertMsg && <AlertModal message={alertMsg} onClose={() => setAlertMsg(null)} />}
 
             {detailUnit && <UnitInfoModal unit={detailUnit} onClose={() => setDetailUnit(null)} />}
+
+            {conditionUnit && (
+                <ConditionViewModal
+                    unit={conditionUnit}
+                    checks={conditionData?.checks ?? {}}
+                    checkedBy={conditionData?.by}
+                    checkedAt={conditionData?.at}
+                    loading={conditionLoading}
+                    onClose={() => { setConditionUnit(null); setConditionData(null); }}
+                />
+            )}
 
             {confirmTarget && (
                 <ConfirmPaymentModal
