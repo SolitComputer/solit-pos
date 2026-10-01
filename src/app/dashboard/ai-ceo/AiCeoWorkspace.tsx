@@ -47,8 +47,8 @@ const PROVIDER_LABEL: Record<AiProviderChoice, string> = {
 };
 
 const PROVIDER_COLOR: Record<string, string> = {
-    deepseek: "#0891b2", // cyan-600
-    gemini: "#2563eb",   // blue-600
+    deepseek: "#0891b2", 
+    gemini: "#2563eb",   
     groq: "#ea580c",     // orange-600
 };
 
