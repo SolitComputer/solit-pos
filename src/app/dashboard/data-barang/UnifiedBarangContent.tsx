@@ -313,6 +313,45 @@ function writeBarangCache(rows: UnifiedRow[]) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PERSIST FILTER (sessionStorage) — supaya filter TIDAK hilang saat user
+// pindah ke halaman Kelola Unit untuk SO lalu klik "back". Komponen ini
+// unmount saat pindah route, jadi semua useState ter-reset ke default — itu
+// sebabnya filter balik ke "Semua". Pola sama persis dengan cache data di atas.
+// ═══════════════════════════════════════════════════════════════════════════
+const BARANG_FILTER_KEY = "unified-barang-filter-v1";
+
+interface BarangFilterState {
+    tipeFilter: "ALL" | ItemType;
+    kategoriFilter: string[];
+    brandFilter: string;
+    stokFilter: "ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS";
+    minPrice: string;
+    maxPrice: string;
+    statusAuditSoFilter: "ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE";
+    sortBy: "NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST";
+    search: string;
+}
+
+function readBarangFilter(): Partial<BarangFilterState> | null {
+    if (typeof window === "undefined") return null;
+    try {
+        const raw = sessionStorage.getItem(BARANG_FILTER_KEY);
+        return raw ? (JSON.parse(raw) as Partial<BarangFilterState>) : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeBarangFilter(state: BarangFilterState) {
+    if (typeof window === "undefined") return;
+    try {
+        sessionStorage.setItem(BARANG_FILTER_KEY, JSON.stringify(state));
+    } catch {
+        /* storage penuh/diblokir — tidak fatal, filter cuma tidak persist */
+    }
+}
+
 // Pilih SATU mode render: kartu mobile ATAU tabel desktop, bukan dua-duanya.
 // Sebelumnya keduanya masuk DOM dan cuma disembunyikan CSS (lg:hidden /
 // hidden lg:block), jadi browser membangun 2x node untuk data yang sama.
@@ -505,6 +544,63 @@ function ConvertToAccessoryModal({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Tes Kondisi — edit checklist kondisi laptop (level model) langsung
+// dari tabel/kartu, tanpa buka form Edit penuh. Read-only kalau role tidak
+// berhak (canEdit=false) — tombol Simpan disembunyikan.
+// ═══════════════════════════════════════════════════════════════════════════
+function ConditionChecksModal({
+    row, value, onChange, canEdit, loading, onClose, onConfirm,
+}: {
+    row: UnifiedRow;
+    value: ConditionChecks;
+    onChange: (v: ConditionChecks) => void;
+    canEdit: boolean;
+    loading: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-sky-400 via-sky-600 to-sky-800 flex-shrink-0" />
+                <div className="px-5 py-4 bg-sky-600 flex-shrink-0">
+                    <p className="font-bold text-white text-sm">Tes Kondisi</p>
+                    <p className="text-xs text-white/70 mt-0.5 truncate">{row.nama}</p>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    <ConditionChecklist value={value} onChange={onChange} readOnly={!canEdit} />
+                    {!canEdit && (
+                        <p className="text-[11px] text-zinc-400 mt-3 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2">
+                            Kamu hanya bisa melihat tes kondisi. Perubahan hanya untuk role yang berhak.
+                        </p>
+                    )}
+                </div>
+                <div className="flex gap-3 px-5 py-4 border-t border-zinc-100 flex-shrink-0">
+                    <button onClick={onClose} disabled={loading}
+                        className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition disabled:opacity-50">
+                        {canEdit ? "Batal" : "Tutup"}
+                    </button>
+                    {canEdit && (
+                        <button onClick={onConfirm} disabled={loading}
+                            className="flex-1 h-10 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Simpan
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // DROPDOWN: Filter Kategori bergaya Excel — checklist multi-select + search.
 // kategoriFilter kosong ([]) berarti SEMUA kategori dianggap tercentang.
 // Begitu satu item di-uncheck, baru materialisasi jadi array eksplisit
@@ -636,15 +732,19 @@ export default function UnifiedBarangContent() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
 
-    const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>("ALL");
-    const [kategoriFilter, setKategoriFilter] = useState<string[]>([]);
-    const [brandFilter, setBrandFilter] = useState("");
-    const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS">("ALL");
-    const [minPrice, setMinPrice] = useState("");
-    const [maxPrice, setMaxPrice] = useState("");
-    const [statusAuditSoFilter, setStatusAuditSoFilter] = useState<"ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE">("ALL");
-    const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST">("NAMA_ASC");
-    const [search, setSearch] = useState("");
+    // Baca filter tersimpan SEKALI saat mount — kalau user baru balik dari
+    // halaman Kelola Unit (habis SO), nilai di bawah langsung terisi filter
+    // terakhir, bukan default.
+    const [bootFilter] = useState(() => readBarangFilter());
+    const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>(() => bootFilter?.tipeFilter ?? "ALL");
+    const [kategoriFilter, setKategoriFilter] = useState<string[]>(() => bootFilter?.kategoriFilter ?? []);
+    const [brandFilter, setBrandFilter] = useState(() => bootFilter?.brandFilter ?? "");
+    const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS">(() => bootFilter?.stokFilter ?? "ALL");
+    const [minPrice, setMinPrice] = useState(() => bootFilter?.minPrice ?? "");
+    const [maxPrice, setMaxPrice] = useState(() => bootFilter?.maxPrice ?? "");
+    const [statusAuditSoFilter, setStatusAuditSoFilter] = useState<"ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE">(() => bootFilter?.statusAuditSoFilter ?? "ALL");
+    const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST">(() => bootFilter?.sortBy ?? "NAMA_ASC");
+    const [search, setSearch] = useState(() => bootFilter?.search ?? "");
     // Input tetap responsif karena `search` langsung update, tapi proses filter
     // yang berat memakai nilai yang ditunda — ketikan tidak lagi tersendat.
     const deferredSearch = useDeferredValue(search);
@@ -682,6 +782,11 @@ export default function UnifiedBarangContent() {
     // convertToAccessory() & ConvertToAccessoryModal di bawah.
     const [convertTarget, setConvertTarget] = useState<UnifiedRow | null>(null);
     const [converting, setConverting] = useState(false);
+    // Target row untuk modal "Tes Kondisi" — edit checklist kondisi laptop
+    // (level model) TANPA harus buka form Edit penuh.
+    const [conditionChecksTarget, setConditionChecksTarget] = useState<UnifiedRow | null>(null);
+    const [conditionChecksDraft, setConditionChecksDraft] = useState<ConditionChecks>({});
+    const [conditionChecksSaving, setConditionChecksSaving] = useState(false);
 
     const [historyTarget, setHistoryTarget] = useState<{ row: UnifiedRow; kind: "audit" | "so" } | null>(null);
     const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
@@ -751,6 +856,13 @@ export default function UnifiedBarangContent() {
     const canAuditAccessory = hasAnyRole(userRoles, ACCESSORY_AUDIT_ROLES);
     const canToggleAudit = (row: UnifiedRow) => row.tipe === "LAPTOP" ? canSeePrivate : canAuditAccessory;
 
+    // Tombol "Tes Kondisi" hanya untuk LAPTOP yang kategorinya punya checklist
+    // (Laptop/Monitor — lihat isConditionCheckCategory) & user berhak edit.
+    // Kalau mau tombolnya tetap tampil untuk SEMUA role (mode lihat saja),
+    // hapus "&& canEditChecklist" di baris bawah ini.
+    const canShowConditionChecks = (row: UnifiedRow) =>
+        row.tipe === "LAPTOP" && isConditionCheckCategory(row.kategori) && canEditChecklist;
+
     // opts.silent = true → refresh di belakang layar: TIDAK menyalakan spinner
     // "Memuat data..." dan TIDAK menampilkan toast kalau gagal (karena data lama
     // dari cache masih tampil di layar, gangguan toast hanya bikin bingung).
@@ -808,8 +920,23 @@ export default function UnifiedBarangContent() {
         })();
     }, []);
 
-    // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe)
-    useEffect(() => { setKategoriFilter([]); }, [tipeFilter]);
+    // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe).
+    // DILEWATI di render pertama supaya kategori hasil restore dari
+    // sessionStorage (saat balik dari halaman Unit) tidak langsung dihapus.
+    const tipeChangeFirstRun = useRef(true);
+    useEffect(() => {
+        if (tipeChangeFirstRun.current) { tipeChangeFirstRun.current = false; return; }
+        setKategoriFilter([]);
+    }, [tipeFilter]);
+
+    // Simpan filter ke sessionStorage tiap kali berubah, supaya tetap ada
+    // saat komponen di-mount ulang (pindah route lalu balik).
+    useEffect(() => {
+        writeBarangFilter({
+            tipeFilter, kategoriFilter, brandFilter, stokFilter,
+            minPrice, maxPrice, statusAuditSoFilter, sortBy, search,
+        });
+    }, [tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, sortBy, search]);
 
     // Deep-link: baca ?tipe= dari URL sekali saat mount — dipakai tombol
     // breadcrumb "Data Aksesori" di halaman Kelola Unit, supaya begitu balik
@@ -1143,6 +1270,45 @@ export default function UnifiedBarangContent() {
             toast.error(e instanceof Error ? e.message : "Gagal update audit");
         } finally {
             setAuditingId(null);
+        }
+    };
+
+    // ── Tes Kondisi (checklist level model laptop) ──────────────────────────
+    const openConditionChecks = (row: UnifiedRow) => {
+        const l = row.raw as LaptopRaw;
+        setConditionChecksDraft(sanitizeConditionChecks(l.condition_checks));
+        setConditionChecksTarget(row);
+    };
+
+    // Simpan ke endpoint yang SAMA dengan form Edit (PUT /api/laptops/[id] —
+    // sudah terima condition_checks). rows & cache ikut di-update biar sinkron
+    // tanpa fetch ulang.
+    const saveConditionChecks = async () => {
+        if (!conditionChecksTarget) return;
+        setConditionChecksSaving(true);
+        try {
+            const res = await fetch(`/api/laptops/${conditionChecksTarget.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ condition_checks: conditionChecksDraft }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal menyimpan tes kondisi");
+            setRows(prev => {
+                const next = prev.map(r =>
+                    r.id === conditionChecksTarget.id
+                        ? { ...r, raw: { ...(r.raw as LaptopRaw), condition_checks: conditionChecksDraft } }
+                        : r
+                );
+                writeBarangCache(next);
+                return next;
+            });
+            toast.success("Tes kondisi berhasil diperbarui");
+            setConditionChecksTarget(null);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal menyimpan tes kondisi");
+        } finally {
+            setConditionChecksSaving(false);
         }
     };
 
@@ -1937,6 +2103,13 @@ export default function UnifiedBarangContent() {
                                                                 Perbaiki Tipe
                                                             </button>
                                                         )}
+                                                        {canShowConditionChecks(row) && (
+                                                            <button onClick={() => openConditionChecks(row)}
+                                                                title="Edit tes kondisi tanpa buka form Edit penuh"
+                                                                className={`${cardActionCls} text-sky-700 bg-sky-50 hover:bg-sky-100`}>
+                                                                Tes Kondisi
+                                                            </button>
+                                                        )}
                                                         {canEditThis && (
                                                             <button onClick={() => openEdit(row)}
                                                                 className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
@@ -2099,6 +2272,11 @@ export default function UnifiedBarangContent() {
                                                                             className="h-7 px-2 text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition">
                                                                             Perbaiki Tipe
                                                                         </button>
+                                                                    )}
+                                                                    {canShowConditionChecks(row) && (
+                                                                        <button onClick={() => openConditionChecks(row)}
+                                                                            title="Edit tes kondisi tanpa buka form Edit penuh"
+                                                                            className="h-7 px-2 text-[11px] font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition">Tes Kondisi</button>
                                                                     )}
                                                                     {((row.tipe === "LAPTOP" && canEditLaptop) || (row.tipe === "AKSESORIS" && canEditAcc)) && (
                                                                         <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
@@ -2279,6 +2457,18 @@ export default function UnifiedBarangContent() {
                     loading={converting}
                     onClose={() => { if (!converting) setConvertTarget(null); }}
                     onConfirm={convertToAccessory}
+                />
+            )}
+
+            {conditionChecksTarget && (
+                <ConditionChecksModal
+                    row={conditionChecksTarget}
+                    value={conditionChecksDraft}
+                    onChange={setConditionChecksDraft}
+                    canEdit={canEditChecklist}
+                    loading={conditionChecksSaving}
+                    onClose={() => { if (!conditionChecksSaving) setConditionChecksTarget(null); }}
+                    onConfirm={saveConditionChecks}
                 />
             )}
 
