@@ -205,12 +205,20 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     // ── 5a2. REFUND OTOMATIS ke Cashflow (uang keluar di TANGGAL CANCEL) ────
+    // HANYA untuk transaksi yang benar-benar LUNAS PENUH (prevStatus === "PAID")
+    // sebelum dibatalkan. Transaksi DP / Ambil-Dulu / Packing (RESERVED/HELD/
+    // PACKING/PENDING) SENGAJA TIDAK dibuatkan refund otomatis — diurus manual
+    // seperti sistem lama. Kenapa: ada kasus customer ambil barang tapi BELUM
+    // bayar (piutang) lalu di-cancel; kalau refund tetap dibuat, muncul uang
+    // keluar padahal uang masuknya tidak pernah ada → saldo minus palsu.
     // Total refund = total uang yang BENAR-BENAR tercatat masuk untuk invoice
     // ini di Cashflow (TRANSACTION + TRANSACTION_DP + TRANSACTION_PAYMENT),
     // supaya net-nya nol tanpa selisih. Pemasukan aslinya sengaja DIBIARKAN
     // di tanggal aslinya — GET /api/cashflow tidak lagi men-void pemasukan
     // yang invoice-nya sudah punya entry TRANSACTION_REFUND.
-    try {
+    if (prevStatus !== "PAID") {
+      console.log(`[RESTORE] skip refund otomatis: status ${prevStatus} (bukan PAID) — invoice ${invoice}`);
+    } else try {
       const { data: directIn } = await supabase
         .from("cashflow_entries")
         .select("nominal")
