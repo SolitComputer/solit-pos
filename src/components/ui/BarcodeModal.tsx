@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 interface UnitBarcode {
   id: string;
   serial_number: string;
-  grade: "A" | "B" | "C";
+  grade?: "A" | "B" | "C";   // laptop saja — aksesoris tidak punya grade
+  condition?: string;         // aksesoris saja (BARU/BEKAS)
   selling_price: number;
   status: string;
 }
@@ -13,6 +14,13 @@ interface UnitBarcode {
 interface BarcodeModalProps {
   laptopId: string;
   laptopName: string;
+  // BARU: default "LAPTOP" biar pemanggil lama tetap jalan. "ACCESSORY" →
+  // fetch dari accessory-units & pakai badge Kondisi, bukan Grade.
+  itemType?: "LAPTOP" | "ACCESSORY";
+  // BARU: kalau diisi, modal TIDAK fetch — langsung pakai unit ini. Dipakai
+  // halaman Kelola Unit yang sudah punya data per baris (termasuk RESERVED,
+  // yang tak akan muncul kalau di-fetch dgn filter TERSEDIA).
+  presetUnit?: UnitBarcode;
   onClose: () => void;
 }
 
@@ -23,22 +31,31 @@ const GRADE_COLOR = {
   B: { bg: "#fef3c7", text: "#78350f", border: "#fcd34d" },
   C: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
 };
-
-export default function BarcodeModal({ laptopId, laptopName, onClose }: BarcodeModalProps) {
-  const [units, setUnits] = useState<UnitBarcode[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function BarcodeModal({ laptopId, laptopName, itemType = "LAPTOP", presetUnit, onClose }: BarcodeModalProps) {
+  const isAccessory = itemType === "ACCESSORY";
+  const [units, setUnits] = useState<UnitBarcode[]>(presetUnit ? [presetUnit] : []);
+  const [loading, setLoading] = useState(!presetUnit);
   const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
+    // Unit sudah dikirim langsung (halaman Kelola Unit) → tak perlu fetch.
+    if (presetUnit) { setUnits([presetUnit]); setLoading(false); return; }
     const fetchUnits = async () => {
       try {
-        const res = await fetch(`/api/laptops/${laptopId}/units`);
+        // Endpoint & status "siap jual" beda antara 2 tipe:
+        //  laptop    : GET /api/laptops/{id}/units          → status SIAP_JUAL
+        //  aksesoris : GET /api/accessory-units?accessory_id={id} → status TERSEDIA
+        const url = isAccessory
+          ? `/api/accessory-units?accessory_id=${laptopId}`
+          : `/api/laptops/${laptopId}/units`;
+        const availableStatus = isAccessory ? "TERSEDIA" : "SIAP_JUAL";
+
+        const res = await fetch(url);
         const data = await res.json();
-        // Tampilkan semua unit yang SIAP_JUAL saja untuk barcode penjualan
-        const siapJual: UnitBarcode[] = (data.data || []).filter(
-          (u: UnitBarcode) => u.status === "SIAP_JUAL"
+        const available: UnitBarcode[] = (data.data || []).filter(
+          (u: UnitBarcode) => u.status === availableStatus
         );
-        setUnits(siapJual);
+        setUnits(available);
       } catch {
         setUnits([]);
       } finally {
@@ -46,7 +63,11 @@ export default function BarcodeModal({ laptopId, laptopName, onClose }: BarcodeM
       }
     };
     fetchUnits();
-  }, [laptopId]);
+    // Pakai serial_number, BUKAN objek presetUnit, sebagai dependency.
+    // Kalau pakai objeknya, tiap render induk bikin referensi objek baru →
+    // effect jalan ulang → setUnits → render lagi → LOOP tak berhenti.
+    // serial_number berupa string yang stabil, jadi aman.
+  }, [laptopId, isAccessory, presetUnit?.serial_number]);
 
   // Escape key
   useEffect(() => {
@@ -103,7 +124,7 @@ export default function BarcodeModal({ laptopId, laptopName, onClose }: BarcodeM
                 Tidak ada unit tersedia
               </p>
               <p style={{ color: "#9ca3af", fontSize: 12, marginTop: 6 }}>
-                Belum ada unit dengan status <strong>Siap Jual</strong>
+                Belum ada unit dengan status <strong>{isAccessory ? "Tersedia" : "Siap Jual"}</strong>
               </p>
             </div>
           ) : (
@@ -128,7 +149,7 @@ export default function BarcodeModal({ laptopId, laptopName, onClose }: BarcodeM
                         borderColor: activeIdx === idx ? "#1a1a2e" : "#e5e7eb",
                       }}
                     >
-                      Unit {idx + 1} · {u.grade}
+                      Unit {idx + 1}{u.grade ? ` · ${u.grade}` : u.condition ? ` · ${u.condition}` : ""}
                     </button>
                   ))}
                 </div>
@@ -139,6 +160,7 @@ export default function BarcodeModal({ laptopId, laptopName, onClose }: BarcodeM
                 <BarcodeCard
                   unit={activeUnit}
                   laptopName={laptopName}
+                  isAccessory={isAccessory}
                 />
               )}
 
@@ -161,10 +183,21 @@ export default function BarcodeModal({ laptopId, laptopName, onClose }: BarcodeM
 }
 
 // ─── Barcode Card ─────────────────────────────────────────────────────────────
-function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: string }) {
+function BarcodeCard({ unit, laptopName, isAccessory }: { unit: UnitBarcode; laptopName: string; isAccessory: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const scanUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/scan/${encodeURIComponent(unit.serial_number)}`;
+
+  // Badge kartu: laptop pakai Grade (A/B/C), aksesoris pakai Kondisi (BARU/BEKAS).
+  // Bentuknya disamakan dgn GRADE_COLOR (bg/text/border) + tambahan `label`,
+  // supaya kode gambar & print di bawah cukup pakai `grade = badge` tanpa
+  // diubah banyak.
+  const badge = isAccessory
+    ? { bg: "#eef2ff", text: "#4338ca", border: "#c7d2fe", label: unit.condition || "Aksesoris" }
+    : (() => {
+        const g = GRADE_COLOR[unit.grade ?? "A"] || GRADE_COLOR.A;
+        return { ...g, label: `Grade ${unit.grade ?? "A"}` };
+      })();
 
   useEffect(() => {
     drawBarcode(canvasRef.current, unit.serial_number);
@@ -173,7 +206,7 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
   //  NEW: Render kartu lengkap ke canvas baru untuk download
   const generateFullBarcodeCanvas = (): HTMLCanvasElement => {
     const barcodeCanvas = canvasRef.current!;
-    const grade = GRADE_COLOR[unit.grade] || GRADE_COLOR.A;
+    const grade = badge;
 
     const scale = 2; // retina / high-DPI
     const cardW = 320;
@@ -236,7 +269,7 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
     y += nameH + nameMB;
 
     // ── Grade Badge ──
-    const badgeText = `Grade ${unit.grade}`;
+    const badgeText = badge.label;
     ctx.font = `bold 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
     const badgeTextW = ctx.measureText(badgeText).width;
     const badgePadX = 12;
@@ -315,7 +348,7 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
     if (!canvas) return;
 
     const imgData = canvas.toDataURL("image/png");
-    const grade = GRADE_COLOR[unit.grade] || GRADE_COLOR.A;
+    const grade = badge;
 
     const printWin = window.open("", "_blank", "width=400,height=600");
     if (!printWin) return;
@@ -398,7 +431,7 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
       <body>
         <div class="card">
           <p class="laptop-name">${laptopName}</p>
-          <span class="grade-badge">Grade ${unit.grade}</span>
+          <span class="grade-badge">${badge.label}</span>
           <img src="${imgData}" class="barcode-img" />
           <p class="sn">${unit.serial_number}</p>
           <p class="price">${fmt(unit.selling_price)}</p>
@@ -413,7 +446,7 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
     `);
     printWin.document.close();
   };
-  const grade = GRADE_COLOR[unit.grade] || GRADE_COLOR.A;
+  const grade = badge;
 
   return (
     <div style={barcodeCardStyle}>
@@ -432,7 +465,7 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
           color: grade.text,
           border: `1px solid ${grade.border}`,
         }}>
-          Grade {unit.grade}
+          {badge.label}
         </span>
       </div>
 

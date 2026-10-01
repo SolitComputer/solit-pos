@@ -1,5 +1,5 @@
 // worker/index.js
-// Custom service worker untuk push notification.
+// Custom service worker untuk push notification (model WhatsApp).
 // next-pwa otomatis meng-inject file ini ke sw.js yang di-generate saat build.
 
 self.addEventListener("push", (event) => {
@@ -13,15 +13,19 @@ self.addEventListener("push", (event) => {
     }
 
     const title = payload.title || "Solit POS";
+    const isSilent = payload.silent ?? false;
+
     const options = {
         body: payload.body || "",
         icon: payload.icon || "/assets/solit03.jpeg",
         badge: payload.badge || "/assets/solit03.jpeg",
         tag: payload.tag || "solit-chat",
-        renotify: payload.renotify ?? true,       // bunyi lagi walau notif diganti
+        // renotify hanya kalau TIDAK silent — silent+renotify ditolak/warning di Chrome
+        renotify: isSilent ? false : (payload.renotify ?? true),
         requireInteraction: payload.requireInteraction ?? false,
-        silent: payload.silent ?? false,          // false = pakai suara default
-        vibrate: [200, 100, 200],                 // getar HP
+        silent: isSilent,
+        vibrate: isSilent ? undefined : [200, 100, 200], // jangan getar kalau silent (mis. ucapan ultah)
+        timestamp: Date.now(),
         data: payload.data || { url: "/dashboard/users" },
     };
 
@@ -30,23 +34,24 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
     event.notification.close();
-    const targetUrl = (event.notification.data && event.notification.data.url) || "/dashboard/users";
+    const data = event.notification.data || {};
+    const targetUrl = data.url || "/dashboard/users";
+    const absoluteUrl = new URL(targetUrl, self.location.origin).href;
 
     event.waitUntil(
         self.clients
             .matchAll({ type: "window", includeUncontrolled: true })
             .then((clientList) => {
-                // Kalau app sudah kebuka → fokuskan tab + suruh buka DM
-                // (useIncomingChat.ts sudah dengerin pesan "NOTIFICATION_CLICK")
+                // Cari tab app yang SUDAH kebuka (origin sama) → fokusin & suruh buka chat
                 for (const client of clientList) {
-                    if ("focus" in client) {
-                        client.focus();
-                        client.postMessage({ type: "NOTIFICATION_CLICK", url: targetUrl });
-                        return;
+                    if (client.url.startsWith(self.location.origin)) {
+                        return client.focus().then((focused) => {
+                            (focused || client).postMessage({ type: "NOTIFICATION_CLICK", url: targetUrl });
+                        });
                     }
                 }
-                // Belum ada tab → buka window baru ke URL yang benar (bukan root hostinger)
-                if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+                // Belum ada tab → buka window baru ke URL absolut (bukan root hostinger)
+                if (self.clients.openWindow) return self.clients.openWindow(absoluteUrl);
             })
     );
 });

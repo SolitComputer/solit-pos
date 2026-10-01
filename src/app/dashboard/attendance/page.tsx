@@ -275,7 +275,7 @@ function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" | "SKIP" {
         return "SKIP";
     }
 
-       if (isLate(a.check_in_time || a.created_at, (a.shift_snapshot ?? a.user_shift) ?? "PAGI")) return "LATE";
+    if (isLate(a.check_in_time || a.created_at, (a.shift_snapshot ?? a.user_shift) ?? "PAGI")) return "LATE";
     return "PRESENT";
 }
 
@@ -5766,7 +5766,7 @@ export default function AttendanceDashboardPage() {
                             <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="w-full text-sm [&_th]:px-2 [&_td]:px-2 [&_.w-10]:w-8 [&_.h-10]:h-8">
                                     <thead>
                                         <tr className="border-b border-gray-100 bg-gray-50/60">
                                             <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">#</th>
@@ -5779,7 +5779,7 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Lembur Libur</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[80px]">Persentase</th>
                                             {isAdmin && (
                                                 <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kontrak</th>
                                             )}
@@ -5916,10 +5916,10 @@ export default function AttendanceDashboardPage() {
                                                         </div>
                                                     </td>                                                        <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
+                                                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[40px]">
                                                                 <div className={`h-full rounded-full bg-gradient-to-r ${barGrad} transition-all duration-700`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
                                                             </div>
-                                                            <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
+                                                            <span className={`text-sm font-black w-12 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
                                                         </div>
                                                     </td>
                                                     {isAdmin && (
@@ -6054,10 +6054,10 @@ export default function AttendanceDashboardPage() {
                             <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-20 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm min-w-[1200px] border-collapse">
+                                <table className="w-full text-sm border-collapse table-fixed">
                                     <thead>
                                         <tr className="border-2 border-gray-300 bg-gray-50/60 sticky top-0">
-                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300">Karyawan</th>
+                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300 w-[160px]">Karyawan</th>
 
                                             {/* PENGHASILAN SECTION */}
                                             <th colSpan={5} className="px-4 py-4 text-center text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/40 border-2 border-gray-300">
@@ -6125,7 +6125,7 @@ export default function AttendanceDashboardPage() {
                                                                     {initials(u.name)}
                                                                 </div>
                                                                 <div className="min-w-0">
-                                                                    <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
+                                                                    <span className="font-bold text-gray-800 block text-sm leading-tight break-words">{u.name}</span>
                                                                     <span className="text-[10px] text-gray-400">
                                                                         {sal ? (sal.salary_type === "FIXED" ? "Tetap" : "% Absen") : "—"}
                                                                     </span>
