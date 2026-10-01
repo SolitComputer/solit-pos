@@ -6054,7 +6054,7 @@ export default function AttendanceDashboardPage() {
                             <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-20 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="min-w-[1100px] w-full text-sm border-collapse">
+                                <table className="min-w-[1000px] lg:min-w-0 w-full text-sm border-collapse lg:[&_th]:px-2 lg:[&_td]:px-2">
                                     <thead>
                                         <tr className="border-2 border-gray-300 bg-gray-50/60 sticky top-0">
                                             <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300 w-[160px]">Karyawan</th>
@@ -6083,8 +6083,8 @@ export default function AttendanceDashboardPage() {
 
                                             {/* Penghasilan sub-headers */}
                                             <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Gaji Pokok</th>
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Tunjangan Istri (×%)</th>
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Tunjangan Anak (×%)</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">T. Istri (×%)</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">T. Anak (×%)</th>
                                             <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Lemburan</th>
                                             <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Kehadiran %</th>
 
