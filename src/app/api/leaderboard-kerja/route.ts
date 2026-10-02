@@ -28,6 +28,13 @@ const PROGRAMMER_USER_IDS = [
 // HRD — Yoga Adi Prakoso. Role sistemnya ADMIN, disatukan ke Divisi HRD
 // lewat ID (pola sama dengan Rayhan Accounting & Programmer di atas).
 const YOGA_HRD_USER_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
+
+// Dedup Tes Kondisi: 1x per (user, barang, tanggal WIB). 0,3 poin (setara SO).
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+const POINTS_PER_CONDITION_CHECK = 0.3;
+function toWibDateStr(d: Date): string {
+  return new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+}
 // Sales Online — role yang dapat poin dari Laporan Harian Sales (chat leads),
 // role-based (bukan per akun). Harus disamakan manual dengan
 // SALES_REPORT_ROLES di src/lib/permissions.ts.
@@ -100,7 +107,8 @@ export const GET = withAuth(async (req, _ctx, user) => {
       { data: missions },
       { data: salesOnlineReports },
       { data: manualAttendanceEntries },
-      { data: overtimeAudits }
+      { data: overtimeAudits },
+      { data: conditionCheckLogs }
     ] = await Promise.all([
       // Sales Offline: transactions — kolom SEBELUMNYA salah nama
       // (created_by/invoice/total_amount TIDAK ADA di tabel ini; nama
@@ -227,7 +235,17 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .select("id, audited_by, audited_at, audit_status")
         .not("audited_by", "is", null)
         .gte("audited_at", startIso)
-        .lte("audited_at", endIso)
+        .lte("audited_at", endIso),
+
+      // Pengelola Barang — Tes Kondisi (label "... — tes kondisi", EDIT).
+      // entity_id + created_at dipakai buat dedup 1x/barang/hari WIB.
+      supabaseAdmin
+        .from("activity_logs")
+        .select("user_id, entity_id, created_at")
+        .eq("action", "EDIT")
+        .ilike("entity_label", "%tes kondisi%")
+        .gte("created_at", startIso)
+        .lte("created_at", endIso)
     ]);
 
     // Programmer: peta jumlah sub-task per tugas — dipakai buat nentuin
@@ -237,6 +255,16 @@ export const GET = withAuth(async (req, _ctx, user) => {
     const itemCountByTodoId = new Map<string, number>();
     (todoItems ?? []).forEach((it: any) => {
       itemCountByTodoId.set(it.todo_id, (itemCountByTodoId.get(it.todo_id) ?? 0) + 1);
+    });
+
+    // Tes Kondisi: dedup 1x per (user, barang, tanggal WIB) → jumlah unik per user.
+    const condCountByUser = new Map<string, number>();
+    const seenCond = new Set<string>();
+    (conditionCheckLogs ?? []).forEach((r: any) => {
+      const key = `${r.user_id}|${r.entity_id}|${toWibDateStr(new Date(r.created_at))}`;
+      if (seenCond.has(key)) return;
+      seenCond.add(key);
+      condCountByUser.set(r.user_id, (condCountByUser.get(r.user_id) ?? 0) + 1);
     });
 
     // Calculate score per user
@@ -389,9 +417,11 @@ export const GET = withAuth(async (req, _ctx, user) => {
       const uInputBarang = uActivities.filter((a: any) => a.action === "CREATE" && a.entity === "unit");
       const uSo = uActivities.filter((a: any) => a.action === "SO");
       const uMinusFixed = uActivities.filter((a: any) => a.action === "MINUS_FIXED");
+      const uCondCount = condCountByUser.get(uid) ?? 0;
       if (hasRole("PENGELOLA")) {
-        score += uInputBarang.length * 1 + uSo.length * 0.3 + uMinusFixed.length * 5;
+        score += uInputBarang.length * 1 + uSo.length * 0.3 + uMinusFixed.length * 5 + uCondCount * POINTS_PER_CONDITION_CHECK;
         metrics.push({ label: "Input Barang", value: uInputBarang.length, unit: "unit" });
+        metrics.push({ label: "Tes Kondisi", value: uCondCount, unit: "tes" });
       }
 
       // ACCOUNTING — Pembukuan Manual (bikin jurnal lewat "+ Jurnal Manual",
