@@ -966,6 +966,7 @@ type PengelolaBarangRow = {
     units_added: number;
     units_solved: number;
     so_count: number;
+    condition_check_count: number;
     rank: number;
     level: number;
     isPermanent: boolean;
@@ -1050,7 +1051,7 @@ function PengelolaBarangLeaderboard({ isAdmin }: { isAdmin: boolean }) {
                 title="Lencana Pengelola Barang"
                 description={
                     <>
-                        Poin dihitung dari 3 aktivitas: <strong>tambah unit</strong> barang baru = 1 poin/unit, unit yang berhasil dipindah dari <strong>Minus ke Siap Jual ("Solved")</strong> = 5 poin/unit, dan <strong>SO (Stock Opname)</strong> laptop = 0,3 poin (SO/UNSO berulang di laptop &amp; hari yang sama cuma dihitung 1x). Juara Top 3 setiap bulan naik 1 level (bulan pertama Level 1, bulan kedua Level 2, dst — maksimal Level 10). Level 1-2 masih <strong>sementara</strong>: kalau bulan depan gak lanjut Top 3, levelnya reset. Begitu tembus <strong>Level 3</strong> (3 bulan Top 3 berturut-turut), lencananya jadi <strong>permanen</strong>.
+                        Poin dihitung dari 4 aktivitas: <strong>tambah unit</strong> barang baru = 1 poin/unit, unit yang berhasil dipindah dari <strong>Minus ke Siap Jual ("Solved")</strong> = 5 poin/unit, <strong>SO (Stock Opname)</strong> laptop = 0,3 poin, dan <strong>Tes Kondisi</strong> = 0,3 poin (SO maupun Tes Kondisi berulang di barang &amp; hari yang sama cuma dihitung 1x). Juara Top 3 setiap bulan naik 1 level
                     </>
                 }
             >
@@ -1090,6 +1091,7 @@ function PengelolaBarangLeaderboard({ isAdmin }: { isAdmin: boolean }) {
                                     <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tambah Unit</th>
                                     <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Solved</th>
                                     <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">SO</th>
+                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tes Kondisi</th>
                                     <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[160px]">Skor Pengelola Barang</th>
                                 </tr>
                             </thead>
@@ -1102,6 +1104,7 @@ function PengelolaBarangLeaderboard({ isAdmin }: { isAdmin: boolean }) {
                                         <td className="px-4 py-4 text-center text-gray-600 font-semibold">{u.units_added}</td>
                                         <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200 shadow-sm">{u.units_solved}</span></td>
                                         <td className="px-4 py-4 text-center text-gray-600 font-semibold">{u.so_count}</td>
+                                        <td className="px-4 py-4 text-center text-indigo-600 font-semibold">{u.condition_check_count}</td>
                                         <td className="px-6 py-4">
                                             <ProgressBar
                                                 pct={(u.total_points / maxPoints) * 100}
@@ -1135,10 +1138,11 @@ function PengelolaBarangLeaderboard({ isAdmin }: { isAdmin: boolean }) {
                                     </div>
                                     <LevelBadge level={u.level} isPermanent={u.isPermanent} />
                                 </div>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-2 gap-2">
                                     <AbsensiStatChip label="Tambah Unit" value={u.units_added} tone="text-gray-700" />
                                     <AbsensiStatChip label="Solved" value={u.units_solved} tone="text-emerald-600" />
                                     <AbsensiStatChip label="SO" value={u.so_count} tone="text-sky-600" />
+                                    <AbsensiStatChip label="Tes Kondisi" value={u.condition_check_count} tone="text-indigo-600" />
                                 </div>
                                 <ProgressBar
                                     pct={(u.total_points / maxPoints) * 100}
