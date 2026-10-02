@@ -301,11 +301,6 @@ export default function FixedAssetsContent() {
     [assets]
   );
 
-  const maxNominal = useMemo(
-    () => assets.reduce((m, a) => Math.max(m, Number(a.nominal) || 0), 0),
-    [assets]
-  );
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return assets;
@@ -649,7 +644,6 @@ export default function FixedAssetsContent() {
               <AssetTagCard
                 key={asset.id}
                 asset={asset}
-                maxNominal={maxNominal}
                 onEdit={() => openEditModal(asset)}
                 onDelete={() => setDeleteTarget(asset)}
               />
@@ -861,19 +855,17 @@ export default function FixedAssetsContent() {
 // ═════════════════════════════════════════════════════════════════════════════
 function AssetTagCard({
   asset,
-  maxNominal,
   onEdit,
   onDelete,
 }: {
   asset: FixedAsset;
-  maxNominal: number;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const type = detectAssetType(asset.nama_aset);
   const TypeIcon = type.Icon;
   const nominal = Number(asset.nominal) || 0;
-  const barPct = maxNominal > 0 ? Math.max(4, (nominal / maxNominal) * 100) : 0;
+
 
   return (
     <li className="group relative flex flex-col rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition">
@@ -923,12 +915,6 @@ function AssetTagCard({
           <p className="text-lg font-black text-[#1a1a2e] tabular-nums tracking-tight">
             {formatIDR(nominal)}
           </p>
-        </div>
-        <div className="h-1 rounded-full bg-gray-100 overflow-hidden mt-2">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-amber-300 to-amber-500"
-            style={{ width: `${barPct}%` }}
-          />
         </div>
         {asset.tanggal_beli && (
           <p className="mt-3 text-[11px] text-gray-500 tabular-nums">
