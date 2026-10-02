@@ -935,12 +935,6 @@ function AssetTagCard({
             Dibeli {formatDate(asset.tanggal_beli)}
           </p>
         )}
-        <div className="flex items-center justify-between gap-2 mt-3 text-[11px] text-gray-400">
-          <span className="truncate">
-            {asset.created_by_name ? `Dicatat ${asset.created_by_name}` : "Dicatat"}
-          </span>
-          <span className="flex-shrink-0 tabular-nums">{formatDate(asset.created_at)}</span>
-        </div>
       </div>
     </li>
   );
