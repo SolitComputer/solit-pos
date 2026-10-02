@@ -182,6 +182,15 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     // dari jadwal — tiebreak terakhir ini yang menjelaskan "kenapa dia posisi
     // nomor 1" kalau 3 kriteria di atas sama persis.
     const ranked = [...scores].sort((a, b) => {
+        // ✅ FIX BUG: orang yang BELUM punya hari kerja sama sekali (total_workdays = 0)
+        // — biasanya akun baru yang belum pernah absen — SELALU didorong ke paling
+        // bawah. Tanpa guard ini mereka "menang" di kriteria pelanggaran (0 pelanggaran
+        // = angka terkecil) dan nyelonong ke Top 3, ngalahin karyawan rajin yang Hari
+        // Sempurna-nya puluhan.
+        const aHasWork = a.total_workdays > 0;
+        const bHasWork = b.total_workdays > 0;
+        if (aHasWork !== bHasWork) return aHasWork ? -1 : 1; // yang punya hari kerja selalu di atas
+
         // ✅ FIX: late_days sekarang total (auto + manual). Telat manual sudah ikut di
         // manual_days, jadi dikurangi manual_late_days agar tidak dihitung dobel.
         // Kalau client tidak kirim manual_late_days (versi lama) → dianggap 0,
