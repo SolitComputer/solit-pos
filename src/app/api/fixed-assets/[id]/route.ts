@@ -57,6 +57,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       nama_aset: body.nama_aset.trim(),
       nominal,
       keterangan: body.keterangan ? String(body.keterangan).trim() : null,
+      tanggal_beli: body.tanggal_beli || null,
       updated_by_name: auth.userName || null,
       updated_at: new Date().toISOString(),
     })

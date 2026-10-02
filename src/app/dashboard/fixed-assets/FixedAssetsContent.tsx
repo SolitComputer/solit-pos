@@ -8,6 +8,7 @@ interface FixedAsset {
   nama_aset: string;
   nominal: number;
   keterangan: string | null;
+  tanggal_beli: string | null;
   created_by_name: string | null;
   updated_by_name: string | null;
   created_at: string;
@@ -18,9 +19,10 @@ interface FormState {
   nama_aset: string;
   nominal: string;
   keterangan: string;
+  tanggal_beli: string;
 }
 
-const EMPTY_FORM: FormState = { nama_aset: "", nominal: "", keterangan: "" };
+const EMPTY_FORM: FormState = { nama_aset: "", nominal: "", keterangan: "", tanggal_beli: "" };
 
 function formatIDR(value: number): string {
   return new Intl.NumberFormat("id-ID", {
@@ -353,6 +355,7 @@ export default function FixedAssetsContent() {
       nama_aset: asset.nama_aset,
       nominal: String(asset.nominal),
       keterangan: asset.keterangan || "",
+      tanggal_beli: asset.tanggal_beli || "",
     });
     setError(null);
     setModalOpen(true);
@@ -382,6 +385,7 @@ export default function FixedAssetsContent() {
         nama_aset: form.nama_aset.trim(),
         nominal: nominalNumber,
         keterangan: form.keterangan.trim() || null,
+        tanggal_beli: form.tanggal_beli || null,
       };
       const res = await fetch(
         editingId ? `/api/fixed-assets/${editingId}` : "/api/fixed-assets",
@@ -646,7 +650,6 @@ export default function FixedAssetsContent() {
                 key={asset.id}
                 asset={asset}
                 maxNominal={maxNominal}
-                totalNominal={totalNominal}
                 onEdit={() => openEditModal(asset)}
                 onDelete={() => setDeleteTarget(asset)}
               />
@@ -743,6 +746,19 @@ export default function FixedAssetsContent() {
                       required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label htmlFor="asset-date" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Tanggal Beli <span className="font-normal text-gray-400">(opsional)</span>
+                  </label>
+                  <input
+                    id="asset-date"
+                    type="date"
+                    value={form.tanggal_beli}
+                    onChange={(e) => setForm((f) => ({ ...f, tanggal_beli: e.target.value }))}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3.5 py-2.5 text-sm outline-none focus:bg-white focus:ring-4 focus:ring-[#1a1a2e]/5 focus:border-[#1a1a2e]/30 transition"
+                  />
                 </div>
 
                 <div>
@@ -846,13 +862,11 @@ export default function FixedAssetsContent() {
 function AssetTagCard({
   asset,
   maxNominal,
-  totalNominal,
   onEdit,
   onDelete,
 }: {
   asset: FixedAsset;
   maxNominal: number;
-  totalNominal: number;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -860,7 +874,6 @@ function AssetTagCard({
   const TypeIcon = type.Icon;
   const nominal = Number(asset.nominal) || 0;
   const barPct = maxNominal > 0 ? Math.max(4, (nominal / maxNominal) * 100) : 0;
-  const sharePct = totalNominal > 0 ? (nominal / totalNominal) * 100 : 0;
 
   return (
     <li className="group relative flex flex-col rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition">
@@ -910,9 +923,6 @@ function AssetTagCard({
           <p className="text-lg font-black text-[#1a1a2e] tabular-nums tracking-tight">
             {formatIDR(nominal)}
           </p>
-          <p className="text-[11px] font-semibold text-amber-600 tabular-nums flex-shrink-0 pb-0.5">
-            {sharePct > 0 && sharePct < 1 ? "<1" : Math.round(sharePct)}% total
-          </p>
         </div>
         <div className="h-1 rounded-full bg-gray-100 overflow-hidden mt-2">
           <div
@@ -920,6 +930,11 @@ function AssetTagCard({
             style={{ width: `${barPct}%` }}
           />
         </div>
+        {asset.tanggal_beli && (
+          <p className="mt-3 text-[11px] text-gray-500 tabular-nums">
+            Dibeli {formatDate(asset.tanggal_beli)}
+          </p>
+        )}
         <div className="flex items-center justify-between gap-2 mt-3 text-[11px] text-gray-400">
           <span className="truncate">
             {asset.created_by_name ? `Dicatat ${asset.created_by_name}` : "Dicatat"}

@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
       nama_aset: body.nama_aset.trim(),
       nominal,
       keterangan: body.keterangan ? String(body.keterangan).trim() : null,
+      tanggal_beli: body.tanggal_beli || null,
       created_by: auth.userId || null,
       created_by_name: auth.userName || null,
     })
