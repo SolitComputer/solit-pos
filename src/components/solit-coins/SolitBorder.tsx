@@ -267,6 +267,26 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
       <path d="M6.5 9.5 4.5 7.5M17.5 9.5l2-2M6.8 15 4.8 17.2" stroke="#dc2626" strokeWidth=".45" strokeLinecap="round" />
     </svg>
   ),
+  "cyber-samurai": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M12 1.5 13.1 15.5H10.9z" fill="#e0f2fe" stroke="#38bdf8" strokeWidth=".6" strokeLinejoin="round" />
+      <circle cx="12" cy="16.3" r="1.6" fill="none" stroke="#ef4444" strokeWidth="1.1" />
+      <rect x="11" y="17.6" width="2" height="5" rx="1" fill="#18181b" stroke="#ef4444" strokeWidth=".4" />
+    </svg>
+  ),
+  "stardust-fairy": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M12 1.5l1.8 4.3 4.3 1.8-4.3 1.8L12 13.5l-1.8-4.1-4.3-1.8 4.3-1.8z"
+        fill="#fbcfe8"
+        stroke={stroke}
+        strokeWidth=".5"
+        strokeLinejoin="round"
+      />
+      <path d="M9.5 13.5 4 19" stroke="#a78bfa" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="4" cy="19" r="1" fill="#fff" />
+    </svg>
+  ),
 };
 
 // Level efek tambahan per preset, dipetakan manual sesuai tier rarity:
@@ -309,6 +329,8 @@ const FX_TIER: Record<string, "common" | "rare" | "epic" | "legendary" | "limite
   "butterfly-waltz": "epic",
   "cursed-reaper": "limited",
   "nightmare-eye": "limited",
+  "cyber-samurai": "epic",
+  "stardust-fairy": "rare",
 };
 
 // Warna aksen tematik per preset — dipakai buat recolor elemen kelap-kelip
@@ -353,6 +375,8 @@ const ACCENT_COLOR: Record<string, string> = {
   "butterfly-waltz": "#e879f9",
   "cursed-reaper": "#ef4444",
   "nightmare-eye": "#c4b5fd",
+  "cyber-samurai": "#f43f5e",
+  "stardust-fairy": "#fbcfe8",
 };
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
@@ -911,6 +935,8 @@ export function SolitBorder({
   const isButterfly = preset === "butterfly-waltz";
   const isCursedReaper = preset === "cursed-reaper";
   const isNightmareEye = preset === "nightmare-eye";
+  const isCyberSamurai = preset === "cyber-samurai";
+  const isStardustFairy = preset === "stardust-fairy";
   const accent = preset ? (ACCENT_COLOR[preset] ?? "#ffffff") : "#ffffff";
 
   return (
@@ -998,11 +1024,19 @@ export function SolitBorder({
           />
         </span>
       )}
+      {!lite && isCyberSamurai && <span className="sb-katana" aria-hidden="true" />}
+      {!lite && isStardustFairy && (
+        <span className="sb-stardust" aria-hidden="true">
+          <span className="sb-star sb-star-1" />
+          <span className="sb-star sb-star-2" />
+          <span className="sb-star sb-star-3" />
+        </span>
+      )}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
         <span
           className={`sb-orn ${
-            !lite && (fx === "legendary" || fx === "limited" || isCodeTerminal) ? "sb-orn-glow" : ""
+            !lite && (fx === "legendary" || fx === "limited" || isCodeTerminal || isCyberSamurai) ? "sb-orn-glow" : ""
           } ${!lite && isCodeTerminal ? "sb-orn-type" : ""} ${!lite && isButterfly ? "sb-orn-flutter" : ""} ${
             !lite && isNightmareEye ? "sb-orn-dilate" : ""
           }`}
@@ -1613,6 +1647,58 @@ export function SolitBorder({
           75% { transform: translateX(-50%) scaleY(1); opacity: 0.9; }
           90% { transform: translateX(-50%) scaleY(0.6); opacity: 0.4; }
         }
+        /* Katana slash — eksklusif Cyber Samurai. Sabetan silang biru-putih-
+           merah yang nyamber sekali tiap beberapa detik (pola sama kayak
+           sb-slash milik Cursed Reaper, tapi warnanya dual-tone biru/merah
+           biar kerasa kayak bentrok dua pedang chi-energy). */
+        .sb-katana {
+          position: absolute;
+          inset: -12%;
+          border-radius: 9999px;
+          pointer-events: none;
+          background: linear-gradient(
+            115deg,
+            transparent 44%,
+            rgba(56, 189, 248, 0.9) 49%,
+            rgba(255, 255, 255, 0.95) 50%,
+            rgba(239, 68, 68, 0.9) 51%,
+            transparent 56%
+          );
+          opacity: 0;
+          animation: sb-katana-flash 4.2s ease-in-out infinite;
+        }
+        @keyframes sb-katana-flash {
+          0%, 88%, 100% { opacity: 0; transform: scale(0.88) rotate(0deg); }
+          90% { opacity: 1; transform: scale(1.06) rotate(-4deg); }
+          92% { opacity: 0.25; transform: scale(1) rotate(0deg); }
+          95% { opacity: 0.85; transform: scale(1.03) rotate(2deg); }
+        }
+        /* Stardust twinkle — eksklusif Stardust Fairy. Beda dari sb-petal
+           (yang jatuh dari atas ke bawah): titik-titik ini DIAM di posisi
+           top/left fix, cuma kedip membesar-mengecil — kesan debu peri
+           yang beterbangan statis di sekitar ring, bukan kelopak gugur. */
+        .sb-stardust {
+          position: absolute;
+          inset: -10%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-star {
+          position: absolute;
+          width: 4px;
+          height: 4px;
+          border-radius: 9999px;
+          background: #ffffff;
+          box-shadow: 0 0 6px 1px rgba(251, 207, 232, 0.9);
+          animation: sb-star-twinkle 2.6s ease-in-out infinite;
+        }
+        .sb-star-1 { top: 8%; left: 18%; }
+        .sb-star-2 { top: 72%; left: 82%; animation-delay: 0.9s; }
+        .sb-star-3 { top: 85%; left: 25%; animation-delay: 1.8s; }
+        @keyframes sb-star-twinkle {
+          0%, 100% { opacity: 0; transform: scale(0.4); }
+          50% { opacity: 1; transform: scale(1.3); }
+        }
         /* Pupil dilate — eksklusif Nightmare Eye. Selector lengkap
            (.sb-ring > .sb-orn.sb-orn-dilate) biar GANTI TOTAL animasi
            float bawaan (pola sama kayak sb-orn-flutter) — bukan nambah,
@@ -2068,6 +2154,37 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 20px rgba(196, 181, 253, 0.9)) brightness(1.3) hue-rotate(15deg); }
         }
 
+        /* ══ CYBER SAMURAI (EPIC) — tema cowok, dark neon biru-merah ═════ */
+        .sb-p-cyber-samurai {
+          background: conic-gradient(
+            from 0deg,
+            #030712 0deg,
+            #0c4a6e 70deg,
+            #38bdf8 100deg,
+            #030712 150deg,
+            #450a0a 210deg,
+            #ef4444 240deg,
+            #030712 300deg,
+            #0c4a6e 340deg,
+            #030712 360deg
+          );
+          animation: sb-spin 4s linear infinite, sb-g-samurai 1.5s ease-in-out infinite;
+        }
+        @keyframes sb-g-samurai {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.8)) brightness(1); }
+          50% { filter: drop-shadow(0 0 18px rgba(239, 68, 68, 0.9)) brightness(1.3); }
+        }
+
+        /* ══ STARDUST FAIRY (RARE) — tema cewek, galaxy pastel ═══════════ */
+        .sb-p-stardust-fairy {
+          background: conic-gradient(from 0deg, #4c1d95, #a78bfa, #fbcfe8, #a78bfa, #4c1d95);
+          animation: sb-spin 5.5s linear infinite, sb-g-stardust 2.6s ease-in-out infinite;
+        }
+        @keyframes sb-g-stardust {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.6)) brightness(1); }
+          50% { filter: drop-shadow(0 0 13px rgba(251, 207, 232, 0.95)) brightness(1.15); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .sb-bg-wrap,
           .sb-bg-wrap > .sb-bg,
@@ -2096,6 +2213,8 @@ export function SolitBorder({
           .sb-petal,
           .sb-drop,
           .sb-slash,
+          .sb-katana,
+          .sb-star,
           .sb-ember,
           .sb-tendril::before,
           .sb-burst,
