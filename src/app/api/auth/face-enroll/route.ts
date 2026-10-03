@@ -72,11 +72,16 @@ export async function POST(request: Request) {
 
     const normalized = normalizeEmbedding(embedding);
 
-    // ⛔ KEAMANAN: blok hanya kalau wajah HAMPIR IDENTIK dengan akun lain.
-    // Threshold sengaja sangat ketat (0.30) karena embedding tinyFaceDetector
-    // kurang tajam memisah orang — kalau kelewat longgar, orang BERBEDA malah
-    // salah diblokir (contoh: Moreno ke-detect sebagai Fikri).
-    const HARD_DUPLICATE_THRESHOLD = 0.30;
+    // ⛔ KEAMANAN: blok hanya kalau wajah BENAR-BENAR HAMPIR IDENTIK dgn akun
+    // lain. Diturunkan dari 0.30 → 0.28 karena faceRecognitionNet (tinyFace)
+    // lemah memisah orang beda tapi mirip (cahaya/kamera sama) → sering salah
+    // blokir user BARU yg belum pernah daftar ("Wajah terdeteksi di akun lain").
+    // Hanya jarak SANGAT kecil (praktis wajah yg sama persis) yg diblok.
+    const HARD_DUPLICATE_THRESHOLD = 0.28;
+    // Di bawah angka ini = dianggap benar2 orang yg sama (data dobel/identik),
+    // bukan sekadar "mirip". Dipakai utk membedakan false-positive vs duplikat asli.
+    const IDENTICAL_THRESHOLD = 0.10;
+    const EMBEDDING_DIMS = 128;
     const { data: otherFaces } = await supabaseAdmin
       .from("users")
       .select("id, name, face_embedding")
@@ -86,29 +91,49 @@ export async function POST(request: Request) {
 
     let closest: { id: string; name: string; distance: number } | null = null;
     for (const other of otherFaces ?? []) {
-      if (!Array.isArray(other.face_embedding) || other.face_embedding.length !== 128) continue;
+      // ✅ FIX: skip embedding rusak — harus array 128 & SEMUA elemen angka
+      // finite. Sebelumnya cuma cek panjang, jadi baris corrupt (mis. berisi
+      // 0/NaN) bisa jadi "wajah terdekat palsu" yg memblokir user baru.
+      if (
+        !Array.isArray(other.face_embedding) ||
+        other.face_embedding.length !== EMBEDDING_DIMS ||
+        !other.face_embedding.every((n: unknown) => typeof n === "number" && Number.isFinite(n))
+      ) {
+        continue;
+      }
       const d = euclideanDistance(normalized, normalizeEmbedding(other.face_embedding));
       if (!closest || d < closest.distance) closest = { id: other.id, name: other.name, distance: d };
     }
 
     // Log jarak wajah terdekat — pakai ini untuk kalibrasi threshold.
     if (closest) {
-      console.log(`[face-enroll] wajah terdekat: ${closest.name} @ ${closest.distance.toFixed(3)} (block bila < ${HARD_DUPLICATE_THRESHOLD})`);
+      console.log(`[face-enroll] wajah terdekat: ${closest.name} @ ${closest.distance.toFixed(3)} (block keras bila < ${HARD_DUPLICATE_THRESHOLD}, identik bila < ${IDENTICAL_THRESHOLD})`);
     }
 
-    if (closest && closest.distance < HARD_DUPLICATE_THRESHOLD) {
-      // Detail teknis (ID + jarak) cukup di log server, tidak perlu ke user.
+    // ✅ FIX: penolakan bertingkat. Hanya blok KERAS kalau wajahnya praktis
+    // identik (< IDENTICAL_THRESHOLD) — ini ciri data dobel/corrupt, bukan
+    // sekadar dua orang mirip. Zona abu-abu (identik..hard) TIDAK lagi diblok
+    // supaya user baru tidak salah ditolak; cukup dicatat utk audit admin.
+    if (closest && closest.distance < IDENTICAL_THRESHOLD) {
       console.warn(
-        `[face-enroll] DITOLAK: ${currentUser.name} (${user.id}) bentrok dengan ${closest.name} (${closest.id}) @ ${closest.distance.toFixed(3)}`
+        `[face-enroll] DITOLAK (identik): ${currentUser.name} (${user.id}) bentrok dengan ${closest.name} (${closest.id}) @ ${closest.distance.toFixed(3)}`
       );
       return NextResponse.json(
         {
           success: false,
-          message: `Wajah ini sudah terdaftar di akun lain (${closest.name}). Satu wajah tidak boleh dipakai untuk dua akun.`,
+          message: `Wajah ini sudah terdaftar di akun lain (${closest.name}). Satu wajah tidak boleh dipakai untuk dua akun. Jika ini salah, hubungi Admin.`,
           code: "FACE_DUPLICATE",
           conflictUserName: closest.name,
         },
         { status: 409 }
+      );
+    }
+
+    // Zona abu-abu: mirip tapi belum tentu orang yg sama (false-positive model).
+    // Izinkan enroll, tapi log WARNING supaya admin bisa cek manual kalau perlu.
+    if (closest && closest.distance < HARD_DUPLICATE_THRESHOLD) {
+      console.warn(
+        `[face-enroll] LOLOS dgn catatan — ${currentUser.name} (${user.id}) agak mirip ${closest.name} (${closest.id}) @ ${closest.distance.toFixed(3)}. Diizinkan (di bawah ambang identik ${IDENTICAL_THRESHOLD}).`
       );
     }
 

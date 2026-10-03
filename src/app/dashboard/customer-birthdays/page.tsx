@@ -274,6 +274,13 @@ export default function CustomerBirthdaysPage() {
                 const res = await fetch("/api/transaction/customer-birthdays");
                 const data = await res.json();
                 if (data.success) setCustomers(data.customers);
+
+                // === DUMMY TES BANNER — HAPUS SETELAH SELESAI CEK ===
+                setCustomers([
+                    { id: "t1", customer_name: "Tes Ultah Hari Ini", customer_phone: "081234567890", customer_birth_date: "2000-10-03", age: 26, diff_days: 0, sales_name: "Sales A", sales_id: "s1", invoice_number: "INV-TEST-1", transaction_date: "2026-10-03" },
+                    { id: "t2", customer_name: "Tes H-2", customer_phone: "081234567891", customer_birth_date: "2000-10-05", age: 26, diff_days: 2, sales_name: "Sales B", sales_id: "s2", invoice_number: "INV-TEST-2", transaction_date: "2026-10-03" },
+                ]);
+                // === END DUMMY ===
             } catch { /* silent */ }
             finally { setLoading(false); }
         };
@@ -366,7 +373,7 @@ export default function CustomerBirthdaysPage() {
                         </div>
                     </div>
 
-                    {/* ── Sorotan: ultah hari ini / terdekat (gaya halaman karyawan) ── */}
+                    {/* ── Sorotan: ultah hari ini / terdekat (gaya halaman karyawan) ── */}f
                     {!loading && todayList.length > 0 && <TodayBanner people={todayList} />}
                     {!loading && todayList.length === 0 && nextUp && <NextUpBanner person={nextUp} />}
 
