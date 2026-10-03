@@ -235,6 +235,33 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
       <circle cx="12" cy="7.5" r=".9" fill="#701a75" />
     </svg>
   ),
+  "cursed-reaper": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M12 2a6 6 0 0 0-6 6c0 2.2 1 3.6 2 4.8V16h1.5v2h1v-2h1v2h1v-2h1.5v-3.2c1-1.2 2-2.6 2-4.8a6 6 0 0 0-6-6z"
+        fill="#e2e8f0"
+        stroke="#1c1917"
+        strokeWidth=".6"
+        strokeLinejoin="round"
+      />
+      <circle cx="9.3" cy="9" r="1.3" fill="#1c1917" />
+      <circle cx="14.7" cy="9" r="1.3" fill="#1c1917" />
+      <path d="M10.8 11.3h2.4l-1.2 1.8z" fill="#1c1917" />
+    </svg>
+  ),
+  "nightmare-eye": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M2 12c2.5-4.5 6-6.5 10-6.5S19.5 7.5 22 12c-2.5 4.5-6 6.5-10 6.5S4.5 16.5 2 12z"
+        fill="#0a1505"
+        stroke="#84cc16"
+        strokeWidth=".7"
+        strokeLinejoin="round"
+      />
+      <ellipse cx="12" cy="12" rx="4" ry="4.6" fill="#84cc16" />
+      <ellipse cx="12" cy="12" rx="1.1" ry="4" fill="#0a1505" />
+    </svg>
+  ),
 };
 
 // Level efek tambahan per preset, dipetakan manual sesuai tier rarity:
@@ -275,6 +302,8 @@ const FX_TIER: Record<string, "common" | "rare" | "epic" | "legendary" | "limite
   "code-terminal": "epic",
   "sakura-bloom": "rare",
   "butterfly-waltz": "epic",
+  "cursed-reaper": "limited",
+  "nightmare-eye": "limited",
 };
 
 // Warna aksen tematik per preset — dipakai buat recolor elemen kelap-kelip
@@ -317,6 +346,8 @@ const ACCENT_COLOR: Record<string, string> = {
   "code-terminal": "#4ade80",
   "sakura-bloom": "#f9a8d4",
   "butterfly-waltz": "#e879f9",
+  "cursed-reaper": "#f87171",
+  "nightmare-eye": "#a3e635",
 };
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
@@ -873,6 +904,8 @@ export function SolitBorder({
   const isCodeTerminal = preset === "code-terminal";
   const isSakura = preset === "sakura-bloom";
   const isButterfly = preset === "butterfly-waltz";
+  const isCursedReaper = preset === "cursed-reaper";
+  const isNightmareEye = preset === "nightmare-eye";
   const accent = preset ? (ACCENT_COLOR[preset] ?? "#ffffff") : "#ffffff";
 
   return (
@@ -932,12 +965,21 @@ export function SolitBorder({
           <span className="sb-petal sb-petal-3" />
         </span>
       )}
+      {!lite && isCursedReaper && (
+        <span className="sb-blood" aria-hidden="true">
+          <span className="sb-drop sb-drop-1" />
+          <span className="sb-drop sb-drop-2" />
+          <span className="sb-drop sb-drop-3" />
+        </span>
+      )}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
         <span
           className={`sb-orn ${
             !lite && (fx === "legendary" || fx === "limited" || isCodeTerminal) ? "sb-orn-glow" : ""
-          } ${!lite && isCodeTerminal ? "sb-orn-type" : ""} ${!lite && isButterfly ? "sb-orn-flutter" : ""}`}
+          } ${!lite && isCodeTerminal ? "sb-orn-type" : ""} ${!lite && isButterfly ? "sb-orn-flutter" : ""} ${
+            !lite && isNightmareEye ? "sb-orn-dilate" : ""
+          }`}
           aria-hidden="true"
         >
           {orn(ornamentSize)}
@@ -968,7 +1010,7 @@ export function SolitBorder({
           position: relative;
           display: inline-flex;
           border-radius: 9999px;
-        }da
+        }
         .sb-bg-wrap {
           position: absolute;
           inset: 0;
@@ -1391,6 +1433,59 @@ export function SolitBorder({
           80% { opacity: 1; }
           100% { top: 106%; opacity: 0; transform: translateX(-50%) rotate(340deg); }
         }
+        /* Blood drip — eksklusif Cursed Reaper. Posisi pakai pola yang sama
+           kayak sb-petal (top/left persen, otomatis nyesuain ukuran ring),
+           tapi bentuknya teardrop (border-radius asimetris + rotate 45deg)
+           dan jatuhnya LURUS tanpa muter — kesan cairan menetes, bukan
+           kelopak yang berputar-putar kayak sakura. */
+        .sb-blood {
+          position: absolute;
+          inset: -10%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-drop {
+          position: absolute;
+          left: 0;
+          width: 5px;
+          height: 7px;
+          background: #dc2626;
+          border-radius: 50% 50% 50% 0;
+          transform: translateX(-50%) rotate(45deg);
+          box-shadow: 0 0 3px rgba(220, 38, 38, 0.8);
+          animation: sb-drop-fall 2.8s ease-in infinite;
+        }
+        .sb-drop-1 { left: 22%; }
+        .sb-drop-2 { left: 50%; animation-delay: 0.9s; }
+        .sb-drop-3 { left: 76%; animation-delay: 1.8s; }
+        @keyframes sb-drop-fall {
+          0% { top: -4%; opacity: 0; }
+          15% { opacity: 1; }
+          75% { opacity: 1; }
+          100% { top: 104%; opacity: 0; }
+        }
+        /* Pupil dilate — eksklusif Nightmare Eye. Selector lengkap
+           (.sb-ring > .sb-orn.sb-orn-dilate) biar GANTI TOTAL animasi
+           float bawaan (pola sama kayak sb-orn-flutter) — bukan nambah,
+           karena sama-sama nyentuh transform. Warna glow var(--accent)
+           sengaja DITULIS ULANG di sini (bukan diwarisi dari class
+           sb-orn-glow), soalnya animasi CSS selalu menang atas property
+           statis untuk property yang sama (filter) — kalau gak ditulis
+           ulang, glow hijau-nya bakal ketimpa jadi putih polos pas
+           animasi jalan. */
+        .sb-ring > .sb-orn.sb-orn-dilate {
+          animation: sb-orn-dilate 2.4s ease-in-out infinite;
+        }
+        @keyframes sb-orn-dilate {
+          0%, 100% {
+            transform: translate(-50%, -52%) scale(1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1);
+          }
+          50% {
+            transform: translate(-50%, -52%) scale(1.35);
+            filter: drop-shadow(0 0 12px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.4);
+          }
+        }
         .sb-orn-glow {
           filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
         }
@@ -1773,6 +1868,24 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 16px rgba(250, 232, 255, 1)) brightness(1.25); }
         }
 
+        /* ══ LIMITED — tema serem ═════════════════════════════════════════ */
+        .sb-p-cursed-reaper {
+          background: conic-gradient(from 0deg, #0a0a0a, #7f1d1d, #e2e8f0, #7f1d1d, #0a0a0a);
+          animation: sb-spin 4s linear infinite, sb-g-reaper 1.5s ease-in-out infinite;
+        }
+        @keyframes sb-g-reaper {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.8)) brightness(1); }
+          50% { filter: drop-shadow(0 0 20px rgba(226, 232, 240, 0.95)) brightness(1.3); }
+        }
+        .sb-p-nightmare-eye {
+          background: conic-gradient(from 0deg, #0a1505, #4d7c0f, #bef264, #4d7c0f, #0a1505);
+          animation: sb-spin 3.6s linear infinite, sb-g-nightmare 1.6s ease-in-out infinite;
+        }
+        @keyframes sb-g-nightmare {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(132, 204, 22, 0.8)) brightness(1); }
+          50% { filter: drop-shadow(0 0 20px rgba(190, 242, 100, 0.95)) brightness(1.3); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .sb-bg-wrap,
           .sb-bg-wrap > .sb-bg,
@@ -1796,7 +1909,9 @@ export function SolitBorder({
           .sb-circuit,
           .sb-orn-type,
           .sb-orn-flutter,
+          .sb-orn-dilate,
           .sb-petal,
+          .sb-drop,
           .sb-burst,
           .sb-ring-jitter,
           .sb-orn {

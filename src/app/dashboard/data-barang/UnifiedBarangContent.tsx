@@ -31,6 +31,7 @@ interface LaptopUnitLite {
     id: string; serial_number: string; status: string;
     purchase_price?: number; sparepart_cost?: number;
     source?: string | null; created_at?: string;
+    is_pedagang_listed?: boolean;
 }
 interface LaptopRaw {
     id: string; laptop_name: string; category_id?: string | null; category_name?: string | null;
@@ -66,6 +67,7 @@ interface UnifiedRow {
     so_at: string | null; so_by: string | null;
     audited_at: string | null; audited_by: string | null;
     unit_id?: string; unit_count: number;
+    is_pedagang_listed?: boolean; // laptop: true kalau ADA unit aktif yang masuk Pricelist Pedagang
     raw: LaptopRaw | AccessoryRaw;
 }
 
@@ -154,6 +156,7 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
         so_at: l.so_at ?? null, so_by: l.so_by ?? null,
         audited_at: l.audited_at ?? null, audited_by: l.audited_by ?? null,
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
+        is_pedagang_listed: aktif.some(u => u.is_pedagang_listed === true),
         raw: l,
     };
 }
@@ -1337,17 +1340,40 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    // ── Pedagang toggle (laptop, stok = 1 saja) ────────────────────────────
-    const togglePedagang = async (row: UnifiedRow, current: boolean) => {
-        if (!row.unit_id) return;
-        setPedagangSavingId(row.unit_id);
+     // ── Pedagang toggle (laptop — SEMUA unit aktif satu model sekaligus) ─────
+    //  Dulu hanya jalan saat stok = 1 (bergantung row.unit_id), jadi laptop
+    //  multi-unit TIDAK punya tombol sama sekali. Sekarang pakai row.id (model)
+    //  + endpoint /api/laptops/[id]/pedagang yang meng-update semua unit aktif.
+    const togglePedagang = async (row: UnifiedRow) => {
+        if (row.tipe !== "LAPTOP") return;
+        const next = !(row.is_pedagang_listed ?? false);
+        setPedagangSavingId(row.id);
         try {
-            const res = await fetch(`/api/units/${row.unit_id}/pedagang`, {
-                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_pedagang_listed: !current }),
+            const res = await fetch(`/api/laptops/${row.id}/pedagang`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_pedagang_listed: next }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal update status pedagang");
-            toast.success("Status pedagang diperbarui");
+            setRows(prev => {
+                const updated = prev.map(r => {
+                    if (r.id !== row.id) return r;
+                    const rawL = r.raw as LaptopRaw;
+                    return {
+                        ...r,
+                        is_pedagang_listed: next,
+                        raw: {
+                            ...rawL,
+                            laptop_units: (rawL.laptop_units ?? []).map(u =>
+                                u.status !== "SOLD" ? { ...u, is_pedagang_listed: next } : u
+                            ),
+                        },
+                    };
+                });
+                writeBarangCache(updated); // cache ikut sinkron biar load berikutnya tidak balik ke status lama
+                return updated;
+            });
+            toast.success(next ? "Laptop masuk Pricelist Pedagang" : "Laptop keluar dari Pricelist Pedagang");
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal update status pedagang");
         } finally {
@@ -2051,10 +2077,11 @@ export default function UnifiedBarangContent() {
 
                                                     {/* (2) GRID AKSI — 2 kolom seragam */}
                                                     <div className="grid grid-cols-2 gap-1.5">
-                                                        {row.tipe === "LAPTOP" && row.unit_id && (
-                                                            <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
-                                                                className={`${cardActionCls} text-zinc-700 bg-zinc-100 hover:bg-zinc-200`}>
-                                                                Pedagang
+                                                        {row.tipe === "LAPTOP" && row.unit_count > 0 && canFullAccessBarang && (
+                                                            <button onClick={() => togglePedagang(row)} disabled={pedagangSavingId === row.id}
+                                                                title={row.is_pedagang_listed ? "Keluarkan dari Pricelist Pedagang" : "Masukkan ke Pricelist Pedagang"}
+                                                                className={`${cardActionCls} ${row.is_pedagang_listed ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100" : "text-zinc-700 bg-zinc-100 hover:bg-zinc-200"}`}>
+                                                                {pedagangSavingId === row.id ? "..." : row.is_pedagang_listed ? "✓ Pedagang" : "+ Pedagang"}
                                                             </button>
                                                         )}
                                                         {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
@@ -2234,9 +2261,12 @@ export default function UnifiedBarangContent() {
                                                             </td>
                                                             <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                                                                 <div className="flex items-center gap-1 flex-nowrap min-w-max">
-                                                                    {row.tipe === "LAPTOP" && row.unit_id && (
-                                                                        <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
-                                                                            className="h-7 px-2 text-[11px] font-semibold text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Pedagang</button>
+                                                                    {row.tipe === "LAPTOP" && row.unit_count > 0 && canFullAccessBarang && (
+                                                                        <button onClick={() => togglePedagang(row)} disabled={pedagangSavingId === row.id}
+                                                                            title={row.is_pedagang_listed ? "Keluarkan dari Pricelist Pedagang" : "Masukkan ke Pricelist Pedagang"}
+                                                                            className={`h-7 px-2 text-[11px] font-semibold rounded-lg transition disabled:opacity-40 ${row.is_pedagang_listed ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100" : "text-zinc-700 bg-zinc-100 hover:bg-zinc-200"}`}>
+                                                                            {pedagangSavingId === row.id ? "..." : row.is_pedagang_listed ? "✓ Pedagang" : "+ Pedagang"}
+                                                                        </button>
                                                                     )}
                                                                     {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
                                                                         <button onClick={() => setAddUnitTarget(row)}
