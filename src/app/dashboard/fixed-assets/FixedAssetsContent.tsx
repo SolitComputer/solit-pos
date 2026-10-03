@@ -13,6 +13,15 @@ interface FixedAsset {
   updated_by_name: string | null;
   created_at: string;
   updated_at: string;
+  last_audited_at: string | null;
+  last_audited_by_name: string | null;
+}
+
+interface AuditLog {
+  id: string;
+  catatan: string | null;
+  audited_by_name: string | null;
+  created_at: string;
 }
 
 interface FormState {
@@ -55,6 +64,35 @@ function formatThousand(raw: string): string {
   const n = Number(raw);
   if (!Number.isFinite(n)) return raw;
   return n.toLocaleString("id-ID", { maximumFractionDigits: 0 });
+}
+
+// Tanggal + jam untuk riwayat audit
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// Tombol audit muncul lagi 1 hari (24 jam) setelah audit terakhir
+const AUDIT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+function canAuditNow(lastAuditedAt: string | null): boolean {
+  if (!lastAuditedAt) return true;
+  return Date.now() - new Date(lastAuditedAt).getTime() >= AUDIT_COOLDOWN_MS;
+}
+
+function auditCooldownLabel(lastAuditedAt: string | null): string {
+  if (!lastAuditedAt) return "";
+  const remaining = AUDIT_COOLDOWN_MS - (Date.now() - new Date(lastAuditedAt).getTime());
+  if (remaining <= 0) return "";
+  const hours = Math.ceil(remaining / (60 * 60 * 1000));
+  if (hours >= 1) return `Bisa audit lagi ${hours} jam lagi`;
+  const mins = Math.ceil(remaining / (60 * 1000));
+  return `Bisa audit lagi ${mins} menit lagi`;
 }
 
 
@@ -277,6 +315,16 @@ export default function FixedAssetsContent() {
   const [deleteTarget, setDeleteTarget] = useState<FixedAsset | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Audit
+  const [auditTarget, setAuditTarget] = useState<FixedAsset | null>(null);
+  const [auditNote, setAuditNote] = useState("");
+  const [auditing, setAuditing] = useState(false);
+
+  // Riwayat audit
+  const [historyTarget, setHistoryTarget] = useState<FixedAsset | null>(null);
+  const [historyItems, setHistoryItems] = useState<AuditLog[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const fetchAssets = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -376,12 +424,15 @@ export default function FixedAssetsContent() {
     setSaving(true);
     setError(null);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         nama_aset: form.nama_aset.trim(),
         nominal: nominalNumber,
-        keterangan: form.keterangan.trim() || null,
         tanggal_beli: form.tanggal_beli || null,
       };
+      // Keterangan hanya dikirim saat TAMBAH. Saat EDIT keterangan tidak diubah di sini.
+      if (!editingId) {
+        payload.keterangan = form.keterangan.trim() || null;
+      }
       const res = await fetch(
         editingId ? `/api/fixed-assets/${editingId}` : "/api/fixed-assets",
         {
@@ -414,6 +465,50 @@ export default function FixedAssetsContent() {
       setError(err.message || "Gagal menghapus aset");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  function openAudit(asset: FixedAsset) {
+    setAuditTarget(asset);
+    setAuditNote(asset.keterangan || ""); // prefill lokasi terakhir biar tinggal diedit
+    setError(null);
+  }
+
+  async function handleAudit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!auditTarget) return;
+    setAuditing(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/fixed-assets/${auditTarget.id}/audit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ catatan: auditNote.trim() || null }),
+      });
+      const d = await res.json();
+      if (!d.success) throw new Error(d.message || "Gagal menyimpan audit");
+      setAuditTarget(null);
+      setAuditNote("");
+      await fetchAssets();
+    } catch (err: any) {
+      setError(err.message || "Gagal menyimpan audit");
+    } finally {
+      setAuditing(false);
+    }
+  }
+
+  async function openHistory(asset: FixedAsset) {
+    setHistoryTarget(asset);
+    setHistoryItems([]);
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/fixed-assets/${asset.id}/audit`, { cache: "no-store" });
+      const d = await res.json();
+      if (d.success) setHistoryItems(d.data || []);
+    } catch {
+      // abaikan; modal tetap tampil kosong
+    } finally {
+      setHistoryLoading(false);
     }
   }
 
@@ -646,6 +741,8 @@ export default function FixedAssetsContent() {
                 asset={asset}
                 onEdit={() => openEditModal(asset)}
                 onDelete={() => setDeleteTarget(asset)}
+                onAudit={() => openAudit(asset)}
+                onHistory={() => openHistory(asset)}
               />
             ))}
           </ul>
@@ -755,19 +852,24 @@ export default function FixedAssetsContent() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="asset-note" className="block text-xs font-semibold text-gray-600 mb-1.5">
-                    Keterangan <span className="font-normal text-gray-400">(opsional)</span>
-                  </label>
-                  <textarea
-                    id="asset-note"
-                    value={form.keterangan}
-                    onChange={(e) => setForm((f) => ({ ...f, keterangan: e.target.value }))}
-                    placeholder="Contoh: Plat B 1234 XYZ, dipakai tim kurir"
-                    rows={3}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3.5 py-2.5 text-sm outline-none focus:bg-white focus:ring-4 focus:ring-[#1a1a2e]/5 focus:border-[#1a1a2e]/30 transition resize-none"
-                  />
-                </div>
+                {!editingId && (
+                  <div>
+                    <label htmlFor="asset-note" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Keterangan <span className="font-normal text-gray-400">(opsional)</span>
+                    </label>
+                    <textarea
+                      id="asset-note"
+                      value={form.keterangan}
+                      onChange={(e) => setForm((f) => ({ ...f, keterangan: e.target.value }))}
+                      placeholder="Contoh: Plat B 1234 XYZ, dipakai tim kurir"
+                      rows={3}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3.5 py-2.5 text-sm outline-none focus:bg-white focus:ring-4 focus:ring-[#1a1a2e]/5 focus:border-[#1a1a2e]/30 transition resize-none"
+                    />
+                    <p className="text-[11px] text-gray-400 mt-1.5">
+                      Setelah aset dibuat, keterangan diperbarui lewat tombol Audit di kartu.
+                    </p>
+                  </div>
+                )}
 
                 {/* Error di dalam modal supaya kelihatan */}
                 {error && (
@@ -845,6 +947,149 @@ export default function FixedAssetsContent() {
             </div>
           </div>
         )}
+
+        {/* ── Audit modal ───────────────────────────────────────────────────── */}
+        {auditTarget && (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+            onClick={() => !auditing && setAuditTarget(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="asset-audit-title"
+              className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-[#1a1a2e] px-5 sm:px-6 pt-4 pb-5 rounded-t-3xl">
+                <div className="sm:hidden mx-auto w-10 h-1.5 rounded-full bg-white/20 mb-4" />
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-400/15 text-emerald-300 flex items-center justify-center flex-shrink-0">
+                    <CheckIcon size={22} />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 id="asset-audit-title" className="text-base font-bold text-white">Audit Aset</h2>
+                    <p className="text-xs text-white/50 truncate">{auditTarget.nama_aset}</p>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleAudit} className="p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6 space-y-4">
+                <div>
+                  <label htmlFor="audit-note" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Keterangan / Lokasi Barang <span className="font-normal text-gray-400">(opsional)</span>
+                  </label>
+                  <textarea
+                    id="audit-note"
+                    value={auditNote}
+                    onChange={(e) => setAuditNote(e.target.value)}
+                    placeholder="Contoh: Ada di ruang sales, dipakai David"
+                    rows={3}
+                    autoFocus
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3.5 py-2.5 text-sm outline-none focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-400/40 transition resize-none"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Keterangan ini akan menggantikan keterangan aset, biar tahu posisi barang terkini.
+                  </p>
+                </div>
+
+                {error && (
+                  <div role="alert" className="rounded-xl bg-red-50 text-red-600 text-sm px-3.5 py-2.5 border border-red-100">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setAuditTarget(null)}
+                    disabled={auditing}
+                    className="flex-1 px-4 py-3 sm:py-2.5 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={auditing}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50"
+                  >
+                    {auditing && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                    {auditing ? "Menyimpan..." : "Konfirmasi Audit"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Riwayat audit modal ───────────────────────────────────────────── */}
+        {historyTarget && (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+            onClick={() => setHistoryTarget(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="asset-history-title"
+              className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md max-h-[85dvh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-[#1a1a2e] px-5 sm:px-6 pt-4 pb-5 rounded-t-3xl flex-shrink-0">
+                <div className="sm:hidden mx-auto w-10 h-1.5 rounded-full bg-white/20 mb-4" />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-xl bg-white/10 text-amber-300 flex items-center justify-center flex-shrink-0">
+                      <HistoryIcon size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 id="asset-history-title" className="text-base font-bold text-white">Riwayat Audit</h2>
+                      <p className="text-xs text-white/50 truncate">{historyTarget.nama_aset}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryTarget(null)}
+                    aria-label="Tutup"
+                    className="p-2 -m-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-5 sm:p-6 overflow-y-auto">
+                {historyLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
+                    ))}
+                  </div>
+                ) : historyItems.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <p className="text-sm font-semibold text-gray-600">Belum ada riwayat audit</p>
+                    <p className="text-xs text-gray-400 mt-1">Audit pertama akan muncul di sini.</p>
+                  </div>
+                ) : (
+                  <ol className="relative space-y-4 before:absolute before:left-[7px] before:top-1 before:bottom-1 before:w-px before:bg-gray-200">
+                    {historyItems.map((log) => (
+                      <li key={log.id} className="relative pl-6">
+                        <span className="absolute left-0 top-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-4 ring-emerald-50" />
+                        <p className="text-xs text-gray-400 tabular-nums">{formatDateTime(log.created_at)}</p>
+                        <p className="text-sm text-gray-800 mt-0.5 break-words">
+                          {log.catatan ? log.catatan : <span className="italic text-gray-400">Tanpa keterangan</span>}
+                        </p>
+                        {log.audited_by_name && (
+                          <p className="text-[11px] text-gray-500 mt-0.5">oleh {log.audited_by_name}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
@@ -857,10 +1102,14 @@ function AssetTagCard({
   asset,
   onEdit,
   onDelete,
+  onAudit,
+  onHistory,
 }: {
   asset: FixedAsset;
   onEdit: () => void;
   onDelete: () => void;
+  onAudit: () => void;
+  onHistory: () => void;
 }) {
   const type = detectAssetType(asset.nama_aset);
   const TypeIcon = type.Icon;
@@ -927,6 +1176,39 @@ function AssetTagCard({
           </span>
           <span className="flex-shrink-0 tabular-nums">{formatDate(asset.created_at)}</span>
         </div>
+
+        {/* Audit lokasi barang */}
+        <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
+          {asset.last_audited_at ? (
+            <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mb-2">
+              <CheckIcon size={12} />
+              Diaudit {formatDate(asset.last_audited_at)}
+              {asset.last_audited_by_name ? ` · ${asset.last_audited_by_name}` : ""}
+            </p>
+          ) : (
+            <p className="text-[11px] text-gray-400 mb-2">Belum pernah diaudit</p>
+          )}
+          <div className="flex items-center gap-2">
+            {canAuditNow(asset.last_audited_at) ? (
+              <button
+                onClick={onAudit}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold px-3 py-1.5 hover:bg-emerald-100 transition"
+              >
+                <CheckIcon size={13} />
+                Audit
+              </button>
+            ) : (
+              <span className="text-[11px] text-gray-400">{auditCooldownLabel(asset.last_audited_at)}</span>
+            )}
+            <button
+              onClick={onHistory}
+              className="inline-flex items-center gap-1.5 rounded-lg text-gray-500 text-xs font-semibold px-2.5 py-1.5 hover:bg-gray-100 transition ml-auto"
+            >
+              <HistoryIcon size={13} />
+              Riwayat
+            </button>
+          </div>
+        </div>
       </div>
     </li>
   );
@@ -965,6 +1247,24 @@ function CloseIcon({ size = 18 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className, size = 15 }: { className?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function HistoryIcon({ className, size = 15 }: { className?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3 3v5h5" />
+      <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+      <path d="M12 7v5l4 2" />
     </svg>
   );
 }
