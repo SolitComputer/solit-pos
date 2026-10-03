@@ -235,6 +235,58 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
       <circle cx="12" cy="7.5" r=".9" fill="#701a75" />
     </svg>
   ),
+  "cursed-reaper": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M12 1.5C7 1.5 4 5.5 4 10c0 3 1.2 5 2.5 6.3L6 21h12l-.5-4.7C18.8 15 20 13 20 10c0-4.5-3-8.5-8-8.5z"
+        fill="#18181b"
+        stroke="#3f3f46"
+        strokeWidth=".5"
+      />
+      <path
+        d="M12 5a5 5 0 0 0-5 5c0 1.8.8 3 1.7 4V16h1.3v1.6h1v-1.6h1v1.6h1v-1.6h1.3v-2c.9-1 1.7-2.2 1.7-4a5 5 0 0 0-5-5z"
+        fill="#e4e4e7"
+      />
+      <circle cx="9.6" cy="9" r="1.2" fill="#dc2626" />
+      <circle cx="14.4" cy="9" r="1.2" fill="#dc2626" />
+      <path d="M10.7 11.6h2.6l-1.3 1.9z" fill="#18181b" />
+      <path d="M13.5 6.5l-1 2 1.2 1.5-1.4 1.8" stroke="#18181b" strokeWidth=".4" fill="none" />
+    </svg>
+  ),
+  "nightmare-eye": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M1.5 12c1.6-3.4 5.2-6.5 10.5-6.5S20.9 8.6 22.5 12c-1.6 3.4-5.2 6.5-10.5 6.5S3.1 15.4 1.5 12z"
+        fill="#09060f"
+        stroke="#4c1d95"
+        strokeWidth=".6"
+        strokeLinejoin="round"
+      />
+      <ellipse cx="12" cy="12" rx="3.8" ry="4.3" fill="#84cc16" />
+      <ellipse cx="12" cy="12" rx="1" ry="3.8" fill="#09060f" />
+      <path d="M6.5 9.5 4.5 7.5M17.5 9.5l2-2M6.8 15 4.8 17.2" stroke="#dc2626" strokeWidth=".45" strokeLinecap="round" />
+    </svg>
+  ),
+  "cyber-samurai": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M12 1.5 13.1 15.5H10.9z" fill="#e0f2fe" stroke="#38bdf8" strokeWidth=".6" strokeLinejoin="round" />
+      <circle cx="12" cy="16.3" r="1.6" fill="none" stroke="#ef4444" strokeWidth="1.1" />
+      <rect x="11" y="17.6" width="2" height="5" rx="1" fill="#18181b" stroke="#ef4444" strokeWidth=".4" />
+    </svg>
+  ),
+  "stardust-fairy": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M12 1.5l1.8 4.3 4.3 1.8-4.3 1.8L12 13.5l-1.8-4.1-4.3-1.8 4.3-1.8z"
+        fill="#fbcfe8"
+        stroke={stroke}
+        strokeWidth=".5"
+        strokeLinejoin="round"
+      />
+      <path d="M9.5 13.5 4 19" stroke="#a78bfa" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="4" cy="19" r="1" fill="#fff" />
+    </svg>
+  ),
 };
 
 // Level efek tambahan per preset, dipetakan manual sesuai tier rarity:
@@ -275,6 +327,10 @@ const FX_TIER: Record<string, "common" | "rare" | "epic" | "legendary" | "limite
   "code-terminal": "epic",
   "sakura-bloom": "rare",
   "butterfly-waltz": "epic",
+  "cursed-reaper": "limited",
+  "nightmare-eye": "limited",
+  "cyber-samurai": "epic",
+  "stardust-fairy": "rare",
 };
 
 // Warna aksen tematik per preset — dipakai buat recolor elemen kelap-kelip
@@ -317,6 +373,10 @@ const ACCENT_COLOR: Record<string, string> = {
   "code-terminal": "#4ade80",
   "sakura-bloom": "#f9a8d4",
   "butterfly-waltz": "#e879f9",
+  "cursed-reaper": "#ef4444",
+  "nightmare-eye": "#c4b5fd",
+  "cyber-samurai": "#f43f5e",
+  "stardust-fairy": "#fbcfe8",
 };
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
@@ -873,6 +933,10 @@ export function SolitBorder({
   const isCodeTerminal = preset === "code-terminal";
   const isSakura = preset === "sakura-bloom";
   const isButterfly = preset === "butterfly-waltz";
+  const isCursedReaper = preset === "cursed-reaper";
+  const isNightmareEye = preset === "nightmare-eye";
+  const isCyberSamurai = preset === "cyber-samurai";
+  const isStardustFairy = preset === "stardust-fairy";
   const accent = preset ? (ACCENT_COLOR[preset] ?? "#ffffff") : "#ffffff";
 
   return (
@@ -881,7 +945,11 @@ export function SolitBorder({
       style={{ padding: thickness, "--accent": accent } as React.CSSProperties}
     >
       {!lite && (
-        <span className="sb-aura-wrap" style={{ "--aura-max": auraOpacity } as React.CSSProperties} aria-hidden="true">
+        <span
+          className={`sb-aura-wrap ${isCursedReaper || isNightmareEye ? "sb-aura-heartbeat" : ""}`}
+          style={{ "--aura-max": auraOpacity } as React.CSSProperties}
+          aria-hidden="true"
+        >
           <span className={`sb-aura-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
         </span>
       )}
@@ -897,6 +965,7 @@ export function SolitBorder({
         )}
         {!lite && <span className="sb-facets" aria-hidden="true" />}
         <span className="sb-bevel" aria-hidden="true" />
+        <span className="sb-specular" aria-hidden="true" />
         {!lite && isCodeTerminal && <span className="sb-circuit" aria-hidden="true" />}
       </span>
       {!lite && hasTrace && <span className="sb-trace" style={{ animationDuration: traceSpeed }} aria-hidden="true" />}
@@ -932,12 +1001,45 @@ export function SolitBorder({
           <span className="sb-petal sb-petal-3" />
         </span>
       )}
+      {!lite && isCursedReaper && (
+        <span className="sb-blood" aria-hidden="true">
+          <span className="sb-drop sb-drop-1" />
+          <span className="sb-drop sb-drop-2" />
+          <span className="sb-drop sb-drop-3" />
+          <span className="sb-slash" />
+        </span>
+      )}
+      {!lite && isCursedReaper && (
+        <span className="sb-embers" aria-hidden="true">
+          <span className="sb-ember sb-ember-1" />
+          <span className="sb-ember sb-ember-2" />
+        </span>
+      )}
+      {!lite && isNightmareEye && (
+        <span className="sb-tendrils" aria-hidden="true">
+          <span className="sb-tendril" style={{ "--tendril-rot": "35deg" } as React.CSSProperties} />
+          <span
+            className="sb-tendril"
+            style={{ "--tendril-rot": "195deg", "--tendril-delay": "2.1s" } as React.CSSProperties}
+          />
+        </span>
+      )}
+      {!lite && isCyberSamurai && <span className="sb-katana" aria-hidden="true" />}
+      {!lite && isStardustFairy && (
+        <span className="sb-stardust" aria-hidden="true">
+          <span className="sb-star sb-star-1" />
+          <span className="sb-star sb-star-2" />
+          <span className="sb-star sb-star-3" />
+        </span>
+      )}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
         <span
           className={`sb-orn ${
-            !lite && (fx === "legendary" || fx === "limited" || isCodeTerminal) ? "sb-orn-glow" : ""
-          } ${!lite && isCodeTerminal ? "sb-orn-type" : ""} ${!lite && isButterfly ? "sb-orn-flutter" : ""}`}
+            !lite && (fx === "legendary" || fx === "limited" || isCodeTerminal || isCyberSamurai) ? "sb-orn-glow" : ""
+          } ${!lite && isCodeTerminal ? "sb-orn-type" : ""} ${!lite && isButterfly ? "sb-orn-flutter" : ""} ${
+            !lite && isNightmareEye ? "sb-orn-dilate" : ""
+          }`}
           aria-hidden="true"
         >
           {orn(ornamentSize)}
@@ -968,7 +1070,7 @@ export function SolitBorder({
           position: relative;
           display: inline-flex;
           border-radius: 9999px;
-        }da
+        }
         .sb-bg-wrap {
           position: absolute;
           inset: 0;
@@ -1010,8 +1112,32 @@ export function SolitBorder({
           z-index: 2;
           pointer-events: none;
           box-shadow:
-            inset 0 1px 1.5px rgba(255, 255, 255, 0.55),
-            inset 0 -1.5px 2px rgba(0, 0, 0, 0.4);
+            inset 0 1.5px 2px rgba(255, 255, 255, 0.6),
+            inset 0 -2px 2.5px rgba(0, 0, 0, 0.45);
+        }
+        /* Specular rim — satu sapuan cahaya TETAP (gak animasi) di sudut
+           kiri-atas, kayak arah lampu studio foto produk. Ini yang bikin
+           SEMUA border (common sampai limited) kerasa "jewel-like"/
+           mengkilat secara instan, tanpa perlu desain ulang 37 gradient
+           satu-satu — murni trik pencahayaan statis, murah banget buat
+           render (gak ada blur, gak ada animasi tambahan). */
+        .sb-specular {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 3;
+          pointer-events: none;
+          background: conic-gradient(
+            from 200deg,
+            transparent 0deg,
+            transparent 18deg,
+            rgba(255, 255, 255, 0.95) 27deg,
+            rgba(255, 255, 255, 0.1) 38deg,
+            transparent 52deg,
+            transparent 360deg
+          );
+          mix-blend-mode: screen;
+          opacity: 0.8;
         }
         /* Circuit trace — eksklusif Code Terminal. Beda teknik dari semua
            efek lain di file ini (yang bentuknya conic-gradient diputer):
@@ -1049,6 +1175,22 @@ export function SolitBorder({
         @keyframes sb-aura-pulse {
           0%, 100% { transform: scale(0.94); opacity: calc(var(--aura-max, 0.4) * 0.55); }
           50% { transform: scale(1.1); opacity: var(--aura-max, 0.4); }
+        }
+        /* Heartbeat — ritme lub-dub (dua detak cepat, lalu jeda panjang),
+           bukan napas sine halus seperti sb-aura-pulse biasa. Khusus
+           Cursed Reaper & Nightmare Eye. */
+        .sb-aura-heartbeat {
+          animation-name: sb-aura-heartbeat;
+          animation-duration: 2.6s;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+        }
+        @keyframes sb-aura-heartbeat {
+          0%, 100% { transform: scale(0.92); opacity: calc(var(--aura-max, 0.4) * 0.5); }
+          12% { transform: scale(1.15); opacity: var(--aura-max, 0.4); }
+          22% { transform: scale(0.98); opacity: calc(var(--aura-max, 0.4) * 0.65); }
+          34% { transform: scale(1.08); opacity: calc(var(--aura-max, 0.4) * 0.9); }
+          46% { transform: scale(0.92); opacity: calc(var(--aura-max, 0.4) * 0.5); }
         }
         .sb-aura-bg {
           position: absolute;
@@ -1390,6 +1532,206 @@ export function SolitBorder({
           10% { opacity: 1; }
           80% { opacity: 1; }
           100% { top: 106%; opacity: 0; transform: translateX(-50%) rotate(340deg); }
+        }
+        /* Blood drip — eksklusif Cursed Reaper. Posisi pakai pola yang sama
+           kayak sb-petal (top/left persen, otomatis nyesuain ukuran ring),
+           tapi bentuknya teardrop (border-radius asimetris + rotate 45deg)
+           dan jatuhnya LURUS tanpa muter — kesan cairan menetes, bukan
+           kelopak yang berputar-putar kayak sakura. */
+        .sb-blood {
+          position: absolute;
+          inset: -10%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-drop {
+          position: absolute;
+          left: 0;
+          width: 5px;
+          height: 7px;
+          background: #dc2626;
+          border-radius: 50% 50% 50% 0;
+          transform: translateX(-50%) rotate(45deg);
+          box-shadow: 0 0 3px rgba(220, 38, 38, 0.8);
+          animation: sb-drop-fall 2.8s ease-in infinite;
+        }
+        .sb-drop-1 { left: 22%; }
+        .sb-drop-2 { left: 50%; animation-delay: 0.9s; }
+        .sb-drop-3 { left: 76%; animation-delay: 1.8s; }
+        @keyframes sb-drop-fall {
+          0% { top: -4%; opacity: 0; }
+          15% { opacity: 1; }
+          75% { opacity: 1; }
+          100% { top: 104%; opacity: 0; }
+        }
+        /* Slash flash — garis terang yang nyamber sekali tiap ±5 detik,
+           kesan sabetan sabit/cakar. Dipakai bareng blood drip, bukan
+           gantiin. */
+        .sb-slash {
+          position: absolute;
+          inset: -15%;
+          border-radius: 9999px;
+          background: linear-gradient(
+            115deg,
+            transparent 42%,
+            rgba(248, 113, 113, 0.9) 49%,
+            rgba(255, 255, 255, 0.8) 50%,
+            rgba(248, 113, 113, 0.9) 51%,
+            transparent 58%
+          );
+          opacity: 0;
+          animation: sb-slash-flash 5s ease-in-out infinite;
+        }
+        @keyframes sb-slash-flash {
+          0%, 92%, 100% { opacity: 0; transform: scale(0.9); }
+          94% { opacity: 1; transform: scale(1.05); }
+          96% { opacity: 0.3; transform: scale(1); }
+          98% { opacity: 0.8; transform: scale(1.02); }
+        }
+        /* Soul embers — percikan jiwa naik dari bawah ring, beda arah
+           total dari blood drip yang turun. */
+        .sb-embers {
+          position: absolute;
+          inset: -8%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-ember {
+          position: absolute;
+          bottom: 8%;
+          width: 3px;
+          height: 3px;
+          border-radius: 9999px;
+          background: #fca5a5;
+          box-shadow: 0 0 5px 1px rgba(248, 113, 113, 0.9);
+          animation: sb-ember-rise 3.4s ease-out infinite;
+        }
+        .sb-ember-1 { left: 30%; }
+        .sb-ember-2 { left: 68%; animation-delay: 1.6s; }
+        @keyframes sb-ember-rise {
+          0% { bottom: 6%; opacity: 0; transform: translateX(0) scale(0.6); }
+          20% { opacity: 1; }
+          100% { bottom: 98%; opacity: 0; transform: translateX(6px) scale(0.2); }
+        }
+        /* Shadow tendrils — uratan gelap yang menjangkau keluar dari tepi
+           ring lalu narik balik. Pola sama kayak sb-glint (wrapper rotate
+           via CSS var, pseudo-element tumbuh dari tepi luar) biar dijamin
+           gak pernah numpuk ke foto — tumbuhnya menjauh dari ring, bukan
+           ke arah tengah. */
+        .sb-tendrils {
+          position: absolute;
+          inset: -2px;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-tendril {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--tendril-rot, 0deg));
+        }
+        .sb-tendril::before {
+          content: "";
+          position: absolute;
+          top: -2px;
+          left: 50%;
+          width: 1.5px;
+          height: 14px;
+          background: linear-gradient(to top, rgba(76, 29, 149, 0.9), transparent);
+          transform: translateX(-50%) scaleY(0);
+          transform-origin: bottom center;
+          animation: sb-tendril-reach 4.2s ease-in-out infinite;
+          animation-delay: var(--tendril-delay, 0s);
+        }
+        @keyframes sb-tendril-reach {
+          0%, 60%, 100% { transform: translateX(-50%) scaleY(0); opacity: 0; }
+          75% { transform: translateX(-50%) scaleY(1); opacity: 0.9; }
+          90% { transform: translateX(-50%) scaleY(0.6); opacity: 0.4; }
+        }
+        /* Katana slash — eksklusif Cyber Samurai. Sabetan silang biru-putih-
+           merah yang nyamber sekali tiap beberapa detik (pola sama kayak
+           sb-slash milik Cursed Reaper, tapi warnanya dual-tone biru/merah
+           biar kerasa kayak bentrok dua pedang chi-energy). */
+        .sb-katana {
+          position: absolute;
+          inset: -12%;
+          border-radius: 9999px;
+          pointer-events: none;
+          background: linear-gradient(
+            115deg,
+            transparent 44%,
+            rgba(56, 189, 248, 0.9) 49%,
+            rgba(255, 255, 255, 0.95) 50%,
+            rgba(239, 68, 68, 0.9) 51%,
+            transparent 56%
+          );
+          opacity: 0;
+          animation: sb-katana-flash 4.2s ease-in-out infinite;
+        }
+        @keyframes sb-katana-flash {
+          0%, 88%, 100% { opacity: 0; transform: scale(0.88) rotate(0deg); }
+          90% { opacity: 1; transform: scale(1.06) rotate(-4deg); }
+          92% { opacity: 0.25; transform: scale(1) rotate(0deg); }
+          95% { opacity: 0.85; transform: scale(1.03) rotate(2deg); }
+        }
+        /* Stardust twinkle — eksklusif Stardust Fairy. Beda dari sb-petal
+           (yang jatuh dari atas ke bawah): titik-titik ini DIAM di posisi
+           top/left fix, cuma kedip membesar-mengecil — kesan debu peri
+           yang beterbangan statis di sekitar ring, bukan kelopak gugur. */
+        .sb-stardust {
+          position: absolute;
+          inset: -10%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-star {
+          position: absolute;
+          width: 4px;
+          height: 4px;
+          border-radius: 9999px;
+          background: #ffffff;
+          box-shadow: 0 0 6px 1px rgba(251, 207, 232, 0.9);
+          animation: sb-star-twinkle 2.6s ease-in-out infinite;
+        }
+        .sb-star-1 { top: 8%; left: 18%; }
+        .sb-star-2 { top: 72%; left: 82%; animation-delay: 0.9s; }
+        .sb-star-3 { top: 85%; left: 25%; animation-delay: 1.8s; }
+        @keyframes sb-star-twinkle {
+          0%, 100% { opacity: 0; transform: scale(0.4); }
+          50% { opacity: 1; transform: scale(1.3); }
+        }
+        /* Pupil dilate — eksklusif Nightmare Eye. Selector lengkap
+           (.sb-ring > .sb-orn.sb-orn-dilate) biar GANTI TOTAL animasi
+           float bawaan (pola sama kayak sb-orn-flutter) — bukan nambah,
+           karena sama-sama nyentuh transform. Warna glow var(--accent)
+           sengaja DITULIS ULANG di sini (bukan diwarisi dari class
+           sb-orn-glow), soalnya animasi CSS selalu menang atas property
+           statis untuk property yang sama (filter) — kalau gak ditulis
+           ulang, glow hijau-nya bakal ketimpa jadi putih polos pas
+           animasi jalan. */
+        .sb-ring > .sb-orn.sb-orn-dilate {
+          animation: sb-orn-dilate 4.5s ease-in-out infinite;
+        }
+        @keyframes sb-orn-dilate {
+          0%, 78% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1);
+          }
+          35% {
+            transform: translate(-50%, -52%) scale(1.3, 1.3);
+            filter: drop-shadow(0 0 13px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.4);
+          }
+          80% {
+            transform: translate(-50%, -52%) scale(1.05, 0.08);
+            filter: drop-shadow(0 0 4px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(0.8);
+          }
+          84% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 10px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.3);
+          }
+          100% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1);
+          }
         }
         .sb-orn-glow {
           filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
@@ -1773,6 +2115,76 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 16px rgba(250, 232, 255, 1)) brightness(1.25); }
         }
 
+        /* ══ LIMITED — tema serem (rombak total) ════════════════════════ */
+        .sb-p-cursed-reaper {
+          background: conic-gradient(
+            from 0deg,
+            #050505 0deg,
+            #450a0a 70deg,
+            #dc2626 95deg,
+            #0a0a0a 140deg,
+            #71717a 200deg,
+            #0a0a0a 240deg,
+            #7f1d1d 310deg,
+            #050505 360deg
+          );
+          animation: sb-spin 4.5s linear infinite, sb-g-reaper 1.3s ease-in-out infinite;
+        }
+        @keyframes sb-g-reaper {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(220, 38, 38, 0.85)) brightness(0.95); }
+          45% { filter: drop-shadow(0 0 22px rgba(248, 113, 113, 1)) brightness(1.4); }
+          55% { filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.7)) brightness(0.85); }
+        }
+        .sb-p-nightmare-eye {
+          background: conic-gradient(
+            from 0deg,
+            #030712 0deg,
+            #3b0764 80deg,
+            #84cc16 110deg,
+            #030712 160deg,
+            #4c1d95 230deg,
+            #030712 280deg,
+            #65a30d 330deg,
+            #030712 360deg
+          );
+          animation: sb-spin 5s linear infinite, sb-g-nightmare 2s ease-in-out infinite;
+        }
+        @keyframes sb-g-nightmare {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(132, 204, 22, 0.8)) brightness(1); }
+          50% { filter: drop-shadow(0 0 20px rgba(196, 181, 253, 0.9)) brightness(1.3) hue-rotate(15deg); }
+        }
+
+        /* ══ CYBER SAMURAI (EPIC) — tema cowok, dark neon biru-merah ═════ */
+        .sb-p-cyber-samurai {
+          background: conic-gradient(
+            from 0deg,
+            #030712 0deg,
+            #0c4a6e 70deg,
+            #38bdf8 100deg,
+            #030712 150deg,
+            #450a0a 210deg,
+            #ef4444 240deg,
+            #030712 300deg,
+            #0c4a6e 340deg,
+            #030712 360deg
+          );
+          animation: sb-spin 4s linear infinite, sb-g-samurai 1.5s ease-in-out infinite;
+        }
+        @keyframes sb-g-samurai {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.8)) brightness(1); }
+          50% { filter: drop-shadow(0 0 18px rgba(239, 68, 68, 0.9)) brightness(1.3); }
+        }
+
+        /* ══ STARDUST FAIRY (RARE) — tema cewek, galaxy pastel ═══════════ */
+        .sb-p-stardust-fairy {
+          background: conic-gradient(from 0deg, #4c1d95, #a78bfa, #fbcfe8, #a78bfa, #4c1d95);
+          animation: sb-spin 5.5s linear infinite, sb-g-stardust 2.6s ease-in-out infinite;
+        }
+        @keyframes sb-g-stardust {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.6)) brightness(1); }
+          50% { filter: drop-shadow(0 0 13px rgba(251, 207, 232, 0.95)) brightness(1.15); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .sb-bg-wrap,
           .sb-bg-wrap > .sb-bg,
@@ -1796,7 +2208,15 @@ export function SolitBorder({
           .sb-circuit,
           .sb-orn-type,
           .sb-orn-flutter,
+          .sb-orn-dilate,
+          .sb-aura-heartbeat,
           .sb-petal,
+          .sb-drop,
+          .sb-slash,
+          .sb-katana,
+          .sb-star,
+          .sb-ember,
+          .sb-tendril::before,
           .sb-burst,
           .sb-ring-jitter,
           .sb-orn {

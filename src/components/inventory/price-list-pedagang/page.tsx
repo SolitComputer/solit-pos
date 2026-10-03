@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type ExcelJS from "exceljs";
 import { UserRole, hasAnyRole } from "@/lib/permissions";
-import { Tags, Package, Wallet, Download, RefreshCw } from "lucide-react";
+import { Tags, Package, Wallet, Download, RefreshCw, Pencil, RotateCcw } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
 
 // Disamakan dengan PRICELIST_MODAL_VIEW_ROLES di pricelistPedagang.ts —
@@ -34,6 +34,7 @@ interface PedagangUnit {
   tier_label: string;
   tier_percent: number;
   pedagang_price: number;
+  is_manual_price?: boolean; // true kalau Price Store di-override manual
 }
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
@@ -177,6 +178,61 @@ function PriceListPedagangContent() {
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterGrade, setFilterGrade] = useState("ALL");
   const [filterBrand, setFilterBrand] = useState("ALL");
+
+  // ── Edit Price Store manual (per model) ──────────────────────────────────
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [savingPriceId, setSavingPriceId] = useState<string | null>(null);
+
+  const startEditPrice = (laptopId: string, current: number) => {
+    setEditingId(laptopId);
+    setEditValue(String(current || ""));
+  };
+  const cancelEdit = () => { setEditingId(null); setEditValue(""); };
+
+  const saveManualPrice = async (laptopId: string) => {
+    const price = Math.round(Number(editValue));
+    if (!Number.isFinite(price) || price < 0) {
+      setAccessError("Harga tidak valid");
+      return;
+    }
+    setSavingPriceId(laptopId);
+    setAccessError(null);
+    try {
+      const res = await fetch("/api/price-list-pedagang", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ laptop_id: laptopId, pedagang_price_manual: price }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "Gagal menyimpan harga");
+      cancelEdit();
+      await fetchData();
+    } catch (e) {
+      setAccessError(e instanceof Error ? e.message : "Gagal menyimpan harga");
+    } finally {
+      setSavingPriceId(null);
+    }
+  };
+
+  const resetManualPrice = async (laptopId: string) => {
+    setSavingPriceId(laptopId);
+    setAccessError(null);
+    try {
+      const res = await fetch("/api/price-list-pedagang", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ laptop_id: laptopId, pedagang_price_manual: null }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "Gagal reset harga");
+      await fetchData();
+    } catch (e) {
+      setAccessError(e instanceof Error ? e.message : "Gagal reset harga");
+    } finally {
+      setSavingPriceId(null);
+    }
+  };
 
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const canSeeModal = hasAnyRole(userRoles, MODAL_VIEW_ROLES);
@@ -381,6 +437,7 @@ function PriceListPedagangContent() {
       modal_price: number;
       tier_label: string;
       pedagang_price: number;
+      isManualPrice: boolean;
       siapJualCount: number;
       totalCount: number;
       serialNumbers: string[];
@@ -421,6 +478,7 @@ function PriceListPedagangContent() {
           modal_price,
           tier_label,
           pedagang_price,
+          isManualPrice: Boolean(u.is_manual_price),
           siapJualCount: u.status === "SIAP_JUAL" ? 1 : 0,
           totalCount: 1,
           serialNumbers: u.status === "SIAP_JUAL" ? [u.serial_number] : [],
@@ -428,10 +486,15 @@ function PriceListPedagangContent() {
       }
     });
 
-    return Array.from(map.values()).sort((a, b) =>
-      a.product.localeCompare(b.product, "id")
-    );
-  }, [filtered]);
+    return Array.from(map.values())
+      // ⬇️ Sembunyikan model yang Siap Jual-nya 0 dari pricelist.
+      //    Tapi saat user memfilter ke status non-siap (Service/Dipesan/dll),
+      //    pakai totalCount supaya unit itu tetap kelihatan (filter status tetap jalan).
+      // Pricelist pedagang hanya menampilkan stok yang BENAR-BENAR siap jual —
+      // model dengan Siap Jual = 0 (qty 0) selalu disembunyikan, apa pun filternya.
+      .filter((item) => item.siapJualCount > 0)
+      .sort((a, b) => a.product.localeCompare(b.product, "id"));
+  }, [filtered, filterStatus]);
 
   return (
     <div className="space-y-4">
@@ -574,7 +637,46 @@ function PriceListPedagangContent() {
                       </td>
                     )}
                     <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                      <span className="font-bold text-gray-900 text-sm tabular-nums">{fmt(item.pedagang_price)}</span>
+                      {editingId === item.laptopId ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <input
+                            type="number" inputMode="numeric" autoFocus
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveManualPrice(item.laptopId);
+                              if (e.key === "Escape") cancelEdit();
+                            }}
+                            className="w-28 h-8 px-2 border border-zinc-300 rounded-lg text-xs text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-zinc-900/15"
+                          />
+                          <button onClick={() => saveManualPrice(item.laptopId)} disabled={savingPriceId === item.laptopId}
+                            className="h-8 px-2 rounded-lg text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40">
+                            {savingPriceId === item.laptopId ? "..." : "Simpan"}
+                          </button>
+                          <button onClick={cancelEdit}
+                            className="h-8 px-2 rounded-lg text-[11px] font-semibold text-zinc-500 bg-zinc-100 hover:bg-zinc-200">Batal</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="font-bold text-gray-900 text-sm tabular-nums">{fmt(item.pedagang_price)}</span>
+                          {item.isManualPrice && (
+                            <span title="Harga diatur manual"
+                              className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1 py-0.5 rounded">M</span>
+                          )}
+                          {canSeeModal && (
+                            <button onClick={() => startEditPrice(item.laptopId, item.pedagang_price)} title="Edit Price Store manual"
+                              className="w-6 h-6 flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {item.isManualPrice && canSeeModal && (
+                            <button onClick={() => resetManualPrice(item.laptopId)} title="Kembalikan ke harga otomatis"
+                              className="w-6 h-6 flex items-center justify-center rounded-lg text-zinc-400 hover:text-amber-600 hover:bg-amber-50 transition">
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
