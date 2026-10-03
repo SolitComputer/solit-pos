@@ -238,28 +238,33 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
   "cursed-reaper": (s) => (
     <svg {...svgProps(s)}>
       <path
-        d="M12 2a6 6 0 0 0-6 6c0 2.2 1 3.6 2 4.8V16h1.5v2h1v-2h1v2h1v-2h1.5v-3.2c1-1.2 2-2.6 2-4.8a6 6 0 0 0-6-6z"
-        fill="#e2e8f0"
-        stroke="#1c1917"
-        strokeWidth=".6"
-        strokeLinejoin="round"
+        d="M12 1.5C7 1.5 4 5.5 4 10c0 3 1.2 5 2.5 6.3L6 21h12l-.5-4.7C18.8 15 20 13 20 10c0-4.5-3-8.5-8-8.5z"
+        fill="#18181b"
+        stroke="#3f3f46"
+        strokeWidth=".5"
       />
-      <circle cx="9.3" cy="9" r="1.3" fill="#1c1917" />
-      <circle cx="14.7" cy="9" r="1.3" fill="#1c1917" />
-      <path d="M10.8 11.3h2.4l-1.2 1.8z" fill="#1c1917" />
+      <path
+        d="M12 5a5 5 0 0 0-5 5c0 1.8.8 3 1.7 4V16h1.3v1.6h1v-1.6h1v1.6h1v-1.6h1.3v-2c.9-1 1.7-2.2 1.7-4a5 5 0 0 0-5-5z"
+        fill="#e4e4e7"
+      />
+      <circle cx="9.6" cy="9" r="1.2" fill="#dc2626" />
+      <circle cx="14.4" cy="9" r="1.2" fill="#dc2626" />
+      <path d="M10.7 11.6h2.6l-1.3 1.9z" fill="#18181b" />
+      <path d="M13.5 6.5l-1 2 1.2 1.5-1.4 1.8" stroke="#18181b" strokeWidth=".4" fill="none" />
     </svg>
   ),
   "nightmare-eye": (s) => (
     <svg {...svgProps(s)}>
       <path
-        d="M2 12c2.5-4.5 6-6.5 10-6.5S19.5 7.5 22 12c-2.5 4.5-6 6.5-10 6.5S4.5 16.5 2 12z"
-        fill="#0a1505"
-        stroke="#84cc16"
-        strokeWidth=".7"
+        d="M1.5 12c1.6-3.4 5.2-6.5 10.5-6.5S20.9 8.6 22.5 12c-1.6 3.4-5.2 6.5-10.5 6.5S3.1 15.4 1.5 12z"
+        fill="#09060f"
+        stroke="#4c1d95"
+        strokeWidth=".6"
         strokeLinejoin="round"
       />
-      <ellipse cx="12" cy="12" rx="4" ry="4.6" fill="#84cc16" />
-      <ellipse cx="12" cy="12" rx="1.1" ry="4" fill="#0a1505" />
+      <ellipse cx="12" cy="12" rx="3.8" ry="4.3" fill="#84cc16" />
+      <ellipse cx="12" cy="12" rx="1" ry="3.8" fill="#09060f" />
+      <path d="M6.5 9.5 4.5 7.5M17.5 9.5l2-2M6.8 15 4.8 17.2" stroke="#dc2626" strokeWidth=".45" strokeLinecap="round" />
     </svg>
   ),
 };
@@ -346,8 +351,8 @@ const ACCENT_COLOR: Record<string, string> = {
   "code-terminal": "#4ade80",
   "sakura-bloom": "#f9a8d4",
   "butterfly-waltz": "#e879f9",
-  "cursed-reaper": "#f87171",
-  "nightmare-eye": "#a3e635",
+  "cursed-reaper": "#ef4444",
+  "nightmare-eye": "#c4b5fd",
 };
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
@@ -914,7 +919,11 @@ export function SolitBorder({
       style={{ padding: thickness, "--accent": accent } as React.CSSProperties}
     >
       {!lite && (
-        <span className="sb-aura-wrap" style={{ "--aura-max": auraOpacity } as React.CSSProperties} aria-hidden="true">
+        <span
+          className={`sb-aura-wrap ${isCursedReaper || isNightmareEye ? "sb-aura-heartbeat" : ""}`}
+          style={{ "--aura-max": auraOpacity } as React.CSSProperties}
+          aria-hidden="true"
+        >
           <span className={`sb-aura-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
         </span>
       )}
@@ -930,6 +939,7 @@ export function SolitBorder({
         )}
         {!lite && <span className="sb-facets" aria-hidden="true" />}
         <span className="sb-bevel" aria-hidden="true" />
+        <span className="sb-specular" aria-hidden="true" />
         {!lite && isCodeTerminal && <span className="sb-circuit" aria-hidden="true" />}
       </span>
       {!lite && hasTrace && <span className="sb-trace" style={{ animationDuration: traceSpeed }} aria-hidden="true" />}
@@ -970,6 +980,22 @@ export function SolitBorder({
           <span className="sb-drop sb-drop-1" />
           <span className="sb-drop sb-drop-2" />
           <span className="sb-drop sb-drop-3" />
+          <span className="sb-slash" />
+        </span>
+      )}
+      {!lite && isCursedReaper && (
+        <span className="sb-embers" aria-hidden="true">
+          <span className="sb-ember sb-ember-1" />
+          <span className="sb-ember sb-ember-2" />
+        </span>
+      )}
+      {!lite && isNightmareEye && (
+        <span className="sb-tendrils" aria-hidden="true">
+          <span className="sb-tendril" style={{ "--tendril-rot": "35deg" } as React.CSSProperties} />
+          <span
+            className="sb-tendril"
+            style={{ "--tendril-rot": "195deg", "--tendril-delay": "2.1s" } as React.CSSProperties}
+          />
         </span>
       )}
       <span className="sb-inner">{children}</span>
@@ -1052,8 +1078,32 @@ export function SolitBorder({
           z-index: 2;
           pointer-events: none;
           box-shadow:
-            inset 0 1px 1.5px rgba(255, 255, 255, 0.55),
-            inset 0 -1.5px 2px rgba(0, 0, 0, 0.4);
+            inset 0 1.5px 2px rgba(255, 255, 255, 0.6),
+            inset 0 -2px 2.5px rgba(0, 0, 0, 0.45);
+        }
+        /* Specular rim — satu sapuan cahaya TETAP (gak animasi) di sudut
+           kiri-atas, kayak arah lampu studio foto produk. Ini yang bikin
+           SEMUA border (common sampai limited) kerasa "jewel-like"/
+           mengkilat secara instan, tanpa perlu desain ulang 37 gradient
+           satu-satu — murni trik pencahayaan statis, murah banget buat
+           render (gak ada blur, gak ada animasi tambahan). */
+        .sb-specular {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 3;
+          pointer-events: none;
+          background: conic-gradient(
+            from 200deg,
+            transparent 0deg,
+            transparent 18deg,
+            rgba(255, 255, 255, 0.95) 27deg,
+            rgba(255, 255, 255, 0.1) 38deg,
+            transparent 52deg,
+            transparent 360deg
+          );
+          mix-blend-mode: screen;
+          opacity: 0.8;
         }
         /* Circuit trace — eksklusif Code Terminal. Beda teknik dari semua
            efek lain di file ini (yang bentuknya conic-gradient diputer):
@@ -1091,6 +1141,22 @@ export function SolitBorder({
         @keyframes sb-aura-pulse {
           0%, 100% { transform: scale(0.94); opacity: calc(var(--aura-max, 0.4) * 0.55); }
           50% { transform: scale(1.1); opacity: var(--aura-max, 0.4); }
+        }
+        /* Heartbeat — ritme lub-dub (dua detak cepat, lalu jeda panjang),
+           bukan napas sine halus seperti sb-aura-pulse biasa. Khusus
+           Cursed Reaper & Nightmare Eye. */
+        .sb-aura-heartbeat {
+          animation-name: sb-aura-heartbeat;
+          animation-duration: 2.6s;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+        }
+        @keyframes sb-aura-heartbeat {
+          0%, 100% { transform: scale(0.92); opacity: calc(var(--aura-max, 0.4) * 0.5); }
+          12% { transform: scale(1.15); opacity: var(--aura-max, 0.4); }
+          22% { transform: scale(0.98); opacity: calc(var(--aura-max, 0.4) * 0.65); }
+          34% { transform: scale(1.08); opacity: calc(var(--aura-max, 0.4) * 0.9); }
+          46% { transform: scale(0.92); opacity: calc(var(--aura-max, 0.4) * 0.5); }
         }
         .sb-aura-bg {
           position: absolute;
@@ -1464,6 +1530,89 @@ export function SolitBorder({
           75% { opacity: 1; }
           100% { top: 104%; opacity: 0; }
         }
+        /* Slash flash — garis terang yang nyamber sekali tiap ±5 detik,
+           kesan sabetan sabit/cakar. Dipakai bareng blood drip, bukan
+           gantiin. */
+        .sb-slash {
+          position: absolute;
+          inset: -15%;
+          border-radius: 9999px;
+          background: linear-gradient(
+            115deg,
+            transparent 42%,
+            rgba(248, 113, 113, 0.9) 49%,
+            rgba(255, 255, 255, 0.8) 50%,
+            rgba(248, 113, 113, 0.9) 51%,
+            transparent 58%
+          );
+          opacity: 0;
+          animation: sb-slash-flash 5s ease-in-out infinite;
+        }
+        @keyframes sb-slash-flash {
+          0%, 92%, 100% { opacity: 0; transform: scale(0.9); }
+          94% { opacity: 1; transform: scale(1.05); }
+          96% { opacity: 0.3; transform: scale(1); }
+          98% { opacity: 0.8; transform: scale(1.02); }
+        }
+        /* Soul embers — percikan jiwa naik dari bawah ring, beda arah
+           total dari blood drip yang turun. */
+        .sb-embers {
+          position: absolute;
+          inset: -8%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-ember {
+          position: absolute;
+          bottom: 8%;
+          width: 3px;
+          height: 3px;
+          border-radius: 9999px;
+          background: #fca5a5;
+          box-shadow: 0 0 5px 1px rgba(248, 113, 113, 0.9);
+          animation: sb-ember-rise 3.4s ease-out infinite;
+        }
+        .sb-ember-1 { left: 30%; }
+        .sb-ember-2 { left: 68%; animation-delay: 1.6s; }
+        @keyframes sb-ember-rise {
+          0% { bottom: 6%; opacity: 0; transform: translateX(0) scale(0.6); }
+          20% { opacity: 1; }
+          100% { bottom: 98%; opacity: 0; transform: translateX(6px) scale(0.2); }
+        }
+        /* Shadow tendrils — uratan gelap yang menjangkau keluar dari tepi
+           ring lalu narik balik. Pola sama kayak sb-glint (wrapper rotate
+           via CSS var, pseudo-element tumbuh dari tepi luar) biar dijamin
+           gak pernah numpuk ke foto — tumbuhnya menjauh dari ring, bukan
+           ke arah tengah. */
+        .sb-tendrils {
+          position: absolute;
+          inset: -2px;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-tendril {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--tendril-rot, 0deg));
+        }
+        .sb-tendril::before {
+          content: "";
+          position: absolute;
+          top: -2px;
+          left: 50%;
+          width: 1.5px;
+          height: 14px;
+          background: linear-gradient(to top, rgba(76, 29, 149, 0.9), transparent);
+          transform: translateX(-50%) scaleY(0);
+          transform-origin: bottom center;
+          animation: sb-tendril-reach 4.2s ease-in-out infinite;
+          animation-delay: var(--tendril-delay, 0s);
+        }
+        @keyframes sb-tendril-reach {
+          0%, 60%, 100% { transform: translateX(-50%) scaleY(0); opacity: 0; }
+          75% { transform: translateX(-50%) scaleY(1); opacity: 0.9; }
+          90% { transform: translateX(-50%) scaleY(0.6); opacity: 0.4; }
+        }
         /* Pupil dilate — eksklusif Nightmare Eye. Selector lengkap
            (.sb-ring > .sb-orn.sb-orn-dilate) biar GANTI TOTAL animasi
            float bawaan (pola sama kayak sb-orn-flutter) — bukan nambah,
@@ -1474,16 +1623,28 @@ export function SolitBorder({
            ulang, glow hijau-nya bakal ketimpa jadi putih polos pas
            animasi jalan. */
         .sb-ring > .sb-orn.sb-orn-dilate {
-          animation: sb-orn-dilate 2.4s ease-in-out infinite;
+          animation: sb-orn-dilate 4.5s ease-in-out infinite;
         }
         @keyframes sb-orn-dilate {
-          0%, 100% {
-            transform: translate(-50%, -52%) scale(1);
+          0%, 78% {
+            transform: translate(-50%, -52%) scale(1, 1);
             filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1);
           }
-          50% {
-            transform: translate(-50%, -52%) scale(1.35);
-            filter: drop-shadow(0 0 12px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.4);
+          35% {
+            transform: translate(-50%, -52%) scale(1.3, 1.3);
+            filter: drop-shadow(0 0 13px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.4);
+          }
+          80% {
+            transform: translate(-50%, -52%) scale(1.05, 0.08);
+            filter: drop-shadow(0 0 4px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(0.8);
+          }
+          84% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 10px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.3);
+          }
+          100% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1);
           }
         }
         .sb-orn-glow {
@@ -1868,22 +2029,43 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 16px rgba(250, 232, 255, 1)) brightness(1.25); }
         }
 
-        /* ══ LIMITED — tema serem ═════════════════════════════════════════ */
+        /* ══ LIMITED — tema serem (rombak total) ════════════════════════ */
         .sb-p-cursed-reaper {
-          background: conic-gradient(from 0deg, #0a0a0a, #7f1d1d, #e2e8f0, #7f1d1d, #0a0a0a);
-          animation: sb-spin 4s linear infinite, sb-g-reaper 1.5s ease-in-out infinite;
+          background: conic-gradient(
+            from 0deg,
+            #050505 0deg,
+            #450a0a 70deg,
+            #dc2626 95deg,
+            #0a0a0a 140deg,
+            #71717a 200deg,
+            #0a0a0a 240deg,
+            #7f1d1d 310deg,
+            #050505 360deg
+          );
+          animation: sb-spin 4.5s linear infinite, sb-g-reaper 1.3s ease-in-out infinite;
         }
         @keyframes sb-g-reaper {
-          0%, 100% { filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.8)) brightness(1); }
-          50% { filter: drop-shadow(0 0 20px rgba(226, 232, 240, 0.95)) brightness(1.3); }
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(220, 38, 38, 0.85)) brightness(0.95); }
+          45% { filter: drop-shadow(0 0 22px rgba(248, 113, 113, 1)) brightness(1.4); }
+          55% { filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.7)) brightness(0.85); }
         }
         .sb-p-nightmare-eye {
-          background: conic-gradient(from 0deg, #0a1505, #4d7c0f, #bef264, #4d7c0f, #0a1505);
-          animation: sb-spin 3.6s linear infinite, sb-g-nightmare 1.6s ease-in-out infinite;
+          background: conic-gradient(
+            from 0deg,
+            #030712 0deg,
+            #3b0764 80deg,
+            #84cc16 110deg,
+            #030712 160deg,
+            #4c1d95 230deg,
+            #030712 280deg,
+            #65a30d 330deg,
+            #030712 360deg
+          );
+          animation: sb-spin 5s linear infinite, sb-g-nightmare 2s ease-in-out infinite;
         }
         @keyframes sb-g-nightmare {
           0%, 100% { filter: drop-shadow(0 0 5px rgba(132, 204, 22, 0.8)) brightness(1); }
-          50% { filter: drop-shadow(0 0 20px rgba(190, 242, 100, 0.95)) brightness(1.3); }
+          50% { filter: drop-shadow(0 0 20px rgba(196, 181, 253, 0.9)) brightness(1.3) hue-rotate(15deg); }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -1910,8 +2092,12 @@ export function SolitBorder({
           .sb-orn-type,
           .sb-orn-flutter,
           .sb-orn-dilate,
+          .sb-aura-heartbeat,
           .sb-petal,
           .sb-drop,
+          .sb-slash,
+          .sb-ember,
+          .sb-tendril::before,
           .sb-burst,
           .sb-ring-jitter,
           .sb-orn {
