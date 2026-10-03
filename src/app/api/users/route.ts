@@ -432,9 +432,20 @@ async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) 
   const { error } = await supabaseAdmin.from("users").delete().eq("id", id);
 
   if (error) {
+    // 23503 = foreign_key_violation — ID user masih dipakai di tabel lain
+    // (mis. journal_entries.updated_by). Kasih pesan yang jelas, bukan error mentah.
+    if ((error as { code?: string }).code === "23503") {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "User tidak bisa dihapus permanen karena datanya masih terhubung ke modul lain (mis. jurnal akuntansi). Pakai 'Nonaktifkan Akun' saja, atau minta programmer melepas keterkaitannya dulu.",
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
-
   const oldAvatarPath = existingUser?.profile_photo_url ? extractAvatarPath(existingUser.profile_photo_url) : null;
   if (oldAvatarPath) {
     await supabaseAdmin.storage.from(AVATAR_BUCKET).remove([oldAvatarPath]);
