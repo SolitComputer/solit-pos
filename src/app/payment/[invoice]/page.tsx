@@ -97,6 +97,10 @@ interface ActiveAccessory {
   selling_price: number; // modal
   is_bonus: boolean;
   stock?: number;
+  // ✅ BARU: diisi saat aksesori ditambah lewat Serial Number.
+  // 1 SN = 1 unit fisik → quantity dikunci 1.
+  serial_number?: string;
+  unit_id?: string;
 }
 
 const inputCls =
@@ -452,11 +456,25 @@ export default function EditTransactionPage() {
     if (q.trim().length < 2) { setAccResults([]); return; }
     setIsFetchingAccs(true);
     try {
-      const res = await fetch(`/api/accessories/search?q=${encodeURIComponent(q)}`);
+      // ✅ Cari aksesori by SERIAL NUMBER (bukan nama). Endpoint ini balikin
+      // 1 baris per unit fisik: { id (=unit_id), serial_number, accessory_id,
+      // accessory_name, selling_price, buy_price, ... } yg statusnya TERSEDIA.
+      const res = await fetch(`/api/accessory-units/search-sn?q=${encodeURIComponent(q.trim())}`);
       const json = await res.json();
       if (json.success) {
-        const selectedIds = new Set(activeAccessories.map((a) => a.accessory_id));
-        setAccResults((json.data || []).filter((a: any) => !selectedIds.has(a.id)));
+        // Dedup pakai serial_number / unit_id — BUKAN accessory_id — karena 1
+        // model aksesori bisa punya banyak unit SN berbeda.
+        const usedUnitIds = new Set(activeAccessories.map((a) => a.unit_id).filter(Boolean));
+        const usedSN = new Set(
+          activeAccessories.map((a) => (a.serial_number ?? "").toUpperCase()).filter(Boolean)
+        );
+        setAccResults(
+          (json.data || []).filter(
+            (a: any) =>
+              !usedUnitIds.has(a.id) &&
+              !usedSN.has(String(a.serial_number ?? "").toUpperCase())
+          )
+        );
       }
     } catch {
       setAccResults([]);
@@ -467,16 +485,24 @@ export default function EditTransactionPage() {
 
   const handleAddAccessory = (a: any) => {
     const newAcc: ActiveAccessory = {
-      accessory_id: a.id,
-      name: a.name,
+      accessory_id: a.accessory_id,              // ← endpoint SN balikin accessory_id, bukan id
+      name: a.accessory_name || a.display_name || a.name || "Aksesori",
       category: a.category,
-      quantity: 1,
-      deal_price: Number(a.sell_price ?? 0),
-      selling_price: Number(a.buy_price ?? 0),
+      quantity: 1,                               // 1 SN = 1 unit fisik → dikunci 1
+      deal_price: Number(a.selling_price ?? 0),  // harga jual unit
+      selling_price: Number(a.buy_price ?? 0),   // modal unit
       is_bonus: false,
-      stock: a.stock,
+      serial_number: a.serial_number,            // ✅ SN unit terpilih
+      unit_id: a.id,                             // ✅ id unit di accessory_units
     };
+    // Cegah SN / unit yang sama ditambah dua kali
+    if (newAcc.unit_id && activeAccessories.some((x) => x.unit_id === newAcc.unit_id)) {
+      setAccSearch("");
+      setAccResults([]);
+      return;
+    }
     setActiveAccessories((prev) => [...prev, newAcc]);
+    // Panel dibiarkan terbuka + search dikosongkan → bisa langsung scan SN berikutnya.
     setAccSearch("");
     setAccResults([]);
     setHasChanges(true);
@@ -549,7 +575,16 @@ export default function EditTransactionPage() {
           unit_id: unitIds[0] ?? null,
           laptop_name: laptopNames.join(" + "),
           laptop_id: activeUnits[0]?.laptop_id ?? null,
-          accessories: activeAccessories,
+          accessories: activeAccessories.map((a) => ({
+            accessory_id: a.accessory_id,
+            name: a.name,
+            quantity: a.serial_number ? 1 : (Number(a.quantity) || 1), // SN → selalu 1
+            selling_price: Number(a.selling_price ?? 0),
+            deal_price: a.is_bonus ? 0 : Number(a.deal_price ?? 0),
+            is_bonus: Boolean(a.is_bonus),
+            serial_number: a.serial_number ?? null, // ✅ unit ditandai SOLD + SN tersimpan
+            unit_id: a.unit_id ?? null,
+          })),
           // Hanya include key-nya kalau ada data yang valid
           ...(purchasePricesPerUnit.length > 0 && {
             purchase_prices_per_unit: purchasePricesPerUnit,
@@ -1175,11 +1210,18 @@ export default function EditTransactionPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-gray-800 truncate">{acc.name}</p>
-                        {acc.category && (
-                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded-md inline-block mt-0.5">
-                            {acc.category}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          {acc.serial_number && (
+                            <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded-md inline-block">
+                              SN: {acc.serial_number}
+                            </span>
+                          )}
+                          {acc.category && (
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded-md inline-block">
+                              {acc.category}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <button
                         type="button"
@@ -1208,34 +1250,36 @@ export default function EditTransactionPage() {
                         {acc.is_bonus ? "🎁 Bonus (Rp0)" : "Berbayar"}
                       </button>
 
-                      {/* Qty Counter */}
-                      <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleUpdateAccessory(idx, {
-                              quantity: Math.max(1, acc.quantity - 1),
-                            })
-                          }
-                          className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-100 text-xs font-bold"
-                        >
-                          -
-                        </button>
-                        <span className="px-2.5 text-xs font-bold text-gray-700 font-mono">
-                          {acc.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleUpdateAccessory(idx, {
-                              quantity: acc.quantity + 1,
-                            })
-                          }
-                          className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-100 text-xs font-bold"
-                        >
-                          +
-                        </button>
-                      </div>
+                      {/* Qty Counter — disembunyikan utk aksesori ber-SN (1 SN = 1 unit) */}
+                      {!acc.serial_number && (
+                        <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateAccessory(idx, {
+                                quantity: Math.max(1, acc.quantity - 1),
+                              })
+                            }
+                            className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-100 text-xs font-bold"
+                          >
+                            -
+                          </button>
+                          <span className="px-2.5 text-xs font-bold text-gray-700 font-mono">
+                            {acc.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateAccessory(idx, {
+                                quantity: acc.quantity + 1,
+                              })
+                            }
+                            className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-100 text-xs font-bold"
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
 
                       {/* Harga Deal Input */}
                       {!acc.is_bonus && (
@@ -1265,7 +1309,7 @@ export default function EditTransactionPage() {
             {/* Add Accessory Input */}
             <div>
               <label className="text-xs font-medium text-gray-400 mb-1.5 flex items-center gap-2">
-                Tambah Aksesori
+                Tambah Aksesori (via Serial Number)
                 {isFetchingAccs && (
                   <span className="flex items-center gap-1 text-emerald-600 text-[10px]">
                     <div className="w-3 h-3 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
@@ -1276,8 +1320,8 @@ export default function EditTransactionPage() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Ketik nama aksesori..."
-                  className="w-full border border-gray-200 rounded-xl h-10 px-3.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-400 transition placeholder:text-gray-300"
+                  placeholder="Scan / ketik Serial Number aksesori..."
+                  className="w-full border border-gray-200 rounded-xl h-10 px-3.5 text-sm font-mono bg-white shadow-sm focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-400 transition placeholder:text-gray-300"
                   value={accSearch}
                   onChange={(e) => handleAccSearch(e.target.value)}
                 />
@@ -1285,19 +1329,22 @@ export default function EditTransactionPage() {
                   <div className="unit-dropdown absolute top-full left-0 right-0 z-20 mt-1.5 max-h-48 overflow-y-auto">
                     {accResults.map((a) => (
                       <button
-                        key={a.id}
+                        key={a.id ?? a.serial_number}
                         type="button"
                         onClick={() => handleAddAccessory(a)}
                         className="unit-dropdown-item w-full px-4 py-2.5 text-left border-b border-gray-50 last:border-0 flex items-center justify-between"
                       >
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-gray-800 truncate">{a.name}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            {a.category ? `${a.category} · ` : ""}Stok: {a.stock ?? 0}
+                          <p className="text-xs font-bold text-gray-800 font-mono truncate">
+                            {a.serial_number}
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+                            {a.accessory_name || a.display_name || "Aksesori"}
+                            {a.category ? ` · ${a.category}` : ""}
                           </p>
                         </div>
                         <span className="text-xs font-mono font-bold text-emerald-700 flex-shrink-0 ml-2">
-                          {fmt(a.sell_price || 0)}
+                          {fmt(a.selling_price || 0)}
                         </span>
                       </button>
                     ))}
@@ -1305,7 +1352,7 @@ export default function EditTransactionPage() {
                 )}
                 {accSearch.trim().length >= 2 && accResults.length === 0 && !isFetchingAccs && (
                   <p className="absolute top-full left-0 mt-1 text-[11px] text-gray-400 px-1">
-                    Tidak ada aksesori cocok
+                    SN tidak ketemu / stok sudah terjual
                   </p>
                 )}
               </div>
