@@ -490,6 +490,149 @@ function CancelItemModal({ order, item, onClose, onCancelled }: {
     );
 }
 
+// ── AddAccessoryModal: Penyedia menambah unit (aksesoris/laptop) ke
+// penyiapan yang SEDANG diproses. Search SN (laptop+aksesoris sekaligus,
+// karena endpoint search-sn sudah merged) + ketik SN manual. Tidak menyentuh
+// stok — murni dicatat ke preparation_items lewat /add-items.
+function AddAccessoryModal({ orderId, onClose, onAdded }: {
+    orderId: string; onClose: () => void; onAdded: () => void;
+}) {
+    type AddItem = {
+        serial_number: string; item_type: "laptop" | "accessory";
+        laptop_name?: string; laptop_id?: string; accessory_id?: string;
+        unit_id?: string; accessory_unit_id?: string;
+    };
+    const [itemKind, setItemKind] = useState<"laptop" | "accessory">("accessory");
+    const [items, setItems] = useState<AddItem[]>([]);
+    const [snSearch, setSnSearch] = useState("");
+    const [snResults, setSnResults] = useState<any[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [manualSN, setManualSN] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const search = useCallback(async (q: string) => {
+        if (q.trim().length < 2) { setSnResults([]); return; }
+        setSearching(true);
+        try {
+            const res = await fetch(`/api/units/search-sn?q=${encodeURIComponent(q)}`);
+            const result = await res.json();
+            setSnResults(result.data || []);
+        } catch { setSnResults([]); } finally { setSearching(false); }
+    }, []);
+
+    const addFromSearch = (u: any) => {
+        const isAcc = u.unit_type === "accessory" || !!u.accessory_id;
+        setItems(prev => [...prev, isAcc
+            ? { serial_number: u.serial_number, item_type: "accessory", laptop_name: u.laptop_name ?? u.accessory_name ?? undefined, accessory_id: u.accessory_id ?? u.laptop_id ?? undefined, accessory_unit_id: u.id ?? undefined }
+            : { serial_number: u.serial_number, item_type: "laptop", laptop_name: u.laptop_name ?? undefined, laptop_id: u.laptop_id ?? undefined, unit_id: u.id ?? undefined }]);
+        setSnSearch(""); setSnResults([]);
+    };
+    const addManual = () => {
+        const sn = manualSN.trim();
+        if (!sn) return;
+        setItems(prev => [...prev, { serial_number: sn, item_type: itemKind }]);
+        setManualSN("");
+    };
+    const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+
+    const submit = async () => {
+        setError("");
+        if (items.length === 0) { setError("Tambahkan minimal 1 unit"); return; }
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/preparation/${orderId}/add-items`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items }),
+            });
+            const result = await res.json();
+            if (!result.success) { setError(result.message || "Gagal menambah unit"); return; }
+            onAdded(); onClose();
+        } catch { setError("Terjadi kesalahan koneksi"); } finally { setSaving(false); }
+    };
+
+    const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white transition";
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
+                <div className="bg-emerald-600 px-5 py-4 flex-shrink-0">
+                    <p className="font-bold text-white text-sm">Tambah Unit / Aksesoris</p>
+                    <p className="text-xs text-emerald-100 mt-0.5">Tambahkan ke penyiapan yang sedang diproses</p>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => setItemKind("laptop")}
+                            className={`h-9 rounded-xl text-xs font-bold border transition ${itemKind === "laptop" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>Laptop</button>
+                        <button type="button" onClick={() => setItemKind("accessory")}
+                            className={`h-9 rounded-xl text-xs font-bold border transition ${itemKind === "accessory" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>Aksesoris</button>
+                    </div>
+
+                    <div className="relative">
+                        <input value={snSearch} onChange={e => { setSnSearch(e.target.value); search(e.target.value); }}
+                            placeholder="Cari SN dari stok..." className={inputCls} />
+                        {searching && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-gray-200 border-t-emerald-600 rounded-full animate-spin" />}
+                    </div>
+                    {snResults.length > 0 && (
+                        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white max-h-44 overflow-y-auto">
+                            {snResults.map((u: any) => (
+                                <button key={u.id} type="button" onClick={() => addFromSearch(u)}
+                                    className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0 transition">
+                                    <p className="font-mono text-sm font-bold text-gray-800">{u.serial_number}</p>
+                                    <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${u.unit_type === "accessory" ? "text-emerald-700 bg-emerald-50 border border-emerald-200" : "text-gray-600 bg-gray-100 border border-gray-200"}`}>
+                                            {u.unit_type === "accessory" ? "AKSESORIS" : "LAPTOP"}
+                                        </span>
+                                        <span className="truncate">{u.laptop_name}{u.grade ? ` · Grade ${u.grade}` : ""}</span>
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="flex gap-2">
+                        <input value={manualSN} onChange={e => setManualSN(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addManual(); } }}
+                            placeholder="Atau ketik SN manual..." className={`${inputCls} font-mono flex-1`} />
+                        <button type="button" onClick={addManual}
+                            className="px-4 h-10 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition whitespace-nowrap">+ Tambah</button>
+                    </div>
+
+                    {items.length > 0 && (
+                        <div className="space-y-1.5">
+                            {items.map((it, i) => (
+                                <div key={i} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
+                                    <div className="min-w-0">
+                                        <p className="font-mono text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                                            {it.serial_number}
+                                            {it.item_type === "accessory" && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">AKSESORIS</span>}
+                                        </p>
+                                        {it.laptop_name && <p className="text-[10px] text-gray-500 truncate">{it.laptop_name}</p>}
+                                    </div>
+                                    <button onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded-lg transition">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
+                    <button onClick={submit} disabled={saving} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                        {saving ? "Menyimpan..." : "Tambahkan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function PreparationDetailPage() {
     const params = useParams();
     const id = params.id as string;
@@ -523,6 +666,7 @@ export default function PreparationDetailPage() {
 
     const [showCancel, setShowCancel] = useState(false);
     const [cancelItemTarget, setCancelItemTarget] = useState<PrepItem | null>(null);
+    const [showAddItems, setShowAddItems] = useState(false);
 
     useEffect(() => {
         getAuthUser().then(u => ({ success: true, user: u }))
@@ -1075,6 +1219,15 @@ export default function PreparationDetailPage() {
                                 <span className="text-xs font-semibold text-blue-600">{checked}/{checkableItems.length} dicek</span>
                             )}
                         </div>
+
+                        {/* Penyedia bisa menambah unit/aksesoris SELAMA diproses */}
+                        {order.status === "DIPROSES" && canDone && (
+                            <button onClick={() => setShowAddItems(true)}
+                                className="w-full mb-3 h-10 border-2 border-dashed border-emerald-300 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition flex items-center justify-center gap-1.5">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                                Tambah Aksesoris / Unit
+                            </button>
+                        )}
                         <div className="space-y-2">
                             {order.preparation_items.map(it => {
                                 const interactive = order.status === "DIPROSES" && canDone && !it.is_cancelled && !it.sold_elsewhere;
@@ -1410,6 +1563,7 @@ export default function PreparationDetailPage() {
                 />
             )}
             {showCancel && <CancelModal order={order} onClose={() => setShowCancel(false)} onCancelled={fetchOrder} />}
+            {showAddItems && <AddAccessoryModal orderId={order.id} onClose={() => setShowAddItems(false)} onAdded={fetchOrder} />}
             {cancelItemTarget && (
                 <CancelItemModal
                     order={order}
