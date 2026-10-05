@@ -31,6 +31,10 @@ export interface EditModalAccessory {
   deal_price: number;
   selling_price: number;
   is_bonus: boolean;
+  // ✅ NEW: diisi saat aksesoris ditambah lewat Serial Number (bukan ketik nama).
+  // Kalau ada serial_number → 1 baris = 1 unit fisik, qty dikunci 1.
+  serial_number?: string;
+  unit_id?: string;
 }
 
 // ─── SORTING TYPES ───────────────────────────────────────────────────
@@ -2605,11 +2609,22 @@ function EditTransactionModal({
     }
     setSearchingAcc(true);
     try {
-      const res = await fetch(`/api/accessories/search?q=${encodeURIComponent(q)}`);
+      // ✅ Cari by SERIAL NUMBER (param ?sn=). Endpoint balikin 1 baris per unit
+      // fisik: { accessory_id, name, deal_price, selling_price, serial_number, unit_id }.
+      const res = await fetch(`/api/accessories/search?sn=${encodeURIComponent(q.trim())}`);
       const json = await res.json();
       if (json.success) {
-        const selectedIds = new Set(accessories.map((a) => a.accessory_id));
-        setAccResults((json.data || []).filter((a: any) => !selectedIds.has(a.id)));
+        // Dedup pakai serial_number / unit_id — BUKAN accessory_id — karena 1
+        // model aksesoris bisa punya banyak unit SN berbeda.
+        const usedSN = new Set(accessories.map((a) => (a.serial_number ?? "").toUpperCase()).filter(Boolean));
+        const usedUnitIds = new Set(accessories.map((a) => a.unit_id).filter(Boolean));
+        setAccResults(
+          (json.data || []).filter(
+            (a: any) =>
+              !usedUnitIds.has(a.unit_id) &&
+              !usedSN.has(String(a.serial_number ?? "").toUpperCase())
+          )
+        );
       }
     } catch {
       setAccResults([]);
@@ -2622,17 +2637,20 @@ function EditTransactionModal({
     setAccessories((prev) => [
       ...prev,
       {
-        accessory_id: a.id,
+        accessory_id: a.accessory_id,              // ← endpoint SN balikin accessory_id, bukan id
         name: a.name,
-        quantity: 1,
-        deal_price: Number(a.sell_price ?? 0),
-        selling_price: Number(a.buy_price ?? 0),
+        quantity: 1,                               // ← 1 SN = 1 unit fisik, dikunci
+        deal_price: Number(a.deal_price ?? 0),     // harga jual
+        selling_price: Number(a.selling_price ?? 0), // harga modal
         is_bonus: false,
+        serial_number: a.serial_number,            // ✅ SN unit terpilih
+        unit_id: a.unit_id,                        // ✅ id unit di accessory_units
       },
     ]);
+    // Panel dibiarkan TERBUKA + search dikosongkan → bisa langsung scan SN
+    // berikutnya tanpa klik "Tambah Aksesori" lagi.
     setAccSearch("");
     setAccResults([]);
-    setShowAddAcc(false);
   };
 
   const handleSave = async () => {
@@ -2663,10 +2681,12 @@ function EditTransactionModal({
         accessories: accessories.map((a) => ({
           accessory_id: a.accessory_id,
           name: a.name,
-          quantity: Number(a.quantity) || 1,
+          quantity: a.serial_number ? 1 : (Number(a.quantity) || 1), // SN → selalu 1
           selling_price: Number(a.selling_price ?? 0),
           deal_price: a.is_bonus ? 0 : Number(a.deal_price ?? 0),
           is_bonus: Boolean(a.is_bonus),
+          serial_number: a.serial_number ?? null, // ✅ dikirim ke PUT: unit ditandai SOLD + SN tersimpan
+          unit_id: a.unit_id ?? null,
         })),
       };
 
@@ -2864,8 +2884,8 @@ function EditTransactionModal({
                     type="text"
                     value={accSearch}
                     onChange={(e) => handleAccSearch(e.target.value)}
-                    placeholder="Ketik minimal 2 huruf nama aksesori/charger..."
-                    className="w-full h-8 pl-8 pr-3 text-xs border border-purple-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400"
+                    placeholder="Scan / ketik Serial Number aksesoris..."
+                    className="w-full h-8 pl-8 pr-3 text-xs font-mono border border-purple-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400"
                   />
                   {searchingAcc && (
                     <div className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -2875,16 +2895,24 @@ function EditTransactionModal({
                   <div className="border border-purple-200 rounded-lg bg-white divide-y divide-gray-100 max-h-36 overflow-y-auto shadow-md">
                     {accResults.map((res) => (
                       <button
-                        key={res.id}
+                        key={res.unit_id ?? res.serial_number}
                         type="button"
                         onClick={() => handleAddAccessory(res)}
                         className="w-full px-3 py-1.5 text-left text-xs hover:bg-purple-50 flex items-center justify-between gap-2 transition"
                       >
-                        <span className="font-medium text-gray-800 truncate">{res.name}</span>
-                        <span className="font-mono text-purple-700 font-bold shrink-0">{fmtRupiah(res.sell_price)}</span>
+                        <span className="min-w-0">
+                          <span className="font-medium text-gray-800 truncate block">{res.name}</span>
+                          <span className="font-mono text-[10px] text-gray-400">SN: {res.serial_number}</span>
+                        </span>
+                        <span className="font-mono text-purple-700 font-bold shrink-0">{fmtRupiah(res.deal_price)}</span>
                       </button>
                     ))}
                   </div>
+                )}
+                {!searchingAcc && accSearch.trim().length >= 2 && accResults.length === 0 && (
+                  <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">
+                    SN "<span className="font-mono font-bold">{accSearch.trim()}</span>" tidak ketemu / stok sudah terjual.
+                  </p>
                 )}
               </div>
             )}
@@ -2908,15 +2936,24 @@ function EditTransactionModal({
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] text-gray-400">Qty:</span>
-                          <input
-                            type="number"
-                            min={1}
-                            value={acc.quantity}
-                            onChange={(e) => handleUpdateAccQty(idx, Number(e.target.value))}
-                            className="w-12 h-6 text-center border border-gray-200 rounded text-[11px] font-bold"
-                          />
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {acc.serial_number ? (
+                            // ✅ Via SN → 1 unit fisik, qty dikunci, tampilkan SN-nya.
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5">
+                              SN: {acc.serial_number}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-[10px] text-gray-400">Qty:</span>
+                              <input
+                                type="number"
+                                min={1}
+                                value={acc.quantity}
+                                onChange={(e) => handleUpdateAccQty(idx, Number(e.target.value))}
+                                className="w-12 h-6 text-center border border-gray-200 rounded text-[11px] font-bold"
+                              />
+                            </>
+                          )}
                         </div>
                       </div>
                       <button

@@ -260,6 +260,10 @@ export default function SolitBanner({
           background-image: linear-gradient(135deg, #581c87 0%, #a855f7 25%, #f3e8ff 50%, #c084fc 75%, #a855f7 100%);
           filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.65));
         }
+        .sb-cf-nightmare-eye {
+          background-image: linear-gradient(135deg, #030712 0%, #4c1d95 25%, #84cc16 50%, #4c1d95 75%, #030712 100%);
+          filter: drop-shadow(0 0 6px rgba(132, 204, 22, 0.65));
+        }
 
         /* ── 2. ORNAMEN SUDUT 3D ─────────────────────────────────── */
         .sb-corner {
@@ -558,6 +562,10 @@ export default function SolitBanner({
         .sb-cg-royal { background: radial-gradient(circle, rgba(147, 197, 253, 0.85) 0%, transparent 70%); }
         .sb-cg-sunset { background: radial-gradient(circle, rgba(251, 146, 60, 0.85) 0%, transparent 70%); }
         .sb-cg-violet { background: radial-gradient(circle, rgba(192, 132, 252, 0.85) 0%, transparent 70%); }
+        .sb-cg-nightmare-eye {
+          background: radial-gradient(circle, rgba(132, 204, 22, 0.85) 0%, transparent 70%);
+          animation: sb-cg-pulse 2.1s ease-in-out infinite;
+        }
 
         @media (prefers-reduced-motion: reduce) {
           .sb-continuous-frame,
