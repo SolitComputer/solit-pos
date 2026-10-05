@@ -45,6 +45,7 @@ export const AKUN = {
   OPS_BULANAN: "520",
   BIAYA_LAIN: "530",
   KEUNTUNGAN_MITRA: "540",
+  PENGELUARAN_TAHUNAN: "550",
 } as const;
 
 export const ACCOUNTS: Account[] = [
@@ -92,6 +93,7 @@ export const ACCOUNTS: Account[] = [
   { code: AKUN.OPS_BULANAN, name: "Operasional Bulanan", type: "BEBAN", normal: "DEBIT" },
   { code: AKUN.BIAYA_LAIN, name: "Biaya Lain-lain", type: "BEBAN", normal: "DEBIT" },
   { code: AKUN.KEUNTUNGAN_MITRA, name: "Keuntungan Mitra / Reseller", type: "BEBAN", normal: "DEBIT" },
+  { code: AKUN.PENGELUARAN_TAHUNAN, name: "Pengeluaran Tahunan", type: "BEBAN", normal: "DEBIT" },
 ];
 
 export const ACCOUNT_MAP: Record<string, Account> = Object.fromEntries(
@@ -204,6 +206,7 @@ export const CASHFLOW_ACCOUNT: Record<string, string> = {
   OPERASIONAL_BULANAN: AKUN.OPS_BULANAN,           // 520
   BIAYA_LAIN: AKUN.BIAYA_LAIN,                     // 530
   KEUNTUNGAN_MITRA: AKUN.KEUNTUNGAN_MITRA,         // 540
+  PENGELUARAN_TAHUNAN: AKUN.PENGELUARAN_TAHUNAN,   // 550
 
   // ── 3 kategori Uang Masuk manual (Penjualan Laptop/Aksesoris/Service) ──
   PENJUALAN_LAPTOP_MANUAL: AKUN.PENJUALAN_LAPTOP,  // 410
