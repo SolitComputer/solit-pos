@@ -281,22 +281,24 @@ function SkeletonRows() {
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 // RESPONSIVE: scale down padding, font, icon size di mobile (< sm)
-function StatCard({ label, value, icon, color, bg, bar }: {
+function StatCard({ label, value, icon, color, bg, bar, dark = false }: {
     label: string; value: number; icon: React.ReactNode;
-    color: string; bg: string; bar: string;
+    color: string; bg: string; bar: string; dark?: boolean;
 }) {
     return (
-        <div className={`${bg} rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] hover:shadow-lg hover:ring-black/5 transition-all duration-300 p-3 sm:p-5 relative overflow-hidden group hover:-translate-y-1`}>
+        <div className={`${bg} rounded-2xl border ${dark ? "border-white/10" : "border-gray-100"} shadow-sm ring-1 ${dark ? "ring-white/5 shadow-lg shadow-[#1a1545]/25" : "ring-black/[0.02]"} hover:shadow-lg ${dark ? "" : "hover:ring-black/5"} transition-all duration-300 p-3 sm:p-5 relative overflow-hidden group hover:-translate-y-1`}>
+            {/* dekorasi lingkaran samar di pojok kanan atas — kasih dimensi */}
+            <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full ${dark ? "bg-white/[0.06]" : "bg-black/[0.015]"} blur-2xl`} />
             <div className={`absolute bottom-0 left-0 right-0 h-1 ${bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
-            <div className="flex items-start justify-between gap-1.5 sm:gap-3">
+            <div className="relative flex items-start justify-between gap-1.5 sm:gap-3">
                 <div className="min-w-0">
                     {/* Label lebih kecil di HP agar tidak truncate */}
-                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1.5 sm:mb-2.5 truncate">{label}</p>
+                    <p className={`text-[9px] sm:text-[10px] font-bold ${dark ? "text-white/60" : "text-gray-400"} uppercase tracking-wider leading-none mb-1.5 sm:mb-2.5 truncate`}>{label}</p>
                     {/* Angka scale down: text-xl di HP, text-3xl di desktop */}
                     <p className={`text-2xl sm:text-3xl font-black tracking-tight leading-none tabular-nums ${color}`}>{value}</p>
                 </div>
                 {/* Icon container scale down di HP */}
-                <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl ${bar} flex items-center justify-center flex-shrink-0 shadow-md opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all`}>
+                <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl ${dark ? "bg-white/15 ring-1 ring-white/10" : bar} flex items-center justify-center flex-shrink-0 shadow-md opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all`}>
                     <span className="scale-75 sm:scale-100 flex items-center justify-center">{icon}</span>
                 </div>
             </div>
@@ -310,13 +312,27 @@ function StatCard({ label, value, icon, color, bg, bar }: {
 function TotalBar({ totalSelling, count }: { totalSelling: number; count: number }) {
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] px-4 sm:px-6 py-4 sm:py-5 flex divide-x divide-gray-100 animate-fadeUp">
-            <div className="flex-1 pr-4 sm:pr-6">
-                <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Total Unit (difilter)</p>
-                <p className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-[#1a1545] to-[#0f0c29] bg-clip-text text-transparent tabular-nums">{count}</p>
+            <div className="flex-1 pr-3 sm:pr-6 flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl ${BRAND_GRADIENT} flex items-center justify-center flex-shrink-0 shadow-md shadow-[#1a1545]/20`}>
+                    <Laptop size={16} className="text-white" />
+                </div>
+                <div className="min-w-0">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Unit (difilter)</p>
+                    <p className="text-xl sm:text-3xl font-black bg-gradient-to-r from-[#1a1545] to-[#0f0c29] bg-clip-text text-transparent tabular-nums">{count}</p>
+                </div>
             </div>
-            <div className="flex-1 pl-4 sm:pl-6">
-                <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Total Harga Jual</p>
-                <p className="text-lg sm:text-2xl font-black text-emerald-600 tabular-nums">{fmt(totalSelling)}</p>
+            <div className="flex-1 pl-3 sm:pl-6 flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="2" y="6" width="20" height="12" rx="2" strokeWidth={2} />
+                        <circle cx="12" cy="12" r="2.5" strokeWidth={2} />
+                        <path strokeLinecap="round" strokeWidth={2} d="M6 12h.01M18 12h.01" />
+                    </svg>
+                </div>
+                <div className="min-w-0">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Jual</p>
+                    <p className="text-base sm:text-2xl font-black text-emerald-600 tabular-nums truncate">{fmt(totalSelling)}</p>
+                </div>
             </div>
         </div>
     );
@@ -889,7 +905,7 @@ function ReadyContent() {
              * - p-3 di HP supaya tabel punya lebih banyak ruang horizontal
              * - space-y-3 di HP supaya konten lebih compact
              */}
-            <main className="min-h-screen bg-[#F7F7F8] p-3 sm:p-6 lg:p-8">
+            <main className="min-h-screen bg-gradient-to-b from-[#F7F7F8] via-[#F7F7F8] to-[#ECECF0] p-3 sm:p-6 lg:p-8">
                 <div className="max-w-full mx-auto space-y-3 sm:space-y-5 lg:space-y-6">
 
                     {/* ── Header ──────────────────────────────────────────────────────────────
@@ -913,9 +929,12 @@ function ReadyContent() {
                             </div>
                             <div className="min-w-0">
                                 <h1 className="text-lg sm:text-2xl font-black text-gray-900 tracking-tight truncate">Barang Siap Jual</h1>
-                                <p className="text-[11px] sm:text-xs text-gray-400 font-medium mt-0.5">
-                                    {isLoading ? "Memuat data..." : `${units.length} unit terdaftar`}
-                                </p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    {!isLoading && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />}
+                                    <p className="text-[11px] sm:text-xs text-gray-400 font-medium truncate">
+                                        {isLoading ? "Memuat data..." : `${units.length} unit terdaftar`}
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
@@ -967,13 +986,19 @@ function ReadyContent() {
                      * RESPONSIVE: gap-2 di HP (lebih rapat), gap-3 di ≥ sm
                      */}
                     <div className="grid grid-cols-3 gap-2 sm:gap-3 animate-fadeUp">
-                        <StatCard label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="bg-gradient-to-r from-[#1a1545] to-[#0f0c29] bg-clip-text text-transparent" bg="bg-white" bar="bg-gradient-to-br from-[#1a1545] to-[#0f0c29]" />
+                        <StatCard dark label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="text-white" bg={BRAND_GRADIENT} bar="bg-white/25" />
                         <StatCard label="Siap Jual" value={counts.siap} icon={<CheckCircle2 size={18} className="text-white" />} color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
                         <StatCard label="Dipesan" value={counts.reserved} icon={<Lock size={18} className="text-white" />} color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
                     </div>
 
                     {/* ── Filter — disamakan dengan Data Barang ───────────── */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] p-3.5 sm:p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L14 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 019 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                            </svg>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Filter &amp; Pencarian</span>
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
                             {/* Search umum — full width di mobile (col-span-2) */}
                             <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
