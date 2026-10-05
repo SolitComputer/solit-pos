@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers, Undo2, Sparkles, RefreshCw } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers, Undo2, Sparkles, RefreshCw, Bookmark, BookmarkCheck } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -332,6 +332,15 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [showPending, setShowPending] = useState(false);
     const hasHydratedPending = useRef(false);
 
+    // ── Penanda Baca (bookmark baris terakhir dibaca) ──
+    // Disimpan di localStorage per periode (bulan), jadi tiap bulan punya penanda sendiri.
+    // Yang disimpan cuma 1 entryId — nandain entry lain otomatis mengganti yang lama.
+    const [bookmarkedId, setBookmarkedId] = useState<string | null>(null);
+    // Ref ke tiap baris entry (desktop) & kartu (mobile) supaya bisa di-scroll saat tombol "Ke Penanda" diklik.
+    const entryRefs = useRef<Map<string, HTMLElement>>(new Map());
+    // Flag highlight sekejap setelah scroll (ring menyala ~2 detik lalu hilang).
+    const [flashId, setFlashId] = useState<string | null>(null);
+
     useEffect(() => {
         const saved = localStorage.getItem("jurnal-show-pending");
         if (saved !== null) {
@@ -339,6 +348,17 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
         hasHydratedPending.current = true;
     }, []);
+
+    // Muat penanda baca untuk periode yang sedang dibuka. Dibaca di useEffect (bukan saat
+    // render) supaya tidak terjadi hydration mismatch. Ganti periode → penanda ikut ganti.
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(`jurnal-bookmark-${period}`);
+            setBookmarkedId(saved || null);
+        } catch {
+            setBookmarkedId(null);
+        }
+    }, [period]);
 
     const load = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
@@ -462,6 +482,62 @@ export default function JurnalUmum({ period }: { period: string }) {
     }, []);
 
     const clearEntrySelection = useCallback(() => setSelectedEntryIds(new Set()), []);
+
+    // Tandai / lepas penanda baca pada sebuah entry. Karena cuma boleh 1 penanda,
+    // nandain entry lain otomatis mengganti yang lama. Klik entry yang sama = lepas penanda.
+    const toggleBookmark = useCallback((entryId: string) => {
+        setBookmarkedId((prev) => {
+            const next = prev === entryId ? null : entryId;
+            try {
+                if (next) localStorage.setItem(`jurnal-bookmark-${period}`, next);
+                else localStorage.removeItem(`jurnal-bookmark-${period}`);
+            } catch { /* abaikan kalau localStorage tidak tersedia */ }
+            setToast(next ? "Penanda baca disimpan di baris ini" : "Penanda baca dihapus");
+            return next;
+        });
+    }, [period]);
+
+    // Lakukan scroll sesungguhnya ke entry penanda + highlight kedip 2 detik.
+    // Dipisah supaya bisa dipanggil ulang setelah daftar selesai di-render.
+    const doScrollToBookmark = useCallback((id: string) => {
+        const el = entryRefs.current.get(id);
+        if (!el) return false; // belum ke-render — biar pemanggil yang nunggu
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setFlashId(id);
+        setTimeout(() => setFlashId(null), 2000);
+        return true;
+    }, []);
+
+    // Penanda tujuan yang "ditunda" — diisi saat tombol diklik tapi barisnya belum ter-render.
+    // Begitu render selesai (lihat useEffect di bawah), scroll dijalankan.
+    const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
+
+    // Klik "Ke Penanda": selalu berhasil ketemu, berapapun urutannya & lagi difilter atau tidak.
+    // 1) Bersihkan semua filter/pencarian yang bisa menyembunyikan barisnya.
+    // 2) Pastikan displayLimit cukup tinggi supaya baris penanda ikut ter-render.
+    // 3) Scroll sekarang kalau sudah ter-render; kalau belum, tunda via pendingScrollId.
+    const scrollToBookmark = useCallback(() => {
+        if (!bookmarkedId) return;
+
+        // (1) reset semua filter & pencarian
+        setSearch("");
+        setSearchNominal("");
+        setAccountCodeFilter(new Set());
+        setShowOnlyWarnings(false);
+        setShowOnlyOutOfSync(false);
+
+        // (2) cari posisi penanda di daftar LENGKAP (tanpa filter), lalu naikkan batas tampilan
+        //     secukupnya kalau posisinya di luar displayLimit sekarang.
+        const idx = entries.findIndex((e) => e.id === bookmarkedId);
+        if (idx >= 0 && idx + 1 > displayLimit) {
+            setDisplayLimit(Math.ceil((idx + 1) / 100) * 100);
+        }
+
+        // (3) coba scroll langsung; kalau barisnya belum ada (baru akan render), tunda
+        if (!doScrollToBookmark(bookmarkedId)) {
+            setPendingScrollId(bookmarkedId);
+        }
+    }, [bookmarkedId, entries, displayLimit, doScrollToBookmark]);
 
     const handleUpdated = useCallback(() => { load(false); }, [load]);
     const handleToggleWarningState = useCallback((entryId: string, hasWarn: boolean) => {
@@ -889,6 +965,17 @@ export default function JurnalUmum({ period }: { period: string }) {
         return filtered.slice(0, displayLimit);
     }, [filtered, displayLimit]);
 
+    // Jalankan scroll yang tertunda setelah React selesai me-render baris barunya.
+    // Ditaruh DI SINI (setelah visibleEntries dideklarasikan) supaya tidak kena error
+    // "used before declaration". visibleEntries jadi dependency supaya efek ini jalan
+    // lagi tiap daftar yang tampil berubah (mis. setelah displayLimit dinaikkan).
+    useEffect(() => {
+        if (!pendingScrollId) return;
+        if (doScrollToBookmark(pendingScrollId)) {
+            setPendingScrollId(null); // berhasil — hentikan penundaan
+        }
+    }, [pendingScrollId, visibleEntries, doScrollToBookmark]);
+
     // Search untuk daftar PENDING (data yang belum dikonfirmasi ke jurnal umum) —
     // terpisah dari `filtered` di atas karena sumber datanya beda (PendingDraft, bukan JournalEntry).
     const filteredPending = useMemo(() => {
@@ -1286,6 +1373,15 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 </button>
                             )}
                         </div>
+                        {bookmarkedId && (
+                            <button
+                                onClick={scrollToBookmark}
+                                title="Lompat ke baris terakhir yang kamu tandai"
+                                className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap inline-flex items-center justify-center gap-1.5"
+                            >
+                                <BookmarkCheck className="w-4 h-4" /> Ke Penanda
+                            </button>
+                        )}
                         <button
                             onClick={() => setShowManual(true)}
                             className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
@@ -1470,6 +1566,13 @@ export default function JurnalUmum({ period }: { period: string }) {
                             entry={entry}
                             isSelected={selectedEntryIds.has(entry.id)}
                             accountCodeFilter={accountCodeFilter}
+                            isBookmarked={bookmarkedId === entry.id}
+                            isFlashing={flashId === entry.id}
+                            onToggleBookmark={toggleBookmark}
+                            registerRef={(el) => {
+                                if (el) entryRefs.current.set(entry.id, el);
+                                else entryRefs.current.delete(entry.id);
+                            }}
                             onToggleSelect={toggleEntrySelected}
                             onEdit={setEditEntry}
                             onLog={setLogEntry}
@@ -1629,6 +1732,13 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                 isSelected={selectedEntryIds.has(entry.id)}
                                                 isDraggingGroup={isDraggingGroup}
                                                 accountCodeFilter={accountCodeFilter}
+                                                isBookmarked={bookmarkedId === entry.id}
+                                                isFlashing={flashId === entry.id}
+                                                onToggleBookmark={toggleBookmark}
+                                                registerRef={(el) => {
+                                                    if (el) entryRefs.current.set(entry.id, el);
+                                                    else entryRefs.current.delete(entry.id);
+                                                }}
                                                 onToggleSelect={toggleEntrySelected}
                                                 onEdit={setEditEntry}
                                                 onLog={setLogEntry}
@@ -3162,6 +3272,10 @@ interface JournalEntryRowProps {
     isSelected: boolean;
     isDraggingGroup: boolean;
     accountCodeFilter: Set<string>;
+    isBookmarked: boolean;
+    isFlashing: boolean;
+    onToggleBookmark: (entryId: string) => void;
+    registerRef: (el: HTMLElement | null) => void;
     onToggleSelect: (id: string) => void;
     onEdit: (entry: JournalEntry) => void;
     onLog: (entry: JournalEntry) => void;
@@ -3257,6 +3371,10 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     isSelected,
     isDraggingGroup,
     accountCodeFilter,
+    isBookmarked,
+    isFlashing,
+    onToggleBookmark,
+    registerRef,
     onToggleSelect,
     onEdit,
     onLog,
@@ -3275,14 +3393,18 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
         <Draggable draggableId={entry.id} index={index}>
             {(provided, snapshot) => (
                 <tbody
-                    ref={provided.innerRef}
+                    ref={(el) => { provided.innerRef(el); registerRef(el); }}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
                     className={`group ${snapshot.isDragging
                         ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400"
                         : isDraggingGroup && isSelected
                             ? "opacity-50 ring-2 ring-blue-200"
-                            : ""
+                            : isFlashing
+                                ? "ring-2 ring-amber-400 bg-amber-50/40"
+                                : isBookmarked
+                                    ? "bg-amber-50/40"
+                                    : ""
                         }`}
                     style={provided.draggableProps.style}
                 >
@@ -3300,7 +3422,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                 }}
                                 className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 cursor-pointer transition ${isSelected ? "bg-blue-50/50" : ""}`}
                             >
-                                <td className="px-4 py-2 align-top">
+                                <td className={`px-4 py-2 align-top relative ${isBookmarked ? "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-amber-500" : ""}`}>
                                     {first && (
                                         <div className="space-y-1">
                                             <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
@@ -3432,6 +3554,16 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                     {first && (
                                         <div className="flex items-center justify-center gap-1">
                                             <button
+                                                onClick={() => onToggleBookmark(entry.id)}
+                                                title={isBookmarked ? "Hapus penanda baca" : "Tandai sebagai baris terakhir dibaca"}
+                                                className={`p-1.5 rounded-lg active:scale-90 transition-all duration-150 ${isBookmarked
+                                                    ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
+                                                    : "text-gray-400 hover:text-amber-600 hover:bg-amber-50"
+                                                    }`}
+                                            >
+                                                {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                                            </button>
+                                            <button
                                                 onClick={() => onEdit(entry)}
                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
                                                 title="Edit jurnal"
@@ -3496,6 +3628,10 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
     entry,
     isSelected,
     accountCodeFilter,
+    isBookmarked,
+    isFlashing,
+    onToggleBookmark,
+    registerRef,
     onToggleSelect,
     onEdit,
     onLog,
@@ -3512,12 +3648,20 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
 
     return (
         <div
+            ref={registerRef}
             onClick={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest("button, input, a, select, textarea")) return;
                 onToggleSelect(entry.id);
             }}
-            className={`rounded-xl border p-3.5 transition-colors ${isSelected ? "border-blue-300 bg-blue-50/50" : "border-gray-200 bg-white"}`}
+            className={`rounded-xl border p-3.5 transition-colors ${isFlashing
+                ? "border-amber-400 bg-amber-50/60 ring-2 ring-amber-400"
+                : isBookmarked
+                    ? "border-amber-300 bg-amber-50/40"
+                    : isSelected
+                        ? "border-blue-300 bg-blue-50/50"
+                        : "border-gray-200 bg-white"
+                }`}
         >
             <div className="flex items-start gap-2.5 mb-2">
                 <input
@@ -3620,8 +3764,17 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
                     );
                 })}
             </div>
-
             <div className="flex items-center justify-end gap-1 mt-2.5 pt-2.5 border-t border-gray-100">
+                <button
+                    onClick={() => onToggleBookmark(entry.id)}
+                    title={isBookmarked ? "Hapus penanda baca" : "Tandai sebagai baris terakhir dibaca"}
+                    className={`p-2 rounded-lg active:scale-90 transition-all duration-150 ${isBookmarked
+                        ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
+                        : "text-gray-400 hover:text-amber-600 hover:bg-amber-50"
+                        }`}
+                >
+                    {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                </button>
                 <button
                     onClick={() => onEdit(entry)}
                     className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
