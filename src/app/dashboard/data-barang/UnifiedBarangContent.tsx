@@ -19,7 +19,7 @@ import {
     LAPTOP_DELETE_ROLES, ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES, ACCESSORY_DELETE_ROLES,
     ACCESSORY_AUDIT_ROLES,
     BARANG_PRIVATE_VIEW_ROLES, BARANG_FULL_ACCESS_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop,
-    canEditConditionChecks,
+    canEditConditionChecks, isBarangBasicViewOnly,
 } from "@/lib/permissions";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -725,9 +725,6 @@ export default function UnifiedBarangContent() {
     // Cache dibaca SEKALI saat komponen pertama kali dibuat. Kalau masih segar,
     // rows langsung terisi & loading langsung false — tabel/kartu tampil di
     // render PERTAMA, tanpa "kedip" loading.
-    // Versi lama memanggil readBarangCache() 3x (dua initializer + satu di
-    // useEffect); tiap panggilan JSON.parse ulang seluruh data barang secara
-    // sinkron, dan itu yang bikin halaman beku saat menu diklik.
     const [bootCache] = useState(() => readBarangCache());
     const [rows, setRows] = useState<UnifiedRow[]>(() => bootCache?.rows ?? []);
     const [loading, setLoading] = useState(() => bootCache === null);
@@ -796,18 +793,9 @@ export default function UnifiedBarangContent() {
     const [historyLoading, setHistoryLoading] = useState(false);
 
     const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string; type: ItemType } | null>(null);
-    //  Tambah unit pertama untuk laptop stok 0 — dibuka dari tombol "Tambah Unit"
-    //  di kolom Aksi (mobile & desktop) ATAU dari klik baris/kartu itu sendiri
-    //  (lihat handleRowClick di bawah), saat row.unit_count === 0.
     const [addUnitTarget, setAddUnitTarget] = useState<UnifiedRow | null>(null);
-    //  Edit SN + tambah unit untuk laptop stok 1 — dibuka dari klik baris/kartu
-    //  (lihat handleRowClick). Unit LENGKAP diambil dulu lewat fetch, karena
-    //  data di tabel gabungan ini tidak menyertakan condition_note/notes.
     const [unitDetailTarget, setUnitDetailTarget] = useState<{ unit: UnitDetailData; row: UnifiedRow } | null>(null);
     const [unitDetailLoading, setUnitDetailLoading] = useState(false);
-    //  Versi AKSESORIS dari 2 state di atas — struktur data unit beda
-    //  (buy_price/condition, bukan purchase_price/grade), dipisah supaya
-    //  tidak mencampur shape data laptop & aksesori di satu state.
     const [addUnitAccessoryTarget, setAddUnitAccessoryTarget] = useState<UnifiedRow | null>(null);
     const [unitDetailAccessoryTarget, setUnitDetailAccessoryTarget] = useState<{ unit: AccessoryUnitDetailData; row: UnifiedRow } | null>(null);
     const [unitDetailAccessoryLoading, setUnitDetailAccessoryLoading] = useState(false);
@@ -824,27 +812,21 @@ export default function UnifiedBarangContent() {
     const { can: matrixCanLaptop } = usePagePermission("laptops");
 
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
+    // KEPALA_PENYEDIA_BARANG: mode "lihat kolom dasar saja" (No–Spek).
+    // Semua kolom sensitif + tombol aksi disembunyikan lewat flag ini.
+    const canOnlyViewBasic = isBarangBasicViewOnly(userRoles);
     const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP) || matrixCanLaptop.create;
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP) || matrixCanLaptop.edit;
     const canDeleteLaptop = hasAnyRole(userRoles, LAPTOP_DELETE_ROLES) || matrixCanLaptop.delete;
     const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
-    //  Klik baris/kartu untuk buka pop-up "Tambah Unit" (stok 0) ATAU pop-up
-    //  "Detail Unit" untuk edit SN + tambah unit (stok 1) — lihat handleRowClick.
     const canAddUnit = hasAnyRole(userRoles, PERMISSIONS.CREATE_UNITS);
-    //  Dipakai sebagai prop canEdit UnitDetailModal — menggerbangi tombol
-    //  "+ Tambah Unit" & "Edit Data" di dalam pop-up detail unit (stok 1).
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
     const canEditChecklist = canEditConditionChecks(userId, userRoles);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
-    // SO untuk AKSESORIS belum punya aturan role khusus seperti canSoLaptop
-    // (yang mempertimbangkan siap_jual) — sementara pakai gate stok > 0.
-    // Sesuaikan di sini kalau nanti ada aturan role spesifik untuk aksesoris.
     const canDoSo = (row: UnifiedRow) => {
         if (!canManageSo) return false;
         if (row.tipe === "LAPTOP") return canSoLaptop(userRoles, userId, row.siap_jual ?? 0);
-        // Aksesoris: SO di tabel utama HANYA untuk stok ≤ 1 (0 atau 1 unit).
-        // Stok > 1 → SO dipindah ke dalam halaman Kelola Unit, per-SN.
         const stok = row.stok ?? 0;
         if (stok > 1) return false;
         return stok > 0;
@@ -853,22 +835,12 @@ export default function UnifiedBarangContent() {
     const canEditAcc = hasAnyRole(userRoles, ACCESSORY_EDIT_ROLES) || matrixCanBarang.edit;
     const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_DELETE_ROLES) || matrixCanBarang.delete;
 
-    // ── Aturan toggle audit: LAPTOP butuh canSeePrivate, AKSESORIS butuh
-    // ACCESSORY_AUDIT_ROLES (ADMIN & ACCOUNTING) — disamakan dengan gate
-    // backend di /api/accessories/[id]/audit/route.ts.
     const canAuditAccessory = hasAnyRole(userRoles, ACCESSORY_AUDIT_ROLES);
     const canToggleAudit = (row: UnifiedRow) => row.tipe === "LAPTOP" ? canSeePrivate : canAuditAccessory;
 
-    // Tombol "Tes Kondisi" hanya untuk LAPTOP yang kategorinya punya checklist
-    // (Laptop/Monitor — lihat isConditionCheckCategory) & user berhak edit.
-    // Kalau mau tombolnya tetap tampil untuk SEMUA role (mode lihat saja),
-    // hapus "&& canEditChecklist" di baris bawah ini.
     const canShowConditionChecks = (row: UnifiedRow) =>
         row.tipe === "LAPTOP" && isConditionCheckCategory(row.kategori) && canEditChecklist;
 
-    // opts.silent = true → refresh di belakang layar: TIDAK menyalakan spinner
-    // "Memuat data..." dan TIDAK menampilkan toast kalau gagal (karena data lama
-    // dari cache masih tampil di layar, gangguan toast hanya bikin bingung).
     const fetchAll = useCallback(async (opts?: { silent?: boolean }) => {
         if (!opts?.silent) setLoading(true);
         try {
@@ -891,9 +863,6 @@ export default function UnifiedBarangContent() {
     }, []);
 
     useEffect(() => {
-        // Ada cache segar? → rows sudah terisi dari lazy initializer di atas,
-        // di sini cuma refresh DIAM-DIAM di belakang layar biar tetap akurat.
-        // Tidak ada cache? → fetch normal dengan spinner "Memuat data...".
         if (bootCache) {
             fetchAll({ silent: true });
         } else {
@@ -923,17 +892,12 @@ export default function UnifiedBarangContent() {
         })();
     }, []);
 
-    // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe).
-    // DILEWATI di render pertama supaya kategori hasil restore dari
-    // sessionStorage (saat balik dari halaman Unit) tidak langsung dihapus.
     const tipeChangeFirstRun = useRef(true);
     useEffect(() => {
         if (tipeChangeFirstRun.current) { tipeChangeFirstRun.current = false; return; }
         setKategoriFilter([]);
     }, [tipeFilter]);
 
-    // Simpan filter ke sessionStorage tiap kali berubah, supaya tetap ada
-    // saat komponen di-mount ulang (pindah route lalu balik).
     useEffect(() => {
         writeBarangFilter({
             tipeFilter, kategoriFilter, brandFilter, stokFilter,
@@ -941,16 +905,11 @@ export default function UnifiedBarangContent() {
         });
     }, [tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, sortBy, search]);
 
-    // Deep-link: baca ?tipe= dari URL sekali saat mount — dipakai tombol
-    // breadcrumb "Data Aksesori" di halaman Kelola Unit, supaya begitu balik
-    // ke sini tab langsung terisi Aksesoris, bukan "Semua" default.
     useEffect(() => {
         const t = new URLSearchParams(window.location.search).get("tipe");
         if (t === "LAPTOP" || t === "AKSESORIS") setTipeFilter(t);
     }, []);
 
-    // Mode layar penuh: kunci scroll body (biar gak dobel-scroll) + tombol
-    // Escape buat keluar, konsisten sama pola modal lain di halaman ini.
     useEffect(() => {
         if (!isMaximized) return;
         const prevOverflow = document.body.style.overflow;
@@ -965,33 +924,18 @@ export default function UnifiedBarangContent() {
         };
     }, [isMaximized]);
 
-    // Kategori dipisah per tipe supaya dropdown laptop tidak menampilkan kategori
-    // aksesoris & sebaliknya. Transition-safe: kategori tanpa `type` (mis. migrasi
-    // belum jalan) tetap ikut muncul di kedua tipe — persis perilaku lama.
     const laptopCategories = useMemo(
         () => categories.filter(c => isLaptopCategoryType(c.type, c.name)),
         [categories],
     );
-    // Sebelumnya strict `c.type === "AKSESORIS"` — kategori dengan nilai type
-    // yang bukan persis string itu (typo lama, beda kapital, dll) jadi tidak
-    // lolos padahal badge-nya tetap kelihatan "Aksesoris" di halaman Kategori.
-    // Sekarang: apa pun yang BUKAN Laptop otomatis kehitung layak dipakai untuk
-    // Aksesoris.
     const accessoryCategories = useMemo(
         () => categories.filter(c => !isLaptopCategoryType(c.type, c.name)),
         [categories],
     );
-    // Dipakai KHUSUS di dropdown Master Kategori pada mode CREATE — supaya
-    // user yang cuma punya hak bikin Aksesoris tidak bisa pilih kategori
-    // ber-type "LAPTOP" dari situ (backend juga akan menolak, ini cuma
-    // supaya UI-nya tidak menyesatkan).
     const creatableCategories = useMemo(
         () => categories.filter(c => (isLaptopCategoryType(c.type, c.name) ? canCreateLaptop : canCreateAcc)),
         [categories, canCreateLaptop, canCreateAcc],
     );
-    // Kategori "PC" masuk keluarga LAPTOP (form & tabelnya sama), tapi label
-    // teks di modal (judul, "Nama Laptop") harus beda — dicek terpisah dari
-    // selectedCategoryId supaya "Tambah Laptop" vs "Tambah PC" akurat.
     const selectedCategoryIsPc = useMemo(() => {
         const cat = categories.find(c => c.id === selectedCategoryId);
         if (!cat) return false;
@@ -1002,12 +946,10 @@ export default function UnifiedBarangContent() {
         () => isConditionCheckCategory(categories.find(c => c.id === selectedCategoryId)?.name),
         [categories, selectedCategoryId],
     );
-    // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
     const filterCategories = tipeFilter === "LAPTOP" ? laptopCategories
         : tipeFilter === "AKSESORIS" ? accessoryCategories
             : categories;
 
-    // Daftar Brand unik yang ada di data
     const availableBrands = useMemo(() => {
         const set = new Set<string>();
         rows.forEach(r => {
@@ -1023,12 +965,8 @@ export default function UnifiedBarangContent() {
     const filteredRows = useMemo(() => {
         let list = rows;
 
-        // 1. Tipe Barang
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
 
-        // 2. Kategori
-        // 2. Kategori (checklist multi-select ala Excel — array kosong berarti
-        // tidak ada filter aktif / semua kategori dianggap tercentang)
         if (kategoriFilter.length > 0) {
             const selectedIds = new Set(kategoriFilter);
             const selectedNames = new Set(
@@ -1040,13 +978,11 @@ export default function UnifiedBarangContent() {
             });
         }
 
-        // 3. Brand
         if (brandFilter) {
             const b = brandFilter.toLowerCase();
             list = list.filter(r => (r.brand || "").toLowerCase() === b);
         }
 
-        // 4. Status Stok
         if (stokFilter !== "ALL") {
             list = list.filter(r => {
                 const stokVal = r.tipe === "LAPTOP" ? (r.stok_tersedia ?? 0) : (r.stok ?? 0);
@@ -1058,7 +994,6 @@ export default function UnifiedBarangContent() {
             });
         }
 
-        // 5. Rentang Harga Jual
         const pMin = minPrice.trim() !== "" ? parseFloat(minPrice) : null;
         const pMax = maxPrice.trim() !== "" ? parseFloat(maxPrice) : null;
         if (pMin !== null && !isNaN(pMin)) {
@@ -1068,7 +1003,6 @@ export default function UnifiedBarangContent() {
             list = list.filter(r => (r.harga_jual || 0) <= pMax);
         }
 
-        // 6. Status Audit & Stock Opname (SO)
         if (statusAuditSoFilter !== "ALL") {
             list = list.filter(r => {
                 if (statusAuditSoFilter === "SO_TODAY") return isSoActive(r.so_at);
@@ -1078,7 +1012,6 @@ export default function UnifiedBarangContent() {
             });
         }
 
-        // 7. Pencarian Teks
         if (deferredSearch.trim()) {
             const t = deferredSearch.toLowerCase();
             list = list.filter(r => {
@@ -1105,7 +1038,6 @@ export default function UnifiedBarangContent() {
             });
         }
 
-        // 8. Urutkan Data (Sorting)
         return [...list].sort((a, b) => {
             if (sortBy === "NAMA_ASC") return a.nama.trim().localeCompare(b.nama.trim(), "id-ID", { sensitivity: "base", numeric: true });
             if (sortBy === "NAMA_DESC") return b.nama.trim().localeCompare(a.nama.trim(), "id-ID", { sensitivity: "base", numeric: true });
@@ -1130,8 +1062,6 @@ export default function UnifiedBarangContent() {
         });
     }, [rows, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, deferredSearch, categories, sortBy]);
 
-    // Semua barang yang lolos filter langsung dirender sekaligus — tidak ada
-    // lagi pemotongan/pagination "Muat lebih banyak".
     const visibleRows = filteredRows;
 
     const counts = useMemo(() => ({
@@ -1141,11 +1071,6 @@ export default function UnifiedBarangContent() {
     }), [rows]);
 
     // ── Export Excel ─────────────────────────────────────────────────────
-    // Laptop: setiap unit/SN aktif (non-SOLD) jadi 1 baris sendiri, supaya
-    // modal, sumber, dan tanggal masuk per-SN kelihatan detail — bukan
-    // digabung per model seperti di tabel. Aksesoris tetap 1 baris per item
-    // (memang tidak punya SN individual). Yang di-export ikut filter/search
-    // yang sedang aktif (pakai filteredRows, bukan rows mentah).
     const handleExportExcel = useCallback(() => {
         try {
             const exportRows: Record<string, string | number>[] = [];
@@ -1159,7 +1084,6 @@ export default function UnifiedBarangContent() {
                     const units = ((row.raw as LaptopRaw).laptop_units ?? []).filter(u => u.status !== "SOLD");
 
                     if (units.length === 0) {
-                        // Model belum punya unit sama sekali — tetap 1 baris, SN kosong
                         exportRows.push({
                             No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
                             Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
@@ -1208,9 +1132,6 @@ export default function UnifiedBarangContent() {
                 { wch: 12 }, { wch: 6 }, { wch: 11 }, { wch: 10 },
             ];
 
-            // ── Styling tabel: header tebal + background gelap, border tipis
-            // di semua sel, baris genap dikasih shading (banded rows, mirip
-            // "Format as Table" bawaan Excel), + dropdown filter di header.
             const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
             const borderTipis = { style: "thin", color: { rgb: "D4D4D8" } } as const;
 
@@ -1233,7 +1154,6 @@ export default function UnifiedBarangContent() {
                 }
             }
 
-            // Dropdown filter di baris header
             ws["!autofilter"] = {
                 ref: XLSX.utils.encode_range({ s: { r: 0, c: range.s.c }, e: { r: 0, c: range.e.c } }),
             };
@@ -1265,7 +1185,7 @@ export default function UnifiedBarangContent() {
             if (!json.success) throw new Error(json.message || "Gagal update audit");
             setRows(prev => {
                 const next = prev.map(r => r.id === row.id ? { ...r, audited_at: json.data.audited_at, audited_by: json.data.audited_by } : r);
-                writeBarangCache(next); // cache ikut update, biar load berikutnya tidak "kedip balik" ke status lama
+                writeBarangCache(next);
                 return next;
             });
             toast.success("Status audit diperbarui");
@@ -1283,9 +1203,6 @@ export default function UnifiedBarangContent() {
         setConditionChecksTarget(row);
     };
 
-    // Simpan ke endpoint yang SAMA dengan form Edit (PUT /api/laptops/[id] —
-    // sudah terima condition_checks). rows & cache ikut di-update biar sinkron
-    // tanpa fetch ulang.
     const saveConditionChecks = async () => {
         if (!conditionChecksTarget) return;
         setConditionChecksSaving(true);
@@ -1316,8 +1233,6 @@ export default function UnifiedBarangContent() {
     };
 
     // ── SO toggle (laptop & aksesoris) ──────────────────────────────────────
-    // Catatan diambil dari SoConfirmModal, bukan window.prompt — Cancel di
-    // modal benar-benar tidak memanggil fungsi ini sama sekali.
     const toggleSo = async (row: UnifiedRow, note: string) => {
         setSoingId(row.id);
         try {
@@ -1340,10 +1255,7 @@ export default function UnifiedBarangContent() {
         }
     };
 
-     // ── Pedagang toggle (laptop — SEMUA unit aktif satu model sekaligus) ─────
-    //  Dulu hanya jalan saat stok = 1 (bergantung row.unit_id), jadi laptop
-    //  multi-unit TIDAK punya tombol sama sekali. Sekarang pakai row.id (model)
-    //  + endpoint /api/laptops/[id]/pedagang yang meng-update semua unit aktif.
+    // ── Pedagang toggle (laptop — SEMUA unit aktif satu model sekaligus) ─────
     const togglePedagang = async (row: UnifiedRow) => {
         if (row.tipe !== "LAPTOP") return;
         const next = !(row.is_pedagang_listed ?? false);
@@ -1370,7 +1282,7 @@ export default function UnifiedBarangContent() {
                         },
                     };
                 });
-                writeBarangCache(updated); // cache ikut sinkron biar load berikutnya tidak balik ke status lama
+                writeBarangCache(updated);
                 return updated;
             });
             toast.success(next ? "Laptop masuk Pricelist Pedagang" : "Laptop keluar dari Pricelist Pedagang");
@@ -1381,9 +1293,6 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    // ── Perbaiki Tipe: kategori tujuan Laptop/PC → cukup ganti category_id
-    // (tetap di tabel laptops, spek aman). Kategori tujuan Aksesoris → tetap
-    // pindah ke tabel accessories lewat convert-to-accessory (perilaku lama).
     const convertToAccessory = async (categoryName: string) => {
         if (!convertTarget) return;
         const targetCategory = categories.find(c => c.name === categoryName);
@@ -1416,9 +1325,6 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    //  Ambil detail unit LENGKAP (condition_note, notes, dst) untuk laptop
-    //  stok 1 — data di tabel gabungan ini cuma versi ringkas, jadi harus
-    //  fetch ulang lewat endpoint units, sama seperti LaptopsContent.tsx.
     const openUnitDetail = async (row: UnifiedRow) => {
         setUnitDetailLoading(true);
         try {
@@ -1439,9 +1345,6 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    //  Versi AKSESORIS dari openUnitDetail — fetch ke endpoint asli
-    //  (GET /api/accessory-units?accessory_id=X), bukan endpoint nested
-    //  yang sudah dihapus karena duplikat & tidak konsisten dengan yang asli.
     const openAccessoryUnitDetail = async (row: UnifiedRow) => {
         setUnitDetailAccessoryLoading(true);
         try {
@@ -1463,12 +1366,8 @@ export default function UnifiedBarangContent() {
     };
 
     // ── Klik baris (desktop) / tap kartu (mobile) ───────────────────────────
-    // Stok 0  → buka pop-up "Tambah Unit" (unit pertama belum ada).
-    // Stok 1  → buka pop-up "Detail Unit" untuk edit SN yang sudah ada ATAU
-    //           tambah unit baru (tombol "+ Tambah Unit" di dalam pop-up itu).
-    // Stok >1 → TIDAK diberi aksi klik — edit SN dilakukan di halaman Units
-    //           lewat tombol "Kelola Unit" yang sudah ada.
     const handleRowClick = (row: UnifiedRow) => {
+        if (canOnlyViewBasic) return; // role basic-view: baris tidak bisa diklik
         if (row.tipe === "LAPTOP") {
             if (row.unit_count === 0 && canAddUnit) {
                 setAddUnitTarget(row);
@@ -1488,9 +1387,6 @@ export default function UnifiedBarangContent() {
             if (action === "detail" && canViewUnits) {
                 openAccessoryUnitDetail(row);
             }
-            // action === "units" → sengaja TIDAK diapa-apakan di sini, sama
-            // seperti LAPTOP saat unit_count > 1: klik baris tidak ngapa-ngapain,
-            // user wajib klik tombol "Kelola Unit" di kolom Aksi.
         }
     };
 
@@ -1529,14 +1425,9 @@ export default function UnifiedBarangContent() {
         setConditionChecks({});
         setAccForm(EMPTY_ACC_FORM);
         setSelectedCategoryId("");
-        setFormModal({ mode: "create", tipe: null }); // tipe baru terisi setelah pilih Kategori
+        setFormModal({ mode: "create", tipe: null });
     };
 
-    // Master Kategori (flat) → derive tipe barang. Kategori bertipe "LAPTOP"
-    // (mis. kategori "Laptop") → form Laptop. Selain itu (Aksesoris/Sparepart/
-    // Umum/null) → form Aksesoris. Ini satu-satunya tempat yang masih peduli
-    // pada field `type` di tabel categories — sudah tidak diekspos lagi
-    // sebagai pilihan terpisah ke user.
     const inferTipeFromCategory = (cat?: { type?: string | null; name?: string }): ItemType =>
         isLaptopCategoryType(cat?.type, cat?.name) ? "LAPTOP" : "AKSESORIS";
 
@@ -1567,8 +1458,6 @@ export default function UnifiedBarangContent() {
                 name: a.name || "", category: a.category || "", brand: a.brand || "", spec: a.spec || "",
                 buy_price: String(a.buy_price ?? ""), sell_price: String(a.sell_price ?? ""), stock: String(a.stock ?? ""), notes: a.notes || "",
             });
-            // Aksesoris disimpan sebagai TEKS nama kategori (bukan id) — cocokkan
-            // balik ke id-nya supaya dropdown Master Kategori bisa nge-preselect.
             setSelectedCategoryId(categories.find(c => c.name.toUpperCase() === (a.category || "").toUpperCase())?.id ?? "");
         }
         setFormModal({ mode: "edit", tipe: row.tipe, row });
@@ -1577,9 +1466,6 @@ export default function UnifiedBarangContent() {
 
     const submitForm = async () => {
         if (!formModal) return;
-        // Mode create: tipe baru terisi setelah user pilih Kategori dari dropdown
-        // Master Kategori (lihat handleCategoryPick) — kalau belum dipilih,
-        // tipe masih null, jadi belum tahu ini Laptop atau Aksesoris.
         if (formModal.mode === "create" && !formModal.tipe) {
             toast.error("Kategori wajib dipilih");
             return;
@@ -1591,7 +1477,6 @@ export default function UnifiedBarangContent() {
                 const body = {
                     ...laptopForm,
                     selling_price: Number(laptopForm.selling_price) || 0,
-                    // Hanya dikirim oleh editor checklist — server juga cek ulang.
                     ...(canEditChecklist && selectedCategoryHasChecklist && { condition_checks: conditionChecks }),
                 };
                 const url = formModal.mode === "edit" ? `/api/laptops/${formModal.row!.id}` : "/api/laptops/create";
@@ -1699,12 +1584,7 @@ export default function UnifiedBarangContent() {
             >
                 <div className="max-w-full mx-auto space-y-4 sm:space-y-5">
 
-                    {/* ── FILTER SUB KATEGORI — dipisah 2 baris: header (judul + aksi) SELALU
-                        di kanan atas, pills di baris sendiri di bawahnya biar bebas wrap
-                        tanpa ikut menyeret tombol Export/Tambah turun.
-                        MOBILE: judul di baris sendiri, tombol aksi jadi 1 baris penuh yang
-                        dibagi rata (flex-1) — sebelumnya tiga tombol ini berdesakan dengan
-                        judul di satu baris sampai teksnya kepotong. ── */}
+                    {/* ── FILTER SUB KATEGORI ── */}
                     <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-3 sm:p-4 space-y-3">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                             <h3 className="text-[13px] font-bold text-zinc-700">Kategori</h3>
@@ -1716,11 +1596,13 @@ export default function UnifiedBarangContent() {
                                 >
                                     {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
-                                <button onClick={handleExportExcel} disabled={filteredRows.length === 0}
-                                    className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition whitespace-nowrap">
-                                    Export Excel
-                                </button>
-                                {(canCreateLaptop || canCreateAcc) && (
+                                {!canOnlyViewBasic && (
+                                    <button onClick={handleExportExcel} disabled={filteredRows.length === 0}
+                                        className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition whitespace-nowrap">
+                                        Export Excel
+                                    </button>
+                                )}
+                                {!canOnlyViewBasic && (canCreateLaptop || canCreateAcc) && (
                                     <button
                                         onClick={openCreate}
                                         className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition whitespace-nowrap"
@@ -1730,8 +1612,6 @@ export default function UnifiedBarangContent() {
                                 )}
                             </div>
                         </div>
-                        {/* Pills kategori: di HP digeser horizontal (1 baris, tidak menumpuk
-                            jadi 4-5 baris), di layar >= sm kembali flex-wrap seperti semula. */}
                         <div className="flex gap-2 overflow-x-auto pills-scroll -mx-1 px-1 pb-0.5 sm:flex-wrap sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
                             <button
                                 onClick={() => setKategoriFilter([])}
@@ -1749,11 +1629,9 @@ export default function UnifiedBarangContent() {
                         </div>
                     </div>
 
-                    {/* ── FILTER UTAMA & LANJUTAN (FULL FILTER) ───────────── */}
+                    {/* ── FILTER UTAMA & LANJUTAN ── */}
                     <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-3 sm:p-5 space-y-3">
-                        {/* Row 1: Search, Kategori, Brand, Toggle Lanjutan, & Reset */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-center">
-                            {/* Search Input */}
                             <div className="relative sm:col-span-2 lg:col-span-4">
                                 <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 pointer-events-none" />
                                 <input
@@ -1769,7 +1647,6 @@ export default function UnifiedBarangContent() {
                                 )}
                             </div>
 
-                            {/* Kategori Dropdown — checklist ala Excel (multi-select + search) */}
                             <div className="lg:col-span-3">
                                 <CategoryChecklistDropdown
                                     categories={filterCategories}
@@ -1778,7 +1655,6 @@ export default function UnifiedBarangContent() {
                                 />
                             </div>
 
-                            {/* Brand Dropdown */}
                             <div className="lg:col-span-2">
                                 <select
                                     className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-zinc-700 font-medium"
@@ -1790,7 +1666,6 @@ export default function UnifiedBarangContent() {
                                 </select>
                             </div>
 
-                            {/* Action Buttons: Toggle Advanced + Reset */}
                             <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
                                 <button
                                     onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
@@ -1821,10 +1696,8 @@ export default function UnifiedBarangContent() {
                             </div>
                         </div>
 
-                        {/* Collapsible Panel: Filter Lanjutan */}
                         {showAdvancedFilter && (
                             <div className="pt-3 border-t border-zinc-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-fadeIn">
-                                {/* Status Stok */}
                                 <div>
                                     <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Status Stok</label>
                                     <select
@@ -1840,7 +1713,6 @@ export default function UnifiedBarangContent() {
                                     </select>
                                 </div>
 
-                                {/* Status Audit & Stock Opname */}
                                 <div>
                                     <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Status Audit / SO</label>
                                     <select
@@ -1855,7 +1727,6 @@ export default function UnifiedBarangContent() {
                                     </select>
                                 </div>
 
-                                {/* Rentang Harga Jual (Min & Max) */}
                                 <div>
                                     <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Harga Jual (Rp)</label>
                                     <div className="flex items-center gap-1.5">
@@ -1879,7 +1750,6 @@ export default function UnifiedBarangContent() {
                                     </div>
                                 </div>
 
-                                {/* Sorting Dropdown */}
                                 <div>
                                     <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Urutkan Berdasarkan</label>
                                     <select
@@ -1899,7 +1769,6 @@ export default function UnifiedBarangContent() {
                             </div>
                         )}
 
-                        {/* Active Filter Badges & Counter */}
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100/80 text-xs text-zinc-500">
                             <div className="flex flex-wrap items-center gap-1.5">
                                 <span className="text-[11px] font-medium text-zinc-400">Total:</span>
@@ -1945,7 +1814,7 @@ export default function UnifiedBarangContent() {
                         </div>
                     </div>
 
-                    {/* ── TABEL / DAFTAR BARANG ────────────────────────────── */}
+                    {/* ── TABEL / DAFTAR BARANG ── */}
                     {loading ? (
                         <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm py-16 text-center text-sm text-zinc-400">Memuat data...</div>
                     ) : filteredRows.length === 0 ? (
@@ -1966,20 +1835,18 @@ export default function UnifiedBarangContent() {
                                         const canEditThis = row.tipe === "LAPTOP" ? canEditLaptop : canEditAcc;
                                         const canDeleteThis = row.tipe === "LAPTOP" ? canDeleteLaptop : canDeleteAcc;
                                         const accAction = getAccessoryUnitAction(row);
-                                        const isRowClickable = row.tipe === "LAPTOP"
+                                        const isRowClickable = canOnlyViewBasic ? false : (row.tipe === "LAPTOP"
                                             ? ((row.unit_count === 0 && canAddUnit) || (row.unit_count === 1 && canViewUnits))
                                             : row.tipe === "AKSESORIS"
                                                 ? ((accAction === "add" && canAddUnit) || (accAction === "detail" && canViewUnits))
-                                                : false;
+                                                : false);
                                         return (
                                             <div
                                                 key={rowKey}
                                                 onClick={() => handleRowClick(row)}
                                                 className={`bg-white rounded-2xl border border-zinc-100 shadow-sm p-3.5 space-y-3 ${isRowClickable ? "cursor-pointer" : ""}`}
                                             >
-                                                {/* Header: tipe + nama + harga jual.
-                                                Kolom harga dibatasi max-w-[42%] & whitespace-nowrap supaya
-                                                angka jutaan tidak melipat dan tidak menggencet nama barang. */}
+                                                {/* Header: tipe + nama + harga jual. */}
                                                 <div className="flex items-start justify-between gap-2.5">
                                                     <div className="min-w-0 flex-1">
                                                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
@@ -1991,60 +1858,60 @@ export default function UnifiedBarangContent() {
                                                             {row.kategori || "Tanpa kategori"}{row.brand ? ` · ${row.brand}` : ""}
                                                         </p>
                                                     </div>
-                                                    <div className="text-right flex-shrink-0 max-w-[42%]">
-                                                        <p className="text-[9px] font-semibold text-zinc-400 uppercase tracking-widest">Harga Jual</p>
-                                                        <p className="text-[13px] font-black text-zinc-900 tabular-nums whitespace-nowrap">{fmt(row.harga_jual)}</p>
-                                                    </div>
-                                                </div>
-
-                                                {/* Chip status stok — beda field antara laptop (ST/SJ/M) dan aksesoris (Stok) */}
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {row.tipe === "LAPTOP" ? (
-                                                        <>
-                                                            <StatChip label="ST" value={row.stok_tersedia} tone={(row.stok_tersedia ?? 0) === 0 ? "red" : "gray"} />
-                                                            <StatChip label="SJ" value={row.siap_jual} tone="green" />
-                                                            <StatChip label="M" value={row.minus} tone={(row.minus ?? 0) > 0 ? "red" : "gray"} />
-                                                        </>
-                                                    ) : (
-                                                        <StatChip label="Stok" value={row.stok} tone={(row.stok ?? 0) === 0 ? "red" : "emerald"} />
+                                                    {!canOnlyViewBasic && (
+                                                        <div className="text-right flex-shrink-0 max-w-[42%]">
+                                                            <p className="text-[9px] font-semibold text-zinc-400 uppercase tracking-widest">Harga Jual</p>
+                                                            <p className="text-[13px] font-black text-zinc-900 tabular-nums whitespace-nowrap">{fmt(row.harga_jual)}</p>
+                                                        </div>
                                                     )}
                                                 </div>
 
-                                                {/* Toggle detail — CPU/RAM/Spek/Sumber/SN/dll disembunyikan di sini,
-                                                BUKAN dihapus, supaya kartu tetap ringkas di layar kecil. */}
-                                                <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(rowKey); }}
-                                                    className="text-[11px] font-semibold text-zinc-700 hover:text-zinc-900 flex items-center gap-1">
-                                                    {expanded ? "Sembunyikan detail" : "Lihat detail lengkap"}
-                                                    <svg className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                                                    </svg>
-                                                </button>
-
-                                                {expanded && (
-                                                    <div className="grid grid-cols-2 gap-2 pt-1">
-                                                        <DetailItem label="CPU" value={row.cpu} />
-                                                        <DetailItem label="RAM" value={row.ram} />
-                                                        <DetailItem label="Storage" value={row.storage} />
-                                                        <DetailItem label="Spek" value={row.spek} />
-                                                        <DetailItem label="Harga Modal" value={row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note} />
-                                                        <DetailItem label="Modal Sparepart" value={row.modal_sparepart != null ? fmt(row.modal_sparepart) : null} />
-                                                        <DetailItem label="Total Jual" value={row.total_jual != null ? fmt(row.total_jual) : null} />
-                                                        <DetailItem label="Gross Profit" value={row.gross_profit != null ? `${row.gross_profit >= 0 ? "+" : ""}${fmt(row.gross_profit)}` : null} />
-                                                        <DetailItem label="Sumber" value={row.sumber} />
-                                                        <DetailItem label="Tgl Masuk" value={row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : null} />
-                                                        <DetailItem label="SN" value={row.sn || row.sn_note} />
+                                                {/* Chip status stok + toggle detail + panel expand — semua
+                                                    disembunyikan untuk role basic-view (KEPALA_PENYEDIA_BARANG). */}
+                                                {!canOnlyViewBasic && (<>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {row.tipe === "LAPTOP" ? (
+                                                            <>
+                                                                <StatChip label="ST" value={row.stok_tersedia} tone={(row.stok_tersedia ?? 0) === 0 ? "red" : "gray"} />
+                                                                <StatChip label="SJ" value={row.siap_jual} tone="green" />
+                                                                <StatChip label="M" value={row.minus} tone={(row.minus ?? 0) > 0 ? "red" : "gray"} />
+                                                            </>
+                                                        ) : (
+                                                            <StatChip label="Stok" value={row.stok} tone={(row.stok ?? 0) === 0 ? "red" : "emerald"} />
+                                                        )}
                                                     </div>
-                                                )}
 
-                                                {/* Aksi — fungsi & gerbang permission-nya PERSIS sama dengan versi
-                                                lama, cuma layoutnya dipecah 2 grup biar rapi di layar kecil:
-                                                (1) BARIS STATUS — Audit & SO masing-masing digabung dengan tombol
-                                                    riwayatnya jadi satu segmented control, jadi ikon History tidak
-                                                    lagi bisa terlempar wrap ke baris lain kepisah dari induknya.
-                                                (2) GRID AKSI — grid 2 kolom, semua tombol lebar & tinggi seragam
-                                                    (cardActionCls), label panjang di-truncate.
-                                                stopPropagation tetap di wrapper supaya tap tombol tidak memicu
-                                                handleRowClick pada kartu. */}
+                                                    {/* Toggle detail — CPU/RAM/Spek/Sumber/SN/dll disembunyikan di sini,
+                                                    BUKAN dihapus, supaya kartu tetap ringkas di layar kecil. */}
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(rowKey); }}
+                                                        className="text-[11px] font-semibold text-zinc-700 hover:text-zinc-900 flex items-center gap-1">
+                                                        {expanded ? "Sembunyikan detail" : "Lihat detail lengkap"}
+                                                        <svg className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </button>
+
+                                                    {expanded && (
+                                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                                            <DetailItem label="CPU" value={row.cpu} />
+                                                            <DetailItem label="RAM" value={row.ram} />
+                                                            <DetailItem label="Storage" value={row.storage} />
+                                                            <DetailItem label="Spek" value={row.spek} />
+                                                            <DetailItem label="Harga Modal" value={row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note} />
+                                                            <DetailItem label="Modal Sparepart" value={row.modal_sparepart != null ? fmt(row.modal_sparepart) : null} />
+                                                            <DetailItem label="Total Jual" value={row.total_jual != null ? fmt(row.total_jual) : null} />
+                                                            <DetailItem label="Gross Profit" value={row.gross_profit != null ? `${row.gross_profit >= 0 ? "+" : ""}${fmt(row.gross_profit)}` : null} />
+                                                            <DetailItem label="Sumber" value={row.sumber} />
+                                                            <DetailItem label="Tgl Masuk" value={row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : null} />
+                                                            <DetailItem label="SN" value={row.sn || row.sn_note} />
+                                                        </div>
+                                                    )}
+                                                </>)}
+
+                                                {/* Aksi — status Audit/SO + grid tombol. Seluruhnya disembunyikan
+                                                    untuk role basic-view. stopPropagation tetap di wrapper supaya
+                                                    tap tombol tidak memicu handleRowClick pada kartu. */}
+                                                {!canOnlyViewBasic && (
                                                 <div className="pt-2.5 border-t border-zinc-100 space-y-1.5" onClick={(e) => e.stopPropagation()}>
 
                                                     {/* (1) BARIS STATUS: Audit + SO */}
@@ -2114,9 +1981,6 @@ export default function UnifiedBarangContent() {
                                                                 Barcode
                                                             </button>
                                                         )}
-                                                        {/* Aksesoris cuma bisa dibarcode kalau SUDAH punya unit SN
-                                                            (accAction "units"/"detail"). Kalau masih "add" (belum ada SN),
-                                                            tidak ada SN untuk di-encode → Tambah Unit dulu. */}
                                                         {row.tipe === "AKSESORIS" && canViewBarcode && accAction !== "add" && (
                                                             <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "AKSESORIS" })}
                                                                 className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
@@ -2151,6 +2015,7 @@ export default function UnifiedBarangContent() {
                                                         )}
                                                     </div>
                                                 </div>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -2162,16 +2027,19 @@ export default function UnifiedBarangContent() {
                                 </div>
                             )}
 
-                            {/* ══ MODE LAPTOP (≥ lg) — tabel penuh, sticky header + kolom nama ══ */}
+                            {/* ══ MODE DESKTOP (≥ lg) — tabel penuh, sticky header + kolom nama ══ */}
                             {isDesktop && (
                                 <div className="hidden lg:block bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
                                     <div className="overflow-auto table-scroll max-h-[70vh]">
                                         <table className="w-full text-sm border-collapse">
                                             <thead>
                                                 <tr className="whitespace-nowrap">
-                                                    {["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek",
-                                                        "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
-                                                        "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "M", "Stok", "SO", "Audit", "Aksi"].map((h, hi) => (
+                                                    {(canOnlyViewBasic
+                                                        ? ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek"]
+                                                        : ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek",
+                                                            "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
+                                                            "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "M", "Stok", "SO", "Audit", "Aksi"]
+                                                    ).map((h, hi) => (
                                                             <th key={h}
                                                                 className={`px-3 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-left bg-zinc-50 border-b-2 border-zinc-100 sticky top-0 ${hi === 2 ? "left-0 z-20 min-w-[180px]" : "z-10"}`}>
                                                                 {h}
@@ -2186,11 +2054,11 @@ export default function UnifiedBarangContent() {
                                                     const zebra = idx % 2 === 1;
                                                     const rowBg = zebra ? "bg-zinc-50" : "bg-white";
                                                     const accAction = getAccessoryUnitAction(row);
-                                                    const isRowClickable = row.tipe === "LAPTOP"
+                                                    const isRowClickable = canOnlyViewBasic ? false : (row.tipe === "LAPTOP"
                                                         ? ((row.unit_count === 0 && canAddUnit) || (row.unit_count === 1 && canViewUnits))
                                                         : row.tipe === "AKSESORIS"
                                                             ? ((accAction === "add" && canAddUnit) || (accAction === "detail" && canViewUnits))
-                                                            : false;
+                                                            : false);
                                                     return (
                                                         <tr
                                                             key={`${row.tipe}-${row.id}`}
@@ -2210,6 +2078,7 @@ export default function UnifiedBarangContent() {
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.ram || <Dash />}</td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.storage || <Dash />}</td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500 max-w-[140px] truncate">{row.spek || <Dash />}</td>
+                                                            {!canOnlyViewBasic && (<>
                                                             <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">
                                                                 {row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note ? <span className="text-zinc-400">{row.harga_modal_note}</span> : <Dash />}
                                                             </td>
@@ -2316,6 +2185,7 @@ export default function UnifiedBarangContent() {
                                                                     )}
                                                                 </div>
                                                             </td>
+                                                            </>)}
                                                         </tr>
                                                     );
                                                 })}
@@ -2348,11 +2218,6 @@ export default function UnifiedBarangContent() {
                         </div>
 
                         <div className="overflow-y-auto flex-1 px-5 sm:px-6 py-5 space-y-3">
-                            {/* ── MASTER KATEGORI (flat) — gantiin toggle Laptop/Aksesoris lama.
-                                Pilih kategori dulu → tipe barang (Laptop/Aksesoris) & field di
-                                bawahnya baru ikut menyesuaikan otomatis. Mode edit: tipe sudah
-                                tetap dari awal (row.tipe), dropdown cuma dipakai buat ganti
-                                kategori spesifiknya, difilter ke kategori yg cocok tipe-nya. */}
                             <Field label="Kategori" required>
                                 <select
                                     className={inputCls}
@@ -2516,7 +2381,6 @@ export default function UnifiedBarangContent() {
                 />
             )}
 
-            {/*  Loader singkat saat menarik detail unit lengkap (stok = 1) */}
             {unitDetailLoading && (
                 <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
                     <div className="w-8 h-8 border-2 border-zinc-200 border-t-zinc-900 rounded-full animate-spin" />
@@ -2535,11 +2399,6 @@ export default function UnifiedBarangContent() {
                         { label: "Storage", value: unitDetailTarget.row.storage },
                     ]}
                     canEdit={canFullAccessBarang}
-                    //  Tombol "+ Tambah Unit" & "Edit Data" di dalam pop-up ini digerbangi
-                    //  CREATE_UNITS/EDIT_UNITS (memuat KEPALA_TEKNISI dkk) — bukan full-access.
-                    //  Tanpa prop ini, canManage jatuh ke canEdit=full-access sehingga role
-                    //  yang backend-nya SUDAH izinkan (mis. KEPALA_TEKNISI) tidak bisa nambah/
-                    //  edit unit dari sini, padahal bisa lewat tombol "Tambah Unit" saat stok 0.
                     canManageUnit={canAddUnit}
                     canEditChecklist={canEditChecklist}
                     canSeePrivate={canSeePrivate}
@@ -2558,10 +2417,6 @@ export default function UnifiedBarangContent() {
                 />
             )}
 
-            {/* ✅ FIX: blok render 2 modal AKSESORIS ini sebelumnya HILANG —
-                state & logic-nya (addUnitAccessoryTarget, openAccessoryUnitDetail,
-                handleRowClick) sudah benar, tapi tanpa render ini popup-nya
-                tidak pernah benar-benar muncul di layar. */}
             {addUnitAccessoryTarget && (
                 <AddUnitModalAccessory
                     accessoryId={addUnitAccessoryTarget.id}
@@ -2609,9 +2464,6 @@ export default function UnifiedBarangContent() {
 
 const inputCls = "w-full h-10 border border-zinc-200 rounded-xl px-3 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400";
 
-// Class tombol aksi di kartu MOBILE. Kuncinya: w-full + h-8 tetap, teks
-// di-truncate. Tanpa ini tombol melebar mengikuti panjang labelnya ("Kelola
-// Unit (12)" vs "SO") sehingga tiap baris jadi zig-zag di layar kecil.
 const cardActionCls = "h-8 w-full inline-flex items-center justify-center px-2 rounded-lg text-[11px] font-semibold truncate transition disabled:opacity-40";
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
@@ -2625,10 +2477,6 @@ function Field({ label, children, required }: { label: string; children: React.R
     );
 }
 
-// ── Dipakai di kartu mobile ──────────────────────────────────────────────
-// StatChip: null (bukan 0) berarti field ini memang tidak berlaku untuk tipe
-// barang ini (mis. "Stok" untuk laptop, atau "ST/SJ/M" untuk aksesoris) →
-// chip tidak dirender sama sekali, bukan ditampilkan sebagai "0".
 function StatChip({ label, value, tone = "gray" }: { label: string; value: number | null; tone?: "gray" | "green" | "red" | "emerald" }) {
     if (value == null) return null;
     const toneCls: Record<string, string> = {
@@ -2644,9 +2492,6 @@ function StatChip({ label, value, tone = "gray" }: { label: string; value: numbe
     );
 }
 
-// DetailItem: dipakai di panel "Lihat detail lengkap" pada kartu mobile.
-// Cek eksplisit undefined/null/"" (bukan pakai `||`) supaya nilai 0 yang
-// valid (mis. Gross Profit = 0) tetap tampil, bukan ikut dianggap kosong.
 function DetailItem({ label, value }: { label: string; value?: string | number | null }) {
     const hasValue = value !== undefined && value !== null && value !== "";
     return (
@@ -2657,4 +2502,4 @@ function DetailItem({ label, value }: { label: string; value?: string | number |
             </p>
         </div>
     );
-}
+} 

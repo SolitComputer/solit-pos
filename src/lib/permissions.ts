@@ -421,7 +421,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ROUTE_PERMISSIONS di file ini (lihat komentar dekat SO_ROLES di bawah).
   "/dashboard/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
 
-  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH", "PKL_PENGELOLA_BARANG", "KEPALA_MARKETING", "MARKETING"],
+  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH", "PKL_PENGELOLA_BARANG", "KEPALA_MARKETING", "MARKETING", "KEPALA_PENYEDIA_BARANG"],
   "/dashboard/audit-barang-keluar": [...ITEM_OUTFLOW_ROLES],
 
   "/dashboard/warranty": [
@@ -1144,6 +1144,20 @@ export const BARANG_PRIVATE_VIEW_ROLES: UserRole[] = [
   "KEPALA_TEKNISI",
 ];
 
+// ── Data Barang: Role "lihat kolom dasar saja" ───────────────────────────────
+// KEPALA_PENYEDIA_BARANG boleh buka halaman Data Barang TAPI hanya kolom
+// No–Nama–Kategori–Merk–CPU–RAM–Storage–Spek. Semua kolom sensitif (harga,
+// modal, sumber, SN, stok, SO, audit, aksi) + tombol Tambah/Export disembunyikan.
+// Sengaja dipisah dari BARANG_PRIVATE_VIEW_ROLES: ini bukan soal "boleh lihat
+// data privat atau tidak", tapi mode tampilan read-only terbatas khusus role ini.
+export const BARANG_BASIC_VIEW_ONLY_ROLES: UserRole[] = [
+  "KEPALA_PENYEDIA_BARANG",
+];
+
+export function isBarangBasicViewOnly(userRoles: string[]): boolean {
+  return hasAnyRole(userRoles, BARANG_BASIC_VIEW_ONLY_ROLES);
+}
+
 // ── Data Barang: Role yang boleh akses fitur SO (Stock Opname) ───────────────
 // Sengaja whitelist TERPISAH dari BARANG_PRIVATE_VIEW_ROLES — SO khusus tim
 // Pengelola Barang saja (termasuk PKL-nya), tidak ikut Asisten CEO/Accounting/
@@ -1237,6 +1251,7 @@ export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   "KEPALA_ZENITH",
   "KEPALA_MARKETING",
   "MARKETING",
+  "KEPALA_PENYEDIA_BARANG", // view-only kolom dasar (No–Spek) di tab Data Barang
 ];
 
 // ── Data Barang: Aksesoris (CRUD) — dipusatkan di sini supaya client
@@ -1258,6 +1273,7 @@ export const ACCESSORY_VIEW_ROLES: UserRole[] = [
   "KEPALA_ZENITH",
   "PKL_PENGELOLA_BARANG",
   "KEPALA_MARKETING", "MARKETING",
+  "KEPALA_PENYEDIA_BARANG", // hanya view kolom dasar (No–Spek) di Data Barang
 ];
 export const ACCESSORY_EDIT_ROLES: UserRole[] = [...ACCESSORY_CREATE_ROLES];
 
