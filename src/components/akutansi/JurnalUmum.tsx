@@ -1286,6 +1286,20 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Sticky Toolbar, Filter & Summary Bar ── */}
             <div className="sticky top-12 lg:top-0 z-20 bg-white/95 backdrop-blur-md -mx-4 sm:-mx-6 px-4 sm:px-6 pt-2 pb-3 space-y-2 border-b border-slate-100 shadow-xs transition-all">
+                {/* ── Baris "Ke Penanda" — ikon saja, rata kanan, muncul hanya jika ada penanda aktif ── */}
+                {bookmarkedId && (
+                    <div className="flex justify-end">
+                        <button
+                            onClick={scrollToBookmark}
+                            title="Lompat ke baris terakhir yang kamu tandai"
+                            aria-label="Ke penanda baca"
+                            className="w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-600 text-white shadow-xs active:scale-90 transition-all duration-150 flex items-center justify-center"
+                        >
+                            <BookmarkCheck className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
+
                 {/* ── Toolbar ── */}
                 <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex-1 flex flex-col sm:flex-row gap-2">
@@ -1388,15 +1402,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 </button>
                             )}
                         </div>
-                        {bookmarkedId && (
-                            <button
-                                onClick={scrollToBookmark}
-                                title="Lompat ke baris terakhir yang kamu tandai"
-                                className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap inline-flex items-center justify-center gap-1.5"
-                            >
-                                <BookmarkCheck className="w-4 h-4" /> Ke Penanda
-                            </button>
-                        )}
                         <button
                             onClick={() => setShowManual(true)}
                             className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
