@@ -29,7 +29,7 @@ interface JournalLine {
     line_order: number;
     checked?: boolean;
     checked_at?: string | null;
-    checked_by_user?: { id: string; name: string } | null; // ⬅️ BARU: siapa yang mencentang baris ini
+    checked_by_user?: { id: string; name: string } | null;
 }
 
 interface WarningLog {
@@ -51,7 +51,7 @@ interface JournalEntry {
     total: number;
     is_edited: boolean;
     sync_available?: boolean;
-    sync_preview?: { keterangan: string; lines: SyncSnapshotLine[] } | null; // ⬅️ BARU: draft hasil sync, buat preview before/after
+    sync_preview?: { keterangan: string; lines: SyncSnapshotLine[] } | null;
     lines: JournalLine[];
     created_by_user?: { id: string; name: string } | null;
     updated_by_user?: { id: string; name: string } | null;
@@ -100,7 +100,6 @@ const fmtTgl = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
 const fmtWaktu = (iso?: string) =>
     iso ? new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
-// ⬅️ BARU: format jam saja (HH:MM) — dipakai untuk "jam masuk" & "jam dicek" di bawah Tanggal
 const fmtJam = (iso?: string | null) =>
     iso ? new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : null;
 
@@ -120,8 +119,6 @@ const SOURCE_GROUP_RANK: Record<string, number> = {
 
 const key = (d: { source_type: string; source_id: string }) => `${d.source_type}:${d.source_id}`;
 
-// Bandingkan lines "sebelum" vs "sesudah" dari snapshot journal_audit_logs (action SYNC),
-// dikelompokkan per account_code+side, buat nunjukin akun mana yang nominalnya berubah.
 type SyncSnapshotLine = { account_code: string; account_name?: string; side: string; nominal: number | string };
 
 function computeLineDiff(beforeLines: SyncSnapshotLine[], afterLines: SyncSnapshotLine[]) {
@@ -146,12 +143,10 @@ function computeLineDiff(beforeLines: SyncSnapshotLine[], afterLines: SyncSnapsh
         .sort((a, b) => (a.side === b.side ? a.account_code.localeCompare(b.account_code) : a.side === "DEBIT" ? -1 : 1));
 }
 
-// ⬅️ BARU: total nominal per sisi (Debit/Kredit) — dipakai buat ringkasan total sebelum/sesudah di SyncPreviewModal
 function sumLinesBySide(lines: { side: string; nominal: number | string }[], side: "DEBIT" | "KREDIT"): number {
     return lines.filter((l) => l.side === side).reduce((s, l) => s + Number(l.nominal || 0), 0);
 }
 
-// ⬅️ BARU: computeLineDiff + status per baris (Baru/Dihapus/Berubah/Tetap) — dipakai SyncPreviewModal
 type SyncDiffRow = ReturnType<typeof computeLineDiff>[number] & {
     delta: number;
     status: "new" | "removed" | "changed" | "same";
@@ -167,7 +162,6 @@ function computeSyncDiffRows(beforeLines: SyncSnapshotLine[], afterLines: SyncSn
     });
 }
 
-// Daftar baris jurnal apa adanya — dipakai buat rincian CREATE/DELETE/CONFIRM di History Perubahan
 function AuditLineList({ lines, tone }: { lines: SyncSnapshotLine[]; tone: "red" | "emerald" | "gray" }) {
     if (!lines || lines.length === 0) return null;
     const border = tone === "red" ? "border-red-100" : tone === "emerald" ? "border-emerald-100" : "border-gray-200";
@@ -189,7 +183,6 @@ function AuditLineList({ lines, tone }: { lines: SyncSnapshotLine[]; tone: "red"
     );
 }
 
-// Tabel perbandingan baris jurnal SEBELUM vs SESUDAH per akun — dipakai EDIT & SYNC di History Perubahan
 function AuditLineDiffTable({ diff }: { diff: ReturnType<typeof computeLineDiff> }) {
     if (diff.length === 0) return null;
     return (
@@ -223,7 +216,6 @@ function AuditLineDiffTable({ diff }: { diff: ReturnType<typeof computeLineDiff>
     );
 }
 
-// ⬅️ BARU: tabel diff lengkap (semua baris, bukan cuma yang berubah) — dipakai SyncPreviewModal
 function SyncDiffDetailTable({ rows }: { rows: SyncDiffRow[] }) {
     if (rows.length === 0) return <p className="text-xs text-gray-400 italic">Tidak ada baris akun.</p>;
 
@@ -288,7 +280,6 @@ function getCompanyBadge(company?: string | null): { label: string; color: strin
     if (cn.includes("zenit")) return { label: "Zenit", color: "bg-teal-50 text-teal-700 border-teal-200" };
     return { label: company.trim(), color: "bg-gray-50 text-gray-600 border-gray-200" };
 }
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function JurnalUmum({ period }: { period: string }) {
     const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -333,16 +324,18 @@ export default function JurnalUmum({ period }: { period: string }) {
     const hasHydratedPending = useRef(false);
 
     // ── Penanda Baca (bookmark baris terakhir dibaca) ──
-    // Disimpan di localStorage per periode (bulan), jadi tiap bulan punya penanda sendiri.
-    // Yang disimpan cuma 1 entryId — nandain entry lain otomatis mengganti yang lama.
+    // Disimpan di localStorage per periode (bulan). Yang disimpan cuma 1 entryId —
+    // nandain entry lain otomatis mengganti yang lama.
     const [bookmarkedId, setBookmarkedId] = useState<string | null>(null);
     // Ref ke tiap baris entry (desktop) & kartu (mobile) supaya bisa di-scroll saat tombol "Ke Penanda" diklik.
     const entryRefs = useRef<Map<string, HTMLElement>>(new Map());
     // Flag highlight sekejap setelah scroll (ring menyala ~2 detik lalu hilang).
     const [flashId, setFlashId] = useState<string | null>(null);
-    // Penanda "sedang melompat ke bookmark" — dipakai supaya useEffect reset displayLimit
-    // TIDAK ikut mengecilkan tampilan balik ke 50 saat scrollToBookmark mengosongkan filter.
+    // Penanda "sedang melompat ke bookmark" — supaya useEffect reset displayLimit TIDAK
+    // ikut mengecilkan tampilan balik ke 50 saat scrollToBookmark mengosongkan filter.
     const isJumpingToBookmark = useRef(false);
+    // Penanda tujuan yang "ditunda" — diisi saat tombol diklik tapi barisnya belum ter-render.
+    const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
 
     useEffect(() => {
         const saved = localStorage.getItem("jurnal-show-pending");
@@ -366,7 +359,7 @@ export default function JurnalUmum({ period }: { period: string }) {
     const load = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000); // stop nunggu setelah 25 detik
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
         try {
             const [jRes, pRes] = await Promise.all([
                 fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}`, { signal: controller.signal }),
@@ -376,9 +369,6 @@ export default function JurnalUmum({ period }: { period: string }) {
             const p = await pRes.json();
             setEntries(j.success ? j.data ?? [] : []);
 
-            // Data dari API sudah terurut deterministik (tanggal, lalu sort_ts).
-            // Sort ulang di sini cuma jaga-jaga kalau ada penggabungan data di masa depan —
-            // pakai sort_ts, BUKAN source_id, supaya urutannya sesuai waktu asli, bukan alfabetis.
             const pendingSorted = (p.success ? p.data ?? [] : []).slice().sort((a: PendingDraft, b: PendingDraft) => {
                 if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
                 return (b.sort_ts ?? "").localeCompare(a.sort_ts ?? "");
@@ -401,8 +391,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         localStorage.setItem("jurnal-show-pending", String(showPending));
     }, [showPending]);
 
-    // Daftar lengkap akun untuk dropdown filter "Ref" — dimuat sekali saat komponen mount,
-    // supaya dropdown menampilkan SEMUA akun yang ada (bukan cuma yang sedang tampil di tabel).
     useEffect(() => {
         fetch("/api/akutansi/accounts")
             .then((r) => r.json())
@@ -410,7 +398,6 @@ export default function JurnalUmum({ period }: { period: string }) {
             .catch(() => { });
     }, []);
 
-    // Tutup dropdown filter akun kalau user klik di luar area dropdown.
     useEffect(() => {
         if (!showAccountFilter) return;
         const handleClickOutside = (e: MouseEvent) => {
@@ -471,13 +458,12 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     };
 
-    // Reset display limit when period or filter changes.
+    // Reset display limit saat period/filter berubah.
     // Dikecualikan saat sedang melompat ke bookmark (scrollToBookmark mengosongkan filter
-    // dengan sengaja — jangan ikut mengecilkan tampilan balik ke 50, biar baris penanda
-    // yang posisinya di bawah tetap ikut ter-render).
+    // dengan sengaja — jangan ikut mengecilkan tampilan balik ke 50).
     useEffect(() => {
         if (isJumpingToBookmark.current) {
-            isJumpingToBookmark.current = false; // konsumsi sekali, lalu kembali normal
+            isJumpingToBookmark.current = false;
             return;
         }
         setDisplayLimit(50);
@@ -493,8 +479,8 @@ export default function JurnalUmum({ period }: { period: string }) {
 
     const clearEntrySelection = useCallback(() => setSelectedEntryIds(new Set()), []);
 
-    // Tandai / lepas penanda baca pada sebuah entry. Karena cuma boleh 1 penanda,
-    // nandain entry lain otomatis mengganti yang lama. Klik entry yang sama = lepas penanda.
+    // Tandai / lepas penanda baca. Cuma 1 penanda — nandain entry lain otomatis mengganti
+    // yang lama. Klik entry yang sama = lepas penanda.
     const toggleBookmark = useCallback((entryId: string) => {
         setBookmarkedId((prev) => {
             const next = prev === entryId ? null : entryId;
@@ -507,48 +493,33 @@ export default function JurnalUmum({ period }: { period: string }) {
         });
     }, [period]);
 
-    // Lakukan scroll sesungguhnya ke entry penanda + highlight kedip 2 detik.
-    // Dipisah supaya bisa dipanggil ulang setelah daftar selesai di-render.
+    // Scroll sesungguhnya ke entry penanda + highlight kedip 2 detik.
     const doScrollToBookmark = useCallback((id: string) => {
         const el = entryRefs.current.get(id);
-        if (!el) return false; // belum ke-render — biar pemanggil yang nunggu
+        if (!el) return false;
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         setFlashId(id);
         setTimeout(() => setFlashId(null), 2000);
-        isJumpingToBookmark.current = false; // scroll selesai — pastikan saklar mati
+        isJumpingToBookmark.current = false;
         return true;
     }, []);
 
-    // Penanda tujuan yang "ditunda" — diisi saat tombol diklik tapi barisnya belum ter-render.
-    // Begitu render selesai (lihat useEffect di bawah), scroll dijalankan.
-    const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
-
-    // Klik "Ke Penanda": selalu berhasil ketemu, berapapun urutannya & lagi difilter atau tidak.
-    // 1) Bersihkan semua filter/pencarian yang bisa menyembunyikan barisnya.
-    // 2) Pastikan displayLimit cukup tinggi supaya baris penanda ikut ter-render.
-    // 3) Scroll sekarang kalau sudah ter-render; kalau belum, tunda via pendingScrollId.
+    // Klik "Lompat ke sini": selalu ketemu, berapapun urutannya & lagi difilter atau tidak.
     const scrollToBookmark = useCallback(() => {
         if (!bookmarkedId) return;
-
-        // Nyalakan saklar DULU, sebelum mengubah filter — supaya useEffect reset displayLimit
-        // yang terpicu oleh perubahan filter di bawah ini tahu harus skip sekali.
         isJumpingToBookmark.current = true;
 
-        // (1) reset semua filter & pencarian
         setSearch("");
         setSearchNominal("");
         setAccountCodeFilter(new Set());
         setShowOnlyWarnings(false);
         setShowOnlyOutOfSync(false);
 
-        // (2) cari posisi penanda di daftar LENGKAP (tanpa filter), lalu naikkan batas tampilan
-        //     secukupnya kalau posisinya di luar displayLimit sekarang.
         const idx = entries.findIndex((e) => e.id === bookmarkedId);
         if (idx >= 0 && idx + 1 > displayLimit) {
             setDisplayLimit(Math.ceil((idx + 1) / 100) * 100);
         }
 
-        // (3) coba scroll langsung; kalau barisnya belum ada (baru akan render), tunda
         if (!doScrollToBookmark(bookmarkedId)) {
             setPendingScrollId(bookmarkedId);
         }
@@ -561,15 +532,10 @@ export default function JurnalUmum({ period }: { period: string }) {
         );
     }, []);
 
-    // Dipanggil saat drag mulai — kalau entry yang di-drag termasuk yang lagi dipilih
-    // (dan ada >1 yang dipilih), tandai supaya baris lain yang ikut pindah bareng dikasih highlight.
     const handleDragStart = (start: DragStart) => {
         setIsDraggingGroup(selectedEntryIds.has(start.draggableId) && selectedEntryIds.size > 1);
     };
 
-    // Hitung posisi sisip untuk grup entry yang digeser bareng: simulasikan dulu
-    // pemindahan SATU entry yang di-drag (persis logic lama), lalu cari entry pertama
-    // SETELAHNYA yang BUKAN bagian dari grup — itu jadi "jangkar" tempat grup disisipkan.
     const computeGroupInsertIndex = (
         list: JournalEntry[],
         sourceIndex: number,
@@ -607,8 +573,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         const draggedEntry = entries[sourceIndex];
         if (!draggedEntry) return;
 
-        // Kalau entry yang di-drag termasuk yang lagi dipilih (dan ada >1 yang dipilih),
-        // pindahkan SEMUA entry terpilih sebagai satu grup — urutan relatifnya dipertahankan.
         const isGroupDrag = selectedEntryIds.has(draggedEntry.id) && selectedEntryIds.size > 1;
         const idsToMoveSet = isGroupDrag
             ? new Set(entries.filter((e) => selectedEntryIds.has(e.id)).map((e) => e.id))
@@ -673,8 +637,6 @@ export default function JurnalUmum({ period }: { period: string }) {
             load(false);
         }
     };
-
-    // ── Rapikan Urutan Sumber per Tanggal (Manual → Service → Transaksi → Cashflow) ──
     const handleSortBySource = async (scope: "all" | "today" | "custom", fromDate: string, toDate: string) => {
         if (entries.length === 0 || reorderingBusy) return;
         setReorderingBusy(true);
@@ -691,7 +653,6 @@ export default function JurnalUmum({ period }: { period: string }) {
             return true;
         };
 
-        // Kelompokkan entries per tanggal
         const dateGroups = new Map<string, JournalEntry[]>();
         for (const e of entries) {
             if (!dateGroups.has(e.tanggal)) {
@@ -707,16 +668,15 @@ export default function JurnalUmum({ period }: { period: string }) {
         for (const [date, list] of dateGroups.entries()) {
             if (inScope(date)) {
                 const originalIds = list.map((e) => e.id);
-                // Urutkan murni berdasarkan waktu (terbaru di atas) agar persis seperti urutan kejadian di Cashflow.
                 const sortedList = [...list].sort((a, b) => {
                     const caA = a.created_at || "";
                     const caB = b.created_at || "";
                     if (caA !== caB) {
-                        return caB.localeCompare(caA); // DESC
+                        return caB.localeCompare(caA);
                     }
                     const idA = a.source_id || a.id || "";
                     const idB = b.source_id || b.id || "";
-                    return idB.localeCompare(idA); // DESC
+                    return idB.localeCompare(idA);
                 });
                 const sortedIds = sortedList.map((e) => e.id);
 
@@ -738,14 +698,12 @@ export default function JurnalUmum({ period }: { period: string }) {
             return;
         }
 
-        // Simpan snapshot sebelumnya untuk fitur Undo
         const previousEntriesSnapshot = [...entries];
         setUndoState({
             previousEntries: previousEntriesSnapshot,
             batches: revertBatches,
         });
 
-        // Optimistic update state
         setEntries(newEntries);
         setShowSortSourceModal(false);
 
@@ -780,7 +738,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         setReorderingBusy(true);
         const { previousEntries, batches } = undoState;
 
-        // Optimistic revert state
         setEntries(previousEntries);
         setUndoState(null);
 
@@ -808,7 +765,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     };
 
-    // Pindahkan semua entry yang terpilih ke tanggal baru
     const handleBulkMove = async () => {
         if (selectedEntryIds.size === 0 || !targetMoveDate || bulkBusy) return;
         setBulkBusy(true);
@@ -835,7 +791,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     };
 
-    // Hapus semua entry yang lagi dipilih sekaligus — pakai endpoint DELETE per-id yang sudah ada.
     const handleBulkDelete = async () => {
         if (selectedEntryIds.size === 0 || bulkBusy) return;
         if (!confirm(`Hapus ${selectedEntryIds.size} jurnal terpilih?\n\nData yang berasal dari sistem akan kembali ke daftar pending.`)) return;
@@ -858,7 +813,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     };
 
-    // Kasih penanda ke semua entry yang lagi dipilih sekaligus — pakai endpoint warning yang sudah ada.
     const handleBulkWarning = async () => {
         if (selectedEntryIds.size === 0 || bulkBusy || !bulkWarningReason.trim()) return;
         setBulkBusy(true);
@@ -885,7 +839,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     };
 
-    // Toggle status "sudah dicek" untuk SELURUH baris dalam satu entry sekaligus
     const toggleEntryChecked = useCallback(async (entry: JournalEntry, next: boolean) => {
         const validLines = entry.lines.filter((l) => !l.id.endsWith("-missing"));
         if (validLines.length === 0) return;
@@ -920,7 +873,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                     if (!json.success) throw new Error(json.message);
                 })
             );
-            // ⬅️ BARU: refresh dari server supaya nama & jam siapa yang mencentang ikut ter-update
             load(false);
         } catch {
             load(false);
@@ -981,22 +933,16 @@ export default function JurnalUmum({ period }: { period: string }) {
     }, [filtered, displayLimit]);
 
     // Jalankan scroll yang tertunda setelah React selesai me-render baris barunya.
-    // Ditaruh DI SINI (setelah visibleEntries dideklarasikan) supaya tidak kena error
-    // "used before declaration". visibleEntries jadi dependency supaya efek ini jalan
-    // lagi tiap daftar yang tampil berubah (mis. setelah displayLimit dinaikkan).
     useEffect(() => {
         if (!pendingScrollId) return;
         if (doScrollToBookmark(pendingScrollId)) {
-            setPendingScrollId(null); // berhasil — hentikan penundaan
+            setPendingScrollId(null);
         }
     }, [pendingScrollId, visibleEntries, doScrollToBookmark]);
 
-    // Search untuk daftar PENDING (data yang belum dikonfirmasi ke jurnal umum) —
-    // terpisah dari `filtered` di atas karena sumber datanya beda (PendingDraft, bukan JournalEntry).
     const filteredPending = useMemo(() => {
         let pendingResult = pending;
         if (showOnlyWarnings) {
-            // Data pending belum masuk ke jurnal umum (belum memiliki penanda manual AKSI)
             pendingResult = [];
         }
         const q = deferredPendingSearch.trim().toLowerCase();
@@ -1016,8 +962,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         });
     }, [pending, deferredPendingSearch, showOnlyWarnings]);
 
-    // Buka/tutup dropdown filter akun. Posisinya dihitung dari posisi tombol "Ref" di layar
-    // (pakai position: fixed) supaya dropdown tidak terpotong oleh area scroll tabel.
     const openAccountFilterDropdown = () => {
         const btn = accountFilterButtonRef.current;
         if (btn) {
@@ -1027,7 +971,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         setShowAccountFilter((v) => !v);
     };
 
-    // Klik akun di dropdown "Ref": kalau sudah aktif, dihapus dari filter; kalau belum, ditambahkan.
     const toggleAccountCodeFilter = (code: string) => {
         setAccountCodeFilter((prev) => {
             const next = new Set(prev);
@@ -1036,7 +979,6 @@ export default function JurnalUmum({ period }: { period: string }) {
         });
     };
 
-    // Daftar akun yang ditampilkan di dalam dropdown, disaring oleh kotak pencarian dropdown.
     const accountsForDropdown = useMemo(() => {
         const q = accountFilterSearch.trim().toLowerCase();
         if (!q) return allAccounts;
@@ -1050,31 +992,11 @@ export default function JurnalUmum({ period }: { period: string }) {
             const displayLines: JournalLine[] = modalMissing
                 ? [
                     ...e.lines,
-                    {
-                        id: `${e.id}-modal-debit-missing`,
-                        account_code: debitAccount,
-                        account_name: accountName(debitAccount),
-                        side: "DEBIT",
-                        nominal: 0,
-                        keterangan: "Harga modal belum diinput",
-                        line_order: 999,
-                    },
-                    {
-                        id: `${e.id}-modal-kredit-missing`,
-                        account_code: kreditAccount,
-                        account_name: accountName(kreditAccount),
-                        side: "KREDIT",
-                        nominal: 0,
-                        keterangan: null,
-                        line_order: 1000,
-                    },
+                    { id: `${e.id}-modal-debit-missing`, account_code: debitAccount, account_name: accountName(debitAccount), side: "DEBIT", nominal: 0, keterangan: "Harga modal belum diinput", line_order: 999 },
+                    { id: `${e.id}-modal-kredit-missing`, account_code: kreditAccount, account_name: accountName(kreditAccount), side: "KREDIT", nominal: 0, keterangan: null, line_order: 1000 },
                 ]
                 : e.lines;
-
-            const lines = accountCodeFilter.size > 0
-                ? displayLines.filter((l) => accountCodeFilter.has(l.account_code))
-                : displayLines;
-
+            const lines = accountCodeFilter.size > 0 ? displayLines.filter((l) => accountCodeFilter.has(l.account_code)) : displayLines;
             return s + sumSide(lines, "DEBIT");
         }, 0);
     }, [filtered, accountCodeFilter]);
@@ -1086,31 +1008,11 @@ export default function JurnalUmum({ period }: { period: string }) {
             const displayLines: JournalLine[] = modalMissing
                 ? [
                     ...e.lines,
-                    {
-                        id: `${e.id}-modal-debit-missing`,
-                        account_code: debitAccount,
-                        account_name: accountName(debitAccount),
-                        side: "DEBIT",
-                        nominal: 0,
-                        keterangan: "Harga modal belum diinput",
-                        line_order: 999,
-                    },
-                    {
-                        id: `${e.id}-modal-kredit-missing`,
-                        account_code: kreditAccount,
-                        account_name: accountName(kreditAccount),
-                        side: "KREDIT",
-                        nominal: 0,
-                        keterangan: null,
-                        line_order: 1000,
-                    },
+                    { id: `${e.id}-modal-debit-missing`, account_code: debitAccount, account_name: accountName(debitAccount), side: "DEBIT", nominal: 0, keterangan: "Harga modal belum diinput", line_order: 999 },
+                    { id: `${e.id}-modal-kredit-missing`, account_code: kreditAccount, account_name: accountName(kreditAccount), side: "KREDIT", nominal: 0, keterangan: null, line_order: 1000 },
                 ]
                 : e.lines;
-
-            const lines = accountCodeFilter.size > 0
-                ? displayLines.filter((l) => accountCodeFilter.has(l.account_code))
-                : displayLines;
-
+            const lines = accountCodeFilter.size > 0 ? displayLines.filter((l) => accountCodeFilter.has(l.account_code)) : displayLines;
             return s + sumSide(lines, "KREDIT");
         }, 0);
     }, [filtered, accountCodeFilter]);
@@ -1127,11 +1029,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
             const { debitAccount, kreditAccount } = getModalAccountsForEntry(e.lines);
             const displayLines = modalMissing
-                ? [
-                    ...e.lines,
-                    { account_code: debitAccount },
-                    { account_code: kreditAccount },
-                ]
+                ? [...e.lines, { account_code: debitAccount }, { account_code: kreditAccount }]
                 : e.lines;
             const linesToRender = accountCodeFilter.size > 0
                 ? displayLines.filter((l) => accountCodeFilter.has(l.account_code))
@@ -1149,6 +1047,10 @@ export default function JurnalUmum({ period }: { period: string }) {
         return () => clearTimeout(t);
     }, [toast, undoState]);
 
+    const registerEntryRef = useCallback((id: string, el: HTMLElement | null) => {
+        if (el) entryRefs.current.set(id, el);
+        else entryRefs.current.delete(id);
+    }, []);
     return (
         <div className="space-y-4">
             {toast && (
@@ -1166,7 +1068,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                     )}
                 </div>
             )}
-
 
             {/* ── Pending panel ── */}
             {pending.length > 0 && (
@@ -1211,8 +1112,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     const k = key(d);
                                     const checked = selected.has(k);
                                     const badge = SOURCE_BADGE[d.source_type];
-                                    // Badge toko & spek CUMA relevan untuk data TRANSACTION —
-                                    // Service dan Cashflow tidak punya konsep laptop_id/company_name.
                                     const companyBadge = d.source_type === "TRANSACTION" ? getCompanyBadge(d.meta?.company_name) : null;
                                     const specParts = [d.meta?.cpu, d.meta?.ram, d.meta?.storage].filter(Boolean) as string[];
                                     const modalMissing = d.source_type === "TRANSACTION" && d.meta?.modal_missing === true;
@@ -1286,17 +1185,13 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Sticky Toolbar, Filter & Summary Bar ── */}
             <div className="sticky top-12 lg:top-0 z-20 bg-white/95 backdrop-blur-md -mx-4 sm:-mx-6 px-4 sm:px-6 pt-2 pb-3 space-y-2 border-b border-slate-100 shadow-xs transition-all">
-                {/* ── Baris "Ke Penanda" — ikon saja, rata kanan, muncul hanya jika ada penanda aktif ── */}
+                {/* ── Penanda Baca — ikon di pojok KIRI; klik → popover detail entry + tombol lompat ── */}
                 {bookmarkedId && (
-                    <div className="flex justify-end">
-                        <button
-                            onClick={scrollToBookmark}
-                            title="Lompat ke baris terakhir yang kamu tandai"
-                            aria-label="Ke penanda baca"
-                            className="w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-600 text-white shadow-xs active:scale-90 transition-all duration-150 flex items-center justify-center"
-                        >
-                            <BookmarkCheck className="w-4 h-4" />
-                        </button>
+                    <div className="flex justify-start">
+                        <BookmarkJumpButton
+                            entry={entries.find((e) => e.id === bookmarkedId) ?? null}
+                            onJump={scrollToBookmark}
+                        />
                     </div>
                 )}
 
@@ -1328,32 +1223,21 @@ export default function JurnalUmum({ period }: { period: string }) {
                             <button
                                 onClick={() => setSortOrder("desc")}
                                 title="Terbaru ke terlama"
-                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${sortOrder === "desc"
-                                    ? "bg-slate-900 text-white shadow-2xs font-bold"
-                                    : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
-                                    }`}
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${sortOrder === "desc" ? "bg-slate-900 text-white shadow-2xs font-bold" : "text-slate-500 hover:text-slate-800 hover:bg-white/50"}`}
                             >
                                 <ArrowUpDown className="w-3 h-3" /> Terbaru
                             </button>
                             <button
                                 onClick={() => setSortOrder("asc")}
                                 title="Terlama ke terbaru"
-                                className={`h-8 px-3 rounded-lg text-xs font-semibold active:scale-95 transition-all duration-150 ${sortOrder === "asc"
-                                    ? "bg-slate-900 text-white shadow-2xs font-bold"
-                                    : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
-                                    }`}
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold active:scale-95 transition-all duration-150 ${sortOrder === "asc" ? "bg-slate-900 text-white shadow-2xs font-bold" : "text-slate-500 hover:text-slate-800 hover:bg-white/50"}`}
                             >
                                 Terlama
                             </button>
                             <button
                                 onClick={() => setShowOnlyWarnings((v) => !v)}
                                 title={showOnlyWarnings ? "Tampilkan semua data" : "Filter hanya data dengan penanda (Modal Rp0 / diedit)"}
-                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyWarnings
-                                    ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300"
-                                    : warningCount > 0
-                                        ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                                        : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
-                                    }`}
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyWarnings ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300" : warningCount > 0 ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100" : "text-slate-500 hover:text-slate-800 hover:bg-white/50"}`}
                             >
                                 <AlertTriangle className={`w-3.5 h-3.5 ${showOnlyWarnings ? "text-white" : warningCount > 0 ? "text-red-600" : "text-slate-400"}`} />
                                 <span>Penanda</span>
@@ -1366,12 +1250,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                             <button
                                 onClick={() => setShowOnlyOutOfSync((v) => !v)}
                                 title={showOnlyOutOfSync ? "Tampilkan semua data" : "Filter hanya data yang nominalnya berubah di sumber (Transaksi/Cashflow/Service)"}
-                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyOutOfSync
-                                    ? "bg-blue-600 text-white shadow-2xs font-bold ring-2 ring-blue-300"
-                                    : outOfSyncCount > 0
-                                        ? "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
-                                        : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
-                                    }`}
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyOutOfSync ? "bg-blue-600 text-white shadow-2xs font-bold ring-2 ring-blue-300" : outOfSyncCount > 0 ? "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100" : "text-slate-500 hover:text-slate-800 hover:bg-white/50"}`}
                             >
                                 <RefreshCw className={`w-3.5 h-3.5 ${showOnlyOutOfSync ? "text-white" : outOfSyncCount > 0 ? "text-blue-600" : "text-slate-400"}`} />
                                 <span>Nominal Berubah</span>
@@ -1482,7 +1361,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                     </div>
                 )}
 
-                {/* ── Filter akun / warning aktif — muncul kalau ada filter yang diaktifkan ── */}
                 {(accountCodeFilter.size > 0 || showOnlyWarnings || showOnlyOutOfSync) && (
                     <div className="flex flex-wrap items-center justify-between gap-2 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -1525,7 +1403,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                     </div>
                 )}
 
-                {/* ── Total — bar ringkasan ── */}
                 {!loading && filtered.length > 0 && (
                     <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl px-5 py-3 flex flex-wrap items-center justify-between gap-x-4 sm:gap-x-6 gap-y-2">
                         <span className="text-xs font-semibold text-slate-500">
@@ -1541,27 +1418,15 @@ export default function JurnalUmum({ period }: { period: string }) {
                             <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
                                 Kredit&nbsp; <span className="font-extrabold text-slate-900">{rp(totalKredit)}</span>
                             </span>
-                            <span
-                                className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0 ${totalDebit === totalKredit
-                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
-                                    : "bg-red-50 text-red-700 border border-red-200/80"
-                                    }`}
-                            >
-                                {totalDebit === totalKredit ? (
-                                    <>
-                                        Balance <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                    </>
-                                ) : (
-                                    "Tidak Balance"
-                                )}
+                            <span className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0 ${totalDebit === totalKredit ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80" : "bg-red-50 text-red-700 border border-red-200/80"}`}>
+                                {totalDebit === totalKredit ? (<>Balance <Check className="w-3.5 h-3.5 text-emerald-600" /></>) : ("Tidak Balance")}
                             </span>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* ── Mobile: kartu per entry — lebih gampang dibaca & di-tap daripada tabel sempit.
-                 Reorder drag-and-drop tetap khusus tampilan tabel desktop di bawah. ── */}
+            {/* ── Mobile: kartu per entry ── */}
             <div className="md:hidden space-y-2.5">
                 {loading ? (
                     Array.from({ length: 4 }).map((_, i) => (
@@ -1589,10 +1454,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                             isBookmarked={bookmarkedId === entry.id}
                             isFlashing={flashId === entry.id}
                             onToggleBookmark={toggleBookmark}
-                            registerRef={(el) => {
-                                if (el) entryRefs.current.set(entry.id, el);
-                                else entryRefs.current.delete(entry.id);
-                            }}
+                            registerRef={(el) => registerEntryRef(entry.id, el)}
                             onToggleSelect={toggleEntrySelected}
                             onEdit={setEditEntry}
                             onLog={setLogEntry}
@@ -1743,7 +1605,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                                             </tr>
                                         </tbody>
                                     ) : (
-
                                         visibleEntries.map((entry, index) => (
                                             <JournalEntryRow
                                                 key={entry.id}
@@ -1755,10 +1616,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                 isBookmarked={bookmarkedId === entry.id}
                                                 isFlashing={flashId === entry.id}
                                                 onToggleBookmark={toggleBookmark}
-                                                registerRef={(el) => {
-                                                    if (el) entryRefs.current.set(entry.id, el);
-                                                    else entryRefs.current.delete(entry.id);
-                                                }}
+                                                registerRef={(el) => registerEntryRef(entry.id, el)}
                                                 onToggleSelect={toggleEntrySelected}
                                                 onEdit={setEditEntry}
                                                 onLog={setLogEntry}
@@ -1839,23 +1697,86 @@ export default function JurnalUmum({ period }: { period: string }) {
     );
 }
 
-// ─── Stat card ────────────────────────────────────────────────────────────────
-function Stat({ label, value, subvalue, tone }: { label: string; value: React.ReactNode; subvalue?: React.ReactNode; tone: "gray" | "blue" | "emerald" | "red" }) {
-    const map = {
-        gray: "border-gray-200 border-t-[#0f0c29]/70 text-gray-900",
-        blue: "border-gray-200 border-t-blue-400 text-blue-800",
-        emerald: "border-gray-200 border-t-emerald-400 text-emerald-800",
-        red: "border-gray-200 border-t-red-400 text-red-700",
+// ─── Tombol + popover "Penanda Baca" (pojok kiri atas toolbar) ───────────────
+// Klik ikon → popover kecil berisi detail entry yang ditandai + tombol "Lompat ke sini".
+function BookmarkJumpButton({ entry, onJump }: { entry: JournalEntry | null; onJump: () => void }) {
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const [open, setOpen] = useState(false);
+
+    useEffect(() => {
+        if (!open) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [open]);
+
+    const badge = entry ? SOURCE_BADGE[entry.source_type] : null;
+    const companyBadge = entry?.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
+
+    const handleJump = () => {
+        setOpen(false);
+        onJump();
     };
+
     return (
-        <div className={`bg-white rounded-xl border border-t-2 p-3.5 sm:p-4 ${map[tone]}`}>
-            <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">{label}</p>
-            <p className="text-base font-black font-mono truncate">{value}</p>
-            {subvalue && <p className="text-[10.5px] font-semibold text-gray-400 truncate mt-0.5">{subvalue}</p>}
+        <div ref={wrapperRef} className="relative inline-block">
+            <button
+                onClick={() => setOpen((v) => !v)}
+                title="Penanda baca — klik untuk lihat & lompat"
+                aria-label="Penanda baca"
+                className={`w-8 h-8 rounded-lg shadow-xs active:scale-90 transition-all duration-150 flex items-center justify-center ${open ? "bg-amber-600 text-white" : "bg-amber-500 hover:bg-amber-600 text-white"}`}
+            >
+                <BookmarkCheck className="w-4 h-4" />
+            </button>
+
+            {open && (
+                <div className="absolute left-0 top-full mt-1.5 z-[90] w-72 bg-white border border-amber-200 rounded-xl shadow-xl p-3.5 text-left">
+                    <div className="flex items-center gap-1.5 pb-2.5 mb-2.5 border-b border-gray-100">
+                        <Bookmark className="w-3.5 h-3.5 text-amber-600" />
+                        <span className="text-[10.5px] font-bold text-amber-700 uppercase tracking-wider">Penanda Baca</span>
+                    </div>
+
+                    {!entry ? (
+                        <p className="text-[11px] text-gray-400">
+                            Entry yang ditandai tidak ditemukan (mungkin sudah dihapus atau pindah bulan).
+                        </p>
+                    ) : (
+                        <>
+                            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                                {badge && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
+                                        {badge.label}
+                                    </span>
+                                )}
+                                {companyBadge && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
+                                        {companyBadge.label}
+                                    </span>
+                                )}
+                            </div>
+
+                            <p className="text-sm font-bold text-gray-900 leading-snug mb-0.5">{entry.keterangan}</p>
+                            <p className="text-[11px] text-gray-400 font-mono mb-3">
+                                {fmtTgl(entry.tanggal)}{fmtJam(entry.created_at) ? ` · Masuk ${fmtJam(entry.created_at)}` : ""}
+                            </p>
+
+                            <button
+                                onClick={handleJump}
+                                className="w-full h-9 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all duration-150 shadow-2xs"
+                            >
+                                <BookmarkCheck className="w-4 h-4" /> Lompat ke sini
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
-
 // ─── Warning toggle — ikon warning + form alasan + riwayat (kolom Aksi) ───────
 function WarningToggle({
     entry,
@@ -1879,12 +1800,9 @@ function WarningToggle({
         const btn = btnRef.current;
         if (!btn) return;
         const rect = btn.getBoundingClientRect();
-        const POPOVER_HEIGHT = 420; // estimasi tinggi maksimal popover (header + form + riwayat)
+        const POPOVER_HEIGHT = 420;
         const spaceBelow = window.innerHeight - rect.bottom;
-        const top =
-            spaceBelow < POPOVER_HEIGHT
-                ? Math.max(8, rect.top - POPOVER_HEIGHT - 6) // ruang bawah kurang -> buka ke atas tombol
-                : rect.bottom + 6;
+        const top = spaceBelow < POPOVER_HEIGHT ? Math.max(8, rect.top - POPOVER_HEIGHT - 6) : rect.bottom + 6;
         setPopPos({ top, left: Math.max(8, rect.right - 256) });
     };
 
@@ -1902,7 +1820,6 @@ function WarningToggle({
     const activate = async () => {
         if (!reason.trim() || busy) return;
         setBusy(true);
-        // Optimistic update
         onToggleWarningState?.(entry.id, true);
         setShowPopover(false);
         try {
@@ -1913,7 +1830,6 @@ function WarningToggle({
             });
             const json = await res.json();
             if (!json.success) {
-                // Revert if error
                 onToggleWarningState?.(entry.id, false);
                 setToast(json.message ?? "Gagal mengaktifkan warning");
                 return;
@@ -1935,14 +1851,12 @@ function WarningToggle({
         }
         if (busy) return;
         setBusy(true);
-        // Optimistic update
         onToggleWarningState?.(entry.id, false);
         setShowPopover(false);
         try {
             const res = await fetch(`/api/akutansi/jurnal/${entry.id}/warning`, { method: "DELETE" });
             const json = await res.json();
             if (!json.success) {
-                // Revert if error
                 onToggleWarningState?.(entry.id, true);
                 setToast(json.message ?? "Gagal menonaktifkan warning");
                 return;
@@ -1964,8 +1878,7 @@ function WarningToggle({
                     onClick={() => { computePos(); setShowPopover((v) => !v); }}
                     disabled={busy}
                     title="Klik untuk hapus atau tandai ulang penanda"
-                    className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${showPopover ? "bg-red-100 text-red-700 border-red-300" : "text-red-600 bg-red-50 border-red-200 hover:bg-red-100"
-                        }`}
+                    className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${showPopover ? "bg-red-100 text-red-700 border-red-300" : "text-red-600 bg-red-50 border-red-200 hover:bg-red-100"}`}
                 >
                     <AlertTriangle className="w-4 h-4 text-red-600" />
                 </button>
@@ -2073,7 +1986,6 @@ function WarningToggle({
         </div>
     );
 }
-
 // ─── Sync history toggle — badge + popover riwayat sinkronisasi nominal (kolom Aksi) ───
 function SyncHistoryToggle({
     entry,
@@ -2092,7 +2004,7 @@ function SyncHistoryToggle({
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const [busy, setBusy] = useState(false);
-    const [showDetailModal, setShowDetailModal] = useState(false); // ⬅️ BARU: modal detail lengkap preview sync
+    const [showDetailModal, setShowDetailModal] = useState(false);
 
     const computePos = () => {
         const btn = btnRef.current;
@@ -2100,10 +2012,7 @@ function SyncHistoryToggle({
         const rect = btn.getBoundingClientRect();
         const POPOVER_HEIGHT = 380;
         const spaceBelow = window.innerHeight - rect.bottom;
-        const top =
-            spaceBelow < POPOVER_HEIGHT
-                ? Math.max(8, rect.top - POPOVER_HEIGHT - 6)
-                : rect.bottom + 6;
+        const top = spaceBelow < POPOVER_HEIGHT ? Math.max(8, rect.top - POPOVER_HEIGHT - 6) : rect.bottom + 6;
         setPopPos({ top, left: Math.max(8, rect.right - 320) });
     };
 
@@ -2170,7 +2079,7 @@ function SyncHistoryToggle({
             );
             setShowPopover(false);
             setConfirming(false);
-            setShowDetailModal(false); // ⬅️ BARU
+            setShowDetailModal(false);
             onUpdated();
         } catch {
             setToast("Koneksi bermasalah saat sinkronisasi");
@@ -2187,8 +2096,7 @@ function SyncHistoryToggle({
                 ref={btnRef}
                 onClick={openPopover}
                 title="Nominal/keterangan berubah di sumber — klik untuk lihat & sinkronkan"
-                className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${showPopover ? "bg-blue-100 text-blue-700 border-blue-300" : "text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100"
-                    }`}
+                className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${showPopover ? "bg-blue-100 text-blue-700 border-blue-300" : "text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100"}`}
             >
                 <RefreshCw className="w-4 h-4 text-blue-600" />
             </button>
@@ -2207,16 +2115,11 @@ function SyncHistoryToggle({
                             : "Nominal dan/atau keterangan jurnal ini belum sama dengan data sumber (Transaksi/Cashflow/Service) terbaru."}
                     </p>
 
-                    {/* Ringkasan cepat + preview perubahan keterangan */}
                     {entry.sync_preview && (
                         <div className="mb-3 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
                             <div className="flex items-center justify-between mb-1.5">
-                                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
-                                    Preview Perubahan
-                                </p>
-                                <span className="text-[10px] font-bold text-blue-600 whitespace-nowrap">
-                                    {numAccountsChanged} akun berubah
-                                </span>
+                                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Preview Perubahan</p>
+                                <span className="text-[10px] font-bold text-blue-600 whitespace-nowrap">{numAccountsChanged} akun berubah</span>
                             </div>
                             {ketChanged && (
                                 <div className="mb-2 bg-white p-2 rounded border border-slate-200/80 text-[10px]">
@@ -2274,10 +2177,7 @@ function SyncHistoryToggle({
                                 return (
                                     <div key={l.id} className="text-[11px] border-b border-gray-100 pb-2 last:border-0 last:pb-0">
                                         <div className="flex items-center justify-between gap-1 mb-0.5">
-                                            <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded border ${isSync
-                                                    ? "bg-blue-50 text-blue-700 border-blue-200"
-                                                    : "bg-amber-50 text-amber-700 border-amber-200"
-                                                }`}>
+                                            <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded border ${isSync ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
                                                 {isSync ? "Sinkronisasi" : "Edit Manual"}
                                             </span>
                                             <span className="text-[9px] text-gray-400 font-mono">{fmtWaktu(l.changed_at)}</span>
@@ -2316,7 +2216,6 @@ function SyncHistoryToggle({
     );
 }
 
-// ⬅️ BARU: modal detail lengkap perbandingan sebelum/sesudah sync
 function SyncPreviewModal({
     entry,
     busy,
@@ -2371,7 +2270,6 @@ function SyncPreviewModal({
                 </div>
 
                 <div className="overflow-y-auto flex-1 p-5 space-y-4">
-                    {/* Ringkasan total */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="rounded-xl border border-gray-200 p-3">
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Total Debit</p>
@@ -2404,7 +2302,6 @@ function SyncPreviewModal({
                         </span>
                     </div>
 
-                    {/* Diff keterangan */}
                     {keteranganChanged && (
                         <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Keterangan</p>
@@ -2421,7 +2318,6 @@ function SyncPreviewModal({
                         </div>
                     )}
 
-                    {/* Tabel rincian per akun */}
                     <div>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Rincian Per Akun</p>
                         <SyncDiffDetailTable rows={rows} />
@@ -2446,7 +2342,6 @@ function SyncPreviewModal({
         </div>
     );
 }
-
 function EntryFormModal({
     period,
     entry,
@@ -2459,10 +2354,6 @@ function EntryFormModal({
     onSaved: () => void;
 }) {
     const isEdit = !!entry;
-    // Entry TRANSACTION yang modalnya belum diinput (trx_meta.modal_missing) cuma
-    // menampilkan baris Modal Keluar (440) / HPP (130) sebagai baris SINTETIS Rp0 di
-    // tabel utama (bukan data journal_lines asli). Supaya baris ini bisa diedit/dihapus
-    // nominalnya lewat form, kita ikut sisipkan sebagai baris beneran saat form dibuka.
     const modalMissing =
         isEdit && entry!.source_type === "TRANSACTION" && entry!.trx_meta?.modal_missing === true;
 
@@ -2475,7 +2366,6 @@ function EntryFormModal({
     const [ref, setRef] = useState(entry?.ref ?? "");
     const [template, setTemplate] = useState("CUSTOM");
 
-    // Template custom buatan role accounting sendiri (beda dari MANUAL_TEMPLATES yang hardcode di lib/accounting.ts)
     const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
     const [showSaveTemplateForm, setShowSaveTemplateForm] = useState(false);
@@ -2518,20 +2408,8 @@ function EntryFormModal({
         const { debitAccount, kreditAccount } = getModalAccountsForEntry(entry?.lines ?? []);
         return [
             ...baseLines,
-            {
-                account_code: debitAccount,
-                side: "DEBIT",
-                nominal: 0,
-                keterangan: "Harga modal belum diinput",
-                _id: crypto.randomUUID(),
-            },
-            {
-                account_code: kreditAccount,
-                side: "KREDIT",
-                nominal: 0,
-                keterangan: "",
-                _id: crypto.randomUUID(),
-            },
+            { account_code: debitAccount, side: "DEBIT", nominal: 0, keterangan: "Harga modal belum diinput", _id: crypto.randomUUID() },
+            { account_code: kreditAccount, side: "KREDIT", nominal: 0, keterangan: "", _id: crypto.randomUUID() },
         ];
     });
     const [saving, setSaving] = useState(false);
@@ -2539,23 +2417,18 @@ function EntryFormModal({
 
     const applyTemplate = (key: string) => {
         setTemplate(key);
-        setEditingTemplateId(null); // pilih template bawaan → keluar dari mode "sedang pakai template custom"
+        setEditingTemplateId(null);
         const t = MANUAL_TEMPLATES.find((x) => x.key === key);
         if (!t || t.lines.length === 0) return;
         setLines(t.lines.map((l) => ({ ...l, nominal: 0, keterangan: "", _id: crypto.randomUUID() })));
     };
 
-    // Terapkan template custom ke form. Beda dengan applyTemplate di atas, nominal &
-    // keterangan per baris IKUT ke-copy (tidak direset ke 0) — karena template custom
-    // sering dipakai untuk entri berulang dengan nominal sama (mis. sewa bulanan), dan
-    // isinya memang yang diisi sendiri oleh role accounting.
     const applyCustomTemplate = (t: CustomTemplate) => {
         setTemplate("CUSTOM");
         setEditingTemplateId(t.id);
         setLines(t.lines.map((l) => ({ ...l, _id: crypto.randomUUID() })));
     };
 
-    // Simpan baris jurnal yang sedang diisi sebagai template custom baru.
     const saveAsTemplate = async () => {
         if (!newTemplateName.trim()) return setError("Nama template wajib diisi");
         setSavingTemplate(true);
@@ -2564,10 +2437,7 @@ function EntryFormModal({
             const res = await fetch("/api/akutansi/jurnal-templates", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: newTemplateName.trim(),
-                    lines: lines.map(({ _id, ...rest }) => rest),
-                }),
+                body: JSON.stringify({ name: newTemplateName.trim(), lines: lines.map(({ _id, ...rest }) => rest) }),
             });
             const json = await res.json();
             if (!json.success) { setError(json.message ?? "Gagal menyimpan template"); return; }
@@ -2581,7 +2451,6 @@ function EntryFormModal({
         }
     };
 
-    // Timpa template yang sedang aktif dengan baris jurnal yang sekarang diisi di form.
     const updateTemplate = async () => {
         if (!editingTemplateId) return;
         setSavingTemplate(true);
@@ -2602,7 +2471,6 @@ function EntryFormModal({
         }
     };
 
-    // Hapus template custom. Tidak mempengaruhi jurnal yang sudah pernah dibuat dari template ini.
     const deleteTemplate = async (t: CustomTemplate) => {
         if (!confirm(`Hapus template "${t.name}"?`)) return;
         try {
@@ -2691,23 +2559,16 @@ function EntryFormModal({
                                     <button
                                         key={t.key}
                                         onClick={() => applyTemplate(t.key)}
-                                        className={`h-8 px-3 rounded-lg text-xs font-semibold border active:scale-[0.96] transition-all duration-150 ${template === t.key
-                                            ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white border-transparent"
-                                            : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                                            }`}
+                                        className={`h-8 px-3 rounded-lg text-xs font-semibold border active:scale-[0.96] transition-all duration-150 ${template === t.key ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white border-transparent" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
                                     >
                                         {t.label}
                                     </button>
                                 ))}
 
-                                {/* Template custom buatan role accounting sendiri */}
                                 {customTemplates.map((t) => (
                                     <div
                                         key={t.id}
-                                        className={`group relative h-8 rounded-lg border active:scale-[0.96] transition-all duration-150 flex items-stretch overflow-hidden ${editingTemplateId === t.id
-                                            ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] border-transparent"
-                                            : "bg-white border-gray-200 hover:bg-gray-50"
-                                            }`}
+                                        className={`group relative h-8 rounded-lg border active:scale-[0.96] transition-all duration-150 flex items-stretch overflow-hidden ${editingTemplateId === t.id ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] border-transparent" : "bg-white border-gray-200 hover:bg-gray-50"}`}
                                     >
                                         <button
                                             type="button"
@@ -2738,7 +2599,6 @@ function EntryFormModal({
                                 </button>
                             </div>
 
-                            {/* Form kecil: simpan baris jurnal saat ini sebagai template custom baru */}
                             {showSaveTemplateForm && (
                                 <div className="mt-2 flex items-center gap-2">
                                     <input
@@ -2766,7 +2626,6 @@ function EntryFormModal({
                                 </div>
                             )}
 
-                            {/* Muncul kalau sedang pakai template custom — untuk update isi template itu sendiri */}
                             {editingTemplateId && (
                                 <button
                                     type="button"
@@ -2811,7 +2670,6 @@ function EntryFormModal({
                         />
                     </div>
 
-                    {/* Baris debit/kredit */}
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
                             <label className="text-xs font-semibold text-gray-500">Baris Jurnal</label>
@@ -2833,10 +2691,7 @@ function EntryFormModal({
                                                     <div
                                                         ref={dragProvided.innerRef}
                                                         {...dragProvided.draggableProps}
-                                                        className={`p-2.5 rounded-lg border space-y-1.5 transition-colors ${dragSnapshot.isDragging
-                                                            ? "border-blue-300 bg-white shadow-lg ring-2 ring-blue-200"
-                                                            : "border-gray-100 bg-gray-50/50"
-                                                            }`}
+                                                        className={`p-2.5 rounded-lg border space-y-1.5 transition-colors ${dragSnapshot.isDragging ? "border-blue-300 bg-white shadow-lg ring-2 ring-blue-200" : "border-gray-100 bg-gray-50/50"}`}
                                                     >
                                                         <div className="flex flex-wrap gap-2 items-center">
                                                             <div
@@ -2849,10 +2704,7 @@ function EntryFormModal({
                                                             <select
                                                                 value={l.side}
                                                                 onChange={(e) => patch(i, { side: e.target.value as JournalSide })}
-                                                                className={`h-9 w-20 sm:w-24 shrink-0 border rounded-lg px-2 text-xs font-bold ${l.side === "DEBIT"
-                                                                    ? "border-blue-200 bg-blue-50 text-blue-700"
-                                                                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                                                    }`}
+                                                                className={`h-9 w-20 sm:w-24 shrink-0 border rounded-lg px-2 text-xs font-bold ${l.side === "DEBIT" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}
                                                             >
                                                                 <option value="DEBIT">Debit</option>
                                                                 <option value="KREDIT">Kredit</option>
@@ -2910,11 +2762,7 @@ function EntryFormModal({
                         </DragDropContext>
                     </div>
 
-                    {/* Balance indicator */}
-                    <div
-                        className={`rounded-xl border p-3 flex flex-wrap items-center justify-between gap-2 ${balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
-                            }`}
-                    >
+                    <div className={`rounded-xl border p-3 flex flex-wrap items-center justify-between gap-2 ${balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
                         <span className={`text-xs font-bold inline-flex items-center gap-1 ${balanced ? "text-emerald-700" : "text-red-700"}`}>
                             {balanced ? <><Check className="w-3.5 h-3.5" /> Balance</> : <><X className="w-3.5 h-3.5" /> Tidak balance</>}
                         </span>
@@ -2949,7 +2797,6 @@ function EntryFormModal({
         </div>
     );
 }
-
 // ─── Audit Log Modal ──────────────────────────────────────────────────────────
 function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () => void }) {
     const [logs, setLogs] = useState<any[]>([]);
@@ -3102,11 +2949,7 @@ function BulkMoveModal({
                             <p className="text-xs text-slate-500">{count} entry jurnal dipilih</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        disabled={busy}
-                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                    >
+                    <button onClick={onClose} disabled={busy} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -3127,20 +2970,10 @@ function BulkMoveModal({
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={busy}
-                        className="h-9 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-                    >
+                    <button type="button" onClick={onClose} disabled={busy} className="h-9 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
                         Batal
                     </button>
-                    <button
-                        type="button"
-                        onClick={onConfirm}
-                        disabled={busy || !targetDate}
-                        className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-40 flex items-center gap-1.5"
-                    >
+                    <button type="button" onClick={onConfirm} disabled={busy || !targetDate} className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-40 flex items-center gap-1.5">
                         {busy ? "Memindahkan..." : `Pindahkan (${count} Jurnal)`}
                     </button>
                 </div>
@@ -3181,11 +3014,7 @@ function SortBySourceModal({ period, onClose, onConfirm, busy }: SortBySourceMod
                             <p className="text-xs text-slate-500">Manual → Service → Transaksi → Cashflow</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        disabled={busy}
-                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                    >
+                    <button onClick={onClose} disabled={busy} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -3193,13 +3022,7 @@ function SortBySourceModal({ period, onClose, onConfirm, busy }: SortBySourceMod
                 <form onSubmit={handleSubmit} className="space-y-3.5">
                     <div className="space-y-2">
                         <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${scope === "all" ? "bg-blue-50/60 border-blue-300 ring-1 ring-blue-300" : "bg-slate-50 border-slate-200 hover:bg-slate-100/70"}`}>
-                            <input
-                                type="radio"
-                                name="sort_scope"
-                                checked={scope === "all"}
-                                onChange={() => setScope("all")}
-                                className="mt-0.5 accent-blue-600"
-                            />
+                            <input type="radio" name="sort_scope" checked={scope === "all"} onChange={() => setScope("all")} className="mt-0.5 accent-blue-600" />
                             <div>
                                 <p className="text-xs font-bold text-slate-800">Semua Tanggal di Periode Ini</p>
                                 <p className="text-[11px] text-slate-500 mt-0.5">Rapikan seluruh tanggal pada periode yang sedang dibuka ({period})</p>
@@ -3207,13 +3030,7 @@ function SortBySourceModal({ period, onClose, onConfirm, busy }: SortBySourceMod
                         </label>
 
                         <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${scope === "today" ? "bg-blue-50/60 border-blue-300 ring-1 ring-blue-300" : "bg-slate-50 border-slate-200 hover:bg-slate-100/70"}`}>
-                            <input
-                                type="radio"
-                                name="sort_scope"
-                                checked={scope === "today"}
-                                onChange={() => setScope("today")}
-                                className="mt-0.5 accent-blue-600"
-                            />
+                            <input type="radio" name="sort_scope" checked={scope === "today"} onChange={() => setScope("today")} className="mt-0.5 accent-blue-600" />
                             <div>
                                 <p className="text-xs font-bold text-slate-800">Hari Ini Saja ({fmtTgl(today)})</p>
                                 <p className="text-[11px] text-slate-500 mt-0.5">Hanya susun ulang entry pada tanggal hari ini</p>
@@ -3221,13 +3038,7 @@ function SortBySourceModal({ period, onClose, onConfirm, busy }: SortBySourceMod
                         </label>
 
                         <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${scope === "custom" ? "bg-blue-50/60 border-blue-300 ring-1 ring-blue-300" : "bg-slate-50 border-slate-200 hover:bg-slate-100/70"}`}>
-                            <input
-                                type="radio"
-                                name="sort_scope"
-                                checked={scope === "custom"}
-                                onChange={() => setScope("custom")}
-                                className="mt-0.5 accent-blue-600"
-                            />
+                            <input type="radio" name="sort_scope" checked={scope === "custom"} onChange={() => setScope("custom")} className="mt-0.5 accent-blue-600" />
                             <div className="flex-1">
                                 <p className="text-xs font-bold text-slate-800">Pilih Rentang Tanggal</p>
                                 <p className="text-[11px] text-slate-500 mt-0.5">Tentukan rentang tanggal yang ingin dirapikan</p>
@@ -3240,42 +3051,21 @@ function SortBySourceModal({ period, onClose, onConfirm, busy }: SortBySourceMod
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <span className="text-[11px] font-bold text-slate-700 block mb-1">Dari Tanggal</span>
-                                    <input
-                                        type="date"
-                                        value={fromDate}
-                                        onChange={(e) => setFromDate(e.target.value)}
-                                        max={toDate || undefined}
-                                        className="w-full h-9 border border-slate-200 bg-white rounded-lg px-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
-                                    />
+                                    <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} max={toDate || undefined} className="w-full h-9 border border-slate-200 bg-white rounded-lg px-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition" />
                                 </div>
                                 <div>
                                     <span className="text-[11px] font-bold text-slate-700 block mb-1">Sampai Tanggal</span>
-                                    <input
-                                        type="date"
-                                        value={toDate}
-                                        onChange={(e) => setToDate(e.target.value)}
-                                        min={fromDate || undefined}
-                                        className="w-full h-9 border border-slate-200 bg-white rounded-lg px-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
-                                    />
+                                    <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} min={fromDate || undefined} className="w-full h-9 border border-slate-200 bg-white rounded-lg px-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition" />
                                 </div>
                             </div>
                         </div>
                     )}
 
                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            disabled={busy}
-                            className="h-9 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-                        >
+                        <button type="button" onClick={onClose} disabled={busy} className="h-9 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
                             Batal
                         </button>
-                        <button
-                            type="submit"
-                            disabled={busy || (scope === "custom" && (!fromDate || !toDate))}
-                            className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs active:scale-95 transition-all duration-150 disabled:opacity-40"
-                        >
+                        <button type="submit" disabled={busy || (scope === "custom" && (!fromDate || !toDate))} className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs active:scale-95 transition-all duration-150 disabled:opacity-40">
                             <Sparkles className="w-3.5 h-3.5" />
                             {busy ? "Merapikan..." : "Rapikan Sekarang"}
                         </button>
@@ -3306,17 +3096,11 @@ interface JournalEntryRowProps {
     setToast: (msg: string) => void;
 }
 
-// Kalkulasi turunan dari 1 journal entry (badge, baris yang ditampilkan, status cek, dst) —
-// dipakai bareng oleh JournalEntryRow (tampilan tabel desktop) & JournalEntryCardMobile (kartu mobile),
-// supaya logikanya konsisten dan tidak dobel dijaga di 2 tempat.
 function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<string>) {
     const badge = SOURCE_BADGE[entry.source_type];
     const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
     const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
     const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
-    // Nama pengisi cuma relevan untuk CASHFLOW — semua entry CASHFLOW di jurnal
-    // umum sudah pasti manual (lihat JSDoc getCashflowMetaByIds), jadi tidak
-    // perlu cek source_category lagi di sini.
     const cashflowNama = entry.source_type === "CASHFLOW" ? entry.trx_meta?.nama ?? null : null;
     const isPengajuanDana = entry.source_type === "CASHFLOW" && entry.trx_meta?.source_type === "PENGAJUAN_DANA";
 
@@ -3325,24 +3109,8 @@ function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<stri
         const { debitAccount, kreditAccount } = getModalAccountsForEntry(entry.lines);
         return [
             ...entry.lines,
-            {
-                id: `${entry.id}-modal-debit-missing`,
-                account_code: debitAccount,
-                account_name: accountName(debitAccount),
-                side: "DEBIT",
-                nominal: 0,
-                keterangan: "Harga modal belum diinput",
-                line_order: 999,
-            },
-            {
-                id: `${entry.id}-modal-kredit-missing`,
-                account_code: kreditAccount,
-                account_name: accountName(kreditAccount),
-                side: "KREDIT",
-                nominal: 0,
-                keterangan: null,
-                line_order: 1000,
-            },
+            { id: `${entry.id}-modal-debit-missing`, account_code: debitAccount, account_name: accountName(debitAccount), side: "DEBIT", nominal: 0, keterangan: "Harga modal belum diinput", line_order: 999 },
+            { id: `${entry.id}-modal-kredit-missing`, account_code: kreditAccount, account_name: accountName(kreditAccount), side: "KREDIT", nominal: 0, keterangan: null, line_order: 1000 },
         ];
     }, [entry.lines, entry.id, modalMissing]);
 
@@ -3361,21 +3129,16 @@ function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<stri
     );
 
     const latestCheckedAt = useMemo(() => {
-        const timestamps = validLinesForCheck
-            .map((l) => l.checked_at)
-            .filter((t): t is string => Boolean(t));
+        const timestamps = validLinesForCheck.map((l) => l.checked_at).filter((t): t is string => Boolean(t));
         if (timestamps.length === 0) return null;
         return timestamps.reduce((max, t) => (t > max ? t : max));
     }, [validLinesForCheck]);
 
-    // ⬅️ BARU: nama yang mencentang (dari checked_by_user hasil GET /api/akutansi/jurnal)
     const checkedByName = useMemo(() => {
         const withUser = validLinesForCheck.find((l) => l.checked && l.checked_by_user?.name);
         return withUser?.checked_by_user?.name ?? null;
     }, [validLinesForCheck]);
 
-    // ⬅️ BARU: jam entry ini "masuk" ke jurnal — entry.created_at sudah berisi waktu asli dari
-    // transaksi/service/cashflow (di-set = sort_ts draft saat confirm), atau waktu simpan untuk jurnal manual
     const entryJam = useMemo(() => fmtJam(entry.created_at), [entry.created_at]);
 
     return {
@@ -3384,7 +3147,6 @@ function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<stri
         checkedByName, entryJam,
     };
 }
-
 const JournalEntryRow = React.memo(function JournalEntryRow({
     entry,
     index,
@@ -3435,7 +3197,6 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                             <tr
                                 key={line.id}
                                 onClick={(e) => {
-                                    // Jangan toggle select kalau yang diklik tombol aksi, checkbox, atau elemen interaktif lain
                                     const target = e.target as HTMLElement;
                                     if (target.closest("button, input, a, select, textarea")) return;
                                     onToggleSelect(entry.id);
@@ -3453,10 +3214,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                     className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
                                                     title="Pilih entry ini"
                                                 />
-                                                <div
-                                                    className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
-                                                    title="Tahan & geser dari sini (bukan dari checkbox)"
-                                                >
+                                                <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600" title="Tahan & geser dari sini (bukan dari checkbox)">
                                                     <GripVertical className="w-3 h-3" />
                                                 </div>
                                                 {fmtTgl(entry.tanggal)}
@@ -3467,10 +3225,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                 </div>
                                             )}
                                             {isEntryChecked && (
-                                                <div
-                                                    className="pl-7 text-[9px] text-emerald-600 font-semibold flex items-center gap-1"
-                                                    title={`Dicek oleh ${checkedByName ?? "—"} pada ${fmtWaktu(latestCheckedAt ?? undefined)}`}
-                                                >
+                                                <div className="pl-7 text-[9px] text-emerald-600 font-semibold flex items-center gap-1" title={`Dicek oleh ${checkedByName ?? "—"} pada ${fmtWaktu(latestCheckedAt ?? undefined)}`}>
                                                     <Check className="w-2.5 h-2.5" />
                                                     {checkedByName ?? "—"} · {fmtJam(latestCheckedAt)}
                                                 </div>
@@ -3483,28 +3238,18 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                     {first && (
                                         <>
                                             <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
-                                                    {badge.label}
-                                                </span>
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>{badge.label}</span>
                                                 {companyBadge && (
-                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
-                                                        {companyBadge.label}
-                                                    </span>
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>{companyBadge.label}</span>
                                                 )}
                                                 {isPengajuanDana && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-teal-50 text-teal-700 border-teal-200">
-                                                        Pengajuan Dana
-                                                    </span>
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-teal-50 text-teal-700 border-teal-200">Pengajuan Dana</span>
                                                 )}
                                                 {cashflowNama && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200">
-                                                        {cashflowNama}
-                                                    </span>
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200">{cashflowNama}</span>
                                                 )}
                                                 {entry.is_edited && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
-                                                        diedit · {entry.updated_by_user?.name ?? "—"}
-                                                    </span>
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">diedit · {entry.updated_by_user?.name ?? "—"}</span>
                                                 )}
                                                 {entry.has_warning && (
                                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1 shrink-0">
@@ -3522,9 +3267,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="text-sm font-bold text-gray-900 mt-1 mb-0.5 leading-snug">
-                                                {entry.keterangan}
-                                            </div>
+                                            <div className="text-sm font-bold text-gray-900 mt-1 mb-0.5 leading-snug">{entry.keterangan}</div>
                                         </>
                                     )}
                                     {first && specParts.length > 0 && (
@@ -3534,19 +3277,12 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                         {line.account_name}
                                     </div>
                                     {line.keterangan && (
-                                        <div className={`text-[10px] italic text-gray-400 mt-0.5 ${isKredit ? "pl-10" : "pl-1"}`}>
-                                            {line.keterangan}
-                                        </div>
+                                        <div className={`text-[10px] italic text-gray-400 mt-0.5 ${isKredit ? "pl-10" : "pl-1"}`}>{line.keterangan}</div>
                                     )}
                                 </td>
 
                                 <td className="px-4 py-2 text-center align-bottom">
-                                    <span
-                                        className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${accountCodeFilter.has(line.account_code)
-                                            ? "bg-blue-50 text-blue-700"
-                                            : "text-gray-400"
-                                            }`}
-                                    >
+                                    <span className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${accountCodeFilter.has(line.account_code) ? "bg-blue-50 text-blue-700" : "text-gray-400"}`}>
                                         {line.account_code}
                                     </span>
                                     {first && entry.ref && (
@@ -3555,19 +3291,11 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                 </td>
 
                                 <td className="px-4 py-2 text-right align-bottom">
-                                    {!isKredit && (
-                                        <span className="text-[12px] font-bold text-gray-900 font-mono">
-                                            {rp(line.nominal)}
-                                        </span>
-                                    )}
+                                    {!isKredit && <span className="text-[12px] font-bold text-gray-900 font-mono">{rp(line.nominal)}</span>}
                                 </td>
 
                                 <td className="px-4 py-2 text-right align-bottom">
-                                    {isKredit && (
-                                        <span className="text-[12px] font-bold text-gray-900 font-mono">
-                                            {rp(line.nominal)}
-                                        </span>
-                                    )}
+                                    {isKredit && <span className="text-[12px] font-bold text-gray-900 font-mono">{rp(line.nominal)}</span>}
                                 </td>
 
                                 <td className="px-4 py-2 align-top">
@@ -3576,56 +3304,25 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                             <button
                                                 onClick={() => onToggleBookmark(entry.id)}
                                                 title={isBookmarked ? "Hapus penanda baca" : "Tandai sebagai baris terakhir dibaca"}
-                                                className={`p-1.5 rounded-lg active:scale-90 transition-all duration-150 ${isBookmarked
-                                                    ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
-                                                    : "text-gray-400 hover:text-amber-600 hover:bg-amber-50"
-                                                    }`}
+                                                className={`p-1.5 rounded-lg active:scale-90 transition-all duration-150 ${isBookmarked ? "text-amber-600 bg-amber-50 hover:bg-amber-100" : "text-gray-400 hover:text-amber-600 hover:bg-amber-50"}`}
                                             >
                                                 {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
                                             </button>
-                                            <button
-                                                onClick={() => onEdit(entry)}
-                                                className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
-                                                title="Edit jurnal"
-                                            >
+                                            <button onClick={() => onEdit(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150" title="Edit jurnal">
                                                 <Pencil className="w-4 h-4" />
                                             </button>
-                                            <SyncHistoryToggle
-                                                entry={entry}
-                                                onUpdated={() => onUpdated(false)}
-                                                setToast={setToast}
-                                            />
-                                            <button
-                                                onClick={() => onLog(entry)}
-                                                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
-                                                title="Riwayat perubahan"
-                                            >
+                                            <SyncHistoryToggle entry={entry} onUpdated={() => onUpdated(false)} setToast={setToast} />
+                                            <button onClick={() => onLog(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150" title="Riwayat perubahan">
                                                 <Clock className="w-4 h-4" />
                                             </button>
-                                            <WarningToggle
-                                                entry={entry}
-                                                onUpdated={() => onUpdated(false)}
-                                                onToggleWarningState={onToggleWarningState}
-                                                setToast={setToast}
-                                            />
-                                            <button
-                                                onClick={() => onDelete(entry)}
-                                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
-                                                title="Hapus"
-                                            >
+                                            <WarningToggle entry={entry} onUpdated={() => onUpdated(false)} onToggleWarningState={onToggleWarningState} setToast={setToast} />
+                                            <button onClick={() => onDelete(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150" title="Hapus">
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={() => onToggleChecked(entry, !isEntryChecked)}
-                                                title={
-                                                    isEntryChecked
-                                                        ? `Sudah dicek pada ${fmtWaktu(latestCheckedAt ?? undefined)} (Klik untuk batalkan)`
-                                                        : "Tandai sudah dicek"
-                                                }
-                                                className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked
-                                                    ? "bg-green-600 border-green-600 text-white shadow-2xs"
-                                                    : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"
-                                                    }`}
+                                                title={isEntryChecked ? `Sudah dicek pada ${fmtWaktu(latestCheckedAt ?? undefined)} (Klik untuk batalkan)` : "Tandai sudah dicek"}
+                                                className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked ? "bg-green-600 border-green-600 text-white shadow-2xs" : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"}`}
                                             >
                                                 <Check className="w-3.5 h-3.5 mx-auto" />
                                             </button>
@@ -3642,8 +3339,6 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
 });
 
 // ─── Kartu entry jurnal untuk layout mobile ──────────────────────────────────
-// Sengaja tanpa drag-handle/reorder (susah & rawan salah tap di layar sentuh) —
-// urutan tetap bisa diatur lewat tampilan tabel di desktop/tablet.
 const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
     entry,
     isSelected,
@@ -3695,34 +3390,22 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
                     <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[11px] font-semibold text-gray-700">{fmtTgl(entry.tanggal)}</span>
                         {entryJam && (
-                            <span className="text-[9px] text-gray-400 font-mono" title="Jam data ini masuk ke jurnal">
-                                Masuk {entryJam}
-                            </span>
+                            <span className="text-[9px] text-gray-400 font-mono" title="Jam data ini masuk ke jurnal">Masuk {entryJam}</span>
                         )}
                     </div>
                     <div className="flex items-center gap-1.5 mb-1 mt-1 flex-wrap">
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
-                            {badge.label}
-                        </span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>{badge.label}</span>
                         {companyBadge && (
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
-                                {companyBadge.label}
-                            </span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>{companyBadge.label}</span>
                         )}
                         {isPengajuanDana && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-teal-50 text-teal-700 border-teal-200">
-                                Pengajuan Dana
-                            </span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-teal-50 text-teal-700 border-teal-200">Pengajuan Dana</span>
                         )}
                         {cashflowNama && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200">
-                                {cashflowNama}
-                            </span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200">{cashflowNama}</span>
                         )}
                         {entry.is_edited && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
-                                diedit · {entry.updated_by_user?.name ?? "—"}
-                            </span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">diedit · {entry.updated_by_user?.name ?? "—"}</span>
                         )}
                         {entry.has_warning && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1">
@@ -3763,18 +3446,13 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
                         <div key={line.id} className="flex items-start justify-between gap-2 px-2.5 py-1.5 bg-gray-50/40">
                             <div className="min-w-0">
                                 <div className={`text-[11px] font-medium ${isKredit ? "pl-4 text-emerald-800" : "text-blue-800"}`}>
-                                    <span
-                                        className={`text-[9px] font-mono font-bold rounded px-1 py-0.5 mr-1 ${accountCodeFilter.has(line.account_code) ? "bg-blue-50 text-blue-700" : "text-gray-400"
-                                            }`}
-                                    >
+                                    <span className={`text-[9px] font-mono font-bold rounded px-1 py-0.5 mr-1 ${accountCodeFilter.has(line.account_code) ? "bg-blue-50 text-blue-700" : "text-gray-400"}`}>
                                         {line.account_code}
                                     </span>
                                     {line.account_name}
                                 </div>
                                 {line.keterangan && (
-                                    <div className={`text-[10px] italic text-gray-400 mt-0.5 ${isKredit ? "pl-4" : ""}`}>
-                                        {line.keterangan}
-                                    </div>
+                                    <div className={`text-[10px] italic text-gray-400 mt-0.5 ${isKredit ? "pl-4" : ""}`}>{line.keterangan}</div>
                                 )}
                             </div>
                             <span className="text-[12px] font-bold text-gray-900 font-mono shrink-0">
@@ -3784,60 +3462,30 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
                     );
                 })}
             </div>
+
             <div className="flex items-center justify-end gap-1 mt-2.5 pt-2.5 border-t border-gray-100">
                 <button
                     onClick={() => onToggleBookmark(entry.id)}
                     title={isBookmarked ? "Hapus penanda baca" : "Tandai sebagai baris terakhir dibaca"}
-                    className={`p-2 rounded-lg active:scale-90 transition-all duration-150 ${isBookmarked
-                        ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
-                        : "text-gray-400 hover:text-amber-600 hover:bg-amber-50"
-                        }`}
+                    className={`p-2 rounded-lg active:scale-90 transition-all duration-150 ${isBookmarked ? "text-amber-600 bg-amber-50 hover:bg-amber-100" : "text-gray-400 hover:text-amber-600 hover:bg-amber-50"}`}
                 >
                     {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
                 </button>
-                <button
-                    onClick={() => onEdit(entry)}
-                    className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
-                    title="Edit jurnal"
-                >
+                <button onClick={() => onEdit(entry)} className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150" title="Edit jurnal">
                     <Pencil className="w-4 h-4" />
                 </button>
-                <SyncHistoryToggle
-                    entry={entry}
-                    onUpdated={() => onUpdated(false)}
-                    setToast={setToast}
-                />
-                <button
-                    onClick={() => onLog(entry)}
-                    className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
-                    title="Riwayat perubahan"
-                >
+                <SyncHistoryToggle entry={entry} onUpdated={() => onUpdated(false)} setToast={setToast} />
+                <button onClick={() => onLog(entry)} className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150" title="Riwayat perubahan">
                     <Clock className="w-4 h-4" />
                 </button>
-                <WarningToggle
-                    entry={entry}
-                    onUpdated={() => onUpdated(false)}
-                    onToggleWarningState={onToggleWarningState}
-                    setToast={setToast}
-                />
-                <button
-                    onClick={() => onDelete(entry)}
-                    className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
-                    title="Hapus"
-                >
+                <WarningToggle entry={entry} onUpdated={() => onUpdated(false)} onToggleWarningState={onToggleWarningState} setToast={setToast} />
+                <button onClick={() => onDelete(entry)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150" title="Hapus">
                     <Trash2 className="w-4 h-4" />
                 </button>
                 <button
                     onClick={() => onToggleChecked(entry, !isEntryChecked)}
-                    title={
-                        isEntryChecked
-                            ? `Sudah dicek pada ${fmtWaktu(latestCheckedAt ?? undefined)} (Tap untuk batalkan)`
-                            : "Tandai sudah dicek"
-                    }
-                    className={`w-8 h-8 rounded-md border flex items-center justify-center active:scale-90 transition-all duration-150 ${isEntryChecked
-                        ? "bg-green-600 border-green-600 text-white shadow-2xs"
-                        : "bg-white border-gray-300 text-gray-300"
-                        }`}
+                    title={isEntryChecked ? `Sudah dicek pada ${fmtWaktu(latestCheckedAt ?? undefined)} (Tap untuk batalkan)` : "Tandai sudah dicek"}
+                    className={`w-8 h-8 rounded-md border flex items-center justify-center active:scale-90 transition-all duration-150 ${isEntryChecked ? "bg-green-600 border-green-600 text-white shadow-2xs" : "bg-white border-gray-300 text-gray-300"}`}
                 >
                     <Check className="w-4 h-4 mx-auto" />
                 </button>
