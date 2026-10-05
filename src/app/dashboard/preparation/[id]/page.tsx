@@ -633,6 +633,62 @@ function AddAccessoryModal({ orderId, onClose, onAdded }: {
     );
 }
 
+// ── EditItemModal: Penyedia ubah SN/nama item yang SUDAH tersimpan ──
+function EditItemModal({ orderId, item, onClose, onSaved }: {
+    orderId: string; item: PrepItem; onClose: () => void; onSaved: () => void;
+}) {
+    const [serial, setSerial] = useState(item.serial_number);
+    const [name, setName] = useState(item.laptop_name ?? "");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const submit = async () => {
+        setError("");
+        if (!serial.trim()) { setError("Serial number tidak boleh kosong"); return; }
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/preparation/${orderId}/edit-item`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ item_id: item.id, serial_number: serial.trim(), laptop_name: name.trim() || null }),
+            });
+            const result = await res.json();
+            if (!result.success) { setError(result.message || "Gagal menyimpan"); return; }
+            onSaved(); onClose();
+        } catch { setError("Terjadi kesalahan koneksi"); } finally { setSaving(false); }
+    };
+
+    const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition";
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-blue-600 px-5 py-4">
+                    <p className="font-bold text-white text-sm">Edit Unit</p>
+                    <p className="text-xs text-blue-100 mt-0.5">Ubah serial number atau nama item</p>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Serial Number *</label>
+                        <input value={serial} onChange={e => setSerial(e.target.value)} className={`${inputCls} font-mono`} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Nama Item (opsional)</label>
+                        <input value={name} onChange={e => setName(e.target.value)} placeholder="Nama laptop / aksesoris" className={inputCls} />
+                    </div>
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
+                    <button onClick={submit} disabled={saving} className="flex-1 h-11 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition disabled:opacity-50">
+                        {saving ? "Menyimpan..." : "Simpan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function PreparationDetailPage() {
     const params = useParams();
     const id = params.id as string;
@@ -667,6 +723,7 @@ export default function PreparationDetailPage() {
     const [showCancel, setShowCancel] = useState(false);
     const [cancelItemTarget, setCancelItemTarget] = useState<PrepItem | null>(null);
     const [showAddItems, setShowAddItems] = useState(false);
+    const [editItemTarget, setEditItemTarget] = useState<PrepItem | null>(null);
 
     useEffect(() => {
         getAuthUser().then(u => ({ success: true, user: u }))
@@ -1265,12 +1322,22 @@ export default function PreparationDetailPage() {
                                             </button>
                                             {it.is_cancelled ? (
                                                 <span className="flex-shrink-0 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Batal</span>
-                                            ) : canCancelItem ? (
-                                                <button type="button" onClick={() => setCancelItemTarget(it)}
-                                                    className="flex-shrink-0 text-[11px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition">
-                                                    Batalkan
-                                                </button>
-                                            ) : null}
+                                            ) : (
+                                                <div className="flex-shrink-0 flex items-center gap-1">
+                                                    {order.status === "DIPROSES" && canDone && (
+                                                        <button type="button" onClick={() => setEditItemTarget(it)}
+                                                            className="text-[11px] font-bold text-blue-500 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded-lg transition">
+                                                            Edit
+                                                        </button>
+                                                    )}
+                                                    {canCancelItem && (
+                                                        <button type="button" onClick={() => setCancelItemTarget(it)}
+                                                            className="text-[11px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition">
+                                                            Batalkan
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                         {/* Unit ini kedeteksi sudah dibayar lewat pesanan/transaksi LAIN — bisa
                                             terjadi karena SN yang sama sengaja boleh dipakai di lebih dari 1
@@ -1564,6 +1631,14 @@ export default function PreparationDetailPage() {
             )}
             {showCancel && <CancelModal order={order} onClose={() => setShowCancel(false)} onCancelled={fetchOrder} />}
             {showAddItems && <AddAccessoryModal orderId={order.id} onClose={() => setShowAddItems(false)} onAdded={fetchOrder} />}
+            {editItemTarget && (
+                <EditItemModal
+                    orderId={order.id}
+                    item={editItemTarget}
+                    onClose={() => setEditItemTarget(null)}
+                    onSaved={fetchOrder}
+                />
+            )}
             {cancelItemTarget && (
                 <CancelItemModal
                     order={order}
