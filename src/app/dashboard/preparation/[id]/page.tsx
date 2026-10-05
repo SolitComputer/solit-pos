@@ -26,6 +26,8 @@ interface PrepItem {
     is_checked: boolean; check_note: string | null;
     is_cancelled: boolean; cancel_reason: string | null;
     cancelled_at: string | null; cancelled_by_name: string | null;
+    item_type?: "laptop" | "accessory" | null;
+    accessory_id?: string | null;
     // Diisi oleh GET /api/preparation/[id] kalau unit_id item ini ternyata
     // sudah SOLD lewat transaksi di pesanan LAIN (business rule: SN yang sama
     // boleh dipakai di lebih dari 1 penyiapan sekaligus — lihat units/search-sn).
@@ -1086,7 +1088,12 @@ export default function PreparationDetailPage() {
                                                     {it.is_checked && !it.is_cancelled && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                                                 </span>
                                                 <div className="min-w-0">
-                                                    <p className={`font-mono text-sm font-bold text-gray-800 ${it.is_cancelled ? "line-through" : ""}`}>{it.serial_number}</p>
+                                                    <p className={`font-mono text-sm font-bold text-gray-800 flex items-center gap-1.5 ${it.is_cancelled ? "line-through" : ""}`}>
+                                                        {it.serial_number}
+                                                        {it.item_type === "accessory" && (
+                                                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded no-underline">AKSESORIS</span>
+                                                        )}
+                                                    </p>
                                                     {it.laptop_name && <p className="text-xs text-gray-500 truncate">{it.laptop_name}</p>}
                                                     {it.laptop_spec && (it.laptop_spec.cpu || it.laptop_spec.ram || it.laptop_spec.storage || it.laptop_spec.gpu) && (
                                                         <div className="flex flex-wrap gap-1 mt-1">

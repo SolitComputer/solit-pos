@@ -210,12 +210,19 @@ function CreateModal({
   const [salesChannel, setSalesChannel] = useState<"MANUAL" | "ECOMMERCE">("MANUAL");
   const [ecommercePlatform, setEcommercePlatform] = useState<"SHOPEE" | "TOKOPEDIA" | "TIKTOK" | "LAZADA" | "">("");
   const [dealPrice, setDealPrice] = useState("");
+  // Jenis item untuk SN yang DIKETIK/SCAN manual. Pencarian sendiri sudah
+  // mengembalikan laptop & aksesoris sekaligus (lihat unit_type), jadi toggle
+  // ini hanya menandai input manual yang jenisnya tak bisa ditebak dari teks SN.
+  const [itemKind, setItemKind] = useState<"laptop" | "accessory">("laptop");
   const [items, setItems] = useState<
     {
       serial_number: string;
-      laptop_name?: string;
+      item_type: "laptop" | "accessory";
+      laptop_name?: string;        // dipakai juga sbg nama tampil aksesoris
       laptop_id?: string;
-      unit_id?: string;
+      accessory_id?: string;
+      unit_id?: string;            // laptop_units.id
+      accessory_unit_id?: string;  // accessory_units.id
     }[]
   >([]);
   const [snSearch, setSnSearch] = useState("");
@@ -249,14 +256,24 @@ function CreateModal({
   );
 
   const addUnit = (u: any) => {
+    const isAcc = u.unit_type === "accessory" || !!u.accessory_id;
     setItems((prev) => [
       ...prev,
-      {
-        serial_number: u.serial_number,
-        laptop_name: u.laptop_name ?? undefined,
-        laptop_id: u.laptop_id ?? undefined,
-        unit_id: u.id ?? undefined,
-      },
+      isAcc
+        ? {
+          serial_number: u.serial_number,
+          item_type: "accessory",
+          laptop_name: u.laptop_name ?? u.accessory_name ?? undefined,
+          accessory_id: u.accessory_id ?? u.laptop_id ?? undefined,
+          accessory_unit_id: u.id ?? undefined,
+        }
+        : {
+          serial_number: u.serial_number,
+          item_type: "laptop",
+          laptop_name: u.laptop_name ?? undefined,
+          laptop_id: u.laptop_id ?? undefined,
+          unit_id: u.id ?? undefined,
+        },
     ]);
     setSnSearch("");
     setSnResults([]);
@@ -266,7 +283,8 @@ function CreateModal({
     if (!sn) return;
     // SENGAJA TIDAK cek duplikat — business rule mengizinkan SN yang sama
     // diinput berkali-kali pada fase persiapan (tidak memengaruhi stok).
-    setItems((prev) => [...prev, { serial_number: sn }]);
+    // item_type ikut toggle aktif; nama & id-nya di-resolve backend dari SN.
+    setItems((prev) => [...prev, { serial_number: sn, item_type: itemKind }]);
     setManualSN("");
   };
   const removeItem = (idx: number) =>
@@ -450,6 +468,20 @@ function CreateModal({
                 </span>
               )}
             </div>
+
+            {/* Jenis untuk input MANUAL/scan. Pencarian di bawah tetap
+                menampilkan laptop & aksesoris sekaligus. */}
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <button type="button" onClick={() => setItemKind("laptop")}
+                className={`h-9 rounded-2xl text-xs font-bold border transition ${itemKind === "laptop" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
+                Laptop
+              </button>
+              <button type="button" onClick={() => setItemKind("accessory")}
+                className={`h-9 rounded-2xl text-xs font-bold border transition ${itemKind === "accessory" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
+                Aksesoris
+              </button>
+            </div>
+
             <div className="relative">
               <input
                 value={snSearch}
@@ -476,9 +508,11 @@ function CreateModal({
                     <p className="font-mono text-sm font-bold text-slate-800">
                       {u.serial_number}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {u.laptop_name}
-                      {u.grade ? ` · Grade ${u.grade}` : ""}
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${u.unit_type === "accessory" ? "text-emerald-700 bg-emerald-50 border border-emerald-200" : "text-slate-600 bg-slate-100 border border-slate-200"}`}>
+                        {u.unit_type === "accessory" ? "AKSESORIS" : "LAPTOP"}
+                      </span>
+                      <span className="truncate">{u.laptop_name}{u.grade ? ` · Grade ${u.grade}` : ""}</span>
                     </p>
                     {u.in_other_preparation && (
                       <p className="text-[10px] text-amber-600 font-semibold mt-0.5">
@@ -533,8 +567,11 @@ function CreateModal({
                     className="flex items-center justify-between bg-slate-50/50 border border-slate-100 rounded-2xl px-4 py-2.5 hover:bg-slate-50 hover:border-slate-200 transition"
                   >
                     <div className="min-w-0">
-                      <p className="font-mono text-xs font-bold text-slate-800">
+                      <p className="font-mono text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         {it.serial_number}
+                        {it.item_type === "accessory" && (
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">AKSESORIS</span>
+                        )}
                       </p>
                       {it.laptop_name && (
                         <p className="text-[10px] text-slate-500 truncate">{it.laptop_name}</p>
@@ -583,7 +620,7 @@ function CreateModal({
                 const clean = sn.trim();
                 // SENGAJA TIDAK cek duplikat, sama seperti addManual di atas.
                 if (clean) {
-                  setItems((prev) => [...prev, { serial_number: clean }]);
+                  setItems((prev) => [...prev, { serial_number: clean, item_type: itemKind }]);
                 }
               }}
               onClose={() => setShowBarcode(false)}
