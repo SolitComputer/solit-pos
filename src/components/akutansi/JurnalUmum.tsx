@@ -340,6 +340,9 @@ export default function JurnalUmum({ period }: { period: string }) {
     const entryRefs = useRef<Map<string, HTMLElement>>(new Map());
     // Flag highlight sekejap setelah scroll (ring menyala ~2 detik lalu hilang).
     const [flashId, setFlashId] = useState<string | null>(null);
+    // Penanda "sedang melompat ke bookmark" — dipakai supaya useEffect reset displayLimit
+    // TIDAK ikut mengecilkan tampilan balik ke 50 saat scrollToBookmark mengosongkan filter.
+    const isJumpingToBookmark = useRef(false);
 
     useEffect(() => {
         const saved = localStorage.getItem("jurnal-show-pending");
@@ -468,8 +471,15 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     };
 
-    // Reset display limit when period or filter changes
+    // Reset display limit when period or filter changes.
+    // Dikecualikan saat sedang melompat ke bookmark (scrollToBookmark mengosongkan filter
+    // dengan sengaja — jangan ikut mengecilkan tampilan balik ke 50, biar baris penanda
+    // yang posisinya di bawah tetap ikut ter-render).
     useEffect(() => {
+        if (isJumpingToBookmark.current) {
+            isJumpingToBookmark.current = false; // konsumsi sekali, lalu kembali normal
+            return;
+        }
         setDisplayLimit(50);
     }, [period, search, searchNominal, accountCodeFilter, showOnlyWarnings, showOnlyOutOfSync, sortOrder]);
 
@@ -505,6 +515,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         setFlashId(id);
         setTimeout(() => setFlashId(null), 2000);
+        isJumpingToBookmark.current = false; // scroll selesai — pastikan saklar mati
         return true;
     }, []);
 
@@ -518,6 +529,10 @@ export default function JurnalUmum({ period }: { period: string }) {
     // 3) Scroll sekarang kalau sudah ter-render; kalau belum, tunda via pendingScrollId.
     const scrollToBookmark = useCallback(() => {
         if (!bookmarkedId) return;
+
+        // Nyalakan saklar DULU, sebelum mengubah filter — supaya useEffect reset displayLimit
+        // yang terpicu oleh perubahan filter di bawah ini tahu harus skip sekali.
+        isJumpingToBookmark.current = true;
 
         // (1) reset semua filter & pencarian
         setSearch("");
