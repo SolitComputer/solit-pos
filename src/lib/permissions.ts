@@ -1155,6 +1155,11 @@ export const BARANG_BASIC_VIEW_ONLY_ROLES: UserRole[] = [
 ];
 
 export function isBarangBasicViewOnly(userRoles: string[]): boolean {
+  // Mode "kolom dasar saja" hanya berlaku kalau user TIDAK punya role lain yang
+  // berhak lihat data privat Data Barang. Kalau user dobel role — mis.
+  // KEPALA_PENYEDIA_BARANG + KEPALA_PENGELOLA_BARANG — privilege yang lebih
+  // tinggi menang, jadi dia tetap dapat tampilan lengkap seperti Admin.
+  if (hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES)) return false;
   return hasAnyRole(userRoles, BARANG_BASIC_VIEW_ONLY_ROLES);
 }
 
