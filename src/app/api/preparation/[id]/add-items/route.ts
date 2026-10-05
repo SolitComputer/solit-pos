@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
-import { DONE_PREPARATION_ROLES } from "@/lib/permissions";
+import { PERMISSIONS } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
 
 interface Props { params: Promise<{ id: string }>; }
@@ -71,4 +71,4 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const POST = withAuth(postHandler, DONE_PREPARATION_ROLES);
+export const POST = withAuth(postHandler, PERMISSIONS.DONE_PREPARATION);
