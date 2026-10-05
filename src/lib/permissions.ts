@@ -1152,6 +1152,7 @@ export const BARANG_PRIVATE_VIEW_ROLES: UserRole[] = [
 // data privat atau tidak", tapi mode tampilan read-only terbatas khusus role ini.
 export const BARANG_BASIC_VIEW_ONLY_ROLES: UserRole[] = [
   "KEPALA_PENYEDIA_BARANG",
+  "PENYEDIA_BARANG",
 ];
 
 export function isBarangBasicViewOnly(userRoles: string[]): boolean {
@@ -1257,6 +1258,7 @@ export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   "KEPALA_MARKETING",
   "MARKETING",
   "KEPALA_PENYEDIA_BARANG", // view-only kolom dasar (No–Spek) di tab Data Barang
+  "PENYEDIA_BARANG",        // view-only kolom dasar + boleh isi Tes Kondisi (lihat CONDITION_CHECK_EDITOR_ROLES)
 ];
 
 // ── Data Barang: Aksesoris (CRUD) — dipusatkan di sini supaya client

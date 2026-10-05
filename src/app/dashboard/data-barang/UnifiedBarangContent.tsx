@@ -1866,6 +1866,20 @@ export default function UnifiedBarangContent() {
                                                     )}
                                                 </div>
 
+                                                {/* Mode basic-view: tombol Tes Kondisi tetap muncul khusus role
+                                                    editor checklist (Penyedia Barang / Kepala Penyedia Barang),
+                                                    walau kolom & aksi lain disembunyikan. stopPropagation supaya
+                                                    tap tombol tidak memicu handleRowClick. */}
+                                                {canOnlyViewBasic && canShowConditionChecks(row) && (
+                                                    <div className="pt-2.5 border-t border-zinc-100" onClick={(e) => e.stopPropagation()}>
+                                                        <button onClick={() => openConditionChecks(row)}
+                                                            title="Isi / lihat tes kondisi barang"
+                                                            className={`${cardActionCls} text-sky-700 bg-sky-50 hover:bg-sky-100`}>
+                                                            Tes Kondisi
+                                                        </button>
+                                                    </div>
+                                                )}
+
                                                 {/* Chip status stok + toggle detail + panel expand — semua
                                                     disembunyikan untuk role basic-view (KEPALA_PENYEDIA_BARANG). */}
                                                 {!canOnlyViewBasic && (<>
@@ -1912,109 +1926,109 @@ export default function UnifiedBarangContent() {
                                                     untuk role basic-view. stopPropagation tetap di wrapper supaya
                                                     tap tombol tidak memicu handleRowClick pada kartu. */}
                                                 {!canOnlyViewBasic && (
-                                                <div className="pt-2.5 border-t border-zinc-100 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="pt-2.5 border-t border-zinc-100 space-y-1.5" onClick={(e) => e.stopPropagation()}>
 
-                                                    {/* (1) BARIS STATUS: Audit + SO */}
-                                                    <div className="flex items-stretch gap-1.5">
-                                                        <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${auditActive ? "bg-emerald-50 border-emerald-200" : "bg-zinc-50 border-zinc-200"}`}>
-                                                            <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
-                                                               title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin/Accounting yang bisa mengubah status audit" : "Tidak punya akses") : ""}
-                                                                className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${auditActive ? "text-emerald-700" : "text-zinc-400"}`}>
-                                                                {auditActive ? "Teraudit" : "Audit"}
-                                                            </button>
-                                                            <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit"
-                                                                className={`w-8 flex-shrink-0 flex items-center justify-center border-l transition ${auditActive ? "border-emerald-200 text-emerald-600" : "border-zinc-200 text-zinc-400"}`}>
-                                                                <HistoryIcon size={13} />
-                                                            </button>
-                                                        </div>
-
-                                                        {canDoSo(row) && (
-                                                            <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${soActive ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
-                                                                <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
-                                                                    className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${soActive ? "text-emerald-700" : "text-red-600"}`}>
-                                                                    {soActive ? "Sudah SO" : "SO"}
+                                                        {/* (1) BARIS STATUS: Audit + SO */}
+                                                        <div className="flex items-stretch gap-1.5">
+                                                            <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${auditActive ? "bg-emerald-50 border-emerald-200" : "bg-zinc-50 border-zinc-200"}`}>
+                                                                <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                                    title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin/Accounting yang bisa mengubah status audit" : "Tidak punya akses") : ""}
+                                                                    className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${auditActive ? "text-emerald-700" : "text-zinc-400"}`}>
+                                                                    {auditActive ? "Teraudit" : "Audit"}
                                                                 </button>
-                                                                <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO"
-                                                                    className={`w-8 flex-shrink-0 flex items-center justify-center border-l transition ${soActive ? "border-emerald-200 text-emerald-600" : "border-red-200 text-red-500"}`}>
+                                                                <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit"
+                                                                    className={`w-8 flex-shrink-0 flex items-center justify-center border-l transition ${auditActive ? "border-emerald-200 text-emerald-600" : "border-zinc-200 text-zinc-400"}`}>
                                                                     <HistoryIcon size={13} />
                                                                 </button>
                                                             </div>
-                                                        )}
-                                                    </div>
 
-                                                    {/* (2) GRID AKSI — 2 kolom seragam */}
-                                                    <div className="grid grid-cols-2 gap-1.5">
-                                                        {row.tipe === "LAPTOP" && row.unit_count > 0 && canFullAccessBarang && (
-                                                            <button onClick={() => togglePedagang(row)} disabled={pedagangSavingId === row.id}
-                                                                title={row.is_pedagang_listed ? "Keluarkan dari Pricelist Pedagang" : "Masukkan ke Pricelist Pedagang"}
-                                                                className={`${cardActionCls} ${row.is_pedagang_listed ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100" : "text-zinc-700 bg-zinc-100 hover:bg-zinc-200"}`}>
-                                                                {pedagangSavingId === row.id ? "..." : row.is_pedagang_listed ? "✓ Pedagang" : "+ Pedagang"}
-                                                            </button>
-                                                        )}
-                                                        {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
-                                                            <button onClick={() => setAddUnitTarget(row)}
-                                                                className={`${cardActionCls} text-white bg-zinc-800 hover:bg-zinc-900`}>
-                                                                Tambah Unit
-                                                            </button>
-                                                        )}
-                                                        {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
-                                                            <Link href={`/dashboard/laptops/${row.id}/units`}
-                                                                className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
-                                                                Kelola Unit ({row.unit_count})
-                                                            </Link>
-                                                        )}
-                                                        {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
-                                                            <button onClick={() => setAddUnitAccessoryTarget(row)}
-                                                                className={`${cardActionCls} text-white bg-zinc-800 hover:bg-zinc-900`}>
-                                                                Tambah Unit
-                                                            </button>
-                                                        )}
-                                                        {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
-                                                            <Link href={`/dashboard/accessories/${row.id}/units`}
-                                                                className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
-                                                                Kelola Unit ({row.stok ?? 0})
-                                                            </Link>
-                                                        )}
-                                                        {row.tipe === "LAPTOP" && canViewBarcode && (
-                                                            <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "LAPTOP" })}
-                                                                className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
-                                                                Barcode
-                                                            </button>
-                                                        )}
-                                                        {row.tipe === "AKSESORIS" && canViewBarcode && accAction !== "add" && (
-                                                            <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "AKSESORIS" })}
-                                                                className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
-                                                                Barcode
-                                                            </button>
-                                                        )}
-                                                        {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count <= 1 && (
-                                                            <button onClick={() => setConvertTarget(row)}
-                                                                title="Pindahkan ke Aksesoris dengan kategori yang benar"
-                                                                className={`${cardActionCls} text-amber-700 bg-amber-50 hover:bg-amber-100`}>
-                                                                Perbaiki Tipe
-                                                            </button>
-                                                        )}
-                                                        {canShowConditionChecks(row) && (
-                                                            <button onClick={() => openConditionChecks(row)}
-                                                                title="Edit tes kondisi tanpa buka form Edit penuh"
-                                                                className={`${cardActionCls} text-sky-700 bg-sky-50 hover:bg-sky-100`}>
-                                                                Tes Kondisi
-                                                            </button>
-                                                        )}
-                                                        {canEditThis && (
-                                                            <button onClick={() => openEdit(row)}
-                                                                className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
-                                                                Edit
-                                                            </button>
-                                                        )}
-                                                        {canDeleteThis && (
-                                                            <button onClick={() => setDeleteRow(row)}
-                                                                className={`${cardActionCls} text-red-500 bg-red-50 hover:bg-red-100`}>
-                                                                Hapus
-                                                            </button>
-                                                        )}
+                                                            {canDoSo(row) && (
+                                                                <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${soActive ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+                                                                    <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
+                                                                        className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${soActive ? "text-emerald-700" : "text-red-600"}`}>
+                                                                        {soActive ? "Sudah SO" : "SO"}
+                                                                    </button>
+                                                                    <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO"
+                                                                        className={`w-8 flex-shrink-0 flex items-center justify-center border-l transition ${soActive ? "border-emerald-200 text-emerald-600" : "border-red-200 text-red-500"}`}>
+                                                                        <HistoryIcon size={13} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* (2) GRID AKSI — 2 kolom seragam */}
+                                                        <div className="grid grid-cols-2 gap-1.5">
+                                                            {row.tipe === "LAPTOP" && row.unit_count > 0 && canFullAccessBarang && (
+                                                                <button onClick={() => togglePedagang(row)} disabled={pedagangSavingId === row.id}
+                                                                    title={row.is_pedagang_listed ? "Keluarkan dari Pricelist Pedagang" : "Masukkan ke Pricelist Pedagang"}
+                                                                    className={`${cardActionCls} ${row.is_pedagang_listed ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100" : "text-zinc-700 bg-zinc-100 hover:bg-zinc-200"}`}>
+                                                                    {pedagangSavingId === row.id ? "..." : row.is_pedagang_listed ? "✓ Pedagang" : "+ Pedagang"}
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
+                                                                <button onClick={() => setAddUnitTarget(row)}
+                                                                    className={`${cardActionCls} text-white bg-zinc-800 hover:bg-zinc-900`}>
+                                                                    Tambah Unit
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
+                                                                <Link href={`/dashboard/laptops/${row.id}/units`}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Kelola Unit ({row.unit_count})
+                                                                </Link>
+                                                            )}
+                                                            {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
+                                                                <button onClick={() => setAddUnitAccessoryTarget(row)}
+                                                                    className={`${cardActionCls} text-white bg-zinc-800 hover:bg-zinc-900`}>
+                                                                    Tambah Unit
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
+                                                                <Link href={`/dashboard/accessories/${row.id}/units`}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Kelola Unit ({row.stok ?? 0})
+                                                                </Link>
+                                                            )}
+                                                            {row.tipe === "LAPTOP" && canViewBarcode && (
+                                                                <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "LAPTOP" })}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Barcode
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "AKSESORIS" && canViewBarcode && accAction !== "add" && (
+                                                                <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "AKSESORIS" })}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Barcode
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count <= 1 && (
+                                                                <button onClick={() => setConvertTarget(row)}
+                                                                    title="Pindahkan ke Aksesoris dengan kategori yang benar"
+                                                                    className={`${cardActionCls} text-amber-700 bg-amber-50 hover:bg-amber-100`}>
+                                                                    Perbaiki Tipe
+                                                                </button>
+                                                            )}
+                                                            {canShowConditionChecks(row) && (
+                                                                <button onClick={() => openConditionChecks(row)}
+                                                                    title="Edit tes kondisi tanpa buka form Edit penuh"
+                                                                    className={`${cardActionCls} text-sky-700 bg-sky-50 hover:bg-sky-100`}>
+                                                                    Tes Kondisi
+                                                                </button>
+                                                            )}
+                                                            {canEditThis && (
+                                                                <button onClick={() => openEdit(row)}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Edit
+                                                                </button>
+                                                            )}
+                                                            {canDeleteThis && (
+                                                                <button onClick={() => setDeleteRow(row)}
+                                                                    className={`${cardActionCls} text-red-500 bg-red-50 hover:bg-red-100`}>
+                                                                    Hapus
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
                                                 )}
                                             </div>
                                         );
@@ -2035,16 +2049,16 @@ export default function UnifiedBarangContent() {
                                             <thead>
                                                 <tr className="whitespace-nowrap">
                                                     {(canOnlyViewBasic
-                                                        ? ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek"]
+                                                        ? ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek", "Tes Kondisi"]
                                                         : ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek",
                                                             "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
                                                             "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "M", "Stok", "SO", "Audit", "Aksi"]
                                                     ).map((h, hi) => (
-                                                            <th key={h}
-                                                                className={`px-3 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-left bg-zinc-50 border-b-2 border-zinc-100 sticky top-0 ${hi === 2 ? "left-0 z-20 min-w-[180px]" : "z-10"}`}>
-                                                                {h}
-                                                            </th>
-                                                        ))}
+                                                        <th key={h}
+                                                            className={`px-3 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-left bg-zinc-50 border-b-2 border-zinc-100 sticky top-0 ${hi === 2 ? "left-0 z-20 min-w-[180px]" : "z-10"}`}>
+                                                            {h}
+                                                        </th>
+                                                    ))}
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -2078,113 +2092,124 @@ export default function UnifiedBarangContent() {
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.ram || <Dash />}</td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.storage || <Dash />}</td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500 max-w-[140px] truncate">{row.spek || <Dash />}</td>
-                                                            {!canOnlyViewBasic && (<>
-                                                            <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">
-                                                                {row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note ? <span className="text-zinc-400">{row.harga_modal_note}</span> : <Dash />}
-                                                            </td>
-                                                            <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.modal_sparepart != null ? fmt(row.modal_sparepart) : <Dash />}</td>
-                                                            <td className="px-3 py-3 text-xs font-bold text-zinc-800 whitespace-nowrap">{fmt(row.harga_jual)}</td>
-                                                            <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.total_jual != null ? fmt(row.total_jual) : <Dash />}</td>
-                                                            <td className="px-3 py-3 text-xs whitespace-nowrap">
-                                                                {row.gross_profit != null ? <span className={row.gross_profit >= 0 ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>{row.gross_profit >= 0 ? "+" : ""}{fmt(row.gross_profit)}</span> : <Dash />}
-                                                            </td>
-                                                            <td className="px-3 py-3 text-xs text-zinc-500">{row.sumber || <Dash />}</td>
-                                                            <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : <Dash />}</td>
-                                                            <td className="px-3 py-3 text-xs text-zinc-500">{row.sn || (row.sn_note ? <span className="text-zinc-400">{row.sn_note}</span> : <Dash />)}</td>
-                                                            <td className="px-3 py-3 text-xs text-center tabular-nums">
-                                                                <span className={(row.stok_tersedia ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok_tersedia ?? <Dash />}</span>
-                                                            </td>
-                                                            <td className="px-3 py-3 text-xs text-center tabular-nums">
-                                                                <span className={(row.siap_jual ?? 0) > 0 ? "text-emerald-600 font-bold" : ""}>{row.siap_jual ?? <Dash />}</span>
-                                                            </td>
-                                                            <td className="px-3 py-3 text-xs text-center tabular-nums">
-                                                                <span className={(row.minus ?? 0) > 0 ? "text-red-500 font-bold" : ""}>{row.minus ?? <Dash />}</span>
-                                                            </td>
-                                                            <td className="px-3 py-3 text-xs text-center tabular-nums">
-                                                                <span className={(row.stok ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok ?? <Dash />}</span>
-                                                            </td>
-                                                            <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                {canDoSo(row) ? (
-                                                                    <div className="flex items-center justify-center gap-1">
-                                                                        <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
-                                                                            className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${soActive ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
-                                                                            {soActive ? "Sudah SO" : "SO"}
+                                                            {canOnlyViewBasic && (
+                                                                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                                                                    {canShowConditionChecks(row) ? (
+                                                                        <button onClick={() => openConditionChecks(row)}
+                                                                            title="Isi / lihat tes kondisi barang"
+                                                                            className="h-7 px-2 text-[11px] font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition">
+                                                                            Tes Kondisi
                                                                         </button>
-                                                                        <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
+                                                                    ) : <Dash />}
+                                                                </td>
+                                                            )}
+                                                            {!canOnlyViewBasic && (<>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">
+                                                                    {row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note ? <span className="text-zinc-400">{row.harga_modal_note}</span> : <Dash />}
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.modal_sparepart != null ? fmt(row.modal_sparepart) : <Dash />}</td>
+                                                                <td className="px-3 py-3 text-xs font-bold text-zinc-800 whitespace-nowrap">{fmt(row.harga_jual)}</td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.total_jual != null ? fmt(row.total_jual) : <Dash />}</td>
+                                                                <td className="px-3 py-3 text-xs whitespace-nowrap">
+                                                                    {row.gross_profit != null ? <span className={row.gross_profit >= 0 ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>{row.gross_profit >= 0 ? "+" : ""}{fmt(row.gross_profit)}</span> : <Dash />}
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500">{row.sumber || <Dash />}</td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : <Dash />}</td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500">{row.sn || (row.sn_note ? <span className="text-zinc-400">{row.sn_note}</span> : <Dash />)}</td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.stok_tersedia ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok_tersedia ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.siap_jual ?? 0) > 0 ? "text-emerald-600 font-bold" : ""}>{row.siap_jual ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.minus ?? 0) > 0 ? "text-red-500 font-bold" : ""}>{row.minus ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.stok ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                    {canDoSo(row) ? (
+                                                                        <div className="flex items-center justify-center gap-1">
+                                                                            <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
+                                                                                className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${soActive ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
+                                                                                {soActive ? "Sudah SO" : "SO"}
+                                                                            </button>
+                                                                            <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
+                                                                                <HistoryIcon size={13} />
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : <Dash />}
+                                                                </td>
+                                                                <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                                            title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
+                                                                            className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
+                                                                            {auditActive ? "Teraudit" : "Audit"}
+                                                                        </button>
+                                                                        <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
                                                                             <HistoryIcon size={13} />
                                                                         </button>
                                                                     </div>
-                                                                ) : <Dash />}
-                                                            </td>
-                                                            <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                   <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
-                                                                        title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
-                                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
-                                                                        {auditActive ? "Teraudit" : "Audit"}
-                                                                    </button>
-                                                                    <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
-                                                                        <HistoryIcon size={13} />
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                                                                <div className="flex items-center gap-1 flex-nowrap min-w-max">
-                                                                    {row.tipe === "LAPTOP" && row.unit_count > 0 && canFullAccessBarang && (
-                                                                        <button onClick={() => togglePedagang(row)} disabled={pedagangSavingId === row.id}
-                                                                            title={row.is_pedagang_listed ? "Keluarkan dari Pricelist Pedagang" : "Masukkan ke Pricelist Pedagang"}
-                                                                            className={`h-7 px-2 text-[11px] font-semibold rounded-lg transition disabled:opacity-40 ${row.is_pedagang_listed ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100" : "text-zinc-700 bg-zinc-100 hover:bg-zinc-200"}`}>
-                                                                            {pedagangSavingId === row.id ? "..." : row.is_pedagang_listed ? "✓ Pedagang" : "+ Pedagang"}
-                                                                        </button>
-                                                                    )}
-                                                                    {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
-                                                                        <button onClick={() => setAddUnitTarget(row)}
-                                                                            className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
-                                                                            Tambah Unit
-                                                                        </button>
-                                                                    )}
-                                                                    {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
-                                                                        <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                                            Kelola Unit ({row.unit_count})
-                                                                        </Link>
-                                                                    )}
-                                                                    {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
-                                                                        <button onClick={() => setAddUnitAccessoryTarget(row)}
-                                                                            className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
-                                                                            Tambah Unit
-                                                                        </button>
-                                                                    )}
-                                                                    {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
-                                                                        <Link href={`/dashboard/accessories/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                                            Kelola Unit ({row.stok ?? 0})
-                                                                        </Link>
-                                                                    )}
-                                                                    {row.tipe === "LAPTOP" && canViewBarcode && (
-                                                                        <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "LAPTOP" })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
-                                                                    )}
-                                                                    {row.tipe === "AKSESORIS" && canViewBarcode && accAction !== "add" && (
-                                                                        <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "AKSESORIS" })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
-                                                                    )}
-                                                                    {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count <= 1 && (
-                                                                        <button onClick={() => setConvertTarget(row)}
-                                                                            title="Pindahkan ke Aksesoris dengan kategori yang benar"
-                                                                            className="h-7 px-2 text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition">
-                                                                            Perbaiki Tipe
-                                                                        </button>
-                                                                    )}
-                                                                    {canShowConditionChecks(row) && (
-                                                                        <button onClick={() => openConditionChecks(row)}
-                                                                            title="Edit tes kondisi tanpa buka form Edit penuh"
-                                                                            className="h-7 px-2 text-[11px] font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition">Tes Kondisi</button>
-                                                                    )}
-                                                                    {((row.tipe === "LAPTOP" && canEditLaptop) || (row.tipe === "AKSESORIS" && canEditAcc)) && (
-                                                                        <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
-                                                                    )}
-                                                                    {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
-                                                                        <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
-                                                                    )}
-                                                                </div>
-                                                            </td>
+                                                                </td>
+                                                                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                                                                    <div className="flex items-center gap-1 flex-nowrap min-w-max">
+                                                                        {row.tipe === "LAPTOP" && row.unit_count > 0 && canFullAccessBarang && (
+                                                                            <button onClick={() => togglePedagang(row)} disabled={pedagangSavingId === row.id}
+                                                                                title={row.is_pedagang_listed ? "Keluarkan dari Pricelist Pedagang" : "Masukkan ke Pricelist Pedagang"}
+                                                                                className={`h-7 px-2 text-[11px] font-semibold rounded-lg transition disabled:opacity-40 ${row.is_pedagang_listed ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100" : "text-zinc-700 bg-zinc-100 hover:bg-zinc-200"}`}>
+                                                                                {pedagangSavingId === row.id ? "..." : row.is_pedagang_listed ? "✓ Pedagang" : "+ Pedagang"}
+                                                                            </button>
+                                                                        )}
+                                                                        {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
+                                                                            <button onClick={() => setAddUnitTarget(row)}
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
+                                                                                Tambah Unit
+                                                                            </button>
+                                                                        )}
+                                                                        {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
+                                                                            <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
+                                                                                Kelola Unit ({row.unit_count})
+                                                                            </Link>
+                                                                        )}
+                                                                        {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
+                                                                            <button onClick={() => setAddUnitAccessoryTarget(row)}
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
+                                                                                Tambah Unit
+                                                                            </button>
+                                                                        )}
+                                                                        {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
+                                                                            <Link href={`/dashboard/accessories/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
+                                                                                Kelola Unit ({row.stok ?? 0})
+                                                                            </Link>
+                                                                        )}
+                                                                        {row.tipe === "LAPTOP" && canViewBarcode && (
+                                                                            <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "LAPTOP" })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
+                                                                        )}
+                                                                        {row.tipe === "AKSESORIS" && canViewBarcode && accAction !== "add" && (
+                                                                            <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "AKSESORIS" })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
+                                                                        )}
+                                                                        {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count <= 1 && (
+                                                                            <button onClick={() => setConvertTarget(row)}
+                                                                                title="Pindahkan ke Aksesoris dengan kategori yang benar"
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition">
+                                                                                Perbaiki Tipe
+                                                                            </button>
+                                                                        )}
+                                                                        {canShowConditionChecks(row) && (
+                                                                            <button onClick={() => openConditionChecks(row)}
+                                                                                title="Edit tes kondisi tanpa buka form Edit penuh"
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition">Tes Kondisi</button>
+                                                                        )}
+                                                                        {((row.tipe === "LAPTOP" && canEditLaptop) || (row.tipe === "AKSESORIS" && canEditAcc)) && (
+                                                                            <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
+                                                                        )}
+                                                                        {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
+                                                                            <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
                                                             </>)}
                                                         </tr>
                                                     );
