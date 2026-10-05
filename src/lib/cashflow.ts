@@ -37,6 +37,7 @@ export const CASHFLOW_CATEGORIES = {
   OPERASIONAL_BULANAN: "Operasional Bulanan",        // 520
   BIAYA_LAIN: "Biaya Lain-lain",                     // 530
   KEUNTUNGAN_MITRA: "Keuntungan Mitra/Reseller",     // 540
+  PENGELUARAN_TAHUNAN: "Pengeluaran Tahunan",        // 550
 } as const;
 
 // Label kategori AUTO dari sistem (auto-sync dari Transaksi/Service) — tidak
