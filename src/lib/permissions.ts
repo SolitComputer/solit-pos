@@ -1251,6 +1251,7 @@ export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   "KEPALA_ZENITH",
   "KEPALA_MARKETING",
   "MARKETING",
+  "KEPALA_PENYEDIA_BARANG", // view-only kolom dasar (No–Spek) di tab Data Barang
 ];
 
 // ── Data Barang: Aksesoris (CRUD) — dipusatkan di sini supaya client
