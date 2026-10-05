@@ -204,6 +204,58 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
+    // ── 5a1. [BARU] Batalkan order Penyiapan (PREP) yang ter-link ke invoice ini ──
+    // Order e-commerce (Shopee/Tokopedia/TikTok/Lazada) saat dibuat otomatis
+    // bikin baris `transactions` + meng-isi `preparation_orders.transaction_invoice`
+    // (lihat POST /api/preparation). Restore transaksi dulu TIDAK menyentuh
+    // preparation sama sekali, jadi order PREP-nya tetap nyangkut dengan status
+    // lamanya (mis. SELESAI) di "Semua Penyiapan" walau transaksinya sudah BATAL.
+    // Nilai status "DIBATALKAN" + field cancelled_* disamakan PERSIS dengan
+    // POST /api/preparation/[id]/cancel supaya konsisten & lolos constraint DB.
+    try {
+      const { data: linkedPreps } = await supabase
+        .from("preparation_orders")
+        .select("id, order_number, status")
+        .eq("transaction_invoice", invoice);
+
+      // Hanya batalkan yang BELUM dibatalkan — idempotent, aman kalau restore
+      // dipanggil ulang / transaksi di-restore berkali-kali.
+      const prepsToCancel = (linkedPreps ?? []).filter((p: any) => p.status !== "DIBATALKAN");
+
+      if (prepsToCancel.length > 0) {
+        const nowIso = new Date().toISOString();
+        const { error: prepCancelErr } = await supabase
+          .from("preparation_orders")
+          .update({
+            status: "DIBATALKAN",
+            cancelled_at: nowIso,
+            cancelled_by: user.id,
+            cancelled_by_name: user.name,
+            cancel_reason: `Transaksi ${invoice} di-restore/batal oleh ${user.name}. ${restoreReason}`,
+            updated_at: nowIso,
+          })
+          .eq("transaction_invoice", invoice)
+          .neq("status", "DIBATALKAN");
+
+        if (prepCancelErr) {
+          console.error("[RESTORE] gagal batalkan preparation ter-link:", prepCancelErr.message);
+        } else {
+          // Catat di log aktivitas tiap order PREP yang ikut dibatalkan.
+          for (const prep of prepsToCancel) {
+            await logActivity({
+              userId: user.id, userName: user.name, userRole: user.role,
+              action: "EDIT", entity: "preparation", entityId: prep.id,
+              entityLabel: `${prep.order_number} — DIBATALKAN otomatis (transaksi ${invoice} di-restore)`,
+              reason: restoreReason,
+            });
+          }
+        }
+      }
+    } catch (prepEx: any) {
+      // Non-fatal: restore transaksi tetap sukses walau sinkron PREP gagal.
+      console.error("[RESTORE] exception saat batalkan preparation:", prepEx?.message ?? prepEx);
+    }
+
     // ── 5a2. REFUND OTOMATIS ke Cashflow (uang keluar di TANGGAL CANCEL) ────
     // HANYA untuk transaksi yang benar-benar LUNAS PENUH (prevStatus === "PAID")
     // sebelum dibatalkan. Transaksi DP / Ambil-Dulu / Packing (RESERVED/HELD/

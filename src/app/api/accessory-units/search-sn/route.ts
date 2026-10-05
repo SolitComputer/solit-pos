@@ -29,6 +29,7 @@ export const GET = withAuth(async (req: NextRequest) => {
       serial_number,
       condition,
       status,
+      buy_price,
       selling_price,
       notes,
      accessories(
