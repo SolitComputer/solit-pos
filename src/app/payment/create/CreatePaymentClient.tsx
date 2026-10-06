@@ -1201,7 +1201,7 @@ export default function CreatePaymentPage() {
                                 </>
                             )}
 
-                            {/* ── Aksesori (opsional, tanpa SN) ── */}
+                            {/* ── Aksesori (opsional, tanpa SN) ──
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
                                     <Gift size={13} /> Aksesori (opsional)
@@ -1240,7 +1240,7 @@ export default function CreatePaymentPage() {
                                 {accSearch.length >= 2 && accResults.length === 0 && !accLoading && (
                                     <p className="text-xs text-gray-400 mt-1.5 px-1">Aksesori tidak ditemukan / stok habis</p>
                                 )}
-                            </div>
+                            </div> */}
 
                             {selectedAccessories.length > 0 && (
                                 <div className="space-y-2">
