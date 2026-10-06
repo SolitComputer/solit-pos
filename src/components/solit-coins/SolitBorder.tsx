@@ -954,6 +954,10 @@ export function SolitBorder({
   const glintOpacity =
     fx === "limited" ? 1 : fx === "legendary" ? 0.9 : fx === "epic" ? 0.75 : fx === "rare" ? 0.55 : 0.4;
   const dualBeam = fx === "epic" || fx === "legendary" || fx === "limited";
+  // Satelit orbit: titik cahaya aksen yang ngelilingin ring di zona halo.
+  // Jumlah naik per rarity (rare 1 → epic 2 → legendary/limited 3).
+  const orbitCount = fx === "limited" || fx === "legendary" ? 3 : fx === "epic" ? 2 : fx === "rare" ? 1 : 0;
+  const rimMax = fx === "limited" ? 1 : fx === "legendary" ? 0.9 : fx === "epic" ? 0.75 : fx === "rare" ? 0.6 : 0.45;
   const isCodeTerminal = preset === "code-terminal";
   const isSakura = preset === "sakura-bloom";
   const isButterfly = preset === "butterfly-waltz";
@@ -979,6 +983,11 @@ export function SolitBorder({
           <span className={`sb-aura-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
         </span>
       )}
+      <span
+        className={`sb-rimglow ${lite ? "sb-rimglow-static" : ""}`}
+        style={{ "--rim-max": rimMax } as React.CSSProperties}
+        aria-hidden="true"
+      />
       {!lite && hasBurst && <span className="sb-burst" aria-hidden="true" />}
       {!lite && hasPulse && <span className="sb-pulse-ring" aria-hidden="true" />}
       {!lite && fx === "limited" && (
@@ -1002,6 +1011,25 @@ export function SolitBorder({
         />
       )}
       {!lite && hasComet && <span className="sb-comet" aria-hidden="true" />}
+      {!lite && orbitCount > 0 && (
+        <span className="sb-orbits" aria-hidden="true">
+          {Array.from({ length: orbitCount }).map((_, i) => (
+            <span
+              key={i}
+              className="sb-orbit"
+              style={
+                {
+                  "--orbit-dur": `${5.5 - i * 0.9}s`,
+                  "--orbit-delay": `${-(i * (5.5 / orbitCount))}s`,
+                  animationDirection: i === 1 ? "reverse" : "normal",
+                } as React.CSSProperties
+              }
+            >
+              <span className="sb-orbit-dot" />
+            </span>
+          ))}
+        </span>
+      )}
       {!lite && isCodeTerminal && (
         <>
           <span className="sb-scanline" aria-hidden="true" />
@@ -1232,6 +1260,55 @@ export function SolitBorder({
         @keyframes sb-circuit-shift {
           0% { background-position: 0% 0%, 0% 0%; }
           100% { background-position: 200% 0%, 0% 200%; }
+        }
+        /* Rim glow — cahaya tipis warna aksen tepat di luar tepi ring.
+           Box-shadow-nya STATIS (murah), yang dianimasiin cuma opacity
+           elemennya. Mode lite (grid) dapet versi statis tanpa animasi,
+           jadi semua border di toko tetep kelihatan lebih "nyala". Intensitas
+           naik per rarity lewat --rim-max. */
+        .sb-rimglow {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: -1;
+          pointer-events: none;
+          box-shadow: 0 0 7px 1px var(--accent, #fff);
+          opacity: var(--rim-max, 0.5);
+          animation: sb-rim-pulse 2.8s ease-in-out infinite;
+        }
+        .sb-rimglow-static {
+          animation: none;
+          opacity: calc(var(--rim-max, 0.5) * 0.7);
+        }
+        @keyframes sb-rim-pulse {
+          0%, 100% { opacity: calc(var(--rim-max, 0.5) * 0.45); }
+          50% { opacity: var(--rim-max, 0.5); }
+        }
+        /* Orbit satellite — titik aksen yang ngelilingin ring di zona halo
+           luar (inset negatif, jadi gak pernah lewat di atas foto). Pola:
+           wrapper muter, titik nempel di tepi atas wrapper. */
+        .sb-orbits {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 3;
+        }
+        .sb-orbit {
+          position: absolute;
+          inset: -7px;
+          animation: sb-spin var(--orbit-dur, 5s) linear infinite;
+          animation-delay: var(--orbit-delay, 0s);
+        }
+        .sb-orbit-dot {
+          position: absolute;
+          top: -2px;
+          left: 50%;
+          width: 4px;
+          height: 4px;
+          margin-left: -2px;
+          border-radius: 9999px;
+          background: #fff;
+          box-shadow: 0 0 6px 2px var(--accent, #fff);
         }
         .sb-aura-wrap {
           position: absolute;
@@ -2479,6 +2556,8 @@ export function SolitBorder({
           .sb-katana,
           .sb-star,
           .sb-wisp::before,
+          .sb-rimglow,
+          .sb-orbit,
           .sb-fang::before,
           .sb-fslash,
           .sb-orn-bite,
