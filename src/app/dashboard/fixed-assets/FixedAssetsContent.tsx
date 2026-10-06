@@ -1,6 +1,5 @@
 "use client";
 
-import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 
 interface FixedAsset {
@@ -517,7 +516,7 @@ export default function FixedAssetsContent() {
   const isFiltering = query.trim() !== "" || typeFilter !== "all";
 
   return (
-    <DashboardLayout>
+    <>
       <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-28 sm:pb-10 max-w-6xl mx-auto">
         {/* ── Header ─────────────────────────────────────────────────────────── */}
         <header className="flex items-center justify-between gap-4 mb-5">
@@ -1091,7 +1090,7 @@ export default function FixedAssetsContent() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }
 
