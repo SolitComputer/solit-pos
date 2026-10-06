@@ -266,6 +266,18 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
         ({ TRANSACTION: "Transaksi", TRANSACTION_PAYMENT: "Pembayaran", TRANSACTION_DP: "DP Transaksi", TRANSACTION_REFUND: "Refund Batal", SERVICE: "Service", MODAL_AWAL: "Modal Awal", PENGAJUAN_DANA: "Pengajuan Dana", MANUAL: "Manual" }[s] ?? s);
     const methodLabel = (m: Entry["payment_method"]) =>
         m === "CASH" ? "Cash" : m === "SALDO" ? "Saldo" : "—";
+    // ⬅️ BARU: metode khusus sheet Uang Masuk — disamakan dgn kolom "Metode" di tabel web.
+    // Manual/Pengajuan Dana → payment_method (Cash/Saldo); entry hasil sync transaksi
+    // (TRANSACTION/_PAYMENT/_DP) → tx_payment_method (Tunai/Transfer/Tunai+Transfer).
+    const incomeMethodLabel = (e: Entry) => {
+        if (e.payment_method === "SALDO") return "Saldo";
+        if (e.payment_method === "CASH") return "Cash";
+        if (
+            (e.source_type === "TRANSACTION" || e.source_type === "TRANSACTION_PAYMENT" || e.source_type === "TRANSACTION_DP") &&
+            e.tx_payment_method
+        ) return e.tx_payment_method;
+        return "—";
+    };
     const auditLabel = (e: Entry) =>
         e.is_audited ? `Sudah Audit${e.audited_by_user?.name ? ` (${e.audited_by_user.name})` : ""}` : "Belum Audit";
 
@@ -326,6 +338,7 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
             { header: "Sumber", key: "sumber", width: 13 },
             { header: "Nama / Customer", key: "nama", width: 26 },
             { header: "Kategori", key: "kategori", width: 22 },
+            { header: "Metode", key: "metode", width: 14 }, // ⬅️ BARU: hanya di sheet Uang Masuk
             { header: "Nominal (Rp)", key: "nominal", width: 20, numFmt: "#,##0" },
             { header: "Keterangan", key: "ket", width: 55 },
             { header: "Status Audit", key: "audit", width: 26 },
@@ -388,6 +401,7 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
                     ? [i + 1, fmtDateExcel(e.tanggal), sourceLabel(e.source_type),
                     e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" ? (e.created_by_user?.name ?? e.nama) : e.nama,
                     e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel("IN", e.category),
+                    incomeMethodLabel(e), // ⬅️ BARU: kolom Metode (hanya sheet Uang Masuk)
                     effNominal(e), e.keterangan ?? "", auditLabel(e)]
                     : [i + 1, fmtDateExcel(e.tanggal), sourceLabel(e.source_type),
                     e.created_by_user?.name ?? e.nama, categoryLabel("OUT", e.category),
