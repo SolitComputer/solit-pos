@@ -158,8 +158,16 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
   ),
   "shadow-fang": (s) => (
     <svg {...svgProps(s)}>
-      <path d="M6 3 9 14l-3 7-3-9z" fill="#52525b" stroke={stroke} strokeWidth=".6" strokeLinejoin="round" />
-      <path d="M18 3 15 14l3 7 3-9z" fill="#27272a" stroke={stroke} strokeWidth=".6" strokeLinejoin="round" />
+      <defs>
+        <linearGradient id="sfFangL" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f4f4f5" />
+          <stop offset=".55" stopColor="#a1a1aa" />
+          <stop offset="1" stopColor="#3f3f46" />
+        </linearGradient>
+      </defs>
+      <path d="M2.5 3.5c3.5-1 7-1 9.5.2 2.5-1.2 6-1.2 9.5-.2-.6 2-1.4 3-2.4 3.6C17 13 15.3 18.5 14 22c-.6-4-1-8-2-11-1 3-1.4 7-2 11-1.3-3.5-3-9-5.1-14.9-1-.6-1.8-1.6-2.4-3.6z" fill="url(#sfFangL)" stroke={stroke} strokeWidth=".55" strokeLinejoin="round" />
+      <path d="M7.2 7.2c.8 3 1.8 6 2.6 9M16.8 7.2c-.8 3-1.8 6-2.6 9" stroke="rgba(255,255,255,.55)" strokeWidth=".7" strokeLinecap="round" />
+      <path d="M2.5 3.5c3.5-1 7-1 9.5.2 2.5-1.2 6-1.2 9.5-.2" stroke="#09090b" strokeWidth="1" strokeLinecap="round" />
     </svg>
   ),
   "nova-burst": (s) => (
@@ -287,6 +295,20 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
       <circle cx="4" cy="19" r="1" fill="#fff" />
     </svg>
   ),
+  "void-stare": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M12 1.5c3.4 1.6 6.5 5.2 6.5 10.5S15.4 20.9 12 22.5c-3.4-1.6-6.5-5.2-6.5-10.5S8.6 3.1 12 1.5z"
+        fill="#050108"
+        stroke="#86198f"
+        strokeWidth=".6"
+        strokeLinejoin="round"
+      />
+      <ellipse cx="12" cy="12" rx="4.3" ry="3.8" fill="#d946ef" />
+      <ellipse cx="12" cy="12" rx="3.8" ry="1" fill="#050108" transform="rotate(20 12 12)" />
+      <path d="M9.5 6 8 4M14.5 6l1.5-2M9.8 18l-1.5 2" stroke="#86198f" strokeWidth=".45" strokeLinecap="round" />
+    </svg>
+  ),
 };
 
 // Level efek tambahan per preset, dipetakan manual sesuai tier rarity:
@@ -331,6 +353,7 @@ const FX_TIER: Record<string, "common" | "rare" | "epic" | "legendary" | "limite
   "nightmare-eye": "limited",
   "cyber-samurai": "epic",
   "stardust-fairy": "rare",
+  "void-stare": "limited",
 };
 
 // Warna aksen tematik per preset — dipakai buat recolor elemen kelap-kelip
@@ -377,6 +400,7 @@ const ACCENT_COLOR: Record<string, string> = {
   "nightmare-eye": "#c4b5fd",
   "cyber-samurai": "#f43f5e",
   "stardust-fairy": "#fbcfe8",
+  "void-stare": "#d946ef",
 };
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
@@ -937,6 +961,8 @@ export function SolitBorder({
   const isNightmareEye = preset === "nightmare-eye";
   const isCyberSamurai = preset === "cyber-samurai";
   const isStardustFairy = preset === "stardust-fairy";
+  const isVoidStare = preset === "void-stare";
+  const isShadowFang = preset === "shadow-fang";
   const accent = preset ? (ACCENT_COLOR[preset] ?? "#ffffff") : "#ffffff";
 
   return (
@@ -946,7 +972,7 @@ export function SolitBorder({
     >
       {!lite && (
         <span
-          className={`sb-aura-wrap ${isCursedReaper || isNightmareEye ? "sb-aura-heartbeat" : ""}`}
+          className={`sb-aura-wrap ${isCursedReaper || isNightmareEye || isVoidStare || isShadowFang ? "sb-aura-heartbeat" : ""}`}
           style={{ "--aura-max": auraOpacity } as React.CSSProperties}
           aria-hidden="true"
         >
@@ -1032,6 +1058,52 @@ export function SolitBorder({
           <span className="sb-star sb-star-3" />
         </span>
       )}
+      {!lite && isShadowFang && (
+        <span className="sb-fangs" aria-hidden="true">
+          <span className="sb-fang" style={{ "--fang-rot": "0deg" } as React.CSSProperties} />
+          <span className="sb-fang" style={{ "--fang-rot": "180deg" } as React.CSSProperties} />
+          <span
+            className="sb-fang sb-fang-small"
+            style={{ "--fang-rot": "90deg", "--fang-delay": "0.35s" } as React.CSSProperties}
+          />
+          <span
+            className="sb-fang sb-fang-small"
+            style={{ "--fang-rot": "270deg", "--fang-delay": "0.35s" } as React.CSSProperties}
+          />
+          <span
+            className="sb-fang sb-fang-small"
+            style={{ "--fang-rot": "45deg", "--fang-delay": "0.7s" } as React.CSSProperties}
+          />
+          <span
+            className="sb-fang sb-fang-small"
+            style={{ "--fang-rot": "135deg", "--fang-delay": "0.7s" } as React.CSSProperties}
+          />
+          <span
+            className="sb-fang sb-fang-small"
+            style={{ "--fang-rot": "225deg", "--fang-delay": "0.7s" } as React.CSSProperties}
+          />
+          <span
+            className="sb-fang sb-fang-small"
+            style={{ "--fang-rot": "315deg", "--fang-delay": "0.7s" } as React.CSSProperties}
+          />
+        </span>
+      )}
+      {!lite && isShadowFang && (
+        <span className="sb-fslash" aria-hidden="true" />
+      )}
+      {!lite && isVoidStare && (
+        <span className="sb-void-wisps" aria-hidden="true">
+          <span className="sb-wisp" style={{ "--wisp-rot": "20deg" } as React.CSSProperties} />
+          <span
+            className="sb-wisp"
+            style={{ "--wisp-rot": "150deg", "--wisp-delay": "1.4s" } as React.CSSProperties}
+          />
+          <span
+            className="sb-wisp"
+            style={{ "--wisp-rot": "260deg", "--wisp-delay": "2.8s" } as React.CSSProperties}
+          />
+        </span>
+      )}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
         <span
@@ -1039,7 +1111,7 @@ export function SolitBorder({
             !lite && (fx === "legendary" || fx === "limited" || isCodeTerminal || isCyberSamurai) ? "sb-orn-glow" : ""
           } ${!lite && isCodeTerminal ? "sb-orn-type" : ""} ${!lite && isButterfly ? "sb-orn-flutter" : ""} ${
             !lite && isNightmareEye ? "sb-orn-dilate" : ""
-          }`}
+          } ${!lite && isVoidStare ? "sb-orn-blink" : ""} ${!lite && isShadowFang ? "sb-orn-bite" : ""}`}
           aria-hidden="true"
         >
           {orn(ornamentSize)}
@@ -1699,6 +1771,42 @@ export function SolitBorder({
           0%, 100% { opacity: 0; transform: scale(0.4); }
           50% { opacity: 1; transform: scale(1.3); }
         }
+        /* Void wisps — eksklusif Void Stare. Beda teknik dari sb-tendril
+           (yang nyentak lurus/"reach") — ini ngalir lebih lambat & melengkung
+           (rotate berubah seiring scale), kesan asap/kabut ungu yang
+           menjalar dari tepi ring, bukan uratan yang nyodok. Posisi tumbuh
+           dari luar (top:-3px, bukan dari tengah) jadi gak pernah numpuk
+           ke foto walau box wrapper-nya nutupin seluruh ring. */
+        .sb-void-wisps {
+          position: absolute;
+          inset: -2px;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-wisp {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--wisp-rot, 0deg));
+        }
+        .sb-wisp::before {
+          content: "";
+          position: absolute;
+          top: -3px;
+          left: 50%;
+          width: 2px;
+          height: 16px;
+          background: linear-gradient(to top, rgba(217, 70, 239, 0.85), transparent);
+          border-radius: 2px;
+          transform: translateX(-50%) scaleY(0) rotate(0deg);
+          transform-origin: bottom center;
+          animation: sb-wisp-curl 5s ease-in-out infinite;
+          animation-delay: var(--wisp-delay, 0s);
+        }
+        @keyframes sb-wisp-curl {
+          0%, 55%, 100% { transform: translateX(-50%) scaleY(0) rotate(0deg); opacity: 0; }
+          70% { transform: translateX(-50%) scaleY(1) rotate(14deg); opacity: 0.85; }
+          88% { transform: translateX(-50%) scaleY(0.5) rotate(-6deg); opacity: 0.3; }
+        }
         /* Pupil dilate — eksklusif Nightmare Eye. Selector lengkap
            (.sb-ring > .sb-orn.sb-orn-dilate) biar GANTI TOTAL animasi
            float bawaan (pola sama kayak sb-orn-flutter) — bukan nambah,
@@ -1731,6 +1839,37 @@ export function SolitBorder({
           100% {
             transform: translate(-50%, -52%) scale(1, 1);
             filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1);
+          }
+        }
+        /* Orn blink — eksklusif Void Stare. Beda ritme dari sb-orn-dilate
+           (yang membesar dulu baru kedip sekali) — ini DUA kali kedip
+           cepat beruntun di ujung siklus, gerak vertikal doang (scaleY),
+           gak ada pembesaran. Sama-sama nulis ulang var(--accent) di
+           filter karena alasan sama kayak sb-orn-dilate (animasi CSS
+           menang atas property statis). */
+        .sb-ring > .sb-orn.sb-orn-blink {
+          animation: sb-orn-blink 5.5s ease-in-out infinite;
+        }
+        @keyframes sb-orn-blink {
+          0%, 85%, 100% {
+            transform: translate(-50%, -52%) scaleY(1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          88% {
+            transform: translate(-50%, -52%) scaleY(0.05);
+            filter: drop-shadow(0 0 11px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          91% {
+            transform: translate(-50%, -52%) scaleY(1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          93% {
+            transform: translate(-50%, -52%) scaleY(0.05);
+            filter: drop-shadow(0 0 11px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          96% {
+            transform: translate(-50%, -52%) scaleY(1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
           }
         }
         .sb-orn-glow {
@@ -2015,13 +2154,116 @@ export function SolitBorder({
           0%, 100% { filter: drop-shadow(0 0 3px rgba(220, 38, 38, 0.6)); }
           50% { filter: drop-shadow(0 0 12px rgba(254, 202, 202, 1)) brightness(1.2); }
         }
+        /* Shadow Fang — dua "taring" cahaya perak tajam yang saling
+           berhadapan (180deg) muter di atas dasar hitam-zinc: kesan
+           sepasang taring yang ngitarin ring. */
         .sb-p-shadow-fang {
-          background: conic-gradient(from 0deg, #09090b, #52525b, #d4d4d8, #52525b, #09090b);
-          animation: sb-spin 4.8s linear infinite, sb-g-fang 2s ease-in-out infinite;
+          background: conic-gradient(
+            from 0deg,
+            #020203 0deg,
+            #09090b 30deg,
+            #27272a 58deg,
+            #f4f4f5 74deg,
+            #3f3f46 88deg,
+            #09090b 118deg,
+            #020203 180deg,
+            #09090b 210deg,
+            #27272a 238deg,
+            #f4f4f5 254deg,
+            #3f3f46 268deg,
+            #09090b 298deg,
+            #020203 360deg
+          );
+          animation: sb-spin 4.2s linear infinite, sb-g-fang 1.8s ease-in-out infinite;
         }
         @keyframes sb-g-fang {
-          0%, 100% { filter: drop-shadow(0 0 3px rgba(82, 82, 91, 0.6)); }
-          50% { filter: drop-shadow(0 0 10px rgba(212, 212, 216, 0.9)); }
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.9)) brightness(0.9); }
+          50% { filter: drop-shadow(0 0 12px rgba(228, 228, 231, 0.95)) brightness(1.2); }
+        }
+        /* Fang snap — taring perak mencuat dari tepi LUAR ring lalu
+           ketarik balik (kayak gigitan). Tumbuh menjauh dari ring (top
+           negatif), jadi gak pernah numpuk ke foto. */
+        .sb-fangs {
+          position: absolute;
+          inset: -2px;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-fang {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--fang-rot, 0deg));
+        }
+        .sb-fang::before {
+          content: "";
+          position: absolute;
+          top: -9px;
+          left: 50%;
+          width: 6px;
+          height: 11px;
+          background: linear-gradient(to top, #52525b, #fafafa);
+          clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+          transform: translateX(-50%) scaleY(0);
+          transform-origin: bottom center;
+          opacity: 0;
+          animation: sb-fang-snap 4s ease-out infinite;
+          animation-delay: var(--fang-delay, 0s);
+        }
+        .sb-fang-small::before {
+          width: 4px;
+          height: 8px;
+          top: -6px;
+        }
+        @keyframes sb-fang-snap {
+          0%, 68%, 100% { transform: translateX(-50%) scaleY(0); opacity: 0; }
+          72% { transform: translateX(-50%) scaleY(1.2); opacity: 1; }
+          78% { transform: translateX(-50%) scaleY(1); opacity: 1; }
+          90% { transform: translateX(-50%) scaleY(1); opacity: 0.85; }
+          96% { transform: translateX(-50%) scaleY(0); opacity: 0; }
+        }
+        /* Silver slash — sabetan perak diagonal tepat setelah taring
+           mencuat (timing 4s sama kayak sb-fang-snap). Di zona halo luar
+           ring, opacity 0 di luar momen sabetan, jadi gak nutup foto. */
+        .sb-fslash {
+          position: absolute;
+          inset: -14%;
+          border-radius: 9999px;
+          z-index: 2;
+          pointer-events: none;
+          opacity: 0;
+          background: linear-gradient(
+            115deg,
+            transparent 44%,
+            rgba(161, 161, 170, 0.8) 49%,
+            rgba(255, 255, 255, 0.95) 50%,
+            rgba(161, 161, 170, 0.8) 51%,
+            transparent 56%
+          );
+          animation: sb-fslash-flash 4s ease-out infinite;
+        }
+        @keyframes sb-fslash-flash {
+          0%, 73%, 100% { opacity: 0; transform: scale(0.9); }
+          75% { opacity: 1; transform: scale(1.06); }
+          80% { opacity: 0.2; transform: scale(1); }
+        }
+        /* Orn bite — taring di ornament "mengatup" (scale) pas fang snap
+           mencuat. Selector lengkap biar ganti total animasi float. */
+        .sb-ring > .sb-orn.sb-orn-bite {
+          animation: sb-orn-bite 4s ease-in-out infinite;
+        }
+        @keyframes sb-orn-bite {
+          0%, 66%, 100% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 4px rgba(228, 228, 231, 0.45)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+          }
+          72% {
+            transform: translate(-50%, -52%) scale(1.22, 0.86);
+            filter: drop-shadow(0 0 10px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.4);
+          }
+          80% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
         }
 
         /* ══ EPIC — batch 3 ════════════════════════════════════════════════ */
@@ -2185,6 +2427,27 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 13px rgba(251, 207, 232, 0.95)) brightness(1.15); }
         }
 
+        /* ══ VOID STARE (LIMITED) — satu keluarga tema sama Nightmare Eye,
+           tapi iris magenta + "mata ketiga" vertikal, biar gak kembar ═══ */
+        .sb-p-void-stare {
+          background: conic-gradient(
+            from 0deg,
+            #020103 0deg,
+            #3b0764 70deg,
+            #d946ef 100deg,
+            #020103 150deg,
+            #581c87 220deg,
+            #020103 270deg,
+            #86198f 320deg,
+            #020103 360deg
+          );
+          animation: sb-spin 5.2s linear infinite, sb-g-void 2.2s ease-in-out infinite;
+        }
+        @keyframes sb-g-void {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(217, 70, 239, 0.75)) brightness(1); }
+          50% { filter: drop-shadow(0 0 19px rgba(192, 38, 211, 0.95)) brightness(1.3) hue-rotate(10deg); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .sb-bg-wrap,
           .sb-bg-wrap > .sb-bg,
@@ -2215,6 +2478,11 @@ export function SolitBorder({
           .sb-slash,
           .sb-katana,
           .sb-star,
+          .sb-wisp::before,
+          .sb-fang::before,
+          .sb-fslash,
+          .sb-orn-bite,
+          .sb-orn-blink,
           .sb-ember,
           .sb-tendril::before,
           .sb-burst,

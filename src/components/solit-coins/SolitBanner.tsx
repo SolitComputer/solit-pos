@@ -98,6 +98,18 @@ export default function SolitBanner({
         <FrameCornerGlow preset={preset} />
       )}
 
+      {/* Shadow Fang — bekas cakar di 2 sudut (kiri-atas & kanan-bawah) yang
+          nyabet sekali tiap beberapa detik. Kecil & sebentar, disembunyikan
+          di mode compact (grid) biar ringan. */}
+      {preset === "shadow-fang" && (
+        <>
+          <span className="sb-claw sb-claw-tl" aria-hidden="true" />
+          <span className="sb-claw sb-claw-br" aria-hidden="true" />
+          <span className="sb-claw sb-claw-tr" aria-hidden="true" />
+          <span className="sb-claw sb-claw-bl" aria-hidden="true" />
+        </>
+      )}
+
       {/* ── 3. MID-EDGE SPARKLES (universal, asset maupun animated) ── */}
       <span className="sb-edge-sparkle sb-es-top" aria-hidden="true">✦</span>
       <span className="sb-edge-sparkle sb-es-bottom" aria-hidden="true">✦</span>
@@ -259,6 +271,25 @@ export default function SolitBanner({
         .sb-cf-violet {
           background-image: linear-gradient(135deg, #581c87 0%, #a855f7 25%, #f3e8ff 50%, #c084fc 75%, #a855f7 100%);
           filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.65));
+        }
+        .sb-cf-shadow-fang {
+          background-image: linear-gradient(
+            135deg,
+            #020203 0%,
+            #09090b 14%,
+            #27272a 24%,
+            #f4f4f5 31%,
+            #3f3f46 37%,
+            #09090b 48%,
+            #020203 60%,
+            #09090b 70%,
+            #27272a 79%,
+            #f4f4f5 86%,
+            #3f3f46 91%,
+            #020203 100%
+          );
+          filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 8px rgba(212, 212, 216, 0.35));
+          animation-duration: 8s, 3s;
         }
         .sb-cf-nightmare-eye {
           background-image: linear-gradient(135deg, #030712 0%, #4c1d95 25%, #84cc16 50%, #4c1d95 75%, #030712 100%);
@@ -562,6 +593,37 @@ export default function SolitBanner({
         .sb-cg-royal { background: radial-gradient(circle, rgba(147, 197, 253, 0.85) 0%, transparent 70%); }
         .sb-cg-sunset { background: radial-gradient(circle, rgba(251, 146, 60, 0.85) 0%, transparent 70%); }
         .sb-cg-violet { background: radial-gradient(circle, rgba(192, 132, 252, 0.85) 0%, transparent 70%); }
+        .sb-cg-shadow-fang { background: radial-gradient(circle, rgba(212, 212, 216, 0.55) 0%, rgba(0, 0, 0, 0.5) 45%, transparent 72%); }
+        /* Claw marks — 3 garis diagonal sejajar (tiga cakar), muncul
+           cepat lalu pudar. Dipasang di sudut, ukurannya kecil. */
+        .sb-claw {
+          position: absolute;
+          width: 34px;
+          height: 34px;
+          z-index: 3;
+          pointer-events: none;
+          opacity: 0;
+          background: repeating-linear-gradient(
+            135deg,
+            transparent 0px 7px,
+            rgba(244, 244, 245, 0.95) 7px 9px,
+            transparent 9px 12px
+          );
+          -webkit-mask: linear-gradient(135deg, #000 0%, transparent 70%);
+          mask: linear-gradient(135deg, #000 0%, transparent 70%);
+          filter: drop-shadow(0 0 4px rgba(228, 228, 231, 0.9));
+          animation: sb-claw-slash 5s ease-out infinite;
+        }
+        .sb-claw-tl { top: 4px; left: 4px; }
+        .sb-claw-br { bottom: 4px; right: 4px; transform: rotate(180deg); animation-delay: 2.5s; }
+        .sb-claw-tr { top: 4px; right: 4px; transform: scaleX(-1); animation-delay: 1.25s; }
+        .sb-claw-bl { bottom: 4px; left: 4px; transform: scaleY(-1); animation-delay: 3.75s; }
+        .sb-compact .sb-claw { display: none; }
+        @keyframes sb-claw-slash {
+          0%, 84%, 100% { opacity: 0; clip-path: inset(0 100% 100% 0); }
+          88% { opacity: 1; clip-path: inset(0 0 0 0); }
+          94% { opacity: 0.6; clip-path: inset(0 0 0 0); }
+        }
         .sb-cg-nightmare-eye {
           background: radial-gradient(circle, rgba(132, 204, 22, 0.85) 0%, transparent 70%);
           animation: sb-cg-pulse 2.1s ease-in-out infinite;
@@ -579,6 +641,7 @@ export default function SolitBanner({
           .sb-c-sweep,
           .sb-corner-sparkle,
           .sb-edge-sparkle,
+          .sb-claw,
           .sb-travel-dot {
             animation: none !important;
           }
