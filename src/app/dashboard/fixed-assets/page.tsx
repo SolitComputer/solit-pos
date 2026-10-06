@@ -1,5 +1,5 @@
-import FixedAssetsContent from "./FixedAssetsContent";
+import AsetKeuanganContent from "./AsetKeuanganContent";
 
-export default function FixedAssetsPage() {
-  return <FixedAssetsContent />;
+export default function Page() {
+  return <AsetKeuanganContent />;
 }
