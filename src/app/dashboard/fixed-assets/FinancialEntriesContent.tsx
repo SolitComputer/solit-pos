@@ -721,7 +721,7 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Kartu entri
+// Kartu entrii
 // ═════════════════════════════════════════════════════════════════════════════
 function EntryCard({
   entry,
