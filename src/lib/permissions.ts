@@ -908,6 +908,10 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
   KEPALA_PENGELOLA_BARANG: [
     "PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG",
   ],
+  // CUSTOMER_SERVICE diperlakukan setara kepala divisi untuk bawahannya sendiri
+  // (PKL_CUSTOMER_SERVICE): boleh atur jadwal/absensi/lembur mereka. Tidak bisa
+  // mengatur role lain, dan dirinya sendiri tetap bawahan KEPALA_TEKNISI.
+  CUSTOMER_SERVICE: ["PKL_CUSTOMER_SERVICE"],
   ADMIN: ["PENGELOLA_BARANG"],
 };
 
