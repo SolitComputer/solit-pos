@@ -958,6 +958,21 @@ export function SolitBorder({
   // Jumlah naik per rarity (rare 1 → epic 2 → legendary/limited 3).
   const orbitCount = fx === "limited" || fx === "legendary" ? 3 : fx === "epic" ? 2 : fx === "rare" ? 1 : 0;
   const rimMax = fx === "limited" ? 1 : fx === "legendary" ? 0.9 : fx === "epic" ? 0.75 : fx === "rare" ? 0.6 : 0.45;
+  // Double ring (cincin tipis kedua di luar) mulai dari epic; permata
+  // (studs) di 4 titik mata angin khusus legendary & limited.
+  const hasOuterRing = fx === "epic" || fx === "legendary" || fx === "limited";
+  const hasStuds = fx === "legendary" || fx === "limited";
+  // Flare = busur cahaya yang "ngejar" keliling pita ring. Semua tier
+  // dapat (common pelan & redup, limited ngebut & terang). Legendary ke
+  // atas dapat busur kedua yang muter berlawanan arah.
+  const flareDur = fx === "limited" ? "2.2s" : fx === "legendary" ? "2.8s" : fx === "epic" ? "3.6s" : fx === "rare" ? "4.6s" : "6s";
+  const flareOp = fx === "limited" ? 1 : fx === "legendary" ? 0.88 : fx === "epic" ? 0.78 : fx === "rare" ? 0.64 : 0.48;
+  const hasFlare2 = fx === "legendary" || fx === "limited";
+  // Sparks = percikan kecil yang terbang KELUAR dari tepi ring lalu
+  // memudar (rare ke atas). Sudutnya tetap (bukan random) biar aman
+  // dari hydration mismatch.
+  const SPARK_ANGLES = [20, 160, 95, 255, 320, 200, 55, 290];
+  const sparkCount = fx === "limited" ? 8 : fx === "legendary" ? 6 : fx === "epic" ? 4 : fx === "rare" ? 3 : 0;
   const isCodeTerminal = preset === "code-terminal";
   const isSakura = preset === "sakura-bloom";
   const isButterfly = preset === "butterfly-waltz";
@@ -972,8 +987,9 @@ export function SolitBorder({
   return (
     <span
       className={`sb-ring ${className}`}
-      style={{ padding: thickness, "--accent": accent } as React.CSSProperties}
+      style={{ padding: thickness, "--accent": accent, "--sb-t": `${thickness}px` } as React.CSSProperties}
     >
+      {!lite && <span className="sb-intro" aria-hidden="true" />}
       {!lite && (
         <span
           className={`sb-aura-wrap ${isCursedReaper || isNightmareEye || isVoidStare || isShadowFang ? "sb-aura-heartbeat" : ""}`}
@@ -993,6 +1009,13 @@ export function SolitBorder({
       {!lite && fx === "limited" && (
         <span className={`sb-pulse-ring sb-pulse-ring-2 ${isJittery ? "sb-ring-jitter" : ""}`} aria-hidden="true" />
       )}
+      {!lite && hasOuterRing && (
+        <span
+          className={`sb-outer-ring ${preset ? `sb-p-${preset}` : ""}`}
+          style={{ ...bgStyle, opacity: fx === "epic" ? 0.6 : 0.85 }}
+          aria-hidden="true"
+        />
+      )}
       <span className="sb-bg-wrap" aria-hidden="true">
         <span className={`sb-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
         {!lite && hasCounterRing && (
@@ -1011,6 +1034,48 @@ export function SolitBorder({
         />
       )}
       {!lite && hasComet && <span className="sb-comet" aria-hidden="true" />}
+      {!lite && (
+        <span
+          className="sb-flare"
+          style={{ "--flare-dur": flareDur, "--flare-op": flareOp } as React.CSSProperties}
+          aria-hidden="true"
+        />
+      )}
+      {!lite && hasFlare2 && (
+        <span
+          className="sb-flare sb-flare-2"
+          style={{ "--flare-dur": flareDur, "--flare-op": flareOp } as React.CSSProperties}
+          aria-hidden="true"
+        />
+      )}
+      {!lite && sparkCount > 0 && (
+        <span className="sb-sparks" aria-hidden="true">
+          {SPARK_ANGLES.slice(0, sparkCount).map((rot, i) => (
+            <span
+              key={rot}
+              className="sb-spark"
+              style={
+                {
+                  "--spark-rot": `${rot}deg`,
+                  "--spark-dur": `${2.6 + (i % 3) * 0.6}s`,
+                  "--spark-delay": `${i * 0.42}s`,
+                } as React.CSSProperties
+              }
+            />
+          ))}
+        </span>
+      )}
+      {!lite && hasStuds && (
+        <span className="sb-studs" aria-hidden="true">
+          {[0, 90, 180, 270].map((rot, i) => (
+            <span
+              key={rot}
+              className="sb-stud"
+              style={{ "--stud-rot": `${rot}deg`, "--stud-delay": `${i * 0.6}s` } as React.CSSProperties}
+            />
+          ))}
+        </span>
+      )}
       {!lite && orbitCount > 0 && (
         <span className="sb-orbits" aria-hidden="true">
           {Array.from({ length: orbitCount }).map((_, i) => (
@@ -1283,6 +1348,143 @@ export function SolitBorder({
         @keyframes sb-rim-pulse {
           0%, 100% { opacity: calc(var(--rim-max, 0.5) * 0.45); }
           50% { opacity: var(--rim-max, 0.5); }
+        }
+        /* Double ring — cincin tipis kedua di LUAR ring utama (epic ke
+           atas), pakai gradient preset yang sama tapi muter berlawanan
+           arah. Bentuk cincin dari mask-exclude (hanya pita 1.5px yang
+           kelihatan), jadi gak pernah masuk ke area foto. !important di
+           animation buat matiin animasi glow bawaan kelas preset (cukup
+           muter doang, biar ringan). */
+        .sb-outer-ring {
+          position: absolute;
+          inset: -5px;
+          border-radius: 9999px;
+          padding: 1.5px;
+          z-index: -1;
+          pointer-events: none;
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          animation: sb-spin-rev 9s linear infinite !important;
+        }
+        /* Flare — busur cahaya (kepala putih + ekor warna aksen) yang
+           ngejar keliling pita ring. Bentuknya cuma pita tipis hasil
+           mask-exclude, jadi TIDAK PERNAH nutup foto. Element-nya yang
+           diputer (ring itu simetris, jadi mask ikut muter dengan aman). */
+        .sb-flare {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          padding: var(--sb-t, 3px);
+          z-index: 2;
+          pointer-events: none;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 235deg,
+            var(--accent, #fff) 325deg,
+            #ffffff 356deg,
+            transparent 360deg
+          );
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          opacity: var(--flare-op, 0.6);
+          animation: sb-spin var(--flare-dur, 4s) linear infinite;
+        }
+        .sb-flare-2 {
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 270deg,
+            var(--accent, #fff) 340deg,
+            #ffffff 357deg,
+            transparent 360deg
+          );
+          opacity: calc(var(--flare-op, 0.6) * 0.8);
+          animation: sb-spin-rev calc(var(--flare-dur, 4s) * 1.35) linear infinite;
+          animation-delay: -1.1s;
+        }
+        /* Sparks — percikan yang terbang keluar dari tepi ring. Wrapper
+           diputar ke sudut tetap, titiknya geser ke atas (= menjauh dari
+           pusat), jadi selalu bergerak ke luar, gak pernah ke foto. */
+        .sb-sparks {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-spark {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--spark-rot, 0deg));
+        }
+        .sb-spark::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 50%;
+          width: 3px;
+          height: 3px;
+          margin-left: -1.5px;
+          border-radius: 9999px;
+          background: #ffffff;
+          box-shadow: 0 0 5px 1px var(--accent, #fff);
+          opacity: 0;
+          animation: sb-spark-fly var(--spark-dur, 3s) ease-out infinite;
+          animation-delay: var(--spark-delay, 0s);
+        }
+        @keyframes sb-spark-fly {
+          0% { transform: translateY(0) scale(1); opacity: 0; }
+          14% { opacity: 1; }
+          100% { transform: translateY(-17px) scale(0.2); opacity: 0; }
+        }
+        /* Intro — satu gelombang kejut sekali jalan pas border muncul. */
+        .sb-intro {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          border: 2px solid var(--accent, #fff);
+          z-index: -1;
+          pointer-events: none;
+          opacity: 0;
+          animation: sb-intro-wave 1.1s ease-out 1 forwards;
+        }
+        @keyframes sb-intro-wave {
+          0% { transform: scale(1); opacity: 0.9; }
+          100% { transform: scale(1.7); opacity: 0; }
+        }
+        /* Studs — permata kecil di 4 titik mata angin (legendary &
+           limited). Duduk tepat di pita ring (bukan di atas foto),
+           kelip bergantian. */
+        .sb-studs {
+          position: absolute;
+          inset: -2px;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-stud {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--stud-rot, 0deg));
+        }
+        .sb-stud::before {
+          content: "";
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          width: 5px;
+          height: 5px;
+          margin-left: -2.5px;
+          background: linear-gradient(135deg, #ffffff, var(--accent, #fff));
+          transform: rotate(45deg);
+          box-shadow: 0 0 5px 1px var(--accent, #fff);
+          animation: sb-stud-twinkle 2.4s ease-in-out infinite;
+          animation-delay: var(--stud-delay, 0s);
+        }
+        @keyframes sb-stud-twinkle {
+          0%, 100% { opacity: 0.55; transform: rotate(45deg) scale(0.85); }
+          50% { opacity: 1; transform: rotate(45deg) scale(1.2); }
         }
         /* Orbit satellite — titik aksen yang ngelilingin ring di zona halo
            luar (inset negatif, jadi gak pernah lewat di atas foto). Pola:
@@ -2558,6 +2760,11 @@ export function SolitBorder({
           .sb-wisp::before,
           .sb-rimglow,
           .sb-orbit,
+          .sb-outer-ring,
+          .sb-flare,
+          .sb-spark::before,
+          .sb-intro,
+          .sb-stud::before,
           .sb-fang::before,
           .sb-fslash,
           .sb-orn-bite,

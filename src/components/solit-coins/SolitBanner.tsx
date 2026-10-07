@@ -8,6 +8,24 @@ import type { BorderStyle } from "@/lib/solit-coins/types";
 // - Menghubungkan seluruh 4 sisi secara mulus (termasuk sisi bawah, tanpa memotong foto avatar).
 // - 4 sudut dihiasi ornamen 3D AI-generated, specular shine sweep, sparkle glint, dan ambient aura bulat sferis.
 
+// Warna aksen per preset — dipakai buat recolor elemen yang tadinya putih
+// polos (titik keliling, sparkle tepi, permata sudut, kilau frame).
+const BANNER_ACCENT: Record<string, string> = {
+  "cosmic-starfield": "#a5b4fc",
+  "dragon-flame": "#fdba74",
+  "golden-crown": "#fde68a",
+  "cyber-neon": "#67e8f9",
+  "rgb-spin": "#f9a8d4",
+  "aurora-wave": "#6ee7b7",
+  "galaxy-pulse": "#d8b4fe",
+  emerald: "#6ee7b7",
+  royal: "#93c5fd",
+  sunset: "#fdba74",
+  violet: "#d8b4fe",
+  "shadow-fang": "#e4e4e7",
+  "nightmare-eye": "#a3e635",
+};
+
 export default function SolitBanner({
   style,
   thickness = 3,
@@ -32,8 +50,13 @@ export default function SolitBanner({
     ? asset.ringImage.split("/").pop()?.replace(/\.[^/.]+$/, "") || ""
     : preset;
 
+  const accent = BANNER_ACCENT[preset] ?? "#ffffff";
+
   return (
-    <div className={`sb-frame-wrap ${compact ? "sb-compact" : ""} ${className}`}>
+    <div
+      className={`sb-frame-wrap ${compact ? "sb-compact" : ""} ${className}`}
+      style={{ "--accent": accent } as React.CSSProperties}
+    >
       {/* Ambient card glow — cahaya besar & blur yang "napas" di belakang
           seluruh kartu, beda dari corner-glow yang cuma di 4 titik sudut;
           ini menyatukan seluruh kartu jadi satu sumber cahaya. Reuse
@@ -77,6 +100,19 @@ export default function SolitBanner({
         aria-hidden="true"
       />
 
+      {/* Gloss — highlight putih lembut di sisi atas frame (kayak cahaya
+          jatuh dari atas), bikin frame kerasa tebal & 3D. Pakai mask
+          ring yang sama, jadi gak pernah masuk ke area foto. */}
+      <div
+        className="sb-frame-gloss"
+        style={{
+          padding: openBottom
+            ? `${thickness}px ${thickness}px 0 ${thickness}px`
+            : `${thickness}px`,
+        }}
+        aria-hidden="true"
+      />
+
       {/* Titik cahaya yang beneran ngelilingin seluruh tepi kartu (bukan
           gradient diputer di tempat) — lintasannya persegi mengikuti
           4 sisi, pakai keyframe left/top persentase biar otomatis
@@ -95,7 +131,13 @@ export default function SolitBanner({
           <Corner pos="br" src={asset.ringImage} code={code} />
         </>
       ) : (
-        <FrameCornerGlow preset={preset} />
+        <>
+          <FrameCornerGlow preset={preset} />
+          <span className="sb-gem sb-gem-tl" aria-hidden="true" />
+          <span className="sb-gem sb-gem-tr" aria-hidden="true" />
+          <span className="sb-gem sb-gem-bl" aria-hidden="true" />
+          <span className="sb-gem sb-gem-br" aria-hidden="true" />
+        </>
       )}
 
       {/* Shadow Fang — bekas cakar di 2 sudut (kiri-atas & kanan-bawah) yang
@@ -482,7 +524,7 @@ export default function SolitBanner({
           position: absolute;
           font-size: 11px;
           line-height: 1;
-          color: #fff;
+          color: var(--accent, #fff);
           z-index: 3;
           pointer-events: none;
           user-select: none;
@@ -494,6 +536,75 @@ export default function SolitBanner({
         .sb-es-left { left: -4px; top: 50%; margin-top: -5.5px; animation-delay: 0.9s; }
         .sb-es-right { right: -4px; top: 50%; margin-top: -5.5px; animation-delay: 2.2s; }
         .sb-compact .sb-edge-sparkle { display: none; }
+
+        /* Prism — sapuan warna-warni (holografik) yang geser di dalam
+           pita frame. Mask ring yang sama kayak frame utama. */
+        .sb-frame-prism {
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          pointer-events: none;
+          z-index: 1;
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          mix-blend-mode: screen;
+          opacity: 0.45;
+          background: linear-gradient(
+            115deg,
+            transparent 0%,
+            transparent 30%,
+            rgba(255, 0, 128, 0.55) 38%,
+            rgba(255, 200, 0, 0.55) 44%,
+            rgba(0, 255, 150, 0.55) 50%,
+            rgba(0, 150, 255, 0.55) 56%,
+            rgba(160, 80, 255, 0.55) 62%,
+            transparent 70%,
+            transparent 100%
+          );
+          background-size: 300% 100%;
+          animation: sb-frame-prism-shift 7s linear infinite;
+        }
+        @keyframes sb-frame-prism-shift {
+          0% { background-position: 100% 0%; }
+          100% { background-position: -100% 0%; }
+        }
+        .sb-compact .sb-frame-prism { opacity: 0.3; }
+        /* Gloss — highlight atas pita frame. */
+        .sb-frame-gloss {
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          pointer-events: none;
+          z-index: 2;
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          mix-blend-mode: overlay;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.35) 100%);
+        }
+        /* Gems — permata kecil di 4 sudut (banner animated). Duduk tepat
+           di sudut frame, kelip bergantian, warna ikut aksen preset. */
+        .sb-gem {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          z-index: 4;
+          pointer-events: none;
+          background: linear-gradient(135deg, #ffffff, var(--accent, #fff));
+          box-shadow: 0 0 7px 1px var(--accent, #fff);
+          transform: rotate(45deg);
+          animation: sb-gem-twinkle 2.8s ease-in-out infinite;
+        }
+        .sb-gem-tl { top: 1px; left: 1px; }
+        .sb-gem-tr { top: 1px; right: 1px; animation-delay: 0.7s; }
+        .sb-gem-br { bottom: 1px; right: 1px; animation-delay: 1.4s; }
+        .sb-gem-bl { bottom: 1px; left: 1px; animation-delay: 2.1s; }
+        .sb-compact .sb-gem { width: 5px; height: 5px; }
+        @keyframes sb-gem-twinkle {
+          0%, 100% { opacity: 0.6; transform: rotate(45deg) scale(0.85); }
+          50% { opacity: 1; transform: rotate(45deg) scale(1.25); }
+        }
 
         /* ── TRAVELING SPARK ──────────────────────────────────────── */
         /* Posisi digerakkan lewat left/top persentase (bukan transform),
@@ -513,7 +624,7 @@ export default function SolitBanner({
           height: 5px;
           border-radius: 9999px;
           background: #fff;
-          box-shadow: 0 0 7px 2px rgba(255, 255, 255, 0.9);
+          box-shadow: 0 0 7px 2px var(--accent, #fff);
           transform: translate(-50%, -50%);
           animation: sb-frame-travel-path 5s linear infinite;
         }
@@ -629,6 +740,27 @@ export default function SolitBanner({
           animation: sb-cg-pulse 2.1s ease-in-out infinite;
         }
 
+        /* Ambient glow — cahaya lembut di belakang kartu. z-index -4 (di
+           BELAKANG foto, pola sama kayak aura border) + opacity rendah
+           biar gak pernah nutup foto. Disembunyiin di mode compact (grid)
+           demi performa. Selector '>' dipakai biar animasinya menang atas
+           animasi bawaan kelas sb-cg-<preset>. */
+        .sb-frame-wrap > .sb-ambient-glow {
+          position: absolute;
+          inset: -12px;
+          border-radius: inherit;
+          z-index: -4;
+          pointer-events: none;
+          filter: blur(16px);
+          opacity: 0.5;
+          animation: sb-amb-breathe 4.2s ease-in-out infinite;
+        }
+        .sb-compact > .sb-ambient-glow { display: none; }
+        @keyframes sb-amb-breathe {
+          0%, 100% { opacity: 0.28; transform: scale(0.98); }
+          50% { opacity: 0.6; transform: scale(1.02); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .sb-continuous-frame,
           .sb-continuous-frame::before,
@@ -642,6 +774,9 @@ export default function SolitBanner({
           .sb-corner-sparkle,
           .sb-edge-sparkle,
           .sb-claw,
+          .sb-frame-prism,
+          .sb-gem,
+          .sb-ambient-glow,
           .sb-travel-dot {
             animation: none !important;
           }
