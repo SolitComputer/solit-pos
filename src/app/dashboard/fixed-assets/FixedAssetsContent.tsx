@@ -521,7 +521,7 @@ export default function FixedAssetsContent() {
         {/* ── Header ─────────────────────────────────────────────────────────── */}
         <header className="flex items-center justify-between gap-4 mb-5">
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-black text-[#1a1a2e] tracking-tight">Data Aset Tetap</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-[#1a1a2e] tracking-tight">Aset</h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
               Catatan aset tetap perusahaan, input manual dan tidak terhubung ke modul lain
             </p>
