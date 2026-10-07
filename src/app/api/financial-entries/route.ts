@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
     .insert({
       entry_type: body.entry_type,
       nama: body.nama.trim(),
+      kategori: body.kategori ? String(body.kategori).trim() : null,
       nominal,
       tanggal: body.tanggal || null,
       keterangan: body.keterangan ? String(body.keterangan).trim() : null,

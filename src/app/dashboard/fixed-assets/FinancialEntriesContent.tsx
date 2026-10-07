@@ -11,6 +11,7 @@ interface FinancialEntry {
   id: string;
   entry_type: EntryType;
   nama: string;
+  kategori: string | null;
   nominal: number | string;
   tanggal: string | null;
   keterangan: string | null;
@@ -30,12 +31,13 @@ interface NominalHistory {
 
 interface FormState {
   nama: string;
+  kategori: string;
   nominal: string;
   tanggal: string;
   keterangan: string;
 }
 
-const EMPTY_FORM: FormState = { nama: "", nominal: "", tanggal: "", keterangan: "" };
+const EMPTY_FORM: FormState = { nama: "", kategori: "", nominal: "", tanggal: "", keterangan: "" };
 
 interface TypeConfig {
   title: string;
@@ -176,6 +178,16 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
     );
   }, [entries, query]);
 
+  // Kategori "buat sendiri": kumpulkan kategori unik dari entri yang sudah ada,
+  // jadi tiap kategori baru yang diketik otomatis muncul di dropdown berikutnya.
+  const kategoriOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of entries) {
+      if (e.kategori && e.kategori.trim()) set.add(e.kategori.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "id-ID"));
+  }, [entries]);
+
   function openCreateModal() {
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -187,6 +199,7 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
     setEditingId(entry.id);
     setForm({
       nama: entry.nama,
+      kategori: entry.kategori || "",
       nominal: String(toNum(entry.nominal)),
       tanggal: entry.tanggal || "",
       keterangan: entry.keterangan || "",
@@ -218,6 +231,7 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
       const payload = {
         entry_type: entryType,
         nama: form.nama.trim(),
+        kategori: entryType === "piutang" ? (form.kategori.trim() || null) : null,
         nominal: nominalNumber,
         tanggal: form.tanggal || null,
         keterangan: form.keterangan.trim() || null,
@@ -481,6 +495,28 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
                 />
               </div>
 
+              {entryType === "piutang" && (
+                <div>
+                  <label htmlFor="fe-kategori" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Kategori <span className="font-normal text-gray-400">(opsional)</span>
+                  </label>
+                  <input
+                    id="fe-kategori"
+                    type="text"
+                    list="fe-kategori-list"
+                    value={form.kategori}
+                    onChange={(e) => setForm((f) => ({ ...f, kategori: e.target.value }))}
+                    placeholder="Pilih atau ketik kategori baru..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3.5 py-2.5 text-sm outline-none focus:bg-white focus:ring-4 focus:ring-[#1a1a2e]/5 focus:border-[#1a1a2e]/30 transition"
+                  />
+                  <datalist id="fe-kategori-list">
+                    {kategoriOptions.map((k) => (
+                      <option key={k} value={k} />
+                    ))}
+                  </datalist>
+                </div>
+              )}
+
               <div>
                 <label htmlFor="fe-nominal" className="block text-xs font-semibold text-gray-600 mb-1.5">Nominal</label>
                 <div className="relative">
@@ -712,6 +748,11 @@ function EntryCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-gray-900 leading-snug break-words line-clamp-2">{entry.nama}</p>
+          {entry.kategori && (
+            <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+              {entry.kategori}
+            </span>
+          )}
           {entry.tanggal && (
             <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">{formatDate(entry.tanggal)}</p>
           )}

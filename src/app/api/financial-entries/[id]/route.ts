@@ -68,6 +68,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     .from("financial_entries")
     .update({
       nama: body.nama.trim(),
+      kategori: body.kategori ? String(body.kategori).trim() : null,
       nominal,
       tanggal: body.tanggal || null,
       keterangan: body.keterangan ? String(body.keterangan).trim() : null,
