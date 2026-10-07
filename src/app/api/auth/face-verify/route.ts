@@ -87,13 +87,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "Wajah belum terdaftar", needEnroll: true }, { status: 400 });
     }
 
-    // ⛔ KEAMANAN KETAT: L2 Normalize + threshold + CROSS-CHECK 1:N (anti tukar wajah)
-    const THRESHOLD = 0.40;      // jarak MAKS ke wajah SENDIRI (turun dari 0.42)
-    const OWNER_MARGIN = 0.03;   // wajah sendiri wajib lebih dekat dari akun lain minimal sekian
+    // ⛔ KEAMANAN: L2 Normalize + threshold + CROSS-CHECK 1:N (anti tukar wajah)
+    // ✅ FIX: 0.40 terlalu ketat utk tinyFaceDetector + averaged embedding —
+    // wajah pemilik sendiri sering salah-tolak saat cahaya/sudut sedikit beda
+    // (gejala "kadang bisa kadang tidak"). 0.50 adalah ambang wajar face-api.js
+    // utk Euclidean pada vektor ter-L2-normalize, masih aman memisah orang beda.
+    const THRESHOLD = 0.50;      // jarak MAKS ke wajah SENDIRI (naik dari 0.40)
+    const OWNER_MARGIN = 0.05;   // margin aman ke akun lain dinaikkan 0.03 → 0.05
 
     const normInput = normalizeEmbedding(embedding);
     const normStored = normalizeEmbedding(userFullData.face_embedding);
     const distanceSelf = euclideanDistance(normInput, normStored);
+    // ✅ Log jarak nyata — pakai angka ini utk kalibrasi THRESHOLD per karyawan.
+    // Lihat di `pm2 logs` saat seseorang gagal/berhasil absen.
+    console.log(`[face-verify] userId=${user.id} distanceSelf=${distanceSelf.toFixed(3)} (threshold ${THRESHOLD})`);
 
     // Ambil SEMUA wajah terdaftar milik user LAIN untuk cross-check identitas.
     // Tujuan: kalau wajah di kamera ternyata lebih cocok ke akun orang lain,
