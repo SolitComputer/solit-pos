@@ -8,7 +8,7 @@ import FinancialEntriesContent, { type EntryType } from "./FinancialEntriesConte
 type TabKey = "aset" | EntryType;
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "aset", label: "Aset Tetap" },
+  { key: "aset", label: "Aset" },
   { key: "utang", label: "Utang" },
   { key: "piutang", label: "Piutang" },
   { key: "modal_service", label: "Modal Service" },
