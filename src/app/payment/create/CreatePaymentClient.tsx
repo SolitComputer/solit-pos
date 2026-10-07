@@ -465,17 +465,42 @@ export default function CreatePaymentPage() {
         if (q.length < 2) { setSnResults([]); return; }
         setIsLoadingUnits(true);
         try {
-            const res = await fetch(`/api/units/search-sn?q=${encodeURIComponent(q)}`);
+            // CS (accessory-only) cari pakai SN aksesoris; role lain pakai SN unit gabungan (laptop + aksesoris)
+            const endpoint = isAccessoryOnlyRole
+                ? `/api/accessory-units/search-sn?q=${encodeURIComponent(q)}`
+                : `/api/units/search-sn?q=${encodeURIComponent(q)}`;
+            const res = await fetch(endpoint);
             const result = await res.json();
+
+            // Endpoint accessory-units bentuk datanya beda → normalisasi ke bentuk UnitOption
+            // supaya handleSelectSnResult & dropdown yang sudah ada bisa dipakai apa adanya.
+            const rows = (result.data || []).map((u: any) =>
+                isAccessoryOnlyRole
+                    ? {
+                        id: u.id,
+                        serial_number: u.serial_number,
+                        selling_price: u.selling_price ?? 0,
+                        purchase_price: u.buy_price ?? 0,
+                        condition_note: u.notes ?? "",
+                        laptop_name: u.display_name || u.accessory_name || "",
+                        unit_type: "accessory" as const,
+                        accessory_id: u.accessory_id,
+                        accessory_name: u.accessory_name,
+                        category: u.category,
+                        condition: u.condition,
+                    }
+                    : u
+            );
+
             // Filter out already-selected units
             const selectedIds = new Set(selectedUnits.map(u => u.unit_id));
-            setSnResults((result.data || []).filter((u: any) => !selectedIds.has(u.id)));
+            setSnResults(rows.filter((u: any) => !selectedIds.has(u.id)));
         } catch {
             setSnResults([]);
         } finally {
             setIsLoadingUnits(false);
         }
-    }, [selectedUnits]);
+    }, [selectedUnits, isAccessoryOnlyRole]);
 
     const handleAccSearch = useCallback(async (q: string) => {
         if (q.length < 2) { setAccResults([]); return; }
@@ -965,166 +990,167 @@ export default function CreatePaymentPage() {
                     {/* ──────────────────────── STEP 2: Pilih Unit ───────────────────── */}
                     {step === 2 && !fromScan && (
                         <>
-                            {!isAccessoryOnlyRole && (
-                                <>
-                                    {/* Search SN */}
-                                    <div>
-                                        <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
-                                            <Laptop size={13} /> Cari & Tambah Serial Number
-                                            {selectedUnits.length > 0 && (
-                                                <span className="text-gray-700 font-semibold">({selectedUnits.length} unit terpilih)</span>
+                            {/* Search SN — CS cari SN aksesoris, role lain cari SN unit (laptop/aksesoris) */}
+                            <>
+                                {/* Search SN */}
+                                <div>
+                                    <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
+                                        <Laptop size={13} /> {isAccessoryOnlyRole ? "Cari & Tambah SN Aksesoris" : "Cari & Tambah Serial Number"}
+                                        {selectedUnits.length > 0 && (
+                                            <span className="text-gray-700 font-semibold">({selectedUnits.length} unit terpilih)</span>
+                                        )}
+                                    </label>
+                                    <div className="relative">
+                                        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                        <input
+                                            type="text"
+                                            placeholder={isAccessoryOnlyRole ? "Ketik SN aksesoris..." : "Ketik SN unit..."}
+                                            className={`${inputClass} pl-10`}
+                                            value={snSearch}
+                                            onChange={e => { setSnSearch(e.target.value); handleSnSearch(e.target.value); }}
+                                        />
+                                        {isLoadingUnits && (
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                <Loader2 size={16} className="text-gray-400 animate-spin" />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Dropdown hasil search */}
+                                    {snResults.length > 0 && (
+                                        <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                                            {snResults.map(u => (
+                                                <button key={u.id} type="button" onClick={() => handleSelectSnResult(u)}
+                                                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-mono text-sm font-semibold text-gray-800">{u.serial_number}</p>
+                                                        {u.unit_type === "accessory" ? (
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex-shrink-0">
+                                                                AKSESORI
+                                                            </span>
+                                                        ) : (
+                                                            u.grade && (
+                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
+                                                                    Grade {u.grade}
+                                                                </span>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-0.5">
+                                                        {u.laptop_name}
+                                                        {u.unit_type === "accessory" && u.condition ? ` · ${u.condition}` : ""}
+                                                        {u.selling_price ? ` · ${fmt(u.selling_price)}` : ""}
+                                                    </p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {snSearch.length >= 2 && snResults.length === 0 && !isLoadingUnits && (
+                                        <p className="text-xs text-red-500 mt-1.5 px-1">SN tidak ditemukan atau sudah dipilih</p>
+                                    )}
+                                </div>
+
+                                {/* Daftar unit terpilih */}
+                                {selectedUnits.length > 0 && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-semibold text-gray-600">
+                                                Unit Terpilih ({selectedUnits.length})
+                                            </label>
+                                        </div>
+                                        {selectedUnits.map((u, i) => (
+                                            <SelectedUnitCard key={u.unit_id} unit={u} index={i} onRemove={() => handleRemoveUnit(i)} />
+                                        ))}
+
+                                        {/* Harga Deal per Unit */}
+                                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
+                                            <label className="text-xs text-gray-500 block">
+                                                Harga Deal per Unit {isEcommercePending ? <span className="text-gray-400 font-normal">(opsional)</span> : "*"}
+                                                <span className="ml-1.5 text-gray-400">({selectedUnits.length} unit)</span>
+                                            </label>
+
+                                            {selectedUnits.map((u, i) => (
+                                                <div key={u.unit_id} className="space-y-1.5">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
+                                                            {i + 1}
+                                                        </span>
+                                                        <p className="text-xs font-semibold text-gray-700 truncate flex-1">{unitLabel(u)}</p>
+                                                        {u.grade && (
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
+                                                                {u.grade}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[10px] font-mono text-gray-400 ml-5.5">
+                                                        {u.unit_type === "accessory" ? u.laptop_name : `SN: ${u.serial_number}`}
+                                                    </p>
+                                                    {hasPedagangPrice(u.unit_id) && (
+                                                        <p className="text-[10px] text-emerald-600 font-medium ml-5.5">Harga mengikuti price list pedagang — masih bisa diubah manual</p>
+                                                    )}
+                                                    <input
+                                                        key={`${u.unit_id}-${pedagangPriceMap[u.unit_id] ?? "none"}`}
+                                                        type="text" inputMode="numeric"
+                                                        placeholder="Harga deal unit ini"
+                                                        className={inputClass}
+                                                        defaultValue={unitPrices[u.unit_id] > 0 ? unitPrices[u.unit_id].toLocaleString("id-ID") : ""}
+                                                        onChange={e => {
+                                                            const raw = e.target.value.replace(/\D/g, "");
+                                                            const num = raw ? Number(raw) : 0;
+                                                            setUnitPrices(prev => ({ ...prev, [u.unit_id]: num }));
+                                                        }}
+                                                        onBlur={e => {
+                                                            const raw = e.target.value.replace(/\D/g, "");
+                                                            if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
+                                                        }}
+                                                        onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
+                                                    />
+                                                </div>
+                                            ))}
+
+                                            {/* Total otomatis */}
+                                            <div className="flex justify-between text-xs border-t border-gray-200 pt-2.5">
+                                                <span className="text-gray-600 font-semibold">Total ({selectedUnits.length} unit)</span>
+                                                <span className="font-bold text-gray-800 font-mono">{fmt(rawDealPrice)}</span>
+                                            </div>
+
+                                            {pendingSubType === "DP_AMBIL" && (
+                                                <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-1.5 mt-2">
+                                                    <label className="text-xs font-semibold text-violet-700 block">
+                                                        Nominal DP <span className="text-violet-400 font-normal">(isi 0 = Ambil Dulu)</span>
+                                                    </label>
+                                                    <input
+                                                        type="text" inputMode="numeric"
+                                                        value={dpAmount > 0 ? dpAmount.toLocaleString("id-ID") : ""}
+                                                        placeholder="0"
+                                                        onChange={e => {
+                                                            const raw = e.target.value.replace(/\D/g, "");
+                                                            const num = raw ? Number(raw) : 0;
+                                                            setDpAmount(Math.min(num, Math.max(0, rawDealPrice - 1)));
+                                                        }}
+                                                        className={inputClass}
+                                                    />
+                                                    <p className="text-[11px] text-violet-500">
+                                                        {dpAmount > 0
+                                                            ? `Sisa setelah DP: ${fmt(Math.max(0, rawDealPrice - dpAmount))}`
+                                                            : "Status: Ambil Dulu (belum ada pembayaran)"}
+                                                    </p>
+                                                </div>
                                             )}
-                                        </label>
-                                        <div className="relative">
-                                            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                            <input
-                                                type="text"
-                                                placeholder="Ketik SN unit..."
-                                                className={`${inputClass} pl-10`}
-                                                value={snSearch}
-                                                onChange={e => { setSnSearch(e.target.value); handleSnSearch(e.target.value); }}
-                                            />
-                                            {isLoadingUnits && (
-                                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                                    <Loader2 size={16} className="text-gray-400 animate-spin" />
+
+                                            {rawDealPrice > 0 && canSeeMargin && (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-gray-500">Selisih / Margin</span>
+                                                    <span className={`font-semibold ${margin >= 0 ? "text-gray-600" : "text-red-500"}`}>
+                                                        {margin >= 0 ? "+" : ""}{fmt(margin)}
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Dropdown hasil search */}
-                                        {snResults.length > 0 && (
-                                            <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                                                {snResults.map(u => (
-                                                    <button key={u.id} type="button" onClick={() => handleSelectSnResult(u)}
-                                                        className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="font-mono text-sm font-semibold text-gray-800">{u.serial_number}</p>
-                                                            {u.unit_type === "accessory" ? (
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex-shrink-0">
-                                                                    AKSESORI
-                                                                </span>
-                                                            ) : (
-                                                                u.grade && (
-                                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
-                                                                        Grade {u.grade}
-                                                                    </span>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                        <p className="text-xs text-gray-500 mt-0.5">
-                                                            {u.laptop_name}
-                                                            {u.unit_type === "accessory" && u.condition ? ` · ${u.condition}` : ""}
-                                                            {u.selling_price ? ` · ${fmt(u.selling_price)}` : ""}
-                                                        </p>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {snSearch.length >= 2 && snResults.length === 0 && !isLoadingUnits && (
-                                            <p className="text-xs text-red-500 mt-1.5 px-1">SN tidak ditemukan atau sudah dipilih</p>
-                                        )}
-                                    </div>
-
-                                    {/* Daftar unit terpilih */}
-                                    {selectedUnits.length > 0 && (
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <label className="text-xs font-semibold text-gray-600">
-                                                    Unit Terpilih ({selectedUnits.length})
-                                                </label>
-                                            </div>
-                                            {selectedUnits.map((u, i) => (
-                                                <SelectedUnitCard key={u.unit_id} unit={u} index={i} onRemove={() => handleRemoveUnit(i)} />
-                                            ))}
-
-                                            {/* Harga Deal per Unit */}
-                                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
-                                                <label className="text-xs text-gray-500 block">
-                                                    Harga Deal per Unit {isEcommercePending ? <span className="text-gray-400 font-normal">(opsional)</span> : "*"}
-                                                    <span className="ml-1.5 text-gray-400">({selectedUnits.length} unit)</span>
-                                                </label>
-
-                                                {selectedUnits.map((u, i) => (
-                                                    <div key={u.unit_id} className="space-y-1.5">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
-                                                                {i + 1}
-                                                            </span>
-                                                            <p className="text-xs font-semibold text-gray-700 truncate flex-1">{unitLabel(u)}</p>
-                                                            {u.grade && (
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
-                                                                    {u.grade}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-[10px] font-mono text-gray-400 ml-5.5">
-                                                            {u.unit_type === "accessory" ? u.laptop_name : `SN: ${u.serial_number}`}
-                                                        </p>
-                                                        {hasPedagangPrice(u.unit_id) && (
-                                                            <p className="text-[10px] text-emerald-600 font-medium ml-5.5">Harga mengikuti price list pedagang — masih bisa diubah manual</p>
-                                                        )}
-                                                        <input
-                                                            key={`${u.unit_id}-${pedagangPriceMap[u.unit_id] ?? "none"}`}
-                                                            type="text" inputMode="numeric"
-                                                            placeholder="Harga deal unit ini"
-                                                            className={inputClass}
-                                                            defaultValue={unitPrices[u.unit_id] > 0 ? unitPrices[u.unit_id].toLocaleString("id-ID") : ""}
-                                                            onChange={e => {
-                                                                const raw = e.target.value.replace(/\D/g, "");
-                                                                const num = raw ? Number(raw) : 0;
-                                                                setUnitPrices(prev => ({ ...prev, [u.unit_id]: num }));
-                                                            }}
-                                                            onBlur={e => {
-                                                                const raw = e.target.value.replace(/\D/g, "");
-                                                                if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
-                                                            }}
-                                                            onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
-                                                        />
-                                                    </div>
-                                                ))}
-
-                                                {/* Total otomatis */}
-                                                <div className="flex justify-between text-xs border-t border-gray-200 pt-2.5">
-                                                    <span className="text-gray-600 font-semibold">Total ({selectedUnits.length} unit)</span>
-                                                    <span className="font-bold text-gray-800 font-mono">{fmt(rawDealPrice)}</span>
-                                                </div>
-
-                                                {pendingSubType === "DP_AMBIL" && (
-                                                    <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-1.5 mt-2">
-                                                        <label className="text-xs font-semibold text-violet-700 block">
-                                                            Nominal DP <span className="text-violet-400 font-normal">(isi 0 = Ambil Dulu)</span>
-                                                        </label>
-                                                        <input
-                                                            type="text" inputMode="numeric"
-                                                            value={dpAmount > 0 ? dpAmount.toLocaleString("id-ID") : ""}
-                                                            placeholder="0"
-                                                            onChange={e => {
-                                                                const raw = e.target.value.replace(/\D/g, "");
-                                                                const num = raw ? Number(raw) : 0;
-                                                                setDpAmount(Math.min(num, Math.max(0, rawDealPrice - 1)));
-                                                            }}
-                                                            className={inputClass}
-                                                        />
-                                                        <p className="text-[11px] text-violet-500">
-                                                            {dpAmount > 0
-                                                                ? `Sisa setelah DP: ${fmt(Math.max(0, rawDealPrice - dpAmount))}`
-                                                                : "Status: Ambil Dulu (belum ada pembayaran)"}
-                                                        </p>
-                                                    </div>
-                                                )}
-
-                                                {rawDealPrice > 0 && canSeeMargin && (
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="text-gray-500">Selisih / Margin</span>
-                                                        <span className={`font-semibold ${margin >= 0 ? "text-gray-600" : "text-red-500"}`}>
-                                                            {margin >= 0 ? "+" : ""}{fmt(margin)}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* ── Trade-In Toggle ── */}
+                                        {/* ── Trade-In Toggle (khusus role laptop, bukan CS/aksesoris) ── */}
+                                        {!isAccessoryOnlyRole && (
                                             <div className="border border-gray-200 rounded-xl overflow-hidden">
                                                 <button
                                                     type="button"
@@ -1192,15 +1218,15 @@ export default function CreatePaymentPage() {
                                                                 </div>
                                                             </div>
                                                         )}
-                                                    </div>
+                                                                                                       </div>
                                                 )}
                                             </div>
+                                            )}
                                         </div>
                                     )}
 
                                 </>
-                            )}
-
+                                
                             {/* ── Aksesori (opsional, tanpa SN) ──
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">

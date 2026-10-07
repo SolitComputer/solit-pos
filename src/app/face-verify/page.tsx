@@ -909,7 +909,17 @@ export default function FaceVerifyPage() {
               const currentAttempt = attemptsRef.current + 1;
               setAttempts(currentAttempt);
               addLog(`mencoba verifikasi [${currentAttempt}/${MAX_ATTEMPTS}]...`, "info");
-              const vd = await doVerify(embedding, currentAttempt, coords);
+              // ✅ FIX: ambil 1 sample tambahan lalu kirim keduanya berurutan —
+              // server memutuskan match jika SALAH SATU lolos. Ini meredam
+              // fluktuasi frame-buruk tanpa mengubah data enroll yang tersimpan.
+              const embedding2 = await captureAveragedEmbedding(3);
+              let vd = await doVerify(embedding, currentAttempt, coords);
+              if (!vd.success && !vd.outOfTime && !vd.needEnroll
+                  && vd.code !== "EARLY_CHECKOUT_NOT_APPROVED" && embedding2) {
+                addLog("sample ke-2 (meredam frame buruk)...", "info");
+                const vd2 = await doVerify(embedding2, currentAttempt, coords);
+                if (vd2.success) vd = vd2;
+              }
 
               if (vd.success) {
                 setStage("success");

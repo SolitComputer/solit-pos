@@ -11,8 +11,8 @@ const ALLOWED_ROLES: UserRole[] = [
     "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
     "TEKNISI", "KEPALA_TEKNISI",
     "ACCOUNTING", "PKL",
+    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
 ];
-
 // GET /api/accessory-units/search-sn?q=xxx
 export const GET = withAuth(async (req: NextRequest) => {
     const { searchParams } = new URL(req.url);
