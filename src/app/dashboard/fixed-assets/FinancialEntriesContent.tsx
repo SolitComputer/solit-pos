@@ -21,10 +21,13 @@ interface FinancialEntry {
   updated_at: string;
 }
 
-interface NominalHistory {
+interface ChangeLog {
   id: string;
-  nominal_lama: number | string;
-  nominal_baru: number | string;
+  action: string; // 'create' | 'update'
+  field: string | null;
+  field_label: string | null;
+  old_value: string | null;
+  new_value: string | null;
   changed_by_name: string | null;
   created_at: string;
 }
@@ -118,6 +121,20 @@ function formatDateTime(iso: string): string {
   });
 }
 
+// Format nilai untuk ditampilkan di riwayat perubahan (nominal → Rp, tanggal → dd MMM yyyy)
+function formatLogValue(field: string | null, value: string | null): string {
+  if (value === null || value === "") return "—";
+  if (field === "nominal") {
+    const n = Number(value);
+    return Number.isFinite(n) ? formatIDR(n) : value;
+  }
+  if (field === "tanggal") {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? value : formatDate(value);
+  }
+  return value;
+}
+
 function errMsg(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
 }
@@ -144,7 +161,7 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
   const [deleting, setDeleting] = useState(false);
 
   const [historyTarget, setHistoryTarget] = useState<FinancialEntry | null>(null);
-  const [historyItems, setHistoryItems] = useState<NominalHistory[]>([]);
+  const [historyItems, setHistoryItems] = useState<ChangeLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const fetchEntries = useCallback(async () => {
@@ -284,8 +301,8 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
     setHistoryItems([]);
     setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/financial-entries/${entry.id}/history`, { cache: "no-store" });
-      const d: ApiResp<NominalHistory[]> = await res.json();
+      const res = await fetch(`/api/financial-entries/${entry.id}/change-logs`, { cache: "no-store" });
+      const d: ApiResp<ChangeLog[]> = await res.json();
       if (d.success) setHistoryItems(d.data || []);
     } catch {
       // abaikan; modal tetap tampil kosong
@@ -558,7 +575,7 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
                 </div>
                 {editingId && (
                   <p className="text-[11px] text-gray-400 mt-1.5">
-                    Kalau nominal diubah, perubahannya otomatis tercatat di Riwayat Nominal.
+                    Semua perubahan (nama, kategori, nominal, tanggal, keterangan) otomatis tercatat di Riwayat Perubahan.
                   </p>
                 )}
               </div>
@@ -685,7 +702,7 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
                     <HistoryIcon size={20} />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-base font-bold text-white">Riwayat Nominal</h2>
+                    <h2 className="text-base font-bold text-white">Riwayat Perubahan</h2>
                     <p className="text-xs text-white/50 truncate">{historyTarget.nama}</p>
                   </div>
                 </div>
@@ -715,25 +732,48 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
                 </div>
               ) : historyItems.length === 0 ? (
                 <div className="py-8 text-center">
-                  <p className="text-sm font-semibold text-gray-600">Belum ada perubahan nominal</p>
-                  <p className="text-xs text-gray-400 mt-1">Perubahan nominal pertama akan muncul di sini.</p>
+                  <p className="text-sm font-semibold text-gray-600">Belum ada riwayat perubahan</p>
+                  <p className="text-xs text-gray-400 mt-1">Perubahan pertama akan muncul di sini.</p>
                 </div>
               ) : (
                 <ol className="relative space-y-4 before:absolute before:left-[7px] before:top-1 before:bottom-1 before:w-px before:bg-gray-200">
-                  {historyItems.map((log) => (
-                    <li key={log.id} className="relative pl-6">
-                      <span className="absolute left-0 top-1 w-3.5 h-3.5 rounded-full bg-amber-400 ring-4 ring-amber-50" />
-                      <p className="text-xs text-gray-400 tabular-nums">{formatDateTime(log.created_at)}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className="text-sm text-gray-400 line-through tabular-nums">{formatIDR(toNum(log.nominal_lama))}</span>
-                        <ArrowIcon />
-                        <span className="text-sm font-bold text-[#1a1a2e] tabular-nums">{formatIDR(toNum(log.nominal_baru))}</span>
-                      </div>
-                      {log.changed_by_name && (
-                        <p className="text-[11px] text-gray-500 mt-0.5">oleh {log.changed_by_name}</p>
-                      )}
-                    </li>
-                  ))}
+                  {historyItems.map((log) => {
+                    const isCreate = log.action === "create";
+                    return (
+                      <li key={log.id} className="relative pl-6">
+                        <span
+                          className={`absolute left-0 top-1 w-3.5 h-3.5 rounded-full ring-4 ${
+                            isCreate ? "bg-sky-500 ring-sky-50" : "bg-emerald-500 ring-emerald-50"
+                          }`}
+                        />
+                        <p className="text-xs text-gray-400 tabular-nums">{formatDateTime(log.created_at)}</p>
+                        <div className="mt-0.5">
+                          <span className="text-[11px] font-semibold text-gray-500">
+                            {log.field_label || log.field || "Perubahan"}
+                            {isCreate && " (input awal)"}
+                          </span>
+                          {isCreate ? (
+                            <p className="text-sm font-semibold text-[#1a1a2e] break-words mt-0.5">
+                              {formatLogValue(log.field, log.new_value)}
+                            </p>
+                          ) : (
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              <span className="text-sm text-gray-400 line-through break-words">
+                                {formatLogValue(log.field, log.old_value)}
+                              </span>
+                              <ArrowIcon />
+                              <span className="text-sm font-bold text-[#1a1a2e] break-words">
+                                {formatLogValue(log.field, log.new_value)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {log.changed_by_name && (
+                          <p className="text-[11px] text-gray-500 mt-0.5">oleh {log.changed_by_name}</p>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ol>
               )}
             </div>
@@ -827,7 +867,7 @@ function EntryCard({
             className="inline-flex items-center gap-1.5 rounded-lg text-gray-500 text-xs font-semibold px-2.5 py-1.5 hover:bg-gray-100 transition ml-auto"
           >
             <HistoryIcon size={13} />
-            Riwayat Nominal
+            Riwayat
           </button>
         </div>
       </div>
