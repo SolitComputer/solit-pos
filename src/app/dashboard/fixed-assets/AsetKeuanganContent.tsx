@@ -43,7 +43,7 @@ export default function AsetKeuanganContent() {
       if (!piutang.success) throw new Error(piutang.message || "Gagal memuat data piutang");
       if (!modal.success) throw new Error(modal.message || "Gagal memuat data modal service");
 
-      exportAsetKeuanganToExcel({
+      await exportAsetKeuanganToExcel({
         aset: aset.data || [],
         utang: utang.data || [],
         piutang: piutang.data || [],
