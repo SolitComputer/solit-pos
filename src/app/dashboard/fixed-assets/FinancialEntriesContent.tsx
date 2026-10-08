@@ -21,6 +21,17 @@ interface FinancialEntry {
   updated_at: string;
 }
 
+// Piutang otomatis hasil sinkron dari Jurnal Umum (akun 140) — read-only.
+interface AutoPiutang {
+  id: string;
+  invoice: string;
+  nama: string;
+  keterangan: string | null;
+  nominal: number;
+  tanggal: string | null;
+  source: "jurnal";
+}
+
 interface ChangeLog {
   id: string;
   action: string; // 'create' | 'update'
@@ -151,6 +162,8 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [kategoriFilter, setKategoriFilter] = useState<string>("all");
+  // Khusus Piutang: daftar piutang otomatis dari Jurnal Umum (akun 140).
+  const [autoEntries, setAutoEntries] = useState<AutoPiutang[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -164,14 +177,29 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
   const [historyItems, setHistoryItems] = useState<ChangeLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const fetchEntries = useCallback(async () => {
+   const fetchEntries = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/financial-entries?type=${entryType}`, { cache: "no-store" });
+      const requests: Promise<Response>[] = [
+        fetch(`/api/financial-entries?type=${entryType}`, { cache: "no-store" }),
+      ];
+      // Tab Piutang: ambil juga piutang otomatis yang disinkron dari Jurnal Umum.
+      if (entryType === "piutang") {
+        requests.push(fetch("/api/financial-entries/auto-piutang", { cache: "no-store" }));
+      }
+      const [res, autoRes] = await Promise.all(requests);
+
       const d: ApiResp<FinancialEntry[]> = await res.json();
       if (!d.success) throw new Error(d.message || "Gagal memuat data");
       setEntries(d.data || []);
+
+      if (autoRes) {
+        const a: ApiResp<AutoPiutang[]> = await autoRes.json();
+        setAutoEntries(a.success ? a.data || [] : []);
+      } else {
+        setAutoEntries([]);
+      }
     } catch (e) {
       setError(errMsg(e, "Gagal memuat data"));
     } finally {
@@ -187,6 +215,12 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
     () => entries.reduce((sum, e) => sum + toNum(e.nominal), 0),
     [entries]
   );
+  // Total piutang otomatis + total gabungan buat kartu ringkasan (auto kosong di tab lain).
+  const autoTotalNominal = useMemo(
+    () => autoEntries.reduce((sum, e) => sum + toNum(e.nominal), 0),
+    [autoEntries]
+  );
+  const displayedTotal = totalNominal + autoTotalNominal;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -341,14 +375,14 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
               <div className="h-9 w-56 rounded-lg bg-white/10 animate-pulse mt-1.5" />
             ) : (
               <p className="text-2xl sm:text-3xl font-black tabular-nums tracking-tight mt-1 break-all">
-                {formatIDR(totalNominal)}
+                {formatIDR(displayedTotal)}
               </p>
             )}
           </div>
           <div className="ml-auto text-right flex-shrink-0">
             <p className="text-[11px] text-white/40">Jumlah entri</p>
             <p className="text-lg font-bold tabular-nums">
-              {loading ? "—" : entries.length}
+              {loading ? "—" : entries.length + autoEntries.length}
               <span className="text-xs font-medium text-white/40 ml-1">data</span>
             </p>
           </div>
@@ -406,6 +440,29 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
         </div>
       )}
 
+      {/* Piutang otomatis dari Jurnal Umum (akun 140) — read-only, selalu sinkron */}
+      {entryType === "piutang" && !loading && autoEntries.length > 0 && (
+        <div className="mb-5">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
+              <SyncIcon size={13} /> Dari Jurnal Umum
+            </span>
+            <span className="text-xs text-gray-500">
+              {autoEntries.length} piutang otomatis · {formatIDR(autoTotalNominal)}
+            </span>
+          </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+            {autoEntries.map((e) => (
+              <AutoPiutangCard key={e.id} entry={e} tile={cfg.tile} Icon={Icon} />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {entryType === "piutang" && !loading && autoEntries.length > 0 && (
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2.5">Piutang Manual</p>
+      )}
+
       {/* Daftar */}
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
@@ -430,7 +487,11 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
             <Icon size={22} />
           </div>
           <p className="text-sm font-semibold text-gray-700">
-            {entries.length === 0 ? "Belum ada data" : "Tidak ditemukan"}
+            {entries.length === 0
+              ? entryType === "piutang" && autoEntries.length > 0
+                ? "Belum ada piutang manual"
+                : "Belum ada data"
+              : "Tidak ditemukan"}
           </p>
           <p className="text-xs text-gray-500 mt-1 max-w-xs">
             {entries.length === 0
@@ -875,7 +936,66 @@ function EntryCard({
   );
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// Kartu piutang OTOMATIS (read-only, dihitung dari Jurnal Umum akun 140)
+// ═════════════════════════════════════════════════════════════════════════════
+function AutoPiutangCard({
+  entry,
+  tile,
+  Icon,
+}: {
+  entry: AutoPiutang;
+  tile: string;
+  Icon: (p: { size?: number; className?: string }) => ReactNode;
+}) {
+  return (
+    <li className="group relative flex flex-col rounded-2xl bg-white border border-emerald-100 shadow-sm ring-1 ring-emerald-50/70">
+      <div className="flex items-start gap-3 p-4 pb-3">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${tile}`}>
+          <Icon size={20} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-gray-900 leading-snug break-words line-clamp-2">{entry.nama}</p>
+          <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+            <SyncIcon size={10} /> Otomatis · Jurnal
+          </span>
+          {entry.tanggal && (
+            <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">{formatDate(entry.tanggal)}</p>
+          )}
+        </div>
+      </div>
+
+      {entry.keterangan && (
+        <p className="px-4 -mt-1 mb-3 text-xs text-gray-500 leading-relaxed line-clamp-2 break-words">
+          {entry.keterangan}
+        </p>
+      )}
+
+      <div className="mt-auto mx-4 border-t border-dashed border-gray-200" aria-hidden="true" />
+
+      <div className="px-4 pt-3 pb-4">
+        <p className="text-lg font-black text-[#1a1a2e] tabular-nums tracking-tight">{formatIDR(toNum(entry.nominal))}</p>
+        <div className="flex items-center justify-between gap-2 mt-3 text-[11px] text-gray-400">
+          <span className="truncate">Sisa piutang berjalan</span>
+          {entry.invoice && <span className="flex-shrink-0 font-mono">{entry.invoice}</span>}
+        </div>
+      </div>
+    </li>
+  );
+}
+
 // ── Icons ─────────────────────────────────────────────────────────────────────
+function SyncIcon({ size = 15, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M21 2v6h-6" />
+      <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+      <path d="M3 22v-6h6" />
+      <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+    </svg>
+  );
+}
+
 function UtangIcon({ size = 18, className }: { size?: number; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
