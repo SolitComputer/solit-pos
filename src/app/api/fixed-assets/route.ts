@@ -69,11 +69,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
   }
 
+  const kategori = body.kategori ? String(body.kategori).trim() : null;
+
   const { data, error } = await supabase
     .from("fixed_assets")
     .insert({
       nama_aset: body.nama_aset.trim(),
       nominal,
+      kategori,
       keterangan: body.keterangan ? String(body.keterangan).trim() : null,
       tanggal_beli: body.tanggal_beli || null,
       created_by: auth.userId || null,
@@ -84,6 +87,31 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+
+  // Catat inputan awal ke riwayat perubahan (action = create)
+  const createLogs = [
+    { field: "nama_aset", field_label: "Nama Aset", value: data.nama_aset },
+    { field: "nominal", field_label: "Nominal", value: data.nominal != null ? String(data.nominal) : null },
+    { field: "kategori", field_label: "Kategori", value: data.kategori },
+    { field: "keterangan", field_label: "Keterangan", value: data.keterangan },
+    { field: "tanggal_beli", field_label: "Tanggal Beli", value: data.tanggal_beli },
+  ]
+    .filter((f) => f.value !== null && f.value !== "")
+    .map((f) => ({
+      asset_id: data.id,
+      action: "create",
+      field: f.field,
+      field_label: f.field_label,
+      old_value: null,
+      new_value: String(f.value),
+      changed_by: auth.userId || null,
+      changed_by_name: auth.userName || null,
+    }));
+
+  if (createLogs.length > 0) {
+    const { error: logErr } = await supabase.from("fixed_asset_change_logs").insert(createLogs);
+    if (logErr) console.error("Gagal mencatat riwayat create aset:", logErr.message);
   }
 
   return NextResponse.json({ success: true, data });

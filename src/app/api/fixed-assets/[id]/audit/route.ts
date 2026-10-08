@@ -75,7 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // Cek aset + cooldown 1 hari (backstop; UI juga sudah menyembunyikan tombol)
   const { data: asset, error: assetErr } = await supabase
     .from("fixed_assets")
-    .select("id, last_audited_at")
+    .select("id, last_audited_at, keterangan")
     .eq("id", id)
     .single();
 
@@ -125,6 +125,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (updErr) {
     return NextResponse.json({ success: false, message: updErr.message }, { status: 500 });
+  }
+
+  // Perubahan keterangan dari proses audit ikut dicatat ke riwayat perubahan
+  if (catatan !== null && (asset.keterangan ?? null) !== catatan) {
+    const { error: logErr } = await supabase.from("fixed_asset_change_logs").insert({
+      asset_id: id,
+      action: "audit",
+      field: "keterangan",
+      field_label: "Keterangan",
+      old_value: asset.keterangan ?? null,
+      new_value: catatan,
+      changed_by: auth.userId || null,
+      changed_by_name: auth.userName || null,
+    });
+    if (logErr) console.error("Gagal mencatat riwayat audit:", logErr.message);
   }
 
   return NextResponse.json({ success: true, data: updated });
