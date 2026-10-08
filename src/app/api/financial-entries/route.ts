@@ -107,5 +107,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
+  // Catat inputan awal ke riwayat perubahan (action = create)
+  const createLogs = [
+    { field: "nama", field_label: "Nama", value: data.nama },
+    { field: "kategori", field_label: "Kategori", value: data.kategori },
+    { field: "nominal", field_label: "Nominal", value: data.nominal != null ? String(data.nominal) : null },
+    { field: "tanggal", field_label: "Tanggal", value: data.tanggal },
+    { field: "keterangan", field_label: "Keterangan", value: data.keterangan },
+  ]
+    .filter((f) => f.value !== null && f.value !== "")
+    .map((f) => ({
+      entry_id: data.id,
+      action: "create",
+      field: f.field,
+      field_label: f.field_label,
+      old_value: null,
+      new_value: String(f.value),
+      changed_by: auth.userId || null,
+      changed_by_name: auth.userName || null,
+    }));
+
+  if (createLogs.length > 0) {
+    const { error: logErr } = await supabase.from("financial_entry_change_logs").insert(createLogs);
+    if (logErr) console.error("Gagal mencatat riwayat create entri:", logErr.message);
+  }
+
   return NextResponse.json({ success: true, data });
 }
