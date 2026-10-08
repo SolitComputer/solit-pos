@@ -53,13 +53,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
   }
 
-  // Ambil data lama untuk bandingkan nominal (bahan riwayat)
+  // Ambil data lama untuk bandingkan tiap field (bahan before/after)
   const { data: existing, error: fetchError } = await supabase
     .from("financial_entries")
-    .select("nominal")
+    .select("nama, kategori, nominal, tanggal, keterangan")
     .eq("id", id)
     .single();
-
   if (fetchError || !existing) {
     return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
   }
@@ -98,6 +97,38 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       // Jangan gagalkan update utama kalau cuma pencatatan riwayat yang error
       console.error("Gagal mencatat riwayat nominal:", historyError.message);
     }
+  }
+
+  // Catat semua perubahan field ke riwayat (action = update) — before/after
+  const normField = (field: string, v: unknown) => {
+    if (v === null || v === undefined || v === "") return null;
+    if (field === "nominal") {
+      const n = Number(v);
+      return Number.isFinite(n) ? String(n) : String(v);
+    }
+    return String(v);
+  };
+  const changes = [
+    { field: "nama", field_label: "Nama", old: existing.nama, now: data.nama },
+    { field: "kategori", field_label: "Kategori", old: existing.kategori, now: data.kategori },
+    { field: "nominal", field_label: "Nominal", old: existing.nominal, now: data.nominal },
+    { field: "tanggal", field_label: "Tanggal", old: existing.tanggal, now: data.tanggal },
+    { field: "keterangan", field_label: "Keterangan", old: existing.keterangan, now: data.keterangan },
+  ]
+    .filter((c) => normField(c.field, c.old) !== normField(c.field, c.now))
+    .map((c) => ({
+      entry_id: id,
+      action: "update",
+      field: c.field,
+      field_label: c.field_label,
+      old_value: normField(c.field, c.old),
+      new_value: normField(c.field, c.now),
+      changed_by_name: auth.userName || null,
+    }));
+
+  if (changes.length > 0) {
+    const { error: logErr } = await supabase.from("financial_entry_change_logs").insert(changes);
+    if (logErr) console.error("Gagal mencatat riwayat perubahan:", logErr.message);
   }
 
   return NextResponse.json({ success: true, data });
