@@ -95,9 +95,10 @@ function buildSheet(
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: STRIPE } };
       }
       cell.border = {
-        bottom: { style: "hair", color: { argb: BORDER } },
-        left: { style: "hair", color: { argb: BORDER } },
-        right: { style: "hair", color: { argb: BORDER } },
+        top: { style: "thin", color: { argb: BORDER } },
+        bottom: { style: "thin", color: { argb: BORDER } },
+        left: { style: "thin", color: { argb: BORDER } },
+        right: { style: "thin", color: { argb: BORDER } },
       };
     });
   });
@@ -127,6 +128,21 @@ function buildSheet(
     }
     ws.getColumn(i + 1).width = Math.min(col.max, Math.max(col.min, maxLen + 2));
   });
+
+  // 4b) Garis tepi luar tabel dipertebal biar makin rapi
+  const lastRow = ws.rowCount;
+  const lastCol = columns.length;
+  for (let r = 1; r <= lastRow; r++) {
+    for (let c = 1; c <= lastCol; c++) {
+      const cell = ws.getCell(r, c);
+      const b = { ...(cell.border || {}) };
+      if (r === 1) b.top = { style: "medium", color: { argb: NAVY } };
+      if (r === lastRow) b.bottom = { style: "medium", color: { argb: NAVY } };
+      if (c === 1) b.left = { style: "medium", color: { argb: NAVY } };
+      if (c === lastCol) b.right = { style: "medium", color: { argb: NAVY } };
+      cell.border = b;
+    }
+  }
 
   // 5) Auto-filter di baris header
   ws.autoFilter = {
