@@ -233,6 +233,109 @@ export async function PATCH(
     );
   }
 
+  // ── Batalkan setelah Eksekusi (cancel) ────────────────────────────────────────
+  // Pengajuan yang SUDAH dieksekusi tapi BELUM direalisasi bisa dibatalkan di sini.
+  // Status jadi final "Dibatalkan" dan jalur realisasi otomatis tertutup.
+  // Boleh: eksekutor baris itu sendiri (executed_by_id) atau ADMIN.
+  if (action === "cancel") {
+    const { data: existing, error: fetchErr } = await supabase
+      .from("fund_requests")
+      .select("is_executed, is_cancelled, realisasi_cashflow_id, executed_by_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+    }
+
+    const isAdmin = roles.includes("ADMIN");
+    const isExecutor = existing.executed_by_id === userId;
+    if (!isAdmin && !isExecutor) {
+      return NextResponse.json(
+        { success: false, message: "Hanya eksekutor pengajuan ini atau Admin yang bisa membatalkan" },
+        { status: 403 }
+      );
+    }
+    if (!existing.is_executed) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan harus sudah dieksekusi dulu sebelum bisa dibatalkan" },
+        { status: 400 }
+      );
+    }
+    if (existing.is_cancelled) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan ini sudah dibatalkan" },
+        { status: 400 }
+      );
+    }
+    if (existing.realisasi_cashflow_id) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan yang sudah direalisasi tidak bisa dibatalkan dari sini" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_cancelled: true,
+        cancelled_by_id: userId,
+        cancelled_by_name: userName,
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: body.reason?.trim() || null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Batal Pembatalan (uncancel) ──────────────────────────────────────────────
+  if (action === "uncancel") {
+    const { data: existing, error: fetchErr } = await supabase
+      .from("fund_requests")
+      .select("executed_by_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+    }
+
+    const isAdmin = roles.includes("ADMIN");
+    const isExecutor = existing.executed_by_id === userId;
+    if (!isAdmin && !isExecutor) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang" },
+        { status: 403 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_cancelled: false,
+        cancelled_by_id: null,
+        cancelled_by_name: null,
+        cancelled_at: null,
+        cancellation_reason: null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
   // ── Update Metode Pembayaran (Cash/Saldo) ─────────────────────────────────────
   // Hanya role ADMIN yang boleh mengubah. Boleh kapan saja, termasuk setelah
   // status Selesai — tapi kalau sudah pernah direalisasi (ada entry Cashflow
