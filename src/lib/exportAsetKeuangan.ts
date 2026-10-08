@@ -37,24 +37,22 @@ function fmtDate(iso: string | null): string {
     : d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-// Definisi kolom: key, judul, lebar minimum & maksimum, perataan
 interface ColumnDef {
   header: string;
-  min: number; // lebar minimum (karakter)
-  max: number; // lebar maksimum, biar kolom panjang tetap kebaca tapi nggak kelebaran
+  min: number;
+  max: number;
   align?: "left" | "center" | "right";
-  numFmt?: string; // format angka excel, mis. "#,##0"
-  wrap?: boolean; // bungkus teks ke bawah (buat keterangan panjang)
+  numFmt?: string;
+  wrap?: boolean;
 }
 
 // Warna tema (ARGB, tanpa tanda #)
 const NAVY = "FF1A1A2E";
 const NAVY_TEXT = "FFFFFFFF";
-const STRIPE = "FFF6F7F9"; // abu sangat muda buat baris genap
-const TOTAL_BG = "FFEFE9DA"; // krem lembut buat baris TOTAL
+const STRIPE = "FFF6F7F9";
+const TOTAL_BG = "FFEFE9DA";
 const BORDER = "FFE2E4E8";
 
-// Bikin satu worksheet rapi dari kolom + baris + baris total
 function buildSheet(
   wb: ExcelJS.Workbook,
   sheetName: string,
@@ -63,7 +61,7 @@ function buildSheet(
   totalRow: (string | number)[]
 ): void {
   const ws = wb.addWorksheet(sheetName, {
-    views: [{ state: "frozen", ySplit: 1 }], // header nempel saat di-scroll
+    views: [{ state: "frozen", ySplit: 1 }],
   });
 
   // 1) Header
@@ -118,26 +116,19 @@ function buildSheet(
     };
   });
 
-  // 4) Lebar kolom otomatis: ukur isi terpanjang, dibatasi min & max per kolom
+  // 4) Lebar kolom otomatis: ukur isi terpanjang, dibatasi min & max
   columns.forEach((col, i) => {
     let maxLen = col.header.length;
     for (const r of rows) {
       const val = r[i];
       if (val == null) continue;
-      // untuk kolom wrap (keterangan), ukur baris terpanjang di dalam sel
-      const text = String(val);
-      const longestLine = col.wrap
-        ? Math.max(...text.split(/\s+/).reduce<number[]>((acc, w) => {
-            // perkiraan kasar panjang baris setelah wrap ~ tidak perlu presisi
-            return acc;
-          }, [text.length]))
-        : text.length;
-      if (longestLine > maxLen) maxLen = longestLine;
+      const len = String(val).length;
+      if (len > maxLen) maxLen = len;
     }
     ws.getColumn(i + 1).width = Math.min(col.max, Math.max(col.min, maxLen + 2));
   });
 
-  // 5) Auto-filter di baris header (biar bisa sortir/filter di Excel)
+  // 5) Auto-filter di baris header
   ws.autoFilter = {
     from: { row: 1, column: 1 },
     to: { row: 1, column: columns.length },
@@ -148,15 +139,15 @@ function buildSheet(
 function addAsetSheet(wb: ExcelJS.Workbook, rows: ExportAsset[]): void {
   const columns: ColumnDef[] = [
     { header: "No", min: 4, max: 6, align: "center" },
-    { header: "Nama Aset", min: 18, max: 40 },
-    { header: "Kategori", min: 12, max: 20 },
+    { header: "Nama Aset", min: 18, max: 45, wrap: true },
+    { header: "Kategori", min: 12, max: 24 },
     { header: "Nominal (Rp)", min: 14, max: 20, align: "right", numFmt: "#,##0" },
     { header: "Tanggal Beli", min: 13, max: 16, align: "center" },
     { header: "Keterangan", min: 24, max: 60, wrap: true },
-    { header: "Dicatat Oleh", min: 14, max: 22 },
+    { header: "Dicatat Oleh", min: 16, max: 40, wrap: true },
     { header: "Tgl Dicatat", min: 13, max: 16, align: "center" },
     { header: "Terakhir Diaudit", min: 14, max: 18, align: "center" },
-    { header: "Diaudit Oleh", min: 14, max: 22 },
+    { header: "Diaudit Oleh", min: 16, max: 40, wrap: true },
   ];
 
   const body = rows.map((r, i) => [
@@ -182,12 +173,12 @@ function addAsetSheet(wb: ExcelJS.Workbook, rows: ExportAsset[]): void {
 function addEntrySheet(wb: ExcelJS.Workbook, sheetName: string, rows: ExportEntry[]): void {
   const columns: ColumnDef[] = [
     { header: "No", min: 4, max: 6, align: "center" },
-    { header: "Nama", min: 18, max: 40 },
-    { header: "Kategori", min: 12, max: 20 },
+    { header: "Nama", min: 18, max: 45, wrap: true },
+    { header: "Kategori", min: 12, max: 24 },
     { header: "Nominal (Rp)", min: 14, max: 20, align: "right", numFmt: "#,##0" },
     { header: "Tanggal", min: 13, max: 16, align: "center" },
     { header: "Keterangan", min: 24, max: 60, wrap: true },
-    { header: "Dicatat Oleh", min: 14, max: 22 },
+    { header: "Dicatat Oleh", min: 16, max: 40, wrap: true },
     { header: "Tgl Dicatat", min: 13, max: 16, align: "center" },
   ];
 
@@ -208,7 +199,7 @@ function addEntrySheet(wb: ExcelJS.Workbook, sheetName: string, rows: ExportEntr
   buildSheet(wb, sheetName, columns, body, totalRow);
 }
 
-// ── Fungsi utama: 4 dataset → 1 file Excel 4 sheet (nama & signature SAMA) ──
+// ── Fungsi utama ────────────────────────────────────────────────────────────
 export async function exportAsetKeuanganToExcel(params: {
   aset: ExportAsset[];
   utang: ExportEntry[];
@@ -224,7 +215,6 @@ export async function exportAsetKeuanganToExcel(params: {
   addEntrySheet(wb, "Piutang", params.piutang);
   addEntrySheet(wb, "Modal Service", params.modalService);
 
-  // Tulis ke blob lalu trigger download (ExcelJS tidak punya writeFile di browser)
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
