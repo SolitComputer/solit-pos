@@ -782,6 +782,7 @@ export default function UnifiedBarangContent() {
     // convertToAccessory() & ConvertToAccessoryModal di bawah.
     const [convertTarget, setConvertTarget] = useState<UnifiedRow | null>(null);
     const [converting, setConverting] = useState(false);
+    const [archivingId, setArchivingId] = useState<string | null>(null);
     // Target row untuk modal "Tes Kondisi" — edit checklist kondisi laptop
     // (level model) TANPA harus buka form Edit penuh.
     const [conditionChecksTarget, setConditionChecksTarget] = useState<UnifiedRow | null>(null);
@@ -850,8 +851,11 @@ export default function UnifiedBarangContent() {
             ]);
             const lapJson = await lapRes.json();
             const accJson = await accRes.json();
-            const laptopRows = (lapJson.success ? lapJson.data : []).map(normalizeLaptop);
-            const accessoryRows = (accJson.success ? accJson.data : []).map(normalizeAccessory);
+            // Barang terarsip (archived_at terisi) TIDAK muncul di Data Barang —
+            // ditampilkan di tab Arsip. Disaring di sini, bukan di endpoint,
+            // supaya halaman lain yang pakai /api/laptops & /api/accessories aman.
+            const laptopRows = (lapJson.success ? lapJson.data : []).filter((l: any) => !l.archived_at).map(normalizeLaptop);
+            const accessoryRows = (accJson.success ? accJson.data : []).filter((a: any) => !a.archived_at).map(normalizeAccessory);
             const merged = [...laptopRows, ...accessoryRows];
             setRows(merged);
             writeBarangCache(merged);
@@ -1290,6 +1294,32 @@ export default function UnifiedBarangContent() {
             toast.error(e instanceof Error ? e.message : "Gagal update status pedagang");
         } finally {
             setPedagangSavingId(null);
+        }
+    };
+
+    // Arsip MANUAL — langsung pindah ke Arsip Barang (tanpa konfirmasi, sesuai
+    // requirement). Baris dihapus dari state lokal + cache biar hilang instan.
+    const archiveRow = async (row: UnifiedRow) => {
+        setArchivingId(row.id);
+        try {
+            const url = row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/archive` : `/api/accessories/${row.id}/archive`;
+            const res = await fetch(url, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ archived: true }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal mengarsipkan");
+            setRows(prev => {
+                const next = prev.filter(r => !(r.id === row.id && r.tipe === row.tipe));
+                writeBarangCache(next);
+                return next;
+            });
+            toast.success("Barang dipindahkan ke Arsip");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal mengarsipkan");
+        } finally {
+            setArchivingId(null);
         }
     };
 
@@ -2008,6 +2038,13 @@ export default function UnifiedBarangContent() {
                                                                     Perbaiki Tipe
                                                                 </button>
                                                             )}
+                                                            {canFullAccessBarang && (
+                                                                <button onClick={() => archiveRow(row)} disabled={archivingId === row.id}
+                                                                    title="Pindahkan barang ini ke Arsip"
+                                                                    className={`${cardActionCls} text-orange-700 bg-orange-50 hover:bg-orange-100`}>
+                                                                    {archivingId === row.id ? "..." : "Arsip"}
+                                                                </button>
+                                                            )}
                                                             {canShowConditionChecks(row) && (
                                                                 <button onClick={() => openConditionChecks(row)}
                                                                     title="Edit tes kondisi tanpa buka form Edit penuh"
@@ -2195,6 +2232,13 @@ export default function UnifiedBarangContent() {
                                                                                 title="Pindahkan ke Aksesoris dengan kategori yang benar"
                                                                                 className="h-7 px-2 text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition">
                                                                                 Perbaiki Tipe
+                                                                            </button>
+                                                                        )}
+                                                                        {canFullAccessBarang && (
+                                                                            <button onClick={() => archiveRow(row)} disabled={archivingId === row.id}
+                                                                                title="Pindahkan barang ini ke Arsip"
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 transition disabled:opacity-40">
+                                                                                {archivingId === row.id ? "..." : "Arsip"}
                                                                             </button>
                                                                         )}
                                                                         {canShowConditionChecks(row) && (

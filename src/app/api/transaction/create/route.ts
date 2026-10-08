@@ -557,6 +557,67 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             }));
         }
 
+        // 8b. AUTO-ARSIP — barang yang stoknya habis KARENA transaksi lunas ini
+        //     otomatis pindah ke Arsip Barang. Non-fatal: kalau gagal, transaksi
+        //     tetap sukses. archived_at di-set HANYA kalau masih NULL → tidak
+        //     menimpa arsip manual & otomatis "berlaku per hari ini".
+        //     Barang yang 0 karena Pengambilan Barang (Service/Kebutuhan) TIDAK
+        //     lewat sini, jadi tetap di Data Barang.
+        try {
+            if (txStatus === "PAID") {
+                const archivedAtISO = new Date().toISOString();
+
+                // Laptop: arsip kalau SEMUA unit model ini sudah tidak aktif.
+                // "aktif" = status !== "SOLD" — sama persis dgn stok_tersedia
+                // di UnifiedBarangContent.
+                if (laptopUnitIds.length > 0) {
+                    const archiveLaptopIds = [...new Set(laptopUnits.map(u => u.laptop_id))];
+                    await Promise.all(archiveLaptopIds.map(async (lid) => {
+                        const { count: activeCount } = await supabase
+                            .from("laptop_units")
+                            .select("id", { count: "exact", head: true })
+                            .eq("laptop_id", lid)
+                            .neq("status", "SOLD");
+                        if ((activeCount ?? 0) === 0) {
+                            await supabase.from("laptops")
+                                .update({ archived_at: archivedAtISO, archived_by: user.name, archive_reason: "TRANSAKSI" })
+                                .eq("id", lid)
+                                .is("archived_at", null);
+                        }
+                    }));
+                }
+
+                // Aksesoris: arsip kalau stok efektif habis. Stok efektif =
+                // unit ber-SN yang belum TERJUAL (kalau sudah pakai SN), atau
+                // kolom stock manual (sudah dikurangi di langkah 7b). Sama
+                // persis dgn derivedStock di /api/accessories.
+                const affectedAccIds = new Set<string>([
+                    ...accQtyById.keys(),
+                    ...accessoryUnits.map(u => u.accessory_id),
+                ]);
+                await Promise.all([...affectedAccIds].map(async (accId) => {
+                    const { data: accRow } = await supabase
+                        .from("accessories")
+                        .select("id, stock, archived_at, accessory_units(id, status)")
+                        .eq("id", accId)
+                        .single();
+                    if (!accRow) return;
+                    const accUnits = (accRow as any).accessory_units ?? [];
+                    const effStock = accUnits.length > 0
+                        ? accUnits.filter((u: any) => u.status !== "TERJUAL").length
+                        : Number((accRow as any).stock) || 0;
+                    if (effStock === 0 && (accRow as any).archived_at == null) {
+                        await supabase.from("accessories")
+                            .update({ archived_at: archivedAtISO, archived_by: user.name, archive_reason: "TRANSAKSI" })
+                            .eq("id", accId)
+                            .is("archived_at", null);
+                    }
+                }));
+            }
+        } catch (archErr: any) {
+            console.error("[transaction/create] auto-arsip gagal (non-fatal):", archErr?.message ?? archErr);
+        }
+
         // 9. Warranty — hanya laptop, hanya kalau sudah benar-benar PAID (bukan DP/Ambil-Dulu/Ecommerce)
         if (txStatus === "PAID" && laptopUnits.length > 0) {
             const warrantyDuration = Number(body.warranty_duration) || 30;
