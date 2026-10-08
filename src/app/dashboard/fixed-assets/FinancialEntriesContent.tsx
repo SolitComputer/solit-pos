@@ -133,6 +133,7 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [kategoriFilter, setKategoriFilter] = useState<string>("all");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -172,11 +173,18 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter(
-      (e) => e.nama.toLowerCase().includes(q) || (e.keterangan || "").toLowerCase().includes(q)
-    );
-  }, [entries, query]);
+    return entries.filter((e) => {
+      if (q && !(e.nama.toLowerCase().includes(q) || (e.keterangan || "").toLowerCase().includes(q))) {
+        return false;
+      }
+      if (kategoriFilter !== "all") {
+        const k = (e.kategori || "").trim();
+        if (kategoriFilter === "__none__") return !k;
+        return k === kategoriFilter;
+      }
+      return true;
+    });
+  }, [entries, query, kategoriFilter]);
 
   // Kategori "buat sendiri": kumpulkan kategori unik dari entri yang sudah ada,
   // jadi tiap kategori baru yang diketik otomatis muncul di dropdown berikutnya.
@@ -361,6 +369,19 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
               </button>
             )}
           </div>
+          {kategoriOptions.length > 0 && (
+            <select
+              value={kategoriFilter}
+              onChange={(e) => setKategoriFilter(e.target.value)}
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none focus:ring-4 focus:ring-[#1a1a2e]/5 focus:border-[#1a1a2e]/30 transition sm:w-52"
+            >
+              <option value="all">Semua kategori</option>
+              {kategoriOptions.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+              <option value="__none__">Tanpa kategori</option>
+            </select>
+          )}
           <p className="text-xs text-gray-500 sm:flex-shrink-0">
             Menampilkan <span className="font-semibold text-gray-800 tabular-nums">{filtered.length}</span> dari{" "}
             <span className="tabular-nums">{entries.length}</span> entri
@@ -409,7 +430,10 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
             </button>
           ) : (
             <button
-              onClick={() => setQuery("")}
+              onClick={() => {
+                setQuery("");
+                setKategoriFilter("all");
+              }}
               className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition"
             >
               Tampilkan semua
@@ -791,8 +815,8 @@ function EntryCard({
             {edited
               ? `Diubah ${entry.updated_by_name || ""}`.trim()
               : entry.created_by_name
-              ? `Dicatat ${entry.created_by_name}`
-              : "Dicatat"}
+                ? `Dicatat ${entry.created_by_name}`
+                : "Dicatat"}
           </span>
           <span className="flex-shrink-0 tabular-nums">{formatDate(edited ? entry.updated_at : entry.created_at)}</span>
         </div>

@@ -6,6 +6,7 @@ interface FixedAsset {
   id: string;
   nama_aset: string;
   nominal: number;
+  kategori: string | null;
   keterangan: string | null;
   tanggal_beli: string | null;
   created_by_name: string | null;
@@ -16,21 +17,26 @@ interface FixedAsset {
   last_audited_by_name: string | null;
 }
 
-interface AuditLog {
+interface ChangeLog {
   id: string;
-  catatan: string | null;
-  audited_by_name: string | null;
+  action: string; // 'create' | 'update' | 'audit'
+  field: string | null;
+  field_label: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  changed_by_name: string | null;
   created_at: string;
 }
 
 interface FormState {
   nama_aset: string;
   nominal: string;
+  kategori: string;
   keterangan: string;
   tanggal_beli: string;
 }
 
-const EMPTY_FORM: FormState = { nama_aset: "", nominal: "", keterangan: "", tanggal_beli: "" };
+const EMPTY_FORM: FormState = { nama_aset: "", nominal: "", kategori: "", keterangan: "", tanggal_beli: "" };
 
 function formatIDR(value: number): string {
   return new Intl.NumberFormat("id-ID", {
@@ -74,6 +80,20 @@ function formatDateTime(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// Format nilai untuk ditampilkan di riwayat perubahan (nominal → Rp, tanggal → dd MMM yyyy)
+function formatLogValue(field: string | null, value: string | null): string {
+  if (value === null || value === "") return "—";
+  if (field === "nominal") {
+    const n = Number(value);
+    return Number.isFinite(n) ? formatIDR(n) : value;
+  }
+  if (field === "tanggal_beli") {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? value : formatDate(value);
+  }
+  return value;
 }
 
 // Tombol audit muncul lagi 1 hari (24 jam) setelah audit terakhir
@@ -306,6 +326,9 @@ export default function FixedAssetsContent() {
   // Filter jenis aset (UI-only, di atas hasil search)
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
+  // Filter kategori manual (baru)
+  const [kategoriFilter, setKategoriFilter] = useState<string>("all");
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -321,8 +344,9 @@ export default function FixedAssetsContent() {
 
   // Riwayat audit
   const [historyTarget, setHistoryTarget] = useState<FixedAsset | null>(null);
-  const [historyItems, setHistoryItems] = useState<AuditLog[]>([]);
+  const [historyItems, setHistoryItems] = useState<ChangeLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
 
   const fetchAssets = useCallback(async () => {
     setLoading(true);
@@ -358,11 +382,27 @@ export default function FixedAssetsContent() {
     );
   }, [assets, query]);
 
-  // Hasil akhir yang ditampilkan: search → filter jenis
+  // Daftar kategori manual unik (buat dropdown + datalist)
+  const kategoriOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of assets) {
+      if (a.kategori && a.kategori.trim()) set.add(a.kategori.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "id-ID"));
+  }, [assets]);
+
+  // Hasil akhir yang ditampilkan: search → filter jenis → filter kategori
   const visibleAssets = useMemo(() => {
-    if (typeFilter === "all") return filtered;
-    return filtered.filter((a) => detectAssetType(a.nama_aset).key === typeFilter);
-  }, [filtered, typeFilter]);
+    return filtered.filter((a) => {
+      if (typeFilter !== "all" && detectAssetType(a.nama_aset).key !== typeFilter) return false;
+      if (kategoriFilter !== "all") {
+        const k = (a.kategori || "").trim();
+        if (kategoriFilter === "__none__") return !k;
+        return k === kategoriFilter;
+      }
+      return true;
+    });
+  }, [filtered, typeFilter, kategoriFilter]);
 
   // ── Display-only: komposisi aset per jenis ────────────────────────────────
   const typeBreakdown = useMemo(() => {
@@ -396,6 +436,7 @@ export default function FixedAssetsContent() {
     setForm({
       nama_aset: asset.nama_aset,
       nominal: String(asset.nominal),
+      kategori: asset.kategori || "",
       keterangan: asset.keterangan || "",
       tanggal_beli: asset.tanggal_beli || "",
     });
@@ -426,6 +467,7 @@ export default function FixedAssetsContent() {
       const payload: Record<string, unknown> = {
         nama_aset: form.nama_aset.trim(),
         nominal: nominalNumber,
+        kategori: form.kategori.trim() || null,
         tanggal_beli: form.tanggal_beli || null,
       };
       // Keterangan hanya dikirim saat TAMBAH. Saat EDIT keterangan tidak diubah di sini.
@@ -501,7 +543,7 @@ export default function FixedAssetsContent() {
     setHistoryItems([]);
     setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/fixed-assets/${asset.id}/audit`, { cache: "no-store" });
+      const res = await fetch(`/api/fixed-assets/${asset.id}/change-logs`, { cache: "no-store" });
       const d = await res.json();
       if (d.success) setHistoryItems(d.data || []);
     } catch {
@@ -513,7 +555,7 @@ export default function FixedAssetsContent() {
 
   const formType = detectAssetType(form.nama_aset);
   const FormTypeIcon = formType.Icon;
-  const isFiltering = query.trim() !== "" || typeFilter !== "all";
+  const isFiltering = query.trim() !== "" || typeFilter !== "all" || kategoriFilter !== "all";
 
   return (
     <>
@@ -664,6 +706,19 @@ export default function FixedAssetsContent() {
                 </button>
               )}
             </div>
+            {kategoriOptions.length > 0 && (
+              <select
+                value={kategoriFilter}
+                onChange={(e) => setKategoriFilter(e.target.value)}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none focus:ring-4 focus:ring-[#1a1a2e]/5 focus:border-[#1a1a2e]/30 transition sm:w-52"
+              >
+                <option value="all">Semua kategori</option>
+                {kategoriOptions.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+                <option value="__none__">Tanpa kategori</option>
+              </select>
+            )}
             <p className="text-xs text-gray-500 sm:flex-shrink-0">
               Menampilkan <span className="font-semibold text-gray-800 tabular-nums">{visibleAssets.length}</span> dari{" "}
               <span className="tabular-nums">{assets.length}</span> aset
@@ -725,6 +780,7 @@ export default function FixedAssetsContent() {
                 onClick={() => {
                   setQuery("");
                   setTypeFilter("all");
+                  setKategoriFilter("all");
                 }}
                 className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition"
               >
@@ -816,6 +872,29 @@ export default function FixedAssetsContent() {
                   />
                   <p className="text-[11px] text-gray-400 mt-1.5">
                     Ikon otomatis mengikuti nama, contoh: motor, mobil, AC, meja, HP.
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="asset-kategori" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Kategori <span className="font-normal text-gray-400">(opsional)</span>
+                  </label>
+                  <input
+                    id="asset-kategori"
+                    type="text"
+                    list="asset-kategori-list"
+                    value={form.kategori}
+                    onChange={(e) => setForm((f) => ({ ...f, kategori: e.target.value }))}
+                    placeholder="Pilih atau ketik kategori baru..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3.5 py-2.5 text-sm outline-none focus:bg-white focus:ring-4 focus:ring-[#1a1a2e]/5 focus:border-[#1a1a2e]/30 transition"
+                  />
+                  <datalist id="asset-kategori-list">
+                    {kategoriOptions.map((k) => (
+                      <option key={k} value={k} />
+                    ))}
+                  </datalist>
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Kategori manual untuk pengelompokan &amp; filter, terpisah dari ikon otomatis.
                   </p>
                 </div>
 
@@ -1042,7 +1121,7 @@ export default function FixedAssetsContent() {
                       <HistoryIcon size={20} />
                     </div>
                     <div className="min-w-0">
-                      <h2 id="asset-history-title" className="text-base font-bold text-white">Riwayat Audit</h2>
+                      <h2 id="asset-history-title" className="text-base font-bold text-white">Riwayat Perubahan</h2>
                       <p className="text-xs text-white/50 truncate">{historyTarget.nama_aset}</p>
                     </div>
                   </div>
@@ -1066,23 +1145,51 @@ export default function FixedAssetsContent() {
                   </div>
                 ) : historyItems.length === 0 ? (
                   <div className="py-10 text-center">
-                    <p className="text-sm font-semibold text-gray-600">Belum ada riwayat audit</p>
-                    <p className="text-xs text-gray-400 mt-1">Audit pertama akan muncul di sini.</p>
+                    <p className="text-sm font-semibold text-gray-600">Belum ada riwayat perubahan</p>
+                    <p className="text-xs text-gray-400 mt-1">Perubahan pertama akan muncul di sini.</p>
                   </div>
                 ) : (
                   <ol className="relative space-y-4 before:absolute before:left-[7px] before:top-1 before:bottom-1 before:w-px before:bg-gray-200">
-                    {historyItems.map((log) => (
-                      <li key={log.id} className="relative pl-6">
-                        <span className="absolute left-0 top-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-4 ring-emerald-50" />
-                        <p className="text-xs text-gray-400 tabular-nums">{formatDateTime(log.created_at)}</p>
-                        <p className="text-sm text-gray-800 mt-0.5 break-words">
-                          {log.catatan ? log.catatan : <span className="italic text-gray-400">Tanpa keterangan</span>}
-                        </p>
-                        {log.audited_by_name && (
-                          <p className="text-[11px] text-gray-500 mt-0.5">oleh {log.audited_by_name}</p>
-                        )}
-                      </li>
-                    ))}
+                    {historyItems.map((log) => {
+                      const isCreate = log.action === "create";
+                      return (
+                        <li key={log.id} className="relative pl-6">
+                          <span
+                            className={`absolute left-0 top-1 w-3.5 h-3.5 rounded-full ring-4 ${isCreate
+                                ? "bg-sky-500 ring-sky-50"
+                                : log.action === "audit"
+                                  ? "bg-amber-400 ring-amber-50"
+                                  : "bg-emerald-500 ring-emerald-50"
+                              }`}
+                          />
+                          <p className="text-xs text-gray-400 tabular-nums">{formatDateTime(log.created_at)}</p>
+                          <div className="mt-0.5">
+                            <span className="text-[11px] font-semibold text-gray-500">
+                              {log.field_label || log.field || "Perubahan"}
+                              {isCreate && " (input awal)"}
+                            </span>
+                            {isCreate ? (
+                              <p className="text-sm font-semibold text-[#1a1a2e] break-words mt-0.5">
+                                {formatLogValue(log.field, log.new_value)}
+                              </p>
+                            ) : (
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                <span className="text-sm text-gray-400 line-through break-words">
+                                  {formatLogValue(log.field, log.old_value)}
+                                </span>
+                                <ArrowIcon />
+                                <span className="text-sm font-bold text-[#1a1a2e] break-words">
+                                  {formatLogValue(log.field, log.new_value)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {log.changed_by_name && (
+                            <p className="text-[11px] text-gray-500 mt-0.5">oleh {log.changed_by_name}</p>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ol>
                 )}
               </div>
@@ -1123,8 +1230,13 @@ function AssetTagCard({
           <TypeIcon size={20} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 mb-0.5">
+          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
             <span className="text-[11px] font-semibold text-gray-500">{type.label}</span>
+            {asset.kategori && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                {asset.kategori}
+              </span>
+            )}
           </div>
           <p className="text-sm font-bold text-gray-900 leading-snug break-words line-clamp-2">
             {asset.nama_aset}
@@ -1264,6 +1376,15 @@ function HistoryIcon({ className, size = 15 }: { className?: string; size?: numb
       <path d="M3 3v5h5" />
       <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
       <path d="M12 7v5l4 2" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300" aria-hidden="true">
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
     </svg>
   );
 }
