@@ -1089,11 +1089,23 @@ async function buildTransactionPaymentDrafts(
     }
   }
 
-  const trxMap = new Map<string, { customer_name: string; laptop_name: string; payment_method: string; company_name: string | null; status: string }>();
+  const trxMap = new Map<
+    string,
+    {
+      customer_name: string;
+      laptop_name: string;
+      payment_method: string;
+      company_name: string | null;
+      status: string;
+      serial_number: string | null;
+      unit_id: string | null;
+      unit_ids: string[] | null;
+    }
+  >();
   for (const batch of chunkArray(invoiceNumbers, 150)) {
     const { data: trxs } = await supabase
       .from("transactions")
-      .select("invoice_number, customer_name, laptop_name, payment_method, company_name, status")
+      .select("invoice_number, customer_name, laptop_name, payment_method, company_name, status, serial_number, unit_id, unit_ids")
       .in("invoice_number", batch);
     for (const t of trxs ?? []) {
       trxMap.set(t.invoice_number as string, {
@@ -1102,8 +1114,45 @@ async function buildTransactionPaymentDrafts(
         payment_method: (t.payment_method as string) ?? "CASH",
         company_name: (t.company_name as string) ?? null,
         status: (t.status as string) ?? "",
+        serial_number: (t.serial_number as string) ?? null,
+        unit_id: (t.unit_id as string) ?? null,
+        unit_ids: Array.isArray(t.unit_ids) ? t.unit_ids : null,
       });
     }
+  }
+
+  // Resolve SN laptop per invoice (unit_ids → laptop_units.serial_number) supaya
+  // keterangan pembayaran DP/Cicilan/Pelunasan ikut menampilkan SN — sama persis
+  // seperti draft transaksi utama. Fallback ke transactions.serial_number (data lama).
+  const paymentUnitIds = new Set<string>();
+  for (const trx of trxMap.values()) {
+    if (trx.unit_id) paymentUnitIds.add(trx.unit_id);
+    if (Array.isArray(trx.unit_ids)) for (const u of trx.unit_ids) if (u) paymentUnitIds.add(u);
+  }
+
+  const snByUnitId = new Map<string, string>();
+  if (paymentUnitIds.size > 0) {
+    for (const batch of chunkArray(Array.from(paymentUnitIds), 150)) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, serial_number")
+        .in("id", batch);
+      for (const u of units ?? []) {
+        if (u.serial_number) snByUnitId.set(u.id as string, u.serial_number as string);
+      }
+    }
+  }
+
+  const snTextByInvoice = new Map<string, string>();
+  for (const [invoice, trx] of trxMap.entries()) {
+    const ids: string[] =
+      Array.isArray(trx.unit_ids) && trx.unit_ids.length > 0 ? trx.unit_ids : trx.unit_id ? [trx.unit_id] : [];
+    const sns: string[] = [];
+    for (const id of ids) {
+      const sn = snByUnitId.get(id);
+      if (sn) sns.push(sn);
+    }
+    snTextByInvoice.set(invoice, sns.length > 0 ? sns.join(", ") : trx.serial_number || "—");
   }
 
   const directInvoices = new Set<string>();
@@ -1137,7 +1186,7 @@ async function buildTransactionPaymentDrafts(
       source_category: "PEMBAYARAN_PIUTANG",
       tanggal: jakartaDate(p.created_at as string),
       sort_ts: p.created_at as string,
-      keterangan: `Pembayaran ${TYPE_LABEL[p.payment_type as string] ?? p.payment_type} · ${trx?.laptop_name ?? "—"} - ${trx?.customer_name ?? "—"}`,
+      keterangan: `Pembayaran ${TYPE_LABEL[p.payment_type as string] ?? p.payment_type} · ${trx?.laptop_name ?? "—"} - ${snTextByInvoice.get(p.invoice_number as string) ?? "—"} - ${trx?.customer_name ?? "—"}`,
       ref: p.invoice_number as string,
       lines,
       total: totalOf(lines),
