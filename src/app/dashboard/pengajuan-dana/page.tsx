@@ -10,7 +10,7 @@ import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, X, CheckCheck, RotateCcw, Banknote,
   ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon, Pencil,
-  Search, ChevronLeft, ChevronRight, Bell, BellRing,
+  Search, ChevronLeft, ChevronRight, Bell, BellRing, Ban,
 } from "lucide-react";
 
 interface FundRequest {
@@ -33,6 +33,11 @@ interface FundRequest {
   rejected_by_name: string | null;
   rejected_at: string | null;
   rejection_reason: string | null;
+  is_cancelled: boolean;
+  cancelled_by_id: string | null;
+  cancelled_by_name: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
   created_at: string;
   realisasi_cashflow_id: string | null;
   realisasi_nominal: number | null;
@@ -54,7 +59,8 @@ type StatusFilter =
   | "executed"
   | "not_executed"
   | "realized"
-  | "not_realized";
+  | "not_realized"
+  | "cancelled";
 
 const CREATE_ROLES = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PURCHASING",
@@ -126,7 +132,15 @@ function formatDateTime(iso: string | null): string {
 /* ════════════════════════════════════════════════════════════════════════════
  *  STATUS BADGE
  * ════════════════════════════════════════════════════════════════════════════ */
-function StatusPill({ approved, executed, rejected }: { approved: boolean; executed: boolean; rejected: boolean }) {
+function StatusPill({ approved, executed, rejected, cancelled }: { approved: boolean; executed: boolean; rejected: boolean; cancelled?: boolean }) {
+  if (cancelled) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+        <Ban className="w-3 h-3" />
+        <span className="line-through decoration-slate-400/60 decoration-[1.5px]">Dibatalkan</span>
+      </span>
+    );
+  }
   if (executed) {
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/80">
@@ -601,7 +615,7 @@ function RejectModal({
         <div className="h-1 bg-gradient-to-r from-rose-400 to-red-500" />
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><X size={16} /></div>
+            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><Ban size={16} /></div>
             <div>
               <p className="text-sm font-bold text-slate-900">Tolak Pengajuan Dana</p>
               <p className="text-[11px] text-slate-400 line-clamp-1 max-w-[220px]">{fundRequest.purpose}</p>
@@ -622,6 +636,81 @@ function RejectModal({
         <div className="px-5 py-4 border-t border-slate-100 flex gap-3 bg-slate-50/60">
           <button onClick={onClose} disabled={saving} className={`flex-1 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition disabled:opacity-50 ${FOCUS_RING}`}>Batal</button>
           <button onClick={submit} disabled={saving} className={`flex-1 h-10 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700 transition disabled:opacity-60 ${FOCUS_RING}`}>{saving ? "Menyimpan..." : "Tolak Pengajuan"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ *  CANCEL MODAL — batalkan pengajuan yang SUDAH dieksekusi tapi BELUM
+ *  direalisasi. Status jadi final "Dibatalkan", jalur realisasi tertutup.
+ *  Alasan opsional (jejak audit). Boleh: eksekutor baris itu sendiri / ADMIN.
+ * ════════════════════════════════════════════════════════════════════════════ */
+function CancelModal({
+  fundRequest, onClose, onSaved,
+}: {
+  fundRequest: FundRequest;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pengajuan-dana/${fundRequest.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel", reason: reason.trim() || undefined }),
+      });
+      const json = await res.json();
+      if (!json.success) { toast.error(json.message || "Gagal membatalkan pengajuan"); return; }
+      toast.success("Pengajuan berhasil dibatalkan");
+      onSaved();
+      onClose();
+    } catch { toast.error("Terjadi kesalahan koneksi"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        <div className="h-1 bg-gradient-to-r from-slate-400 to-rose-500" />
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><Ban size={16} /></div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">Batalkan Pengajuan Dana</p>
+              <p className="text-[11px] text-slate-400 line-clamp-1 max-w-[220px]">{fundRequest.purpose}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className={`w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition ${FOCUS_RING}`}><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-2">
+          <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-700 font-medium">
+            Pengajuan ini sudah dieksekusi. Dengan membatalkan, pengajuan tidak diteruskan ke realisasi (tidak masuk Cashflow).
+          </div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">Alasan Pembatalan <span className="text-slate-400 font-normal">(opsional)</span></label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder="Contoh: Barang batal dibeli, dana dikembalikan"
+            className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-400/15 focus:bg-white transition-all resize-none placeholder:text-slate-400"
+          />
+        </div>
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 bg-slate-50/60">
+          <button onClick={onClose} disabled={saving} className={`flex-1 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition disabled:opacity-50 ${FOCUS_RING}`}>Kembali</button>
+          <button onClick={submit} disabled={saving} className={`flex-1 h-10 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700 transition disabled:opacity-60 ${FOCUS_RING}`}>{saving ? "Memproses..." : "Batalkan Pengajuan"}</button>
         </div>
       </div>
     </div>
@@ -855,6 +944,15 @@ function DetailModal({
                 <span className="text-xs font-semibold text-rose-600 text-right">
                   {fundRequest.rejected_by_name} · {formatDateTime(fundRequest.rejected_at)}
                   {fundRequest.rejection_reason ? ` — "${fundRequest.rejection_reason}"` : ""}
+                </span>
+              </div>
+            )}
+            {fundRequest.is_cancelled && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-500 flex-shrink-0">Dibatalkan oleh</span>
+                <span className="text-xs font-semibold text-slate-500 text-right">
+                  {fundRequest.cancelled_by_name} · {formatDateTime(fundRequest.cancelled_at)}
+                  {fundRequest.cancellation_reason ? ` — "${fundRequest.cancellation_reason}"` : ""}
                 </span>
               </div>
             )}
@@ -1175,6 +1273,8 @@ export default function PengajuanDanaPage() {
   const [realisasiTarget, setRealisasiTarget] = useState<FundRequest | null>(null);
   const [editMetodeTarget, setEditMetodeTarget] = useState<FundRequest | null>(null);
   const [rejectTarget, setRejectTarget] = useState<FundRequest | null>(null);
+  // ⬅️ BARU: target modal pembatalan setelah eksekusi
+  const [cancelTarget, setCancelTarget] = useState<FundRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -1256,7 +1356,7 @@ export default function PengajuanDanaPage() {
       const msgs: Record<string, string> = {
         approve: "Pengajuan disetujui", unapprove: "Persetujuan dibatalkan",
         execute: "Ditandai sudah dieksekusi", unexecute: "Status eksekusi dibatalkan",
-        unreject: "Penolakan dibatalkan",
+        unreject: "Penolakan dibatalkan", uncancel: "Pembatalan dibatalkan",
       };
       toast.success(msgs[action] || "Berhasil");
       fetchData();
@@ -1283,6 +1383,8 @@ export default function PengajuanDanaPage() {
   const totalNotExecuted = data.length - totalExecuted;
   const totalRealized = data.filter((r) => r.realisasi_cashflow_id).length;
   const totalNotRealized = data.length - totalRealized;
+  // ⬅️ BARU: hitung total pengajuan yang dibatalkan setelah eksekusi
+  const totalCancelled = data.filter((r) => r.is_cancelled).length;
 
   // ⬅️ BARU: pengajuan status "Menunggu" (belum di-ACC & belum ditolak), terbaru di atas
   const pendingApprovalData = data
@@ -1297,10 +1399,13 @@ export default function PengajuanDanaPage() {
     if (statusFilter === "not_executed" && r.is_executed) return false;
     if (statusFilter === "realized" && !r.realisasi_cashflow_id) return false;
     if (statusFilter === "not_realized" && r.realisasi_cashflow_id) return false;
+    // ⬅️ BARU: filter khusus pengajuan yang dibatalkan
+    if (statusFilter === "cancelled" && !r.is_cancelled) return false;
 
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      const statusText = r.is_executed ? "selesai" : r.is_approved ? "disetujui" : r.is_rejected ? "ditolak" : "menunggu";
+      // ⬅️ BARU: status "dibatalkan" didahulukan supaya ikut kena pencarian
+      const statusText = r.is_cancelled ? "dibatalkan" : r.is_executed ? "selesai" : r.is_approved ? "disetujui" : r.is_rejected ? "ditolak" : "menunggu";
       const haystack = [
         r.requester_name,
         r.purpose,
@@ -1336,6 +1441,8 @@ export default function PengajuanDanaPage() {
     { key: "not_executed", label: "Belum Eksekusi", count: totalNotExecuted, icon: <Clock className="w-3 h-3" /> },
     { key: "realized", label: "Sudah Realisasi", count: totalRealized, icon: <CheckCircle2 className="w-3 h-3" /> },
     { key: "not_realized", label: "Belum Realisasi", count: totalNotRealized, icon: <Clock className="w-3 h-3" /> },
+    // ⬅️ BARU: chip filter untuk pengajuan yang dibatalkan
+    { key: "cancelled", label: "Dibatalkan", count: totalCancelled, icon: <Ban className="w-3 h-3" /> },
   ];
 
   const CARD_STYLE = "bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_30px_-6px_rgba(99,102,241,0.12)] transition-all duration-300";
@@ -1689,7 +1796,7 @@ export default function PengajuanDanaPage() {
                         </td>
 
                         <td className="px-4 py-4 text-center">
-                          <StatusPill approved={row.is_approved} executed={row.is_executed} rejected={row.is_rejected} />
+                          <StatusPill approved={row.is_approved} executed={row.is_executed} rejected={row.is_rejected} cancelled={row.is_cancelled} />
                         </td>
 
                         {/* Persetujui */}
@@ -1786,9 +1893,29 @@ export default function PengajuanDanaPage() {
                           )}
                         </td>
 
-                        {/* Realisasi */}
+                        {/* Realisasi / Batalkan */}
+                        {/* ⬅️ BARU: kolom ini sekarang punya 2 jalur setelah eksekusi —
+                            Isi Realisasi ATAU Batalkan. Baris yang sudah dibatalkan tampil
+                            abu-abu dengan opsi uncancel (eksekutor/ADMIN). */}
                         <td className="px-4 py-4 text-center">
-                          {row.realisasi_cashflow_id ? (
+                          {row.is_cancelled ? (
+                            <div className="inline-flex flex-col items-center gap-1">
+                              <button
+                                onClick={() => canRealisasiRow ? handleAction(row.id, "uncancel") : undefined}
+                                disabled={busy || !canRealisasiRow}
+                                title={canRealisasiRow ? "Batalkan pembatalan" : `Dibatalkan oleh ${row.cancelled_by_name}`}
+                                className={`w-8 h-8 rounded-2xl flex items-center justify-center transition-all ${FOCUS_RING} ${canRealisasiRow
+                                  ? "bg-slate-400 text-white shadow-sm hover:bg-slate-500 cursor-pointer active:scale-90"
+                                  : "bg-slate-100 text-slate-500 cursor-default"
+                                  }`}
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                              <span className="text-[10px] text-slate-500 font-semibold">Dibatalkan</span>
+                              <span className="text-[10px] text-slate-400 max-w-[92px] truncate">{row.cancelled_by_name}</span>
+                              <span className="text-[9px] text-slate-400 max-w-[92px] text-center leading-tight">{formatDateTime(row.cancelled_at)}</span>
+                            </div>
+                          ) : row.realisasi_cashflow_id ? (
                             <div className="inline-flex flex-col items-center gap-1">
                               <span
                                 title={`Realisasi sudah final · Direalisasi oleh ${row.realisasi_by_name ?? "-"}`}
@@ -1802,13 +1929,22 @@ export default function PengajuanDanaPage() {
                             </div>
                           ) : row.is_executed ? (
                             canRealisasiRow ? (
-                              <button
-                                onClick={() => setRealisasiTarget(row)}
-                                title="Isi realisasi pengeluaran"
-                                className={`w-8 h-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-teal-400 hover:bg-teal-50 flex items-center justify-center mx-auto transition-all hover:scale-110 active:scale-90 ${FOCUS_RING}`}
-                              >
-                                <Banknote className="w-4 h-4 text-slate-300 group-hover:text-teal-500" />
-                              </button>
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  onClick={() => setRealisasiTarget(row)}
+                                  title="Isi realisasi pengeluaran"
+                                  className={`w-8 h-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-teal-400 hover:bg-teal-50 flex items-center justify-center transition-all hover:scale-110 active:scale-90 ${FOCUS_RING}`}
+                                >
+                                  <Banknote className="w-4 h-4 text-slate-300 group-hover:text-teal-500" />
+                                </button>
+                                <button
+                                  onClick={() => setCancelTarget(row)}
+                                  title="Batalkan pengajuan (tidak jadi direalisasi)"
+                                  className={`w-8 h-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-rose-400 hover:bg-rose-50 flex items-center justify-center transition-all hover:scale-110 active:scale-90 ${FOCUS_RING}`}
+                                >
+                                  <X className="w-4 h-4 text-slate-300 group-hover:text-rose-500" />
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-[10px] text-amber-500 font-semibold" title={`Hanya ${row.executed_by_name} yang bisa mengisi realisasi ini`}>Menunggu</span>
                             )
@@ -1848,7 +1984,7 @@ export default function PengajuanDanaPage() {
                           <p className="text-[11px] text-slate-400">{formatDate(row.created_at)}</p>
                         </div>
                       </div>
-                      <StatusPill approved={row.is_approved} executed={row.is_executed} rejected={row.is_rejected} />
+                      <StatusPill approved={row.is_approved} executed={row.is_executed} rejected={row.is_rejected} cancelled={row.is_cancelled} />
                     </div>
 
                     <button
@@ -1910,17 +2046,45 @@ export default function PengajuanDanaPage() {
                       </button>
                     )}
 
-                    {row.is_executed && !row.realisasi_cashflow_id && (
+                    {/* ⬅️ BARU: tombol Isi Realisasi + Batalkan (hanya kalau belum direalisasi & belum dibatalkan) */}
+                    {row.is_executed && !row.realisasi_cashflow_id && !row.is_cancelled && (
                       canRealisasiRow ? (
-                        <button
-                          onClick={() => setRealisasiTarget(row)}
-                          className={`w-full h-10 rounded-xl bg-teal-50 text-teal-600 text-xs font-bold border border-teal-200 active:scale-95 transition ${FOCUS_RING}`}
-                        >
-                          Isi Realisasi
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setRealisasiTarget(row)}
+                            className={`flex-1 h-10 rounded-xl bg-teal-50 text-teal-600 text-xs font-bold border border-teal-200 active:scale-95 transition ${FOCUS_RING}`}
+                          >
+                            Isi Realisasi
+                          </button>
+                          <button
+                            onClick={() => setCancelTarget(row)}
+                            className={`flex-1 h-10 rounded-xl bg-rose-50 text-rose-600 text-xs font-bold border border-rose-200 active:scale-95 transition ${FOCUS_RING}`}
+                          >
+                            Batalkan
+                          </button>
+                        </div>
                       ) : (
                         <p className="text-[11px] text-amber-500 font-semibold">Menunggu realisasi dari {row.executed_by_name}</p>
                       )
+                    )}
+
+                    {/* ⬅️ BARU: baris info "Dibatalkan oleh …" + link uncancel di mobile */}
+                    {row.is_cancelled && (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 space-y-1">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                          <Ban className="w-3 h-3" />
+                          <span className="line-through decoration-slate-400/60">Dibatalkan</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                          {row.cancelled_by_name} · {formatDateTime(row.cancelled_at)}
+                          {row.cancellation_reason ? ` — "${row.cancellation_reason}"` : ""}
+                        </p>
+                        {canRealisasiRow && (
+                          <button onClick={() => handleAction(row.id, "uncancel")} className={`inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 ${FOCUS_RING}`}>
+                            <RotateCcw className="w-3 h-3" /> Batalkan pembatalan
+                          </button>
+                        )}
+                      </div>
                     )}
 
                     {row.realisasi_cashflow_id && (
@@ -1973,6 +2137,15 @@ export default function PengajuanDanaPage() {
         <RejectModal
           fundRequest={rejectTarget}
           onClose={() => setRejectTarget(null)}
+          onSaved={fetchData}
+        />
+      )}
+
+      {/* ⬅️ BARU: render modal pembatalan setelah eksekusi */}
+      {cancelTarget && (
+        <CancelModal
+          fundRequest={cancelTarget}
+          onClose={() => setCancelTarget(null)}
           onSaved={fetchData}
         />
       )}
