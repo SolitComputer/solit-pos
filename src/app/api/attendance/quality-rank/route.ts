@@ -96,10 +96,23 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
             historyByUser.get(r.user_id)!.push({ year: r.year, month: r.month, rank: r.rank });
         });
 
-        const list = (rows ?? []).map((r) => {
+        // ✅ FIX BUG: snapshot bulan lama di-generate SEBELUM guard "total_workdays > 0"
+        // ada di POST, jadi akun baru (hari kerja 0) ke-freeze dengan rank 1/2/3 di DB.
+        // GET ini cuma baca `rank` apa adanya → mereka muncul di atas/podium.
+        // Re-order defensif: yang punya hari kerja selalu di atas, yang 0 hari kerja
+        // selalu di bawah — tanpa perlu generate ulang bulan lama.
+        const orderedRows = [...(rows ?? [])].sort((a, b) => {
+            const aHasWork = (a.total_workdays ?? 0) > 0;
+            const bHasWork = (b.total_workdays ?? 0) > 0;
+            if (aHasWork !== bHasWork) return aHasWork ? -1 : 1;
+            return (a.rank ?? 9999) - (b.rank ?? 9999); // sisanya ikut urutan rank tersimpan
+        });
+
+        const list = orderedRows.map((r, i) => {
             const levelInfo = computeBadgeLevel(historyByUser.get(r.user_id) ?? []);
             return {
                 ...r,
+                rank: i + 1, // ✅ rank display dihitung ulang → akun 0 hari kerja gak bisa nyangkut di Top 3/podium
                 name: userMap.get(r.user_id)?.name ?? "Unknown",
                 role: userMap.get(r.user_id)?.role ?? "",
                 level: levelInfo.displayLevel,
