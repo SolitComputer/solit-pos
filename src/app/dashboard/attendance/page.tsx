@@ -3859,8 +3859,26 @@ export default function AttendanceDashboardPage() {
     }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchShiftSchedules, fetchShiftConfigs, fetchSalarySlips, currentUser]);
     // ── Derived ───────────────────────────────────────────────────────────────
     const dayOffByName = useMemo(() => { const m: Record<string, Set<number>> = {}; dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); }); return m; }, [dayOffs]);
-    const dateOffByName = useMemo(() => { const m: Record<string, Set<string>> = {}; allDateOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.off_date); }); return m; }, [allDateOffs]);
-
+    const dateOffByName = useMemo(() => {
+        const m: Record<string, Set<string>> = {};
+        // ✅ FIX: dulu nge-key dari d.users?.name, padahal endpoint /date-off GET
+        // TIDAK ikut join users → d.users undefined → semua date_off ter-skip,
+        // jadi libur per-tanggal tidak pernah kebaca di akun karyawan sendiri
+        // (muncul di admin karena jalur resolve-nya beda). Sekarang nge-key dari
+        // user_id → resolve ke nama via allUsers (konsisten dgn monthlyOffByName),
+        // dengan fallback ke d.users?.name / currentUser kalau user tidak ada di
+        // allUsers (kasus akun sendiri yg allUsers-nya terbatas).
+        allDateOffs.forEach(d => {
+            const n = allUsers.find(u => u.id === d.user_id)?.name
+                ?? d.users?.name
+                ?? (d.user_id === currentUser?.id ? currentUser?.name : null);
+            if (!n) return;
+            if (!m[n]) m[n] = new Set();
+            m[n].add(d.off_date);
+        });
+        return m;
+    }, [allDateOffs, allUsers, currentUser]);
+    
     const dateWorkByName = useMemo(() => {
         const m: Record<string, Set<string>> = {};
         allDateWorks.forEach(d => {
