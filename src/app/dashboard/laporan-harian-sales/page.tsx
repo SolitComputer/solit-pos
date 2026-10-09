@@ -28,9 +28,9 @@ import {
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserClient } from "@/lib/auth-client";
 
-type Channel = "WA" | "FB" | "OLX" | "CAROUSEL" | "ECOMMERCE" | "SOSMED" | "MITRA" | "RESELLER";
+type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "ECOMMERCE" | "TOKOPEDIA" | "SHOPEE" | "SOSMED" | "MITRA" | "RESELLER";
 
-const CHANNELS: Channel[] = ["WA", "FB", "OLX", "CAROUSEL", "ECOMMERCE", "SOSMED", "MITRA", "RESELLER"];
+const CHANNELS: Channel[] = ["WA", "FB", "IG", "TIKTOK", "SOSMED", "OLX", "CAROUSEL", "ECOMMERCE", "TOKOPEDIA", "SHOPEE", "MITRA", "RESELLER"];
 
 const channelLabels: Record<Channel, string> = {
   WA: "WhatsApp",
@@ -41,8 +41,11 @@ const channelLabels: Record<Channel, string> = {
   SOSMED: "Sosmed",
   MITRA: "Mitra",
   RESELLER: "Reseller",
+  IG: "Instagram",
+  TIKTOK: "TikTok",
+  TOKOPEDIA: "Tokopedia",
+  SHOPEE: "Shopee",
 };
-
 const channelBadgeClass: Record<Channel, string> = {
   WA: "bg-emerald-50 text-emerald-600",
   FB: "bg-blue-50 text-blue-600",
@@ -52,6 +55,10 @@ const channelBadgeClass: Record<Channel, string> = {
   SOSMED: "bg-indigo-50 text-indigo-600",
   MITRA: "bg-violet-50 text-violet-600",
   RESELLER: "bg-amber-50 text-amber-600",
+  IG: "bg-pink-50 text-pink-600",
+  TIKTOK: "bg-zinc-100 text-zinc-700",
+  TOKOPEDIA: "bg-green-50 text-green-600",
+  SHOPEE: "bg-red-50 text-red-600",
 };
 
 // Aksen warna kecil per-channel (dot di tab & garis kiri baris tabel) —
@@ -65,6 +72,10 @@ const channelDotClass: Record<Channel, string> = {
   SOSMED: "bg-indigo-500",
   MITRA: "bg-violet-500",
   RESELLER: "bg-amber-500",
+  IG: "bg-pink-500",
+  TIKTOK: "bg-zinc-700",
+  TOKOPEDIA: "bg-green-500",
+  SHOPEE: "bg-red-500",
 };
 
 const channelBorderClass: Record<Channel, string> = {
@@ -76,6 +87,10 @@ const channelBorderClass: Record<Channel, string> = {
   SOSMED: "border-l-indigo-400",
   MITRA: "border-l-violet-400",
   RESELLER: "border-l-amber-400",
+  IG: "border-l-pink-400",
+  TIKTOK: "border-l-zinc-500",
+  TOKOPEDIA: "border-l-green-400",
+  SHOPEE: "border-l-red-400",
 };
 
 // Warna badge angka pada tab channel saat aktif (di-invert jadi soft-on-dark).
@@ -88,6 +103,10 @@ const channelActiveCountClass: Record<Channel, string> = {
   SOSMED: "bg-indigo-400/25 text-indigo-100",
   MITRA: "bg-violet-400/25 text-violet-100",
   RESELLER: "bg-amber-400/25 text-amber-100",
+  IG: "bg-pink-400/25 text-pink-100",
+  TIKTOK: "bg-zinc-400/25 text-zinc-100",
+  TOKOPEDIA: "bg-green-400/25 text-green-100",
+  SHOPEE: "bg-red-400/25 text-red-100",
 };
 
 // FB/OLX/Carousell -> input Username. Mitra/Reseller -> input Nama Mitra/Reseller.
@@ -103,6 +122,10 @@ const CHANNEL_CONTACT_MODE: Record<Channel, ContactMode> = {
   SOSMED: "username",
   MITRA: "partner",
   RESELLER: "partner",
+  IG: "username",
+  TIKTOK: "username",
+  TOKOPEDIA: "username",
+  SHOPEE: "username",
 };
 
 const contactFieldConfig: Record<"username" | "partner", { label: string; placeholder: string }> = {
