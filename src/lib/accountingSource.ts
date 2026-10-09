@@ -1283,12 +1283,22 @@ async function buildServiceDrafts(
     for (const e of (existingEntries ?? []) as any[]) {
       const rawSourceId = e.source_id as string;
       const baseId = rawSourceId.split("__")[0];
-      const jasaLine = (e.lines ?? []).find(
-        (l: any) => l.account_code === AKUN.JASA_SERVICE && l.side === "KREDIT"
-      );
-      if (jasaLine) {
+      // (fix) Ukur "sudah dibayar berapa" dari sisi DEBIT Kas (uang masuk), BUKAN
+      // dari kredit Jasa Service. Kalau diukur dari Jasa Service, begitu jurnal
+      // diedit & sebagian pendapatan dipindah ke akun lain (mis. Penjualan Laptop),
+      // nilai Jasa Service mengecil → selisihnya salah dianggap "belum dibukukan"
+      // → draft muncul lagi sebagai pending. Sisi Kas tidak ikut berubah saat
+      // sumber pendapatan dipecah, jadi ukuran ini stabil.
+      const kasDebit = (e.lines ?? [])
+        .filter(
+          (l: any) =>
+            (l.account_code === AKUN.KAS_CASH || l.account_code === AKUN.KAS_SALDO) &&
+            l.side === "DEBIT"
+        )
+        .reduce((s: number, l: any) => s + Math.round(Number(l.nominal ?? 0)), 0);
+      if (kasDebit > 0) {
         const cur = alreadyPostedByService.get(baseId) ?? 0;
-        alreadyPostedByService.set(baseId, cur + Math.round(Number(jasaLine.nominal)));
+        alreadyPostedByService.set(baseId, cur + kasDebit);
       }
       if (rawSourceId.includes("__DP")) {
         dpCountByService.set(baseId, (dpCountByService.get(baseId) ?? 0) + 1);
