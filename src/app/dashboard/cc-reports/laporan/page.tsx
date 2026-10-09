@@ -203,7 +203,7 @@ export default function CCLaporanPage() {
           </div>
 
           {/* ── Tab brand ── */}
-          <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
             {BRAND_TABS.map((b) => {
               const active = brand === b.key;
               return (
@@ -211,8 +211,8 @@ export default function CCLaporanPage() {
                   key={b.key}
                   onClick={() => setBrand(b.key)}
                   className={`flex items-center justify-center gap-1.5 rounded-2xl border px-2 py-2.5 text-xs font-bold transition ${active
-                      ? "border-gray-900 bg-gray-900 text-white shadow-sm"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
+                    ? "border-gray-900 bg-gray-900 text-white shadow-sm"
+                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
                     }`}
                 >
                   <span
@@ -367,7 +367,7 @@ export default function CCLaporanPage() {
 function Dot({ done }: { done: boolean }) {
   return done ? (
     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-xs font-black text-emerald-600">
-      
+
     </span>
   ) : (
     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-50 text-xs font-black text-gray-300">
