@@ -252,8 +252,12 @@ const AUDIT_LEADS_MENU: MenuGroup = {
   items: [
     { name: "WhatsApp", href: "/dashboard/audit-leads/wa", icon: Icons.salesReport },
     { name: "Facebook", href: "/dashboard/audit-leads/fb", icon: Icons.salesReport },
+    { name: "Instagram", href: "/dashboard/audit-leads/ig", icon: Icons.salesReport },
+    { name: "TikTok", href: "/dashboard/audit-leads/tiktok", icon: Icons.salesReport },
     { name: "OLX", href: "/dashboard/audit-leads/olx", icon: Icons.salesReport },
     { name: "Carousell", href: "/dashboard/audit-leads/carousell", icon: Icons.salesReport },
+    { name: "Tokopedia", href: "/dashboard/audit-leads/tokopedia", icon: Icons.salesReport },
+    { name: "Shopee", href: "/dashboard/audit-leads/shopee", icon: Icons.salesReport },
     { name: "Mitra", href: "/dashboard/audit-leads/mitra", icon: Icons.salesReport },
     { name: "Reseller", href: "/dashboard/audit-leads/reseller", icon: Icons.salesReport },
   ],
