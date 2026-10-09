@@ -915,7 +915,8 @@ export default function FaceVerifyPage() {
               const embedding2 = await captureAveragedEmbedding(3);
               let vd = await doVerify(embedding, currentAttempt, coords);
               if (!vd.success && !vd.outOfTime && !vd.needEnroll
-                  && vd.code !== "EARLY_CHECKOUT_NOT_APPROVED" && embedding2) {
+                  && vd.code !== "EARLY_CHECKOUT_NOT_APPROVED"
+                  && vd.code !== "FACE_BELONGS_TO_OTHER" && embedding2) {
                 addLog("sample ke-2 (meredam frame buruk)...", "info");
                 const vd2 = await doVerify(embedding2, currentAttempt, coords);
                 if (vd2.success) vd = vd2;
@@ -935,6 +936,14 @@ export default function FaceVerifyPage() {
               } else if (vd.code === "EARLY_CHECKOUT_NOT_APPROVED") {
                 setEarlyCheckoutMsg(vd.message ?? "Belum waktunya pulang.");
                 setStage("early-checkout-request");
+              } else if (vd.code === "FACE_BELONGS_TO_OTHER") {
+                // ✅ FIX: dulu kasus ini jatuh ke "wajah tidak cocok" biasa —
+                // karyawan retry 5x tanpa tahu sebabnya. Sekarang diarahkan ke
+                // layar face-conflict dengan pesan jelas + saran hubungi admin.
+                setFaceConflict({ code: "FACE_BELONGS_TO_OTHER", conflictName: vd.conflictName ?? null });
+                setMessage(vd.message ?? "Wajah terdeteksi mirip dengan akun lain.");
+                setStage("face-conflict");
+                addLog("verifikasi ditolak: wajah mirip akun lain", "err");
               } else if (vd.outOfTime) {
                 setTimeInfo({
                   reason: vd.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
