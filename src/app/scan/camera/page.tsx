@@ -80,9 +80,13 @@ export default function CameraScanPage() {
                     aspectRatio: 1.777,
                 },
                 async (decodedText) => {
-                    // Bersihkan karakter kontrol di titik decode juga (bukan cuma
-                    // di handleSearch) supaya SN yang ditampilkan & dicari konsisten.
-                    const clean = decodedText.replace(/[\u0000-\u001F\u007F]/g, "").trim();
+                    // Bersihkan karakter kontrol + AIM prefix (]C1 dll) di titik
+                    // decode juga, supaya SN yang DITAMPILKAN di layar juga sudah
+                    // bersih (bukan cuma yang dikirim ke API).
+                    const clean = decodedText
+                        .replace(/[\u0000-\u001F\u007F]/g, "")
+                        .replace(/^\][A-Za-z]\d/, "")
+                        .trim();
                     setDecoded(clean);
                     await stopScanner();
                     handleSearch(clean);
@@ -127,9 +131,13 @@ export default function CameraScanPage() {
     };
 
     const handleSearch = async (raw: string) => {
-         // Buang karakter kontrol/non-printable (mis. Enter dari scanner) lalu
-        // trim, supaya SN persis sama dengan yang tersimpan di database.
-        const sn = raw.replace(/[\u0000-\u001F\u007F]/g, "").trim();
+        // Buang karakter kontrol/non-printable (mis. Enter dari scanner) lalu trim.
+        let sn = raw.replace(/[\u0000-\u001F\u007F]/g, "").trim();
+        // ✅ Buang AIM symbology identifier yang ditambahkan BarcodeDetector di
+        // depan hasil: ]C1 (Code128), ]C0, ]C2, ]A0 (Code39), ]Q0 (QR), ]E0 (EAN),
+        // dll. Pola: ] + 1 huruf + 1 digit. Tanpa ini, SN "MPC-WW" terkirim jadi
+        // "]C1MPC-WW" → API 404. Inilah akar kegagalan scan kamera.
+        sn = sn.replace(/^\][A-Za-z]\d/, "").trim();
         setLoading(true);
         setDebug(null);
 
