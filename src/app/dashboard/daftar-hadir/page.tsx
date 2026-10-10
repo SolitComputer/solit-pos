@@ -22,6 +22,7 @@ import {
   Clock,
   Percent,
   Pencil,
+  LogOut,
 } from "lucide-react";
 
 type AttendanceEntry = {
@@ -30,6 +31,7 @@ type AttendanceEntry = {
   role: string;
   check_in_time: string;
   method: "FACE" | "MANUAL";
+  check_out_time?: string | null; // ✅ NEW — jam pulang (ISO), null kalau belum pulang
 };
 
 type ManualRecord = {
@@ -174,14 +176,32 @@ export default function DaftarHadirPage() {
       const now = new Date();
       const todayKey = getWIBToday();
 
-      const [attRes, usersRes, manualRes] = await Promise.all([
+      const [attRes, usersRes, manualRes, allAttRes] = await Promise.all([
         fetch("/api/attendance/today", { cache: "no-store" }),
         fetch("/api/attendance/users", { cache: "no-store" }),
         fetch(`/api/attendance/manual?year=${now.getFullYear()}&month=${now.getMonth() + 1}`, { cache: "no-store" }),
+        fetch("/api/attendance", { cache: "no-store" }), // ✅ NEW — ambil semua record termasuk absen pulang (OUT)
       ]);
 
       const attJson = await attRes.json();
       const baseData: GroupedAttendance = attJson.success ? attJson.data : EMPTY;
+
+      // ✅ NEW — bangun map jam pulang: key `${user_id}_${tanggalWIB}` → jam pulang (ISO)
+      // Ambil dari record direction OUT di /api/attendance (sama seperti di halaman Absensi)
+      const checkoutMap: Record<string, string> = {};
+      try {
+        const allAttJson = await allAttRes.json();
+        if (allAttJson.success) {
+          (allAttJson.data || []).forEach((a: { user_id: string; direction?: string; check_in_time?: string; created_at?: string }) => {
+            if (a.direction !== "OUT") return;
+            const iso = a.check_in_time || a.created_at;
+            if (!iso) return;
+            checkoutMap[`${a.user_id}_${toWIBDateKey(iso)}`] = iso;
+          });
+        }
+      } catch (e) {
+        console.error("[daftar-hadir] parse checkout error:", e);
+      }
 
       const usersJson = await usersRes.json();
       if (usersJson.success) setAllUsers(usersJson.data || []);
@@ -193,10 +213,16 @@ export default function DaftarHadirPage() {
           [...baseData.pagi, ...baseData.siang, ...baseData.sore].map((e) => e.user_id)
         );
 
+        // ✅ NEW — tempelkan jam pulang ke tiap entry absen masuk (dari baseData)
+        const attachCheckout = (e: AttendanceEntry): AttendanceEntry => ({
+          ...e,
+          check_out_time: checkoutMap[`${e.user_id}_${toWIBDateKey(e.check_in_time)}`] ?? null,
+        });
+
         const merged: GroupedAttendance = {
-          pagi: [...baseData.pagi],
-          siang: [...baseData.siang],
-          sore: [...baseData.sore],
+          pagi: baseData.pagi.map(attachCheckout),
+          siang: baseData.siang.map(attachCheckout),
+          sore: baseData.sore.map(attachCheckout),
         };
 
         (manualJson.data || []).forEach((m: ManualRecord) => {
@@ -210,6 +236,7 @@ export default function DaftarHadirPage() {
             role: m.users?.role || "",
             check_in_time: m.check_in_time,
             method: "MANUAL",
+            check_out_time: checkoutMap[`${m.user_id}_${m.attendance_date}`] ?? null, // ✅ NEW
           };
           merged[classifyDaySection(m.check_in_time)].push(entry);
         });
@@ -519,8 +546,22 @@ export default function DaftarHadirPage() {
                           </p>
                           <p className="text-[10px] text-gray-400">{humanizeRoleKey(e.role)}</p>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xs font-mono font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded-lg">{toWIBTime(e.check_in_time)}</p>
+                        <div className="text-right flex-shrink-0 space-y-1">
+                          <p className="text-xs font-mono font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded-lg flex items-center justify-end gap-1" title="Jam masuk">
+                            <Sun className="w-2.5 h-2.5 text-amber-400" />
+                            {toWIBTime(e.check_in_time)}
+                          </p>
+                          {e.check_out_time ? (
+                            <p className="text-xs font-mono font-bold text-violet-700 bg-violet-50 px-2 py-1 rounded-lg flex items-center justify-end gap-1" title="Jam pulang">
+                              <LogOut className="w-2.5 h-2.5 text-violet-500" />
+                              {toWIBTime(e.check_out_time)}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] font-semibold text-orange-500 bg-orange-50 px-2 py-1 rounded-lg flex items-center justify-end gap-1" title="Belum absen pulang">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                              Belum pulang
+                            </p>
+                          )}
                         </div>
                       </div>
                     ))
