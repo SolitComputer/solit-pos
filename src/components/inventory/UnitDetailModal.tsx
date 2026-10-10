@@ -69,6 +69,7 @@ const GRADE_STYLE: Record<string, { badge: string; desc: string }> = {
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
+    MINUS_SIAP_JUAL: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", label: "Minus Siap Jual" },
     BELUM_SIAP: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Belum Siap" },
     SERVICE: { badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500", label: "Service" },
     RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
@@ -79,7 +80,8 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
 
 // Status yang boleh dipilih manual. RESERVED/HELD/PACKING/SOLD digerakkan
 // oleh alur transaksi, bukan diedit tangan dari sini.
-const EDITABLE_STATUS = ["SIAP_JUAL", "BELUM_SIAP", "SERVICE"] as const;
+// "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual / dibikin payment.
+const EDITABLE_STATUS = ["SIAP_JUAL", "MINUS_SIAP_JUAL", "BELUM_SIAP", "SERVICE"] as const;
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 const fmtDate = (iso: string) =>

@@ -10,8 +10,7 @@ import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES } from "@/lib/permissions";
-import { hasSopAccess } from "@/lib/sop";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES } from "@/lib/permissions";import { hasSopAccess } from "@/lib/sop";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
@@ -49,6 +48,9 @@ function isItemActive(href: string, pathname: string): boolean {
 
   if (href === "/dashboard/laptops/ready") {
     return pathname === "/dashboard/laptops/ready";
+  }
+  if (href === "/dashboard/laptops/minus-siap-jual") {
+    return pathname === "/dashboard/laptops/minus-siap-jual";
   }
   if (href === "/dashboard/laptops/minus") {
     return pathname === "/dashboard/laptops/minus";
@@ -273,6 +275,7 @@ const ITEM_AUDIT_OUTFLOW: MenuItem = { name: "Audit Barang Keluar", href: "/dash
 const ITEM_FIXED_ASSETS: MenuItem = { name: "Aset", href: "/dashboard/fixed-assets", icon: Icons.fixedAsset };
 const ITEM_ASET_MATOT: MenuItem = { name: "Aset Matot", href: "/dashboard/fixed-assets/aset-matot", icon: Icons.assetMatot };
 const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
+const ITEM_LAPTOP_MINUS_SIAP_JUAL: MenuItem = { name: "Minus Siap Jual", href: "/dashboard/laptops/minus-siap-jual", icon: Icons.laptopMinus };
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LAPTOP_MONITORING: MenuItem = { name: "Monitoring Stok", href: "/dashboard/laptops/monitoring", icon: Icons.laptopMonitoring };
 // Pakai icon yang sama dengan "Riwayat Servis" (Icons.serviceHistory) — secara
@@ -1030,6 +1033,33 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   });
   if (!hasInventaris) {
     ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Inventaris", items: [ITEM_RIWAYAT_SO] }];
+  }
+});
+
+// ── Minus Siap Jual: hanya untuk LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES ───────────
+// Daftar role SENGAJA lebih sempit dari yang bisa lihat Barang Siap Jual
+// (mis. Marketing/Accounting boleh lihat Siap Jual tapi TIDAK Minus Siap Jual),
+// jadi TIDAK bisa auto-ikut Barang Siap Jual — harus whitelist eksplisit.
+// Item disisipkan TEPAT di bawah "Barang Siap Jual" via findIndex; kalau role
+// itu belum punya "Barang Siap Jual" di grup Inventaris, item ditaruh di akhir.
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES as string[]).includes(role)) return;
+  let hasInventaris = false;
+  ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
+    if (g.label !== "Inventaris") return g;
+    hasInventaris = true;
+    if (g.items.some((it) => it.href === ITEM_LAPTOP_MINUS_SIAP_JUAL.href)) return g;
+    const readyIdx = g.items.findIndex((it) => it.href === ITEM_LAPTOP_SIAP_JUAL.href);
+    const items = [...g.items];
+    if (readyIdx >= 0) {
+      items.splice(readyIdx + 1, 0, ITEM_LAPTOP_MINUS_SIAP_JUAL);
+    } else {
+      items.push(ITEM_LAPTOP_MINUS_SIAP_JUAL);
+    }
+    return { ...g, items };
+  });
+  if (!hasInventaris) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Inventaris", items: [ITEM_LAPTOP_MINUS_SIAP_JUAL] }];
   }
 });
 

@@ -62,7 +62,7 @@ interface UnifiedRow {
     harga_jual: number; total_jual: number | null; gross_profit: number | null;
     sumber: string | null; tanggal_masuk: string | null;
     sn: string | null; sn_note?: string;
-    stok_tersedia: number | null; siap_jual: number | null; minus: number | null; // laptop (ST/SJ/M)
+    stok_tersedia: number | null; siap_jual: number | null; minus: number | null; minus_siap_jual: number | null; // laptop (ST/SJ/M/MSJ)
     stok: number | null; // aksesoris
     so_at: string | null; so_by: string | null;
     audited_at: string | null; audited_by: string | null;
@@ -131,9 +131,13 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     // sama seperti SOLD, tapi tetap dibedakan dari penjualan di laporan.
     const aktif = units.filter(u => u.status !== "SOLD" && u.status !== "KELUAR");
     const siapJual = aktif.filter(u => u.status === "SIAP_JUAL").length;
+    // "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual (bisa dibikin
+    // payment). Dihitung terpisah dari minus biasa (SERVICE/BELUM_SIAP) yang
+    // TIDAK boleh dijual.
+    const minusSiapJual = aktif.filter(u => u.status === "MINUS_SIAP_JUAL").length;
     const stokMinus = aktif.filter(u => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
     const dalamPenyiapan = aktif.filter(u => u.status === "DALAM_PENYIAPAN").length;
-    const stokTersedia = siapJual + stokMinus + dalamPenyiapan;
+    const stokTersedia = siapJual + stokMinus + dalamPenyiapan + minusSiapJual;
     const one = aktif.length === 1 ? aktif[0] : null;
     const modals = aktif.map(u => u.purchase_price).filter((n): n is number => n != null && n > 0);
     const min = modals.length ? Math.min(...modals) : 0;
@@ -154,7 +158,7 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
         tanggal_masuk: one ? (one.created_at ?? null) : null,
         sn: one ? one.serial_number : null,
         sn_note: one ? undefined : (aktif.length > 1 ? `${aktif.length} SN` : undefined),
-        stok_tersedia: stokTersedia, siap_jual: siapJual, minus: stokMinus, stok: null,
+        stok_tersedia: stokTersedia, siap_jual: siapJual, minus: stokMinus, minus_siap_jual: minusSiapJual, stok: null,
         so_at: l.so_at ?? null, so_by: l.so_by ?? null,
         audited_at: l.audited_at ?? null, audited_by: l.audited_by ?? null,
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
@@ -179,7 +183,7 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
         tanggal_masuk: one ? (one.created_at ?? null) : null,
         sn: one ? one.serial_number : null,
         sn_note: one ? undefined : (aktif.length > 1 ? `${aktif.length} SN` : undefined),
-        stok_tersedia: null, siap_jual: null, minus: null,
+        stok_tersedia: null, siap_jual: null, minus: null, minus_siap_jual: null,
         stok: units.length > 0 ? aktif.length : (a.stock ?? 0),
         so_at: a.so_at ?? null, so_by: a.so_by ?? null,
         audited_at: a.audited_at ?? null, audited_by: a.audited_by ?? null,
@@ -331,7 +335,7 @@ interface BarangFilterState {
     tipeFilter: "ALL" | ItemType;
     kategoriFilter: string[];
     brandFilter: string;
-    stokFilter: "ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS";
+    stokFilter: "ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS" | "MINUS_SIAP_JUAL";
     minPrice: string;
     maxPrice: string;
     statusAuditSoFilter: "ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE";
@@ -742,8 +746,7 @@ export default function UnifiedBarangContent() {
     const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>(() => bootFilter?.tipeFilter ?? "ALL");
     const [kategoriFilter, setKategoriFilter] = useState<string[]>(() => bootFilter?.kategoriFilter ?? []);
     const [brandFilter, setBrandFilter] = useState(() => bootFilter?.brandFilter ?? "");
-    const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS">(() => bootFilter?.stokFilter ?? "ALL");
-    const [minPrice, setMinPrice] = useState(() => bootFilter?.minPrice ?? "");
+    const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS" | "MINUS_SIAP_JUAL">(() => bootFilter?.stokFilter ?? "ALL");     const [minPrice, setMinPrice] = useState(() => bootFilter?.minPrice ?? "");
     const [maxPrice, setMaxPrice] = useState(() => bootFilter?.maxPrice ?? "");
     const [statusAuditSoFilter, setStatusAuditSoFilter] = useState<"ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE">(() => bootFilter?.statusAuditSoFilter ?? "ALL");
     const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST">(() => bootFilter?.sortBy ?? "NAMA_ASC");
@@ -997,6 +1000,7 @@ export default function UnifiedBarangContent() {
                 if (stokFilter === "EMPTY") return stokVal === 0;
                 if (stokFilter === "SIAP_JUAL") return r.tipe === "LAPTOP" && (r.siap_jual ?? 0) > 0;
                 if (stokFilter === "MINUS") return r.tipe === "LAPTOP" && (r.minus ?? 0) > 0;
+                if (stokFilter === "MINUS_SIAP_JUAL") return r.tipe === "LAPTOP" && (r.minus_siap_jual ?? 0) > 0;
                 return true;
             });
         }
@@ -1753,6 +1757,7 @@ export default function UnifiedBarangContent() {
                                         <option value="EMPTY">Stok Habis (= 0)</option>
                                         <option value="SIAP_JUAL">Ada Unit Siap Jual</option>
                                         <option value="MINUS">Ada Stock Minus / Service</option>
+                                        <option value="MINUS_SIAP_JUAL">Ada Minus Siap Jual</option>
                                     </select>
                                 </div>
 
@@ -1931,6 +1936,7 @@ export default function UnifiedBarangContent() {
                                                             <>
                                                                 <StatChip label="ST" value={row.stok_tersedia} tone={(row.stok_tersedia ?? 0) === 0 ? "red" : "gray"} />
                                                                 <StatChip label="SJ" value={row.siap_jual} tone="green" />
+                                                                <StatChip label="MSJ" value={row.minus_siap_jual} tone={(row.minus_siap_jual ?? 0) > 0 ? "amber" : "gray"} />
                                                                 <StatChip label="M" value={row.minus} tone={(row.minus ?? 0) > 0 ? "red" : "gray"} />
                                                             </>
                                                         ) : (
@@ -2102,7 +2108,7 @@ export default function UnifiedBarangContent() {
                                                         ? ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek", "Tes Kondisi"]
                                                         : ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek",
                                                             "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
-                                                            "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "M", "Stok", "SO", "Audit", "Aksi"]
+                                                            "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "MSJ", "M", "Stok", "SO", "Audit", "Aksi"]
                                                     ).map((h, hi) => (
                                                         <th key={h}
                                                             className={`px-3 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-left bg-zinc-50 border-b-2 border-zinc-100 sticky top-0 ${hi === 2 ? "left-0 z-20 min-w-[180px]" : "z-10"}`}>
@@ -2171,6 +2177,9 @@ export default function UnifiedBarangContent() {
                                                                 </td>
                                                                 <td className="px-3 py-3 text-xs text-center tabular-nums">
                                                                     <span className={(row.siap_jual ?? 0) > 0 ? "text-emerald-600 font-bold" : ""}>{row.siap_jual ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.minus_siap_jual ?? 0) > 0 ? "text-amber-600 font-bold" : ""}>{row.minus_siap_jual ?? <Dash />}</span>
                                                                 </td>
                                                                 <td className="px-3 py-3 text-xs text-center tabular-nums">
                                                                     <span className={(row.minus ?? 0) > 0 ? "text-red-500 font-bold" : ""}>{row.minus ?? <Dash />}</span>
@@ -2559,13 +2568,14 @@ function Field({ label, children, required }: { label: string; children: React.R
     );
 }
 
-function StatChip({ label, value, tone = "gray" }: { label: string; value: number | null; tone?: "gray" | "green" | "red" | "emerald" }) {
+function StatChip({ label, value, tone = "gray" }: { label: string; value: number | null; tone?: "gray" | "green" | "red" | "emerald" | "amber" }) {
     if (value == null) return null;
     const toneCls: Record<string, string> = {
         gray: "bg-zinc-50 text-zinc-500 border-zinc-200",
         green: "bg-emerald-50 text-emerald-700 border-emerald-200",
         red: "bg-red-50 text-red-600 border-red-200",
         emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        amber: "bg-amber-50 text-amber-700 border-amber-200",
     };
     return (
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border tabular-nums ${toneCls[tone]}`}>

@@ -413,7 +413,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_CC", // khusus Barang Siap Jual saja (lihat LAPTOP_READY_VIEW_ROLES)
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"],
-  "/dashboard/laptops/monitoring": [
+  // Minus Siap Jual — ditulis literal (bukan spread) karena
+  // LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES didefinisikan SETELAH ROUTE_PERMISSIONS.
+  // HARUS disamakan manual dengan konstanta itu kalau daftar role diubah.
+  "/dashboard/laptops/minus-siap-jual": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES"],  "/dashboard/laptops/monitoring": [
     ...FULL_ACCESS, "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
   ],
   // Riwayat SO gabungan (lintas semua laptop). Sengaja ditulis literal, BUKAN
@@ -478,6 +481,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_CC", // dipakai halaman Barang Siap Jual untuk fetch data
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"],
+  "/api/laptops/minus-siap-jual-units": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES"],
   "/api/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
   "/api/dashboard": [...ALL_ROLES],
   "/api/transaction/create": [
@@ -944,6 +948,21 @@ export const LAPTOP_VIEW_ROLES: UserRole[] = [
 export const LAPTOP_READY_VIEW_ROLES: UserRole[] = [
   ...LAPTOP_VIEW_ROLES,
   "KEPALA_CC", // khusus: KEPALA_CC hanya boleh lihat Barang Siap Jual, TIDAK boleh akses Data Barang penuh (LAPTOP_VIEW_ROLES)
+];
+
+// ── Minus Siap Jual (unit minus yang sudah boleh dijual / bisa dibikin payment) ──
+// Whitelist SENGAJA lebih sempit dari LAPTOP_READY_VIEW_ROLES — hanya tim inti
+// yang perlu lihat barang minus-tapi-jual. Dipakai di route API
+// (/api/laptops/minus-siap-jual-units), route halaman
+// (/dashboard/laptops/minus-siap-jual), dan sidebar.
+export const LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES: UserRole[] = [
+  "ADMIN",
+  "PROGRAMMER", // selalu akses penuh untuk maintenance
+  "KEPALA_SALES",
+  "CREW_SALES",
+  "PENGELOLA_BARANG",
+  "KEPALA_PENGELOLA_BARANG",
+  "PKL_SALES",
 ];
 
 export const LAPTOP_DELETE_ROLES: UserRole[] = [
