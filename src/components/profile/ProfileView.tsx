@@ -144,6 +144,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [showBannerActions, setShowBannerActions] = useState(false);
     const bannerInputRef = useRef<HTMLInputElement>(null);
     const [showPhotoModal, setShowPhotoModal] = useState(false);
+    const [avatarError, setAvatarError] = useState(false); // ✅ fallback saat foto gagal load
     const [showPhotoActions, setShowPhotoActions] = useState(false);
     const [cropTarget, setCropTarget] = useState<{ type: "avatar" | "banner"; src: string; fileName: string } | null>(null);
 
@@ -255,7 +256,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                         } : p);
                     }
                 })
-                .catch(() => {});
+                .catch(() => { });
         };
         window.addEventListener("solit:border-updated", handleBorderUpdate);
         return () => window.removeEventListener("solit:border-updated", handleBorderUpdate);
@@ -282,7 +283,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-                        const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes, auditMarketingRes, customAwardsRes] = await Promise.all([
+            const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes, auditMarketingRes, customAwardsRes] = await Promise.all([
                 getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
@@ -1076,7 +1077,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                     userName={profile.name}
                     onClose={() => setShowContractModal(false)}
                 />
-            )}  
+            )}
 
             <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xl shadow-slate-200/40 relative z-0">
                 {/* ── BANNER HERO ── */}
@@ -1098,7 +1099,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                     )}
 
                     {/* Ganti Banner Action Pill (Digeser agar tidak menabrak ornamen sudut kanan-bawah) */}
-                     {(isSelf || isAdmin) && (
+                    {(isSelf || isAdmin) && (
                         <label title="Ganti banner"
                             className={`absolute z-40 bottom-3 right-14 sm:bottom-3.5 sm:right-16 h-8 px-3 sm:h-9 sm:px-3.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-semibold transition-all shadow-lg hover:scale-105 active:scale-95 focus-within:ring-2 focus-within:ring-white/60 ${uploadingBanner ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}>
                             {uploadingBanner ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
@@ -1119,9 +1120,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                                     role="button"
                                     tabIndex={0}
                                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setShowInfoPopup(true); }}
-                                    className={`group/capsule absolute left-1/2 -translate-x-1/2 -translate-y-full w-max max-w-[220px] sm:max-w-[270px] p-2 sm:p-2.5 rounded-2xl shadow-2xl z-30 border border-white/20 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
-                                        profile.equipped_border ? "-top-4 sm:-top-5" : "-top-2.5 sm:-top-3"
-                                    }`}
+                                    className={`group/capsule absolute left-1/2 -translate-x-1/2 -translate-y-full w-max max-w-[220px] sm:max-w-[270px] p-2 sm:p-2.5 rounded-2xl shadow-2xl z-30 border border-white/20 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${profile.equipped_border ? "-top-4 sm:-top-5" : "-top-2.5 sm:-top-3"
+                                        }`}
                                     style={{
                                         background: "linear-gradient(135deg, rgba(15, 12, 41, 0.95) 0%, rgba(26, 21, 69, 0.95) 100%)",
                                         backdropFilter: "blur(14px)",
@@ -1194,15 +1194,19 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 const hasBorder = !!profile.equipped_border;
                                 const avatarContent = (
                                     <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
-                                        className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${
-                                            hasBorder ? "" : "border-4 border-white shadow-md"
-                                        } ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
+                                        className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${hasBorder ? "" : "border-4 border-white shadow-md"
+                                            } ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
                                         style={{
                                             background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)",
                                             animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none"
                                         }}>
-                                        {profile.profile_photo_url
-                                            ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
+                                        {profile.profile_photo_url && !avatarError
+                                            ? <img
+                                                src={profile.profile_photo_url}
+                                                alt={profile.name}
+                                                className="w-full h-full object-cover"
+                                                onError={() => setAvatarError(true)}  // ✅ kalau gagal, tampilkan inisial
+                                            />
                                             : getInitials(profile.name)}
                                     </div>
                                 );
@@ -1229,9 +1233,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                             {/* Camera Action Button */}
                             {(isSelf || isAdmin) && (
                                 <button onClick={() => setShowPhotoActions(true)} disabled={uploading} title="Opsi foto profil"
-                                    className={`absolute z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-lg border border-slate-200 flex items-center justify-center hover:scale-110 active:scale-95 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 ${
-                                        profile.equipped_border ? "-bottom-1 -right-1 sm:-bottom-1.5 sm:-right-1.5" : "-bottom-0.5 -right-0.5"
-                                    }`}>
+                                    className={`absolute z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-lg border border-slate-200 flex items-center justify-center hover:scale-110 active:scale-95 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 ${profile.equipped_border ? "-bottom-1 -right-1 sm:-bottom-1.5 sm:-right-1.5" : "-bottom-0.5 -right-0.5"
+                                        }`}>
                                     {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : <Camera className="w-3.5 h-3.5 text-slate-700" />}
                                 </button>
                             )}
@@ -1244,7 +1247,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                         {/* Admin action buttons (for others): Penghargaan & Hapus Foto */}
                         {(isCustomAwardAdmin || (isAdmin && profile.profile_photo_url)) && (
                             <div className="mb-1 flex items-center gap-1.5 sm:gap-2">
-                                 {isCustomAwardAdmin && (
+                                {isCustomAwardAdmin && (
                                     <button onClick={() => setShowAwardModal(true)} title="Beri Penghargaan"
                                         className="flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-auto sm:px-3.5 sm:py-1.5 rounded-full sm:rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 shadow-xs flex-shrink-0">
                                         <Award className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Penghargaan</span>
@@ -1300,7 +1303,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                             </div>
                         </div>
                         {achievements && (
-                                                        <AchievementTitles
+                            <AchievementTitles
                                 achievements={achievements}
                                 qualityRank={qualityRank}
                                 kerjaRank={kerjaRank}
@@ -1320,7 +1323,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                     {/* ── SOLIT COINS SHOWCASE ── */}
                     {isSelf && (
                         <div className="mt-5">
-                        <SolitCoinsWidget onOpen={() => setShowCoins(true)} />
+                            <SolitCoinsWidget onOpen={() => setShowCoins(true)} />
                         </div>
                     )}
 
@@ -1625,7 +1628,7 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     // MILESTONE kumulatif total tahap Take+Edit video yang berhasil
     // diselesaikan (100/200/.../1000), bersifat all-time & tidak dibatasi
     // Top 3 — sama polanya dengan Penyedia Barang/Sales/Teknisi.
-        const hasKontenBadge = !!(kontenBadge && kontenBadge.hasBadge);
+    const hasKontenBadge = !!(kontenBadge && kontenBadge.hasBadge);
     // ✅ NEW — Lencana Audit Marketing (tab "Audit Marketing" di /dashboard/lencana):
     // MILESTONE kumulatif poin audit (0,5 poin per laporan yang diaudit), bersifat
     // all-time & tidak dibatasi Top 3 — sama polanya dengan milestone lainnya.
@@ -1663,7 +1666,7 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
             {hasTeknisiBadge && (
                 <TeknisiMilestoneBadge rank={teknisiBadge!.rank} milestone={teknisiBadge!.milestone} />
             )}
-                        {hasKontenBadge && (
+            {hasKontenBadge && (
                 <KontenMilestoneBadge rank={kontenBadge!.rank} milestone={kontenBadge!.milestone} />
             )}
             {hasAuditMarketingBadge && (
@@ -1672,7 +1675,7 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
             {hasCustomAwards && customAwards!.map((a) => (
                 <CustomAwardBadge key={a.id} title={a.title} periodLabel={a.period_label} icon={a.icon} colorScheme={a.color_scheme} />
             ))}
-                        {titles.map((t) => (
+            {titles.map((t) => (
                 <AchievementTitleBadge key={t.label} rank={t.rank} label={t.label} />
             ))}
         </div>
@@ -1756,7 +1759,7 @@ function DeliveryMilestoneBadge({ rank, milestone }: { rank: number; milestone: 
         bronze: "rgba(251,146,60,0.35)",
     };
 
-        return (
+    return (
         <BadgePill
             gradient={gradients[tier]}
             glow={glow[tier]}
@@ -1787,7 +1790,7 @@ function ProviderMilestoneBadge({ rank, milestone }: { rank: number; milestone: 
         bronze: "rgba(45,212,191,0.35)",
     };
 
-        return (
+    return (
         <BadgePill
             gradient={gradients[tier]}
             glow={glow[tier]}
@@ -1816,7 +1819,7 @@ function SalesMilestoneBadge({ rank, milestone }: { rank: number; milestone: num
         bronze: "rgba(251,113,133,0.35)",
     };
 
-       return (
+    return (
         <BadgePill
             gradient={gradients[tier]}
             glow={glow[tier]}
@@ -1845,7 +1848,7 @@ function TeknisiMilestoneBadge({ rank, milestone }: { rank: number; milestone: n
         bronze: "rgba(74,222,128,0.35)",
     };
 
-        return (
+    return (
         <BadgePill
             gradient={gradients[tier]}
             glow={glow[tier]}
@@ -1875,7 +1878,7 @@ function KontenMilestoneBadge({ rank, milestone }: { rank: number; milestone: nu
         bronze: "rgba(56,189,248,0.35)",
     };
 
-       return (
+    return (
         <BadgePill
             gradient={gradients[tier]}
             glow={glow[tier]}
@@ -1905,7 +1908,7 @@ function AuditMarketingMilestoneBadge({ rank, milestone }: { rank: number; miles
         bronze: "rgba(240,171,252,0.35)",
     };
 
-       return (
+    return (
         <BadgePill
             gradient={gradients[tier]}
             glow={glow[tier]}
@@ -2022,7 +2025,7 @@ function LevelBadgeDisplay({
     const gradients = gradientsByScheme[colorScheme];
     const glow = glowByScheme[colorScheme];
 
-        const showProvisional = !isPermanent && isOngoingMonth;
+    const showProvisional = !isPermanent && isOngoingMonth;
 
     return (
         <BadgePill
@@ -2056,7 +2059,7 @@ function AchievementTitleBadge({ rank, label }: { rank: number; label: string })
             ? <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             : <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />;
 
-       return (
+    return (
         <BadgePill
             gradient={gradients[tier]}
             glow={glow[tier]}
