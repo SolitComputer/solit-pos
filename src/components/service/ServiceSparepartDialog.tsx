@@ -75,13 +75,23 @@ export default function ServiceSparepartDialog({
   useEffect(() => {
     if (!open || mode !== "stock" || selected) return;
     const q = search.trim();
-    if (q.length < 1) { setResults([]); return; }
+    if (q.length < 2) { setResults([]); return; }
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`/api/accessory-units/search-sn-service?q=${encodeURIComponent(q)}`);
+        const res = await fetch(`/api/accessory-units/search-sn?q=${encodeURIComponent(q)}`);
         const json = await res.json();
-        if (json.success) setResults(json.data as SnResult[]);
+        if (json.success) {
+          setResults(
+            (json.data as any[]).map((d) => ({
+              unit_id: d.id,
+              serial_number: d.serial_number,
+              accessory_id: d.accessory_id,
+              accessory_name: d.accessory_name ?? "Aksesoris",
+              buy_price: Math.round(Number(d.buy_price ?? 0)),
+            }))
+          );
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -220,7 +230,7 @@ export default function ServiceSparepartDialog({
                 </div>
 
                 {/* Dropdown hasil */}
-                {!selected && search.trim().length >= 1 && (
+                                {!selected && search.trim().length >= 2 && (
                   <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                     {searching ? (
                       <div className="px-3 py-2.5 text-xs text-gray-400">Mencari...</div>

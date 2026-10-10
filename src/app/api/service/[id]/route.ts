@@ -208,19 +208,21 @@ export async function PATCH(
             ? supabase.from("accessories").select("id, buy_price").in("id", accIds)
             : Promise.resolve({ data: [] as any[] }),
           unitIds.length
-            ? supabase.from("accessory_units").select("id, serial_number").in("id", unitIds)
+            ? supabase.from("accessory_units").select("id, serial_number, buy_price").in("id", unitIds)
             : Promise.resolve({ data: [] as any[] }),
         ]);
-        const buyPriceMap = new Map((accRows ?? []).map((a: any) => [a.id, Math.round(Number(a.buy_price ?? 0))]));
-        const snMap = new Map((unitRows ?? []).map((u: any) => [u.id, u.serial_number as string]));
+        const accBuyMap = new Map((accRows ?? []).map((a: any) => [a.id, Math.round(Number(a.buy_price ?? 0))]));
+        const unitInfoMap = new Map(
+          (unitRows ?? []).map((u: any) => [u.id, { sn: u.serial_number as string, buy: Math.round(Number(u.buy_price ?? 0)) }])
+        );
 
         let modalStok = 0;
         const sns: string[] = [];
         for (const acc of accessories_used) {
+          const info = acc.unit_id ? unitInfoMap.get(acc.unit_id) : undefined;
           if (acc.unit_id) {
             await supabase.from("accessory_units").update({ status: "KELUAR" }).eq("id", acc.unit_id);
-            const sn = snMap.get(acc.unit_id);
-            if (sn) sns.push(sn);
+            if (info?.sn) sns.push(info.sn);
           }
           await recordOutflow({
             accessory_id: acc.accessory_id,
@@ -236,7 +238,8 @@ export async function PATCH(
             p_accessory_id: acc.accessory_id,
             p_qty: acc.qty,
           });
-          modalStok += (buyPriceMap.get(acc.accessory_id) ?? 0) * Number(acc.qty || 1);
+          const unitBuy = info?.buy ?? 0;
+          modalStok += (unitBuy > 0 ? unitBuy : (accBuyMap.get(acc.accessory_id) ?? 0)) * Number(acc.qty || 1);
         }
 
         if (modalStok > 0) {
