@@ -538,13 +538,13 @@ export default function DaftarHadirPage() {
                           {initials(e.name)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-800 truncate flex items-center gap-1">
-                            {e.name}
+                          <p className="text-xs font-bold text-gray-800 flex items-start gap-1 leading-snug">
+                            <span className="break-words">{e.name}</span>
                             {e.method === "MANUAL" && (
-                              <Pencil className="w-2.5 h-2.5 text-blue-500 flex-shrink-0" aria-label="Absen manual" />
+                              <Pencil className="w-2.5 h-2.5 text-blue-500 flex-shrink-0 mt-0.5" aria-label="Absen manual" />
                             )}
                           </p>
-                          <p className="text-[10px] text-gray-400">{humanizeRoleKey(e.role)}</p>
+                          <p className="text-[10px] text-gray-400 leading-snug">{humanizeRoleKey(e.role)}</p>
                         </div>
                         <div className="text-right flex-shrink-0 space-y-1">
                           <p className="text-xs font-mono font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded-lg flex items-center justify-end gap-1" title="Jam masuk">
