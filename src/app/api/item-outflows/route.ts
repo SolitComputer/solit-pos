@@ -5,6 +5,8 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { ITEM_OUTFLOW_ROLES, expandRolesWithParents } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
+import { recalcLaptopParentQty } from "@/lib/laptopStock";
+import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
 
 const VALID_TYPES = ["SERVICE", "KEBUTUHAN"] as const;
 type OutflowType = (typeof VALID_TYPES)[number];
@@ -208,6 +210,8 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         const item_kind = String(body.item_kind ?? "").toUpperCase() as ItemKind;
         const item_ref_id = body.item_ref_id || null;
         const item_name = String(body.item_name ?? "").trim();
+        const unit_id = body.unit_id || null; // ✅ unit SN yang dipilih (null = stok manual)
+        const serial_number = body.serial_number ? String(body.serial_number).trim() : null;
         const purpose = String(body.purpose ?? "").trim();
         const person_name = user.name; // ← selalu dari akun, bukan body
 
@@ -249,38 +253,39 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             nominal = n;
         }
 
-        // ── Cek stok sebelum insert ───────────────────────────────────────────
-        // Pastikan stok tersedia agar tidak jadi negatif.
-        if (item_ref_id) {
-            if (item_kind === "ACCESSORY") {
-                const { data: acc } = await supabaseAdmin
-                    .from("accessories")
-                    .select("stock")
-                    .eq("id", item_ref_id)
-                    .single();
-
-                if (!acc || Number(acc.stock) < 1) {
-                    return NextResponse.json(
-                        { success: false, message: "Stok aksesoris tidak mencukupi" },
-                        { status: 400 }
-                    );
-                }
-            } else if (item_kind === "LAPTOP") {
-                const { data: lp } = await supabaseAdmin
-                    .from("laptops")
-                    .select("qty")
-                    .eq("id", item_ref_id)
-                    .single();
-
-                if (!lp || Number(lp.qty) < 1) {
-                    return NextResponse.json(
-                        { success: false, message: "Stok laptop tidak mencukupi" },
-                        { status: 400 }
-                    );
-                }
+        // ── Cek ketersediaan UNIT sebelum insert ──────────────────────────────
+        // Pengambilan per-unit (by SN) → yang dicek STATUS UNIT, bukan qty induk.
+        if (!unit_id) {
+            return NextResponse.json(
+                { success: false, message: "Unit (SN) wajib dipilih dari daftar" },
+                { status: 400 }
+            );
+        }
+        if (item_kind === "ACCESSORY") {
+            const { data: unit } = await supabaseAdmin
+                .from("accessory_units")
+                .select("id, status")
+                .eq("id", unit_id)
+                .single();
+            if (!unit || unit.status !== "TERSEDIA") {
+                return NextResponse.json(
+                    { success: false, message: "Unit aksesoris sudah tidak tersedia" },
+                    { status: 400 }
+                );
+            }
+        } else if (item_kind === "LAPTOP") {
+            const { data: unit } = await supabaseAdmin
+                .from("laptop_units")
+                .select("id, status")
+                .eq("id", unit_id)
+                .single();
+            if (!unit || unit.status !== "SIAP_JUAL") {
+                return NextResponse.json(
+                    { success: false, message: "Unit laptop sudah tidak tersedia" },
+                    { status: 400 }
+                );
             }
         }
-
         // ── Insert pengambilan ────────────────────────────────────────────────
         const { data, error } = await supabase
             .from("item_outflows")
@@ -290,6 +295,8 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
                 item_kind,
                 item_ref_id,
                 item_name,
+                unit_id,
+                serial_number,
                 purpose,
                 nominal,
                 created_by: user.id,
@@ -305,53 +312,28 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
                 { status: 400 }
             );
         }
-
-        // ── Kurangi stok 1 unit ───────────────────────────────────────────────
-        // Dilakukan SETELAH insert berhasil supaya kalau pengurangan gagal
-        // kita bisa tahu ada data yang masuk tapi stok belum terkurangi
-        // (lebih mudah di-debug vs rollback kompleks).
-        if (item_ref_id) {
-            if (item_kind === "ACCESSORY") {
-                // Pakai RPC yang sudah ada di sistem (decrement_accessory_stock)
-                const { error: rpcErr } = await supabaseAdmin.rpc(
-                    "decrement_accessory_stock",
-                    { p_accessory_id: item_ref_id, p_qty: 1 }
-                );
-                if (rpcErr) {
-                    // Pengambilan sudah tercatat — log warning, jangan fail response
-                    console.error("[item-outflows] Gagal kurangi stok aksesoris:", rpcErr.message);
-                }
-            } else if (item_kind === "LAPTOP") {
-                // Kurangi qty laptop langsung (sama seperti sync-units)
-                const { error: lpErr } = await supabaseAdmin.rpc(
-                    "decrement_laptop_qty",
-                    { p_laptop_id: item_ref_id, p_qty: 1 }
-                );
-                if (lpErr) {
-                    // ✅ FIX (race condition): dulu read-modify-write polos (baca qty,
-                    // lalu tulis qty-1) — dua pengambilan bersamaan bisa baca qty yang
-                    // sama sebelum salah satu sempat menulis, jadi qty kurang terpotong.
-                    // Sekarang pakai compare-and-swap: tulis cuma berhasil kalau qty
-                    // masih persis seperti saat dibaca, kalau gagal coba baca ulang.
-                    for (let attempt = 0; attempt < 5; attempt++) {
-                        const { data: currentLp } = await supabaseAdmin
-                            .from("laptops")
-                            .select("qty")
-                            .eq("id", item_ref_id)
-                            .single();
-                        if (!currentLp) break;
-
-                        const { data: casRows } = await supabaseAdmin
-                            .from("laptops")
-                            .update({ qty: Math.max(0, Number(currentLp.qty) - 1) })
-                            .eq("id", item_ref_id)
-                            .eq("qty", currentLp.qty)
-                            .select("id");
-
-                        if (casRows && casRows.length > 0) break;
-                    }
-                }
-            }
+        
+        // ── Tandai UNIT keluar & hitung ulang stok induk ──────────────────────
+        // Dilakukan SETELAH insert berhasil. Status "KELUAR" sengaja BUKAN
+        // SOLD/TERJUAL supaya pengambilan internal ini TIDAK tercampur ke data
+        // penjualan / laporan omzet. Stok di Data Barang dihitung dari status
+        // unit, jadi di sinilah stok benar-benar berkurang. recalc* menyamakan
+        // qty/stock induk dengan kondisi unit terbaru.
+        // Guard .eq(status lama) = idempoten: klik dobel tidak menandai 2x.
+        if (item_kind === "ACCESSORY") {
+            await supabaseAdmin
+                .from("accessory_units")
+                .update({ status: "KELUAR" })
+                .eq("id", unit_id)
+                .eq("status", "TERSEDIA");
+            await recalcAccessoryParentStock(supabaseAdmin, item_ref_id);
+        } else if (item_kind === "LAPTOP") {
+            await supabaseAdmin
+                .from("laptop_units")
+                .update({ status: "KELUAR" })
+                .eq("id", unit_id)
+                .eq("status", "SIAP_JUAL");
+            await recalcLaptopParentQty(supabaseAdmin, item_ref_id);
         }
 
         await logActivity({

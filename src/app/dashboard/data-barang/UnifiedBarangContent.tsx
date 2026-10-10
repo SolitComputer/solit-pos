@@ -127,7 +127,9 @@ function getAccessoryUnitAction(row: UnifiedRow): "units" | "add" | "detail" | n
 
 function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const units = l.laptop_units ?? [];
-    const aktif = units.filter(u => u.status !== "SOLD");
+    // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok,
+    // sama seperti SOLD, tapi tetap dibedakan dari penjualan di laporan.
+    const aktif = units.filter(u => u.status !== "SOLD" && u.status !== "KELUAR");
     const siapJual = aktif.filter(u => u.status === "SIAP_JUAL").length;
     const stokMinus = aktif.filter(u => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
     const dalamPenyiapan = aktif.filter(u => u.status === "DALAM_PENYIAPAN").length;
@@ -163,7 +165,8 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
 
 function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     const units = a.accessory_units ?? [];
-    const aktif = units.filter(u => u.status !== "TERJUAL");
+    // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok.
+    const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR");
     const one = aktif.length === 1 ? aktif[0] : null;
     const margin = (a.sell_price || 0) - (a.buy_price || 0);
     return {
@@ -1038,6 +1041,16 @@ export default function UnifiedBarangContent() {
                     }
                 }
 
+                // ✅ FIX: SN aksesoris ikut dicari juga. Sebelumnya hanya laptop
+                // yang menelusuri unit-nya, jadi SN aksesoris yang punya >1 unit
+                // ber-SN tidak pernah kebaca lewat kotak pencarian.
+                if (r.tipe === "AKSESORIS" && r.raw && "accessory_units" in r.raw) {
+                    const units = (r.raw as AccessoryRaw).accessory_units;
+                    if (units && units.some(u => u.serial_number?.toLowerCase().includes(t))) {
+                        return true;
+                    }
+                }
+
                 return false;
             });
         }
@@ -1085,7 +1098,7 @@ export default function UnifiedBarangContent() {
                 const soLabel = row.tipe === "LAPTOP" ? (isSoActive(row.so_at) ? "Sudah SO" : "Belum SO") : "-";
 
                 if (row.tipe === "LAPTOP") {
-                    const units = ((row.raw as LaptopRaw).laptop_units ?? []).filter(u => u.status !== "SOLD");
+                    const units = ((row.raw as LaptopRaw).laptop_units ?? []).filter(u => u.status !== "SOLD" && u.status !== "KELUAR");
 
                     if (units.length === 0) {
                         exportRows.push({

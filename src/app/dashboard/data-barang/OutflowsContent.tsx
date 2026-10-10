@@ -32,6 +32,8 @@ interface ItemOutflow {
     // ── Khusus row hasil penjualan (sumber: accessory_outflows) ──
     status?: "active" | "cancelled";
     transaction_invoice?: string | null;
+    unit_id?: string | null;        // ✅ unit SN yang diambil
+    serial_number?: string | null;  // ✅ SN untuk tampilan "nama - SN" & pencarian
 }
 
 interface MasterItem {
@@ -39,8 +41,10 @@ interface MasterItem {
     id: string;
     name: string;
     meta?: string;
+    unit_id?: string | null;        // ✅ unit SN; null = barang stok manual tanpa SN
+    serial_number?: string | null;  // ✅ SN unit
 }
-
+    
 // ── Helpers ────────────────────────────────────────────────────────────────
 const rupiah = (n: number | null | undefined) =>
     n == null ? "—" : "Rp " + Math.round(n).toLocaleString("id-ID");
@@ -186,7 +190,8 @@ export default function OutflowsContent() {
                 if (
                     !row.item_name.toLowerCase().includes(q) &&
                     !row.person_name.toLowerCase().includes(q) &&
-                    !row.purpose.toLowerCase().includes(q)
+                    !row.purpose.toLowerCase().includes(q) &&
+                    !(row.serial_number ?? "").toLowerCase().includes(q) // ✅ SN
                 ) return false;
             }
             return true;
@@ -240,7 +245,7 @@ export default function OutflowsContent() {
                         <input
                             value={searchText}
                             onChange={e => setSearchText(e.target.value)}
-                            placeholder="Cari barang, nama, kebutuhan…"
+                            placeholder="Cari barang, nama, kebutuhan, SN…"
                             className="w-full pl-8 pr-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400"
                         />
                     </div>
@@ -389,7 +394,7 @@ export default function OutflowsContent() {
                                                 <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded border ${KIND_BADGE[row.item_kind]}`}>
                                                     {KIND_LABEL[row.item_kind]}
                                                 </span>
-                                                <span className="text-gray-700">{row.item_name}</span>
+                                                <span className="text-gray-700">{row.item_name}{row.serial_number ? ` - ${row.serial_number}` : ""}</span>
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate" title={row.purpose}>
@@ -555,17 +560,18 @@ function OutflowFormModal({
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
+        // Pengambilan murni per-unit → hanya item ber-SN, dan cari HANYA by SN.
+        const withSn = options.filter(o => !!o.serial_number);
         const base = q
-            ? options.filter(o =>
-                o.name.toLowerCase().includes(q) ||
-                (o.meta ?? "").toLowerCase().includes(q)
-            )
-            : options;
+            ? withSn.filter(o => (o.serial_number ?? "").toLowerCase().includes(q))
+            : withSn;
         return base.slice(0, 40);
     }, [search, options]);
 
     const selectItem = (opt: MasterItem) => {
-        setSelected(opt); setSearch(opt.name); setComboOpen(false);
+        setSelected(opt);
+        setSearch(opt.serial_number ? `${opt.name} - ${opt.serial_number}` : opt.name);
+        setComboOpen(false);
     };
 
     const handleSubmit = async () => {
@@ -586,6 +592,8 @@ function OutflowFormModal({
                     item_kind: selected.kind,
                     item_ref_id: selected.id,
                     item_name: selected.name,
+                    unit_id: selected.unit_id ?? null,
+                    serial_number: selected.serial_number ?? null,
                     purpose: purpose.trim(),
                     nominal: type === "SERVICE" ? Number(nominal) : null,
                 }),
@@ -648,23 +656,25 @@ function OutflowFormModal({
                             value={search}
                             onChange={e => { setSearch(e.target.value); setComboOpen(true); setSelected(null); }}
                             onFocus={() => setComboOpen(true)}
-                            placeholder={optLoading ? "Memuat daftar barang…" : "Cari laptop / aksesoris…"}
+                            placeholder={optLoading ? "Memuat daftar unit…" : "Cari Serial Number (SN)…"}
                             disabled={optLoading}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:bg-gray-50"
                         />
                         {comboOpen && !optLoading && (
                             <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
                                 {filtered.length === 0 ? (
-                                    <div className="px-3.5 py-3 text-sm text-gray-400">Barang tidak ditemukan</div>
+                                    <div className="px-3.5 py-3 text-sm text-gray-400">SN tidak ditemukan</div>
                                 ) : filtered.map(opt => (
-                                    <button key={`${opt.kind}-${opt.id}`} type="button" onClick={() => selectItem(opt)}
+                                    <button key={`${opt.kind}-${opt.unit_id ?? opt.id}`} type="button" onClick={() => selectItem(opt)}
                                         className="w-full text-left px-3.5 py-2.5 hover:bg-gray-50 transition flex items-center gap-2">
                                         <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded border flex-shrink-0 ${KIND_BADGE[opt.kind]}`}>
                                             {KIND_LABEL[opt.kind]}
                                         </span>
                                         <span className="min-w-0">
                                             <span className="block text-sm text-gray-800 truncate">{opt.name}</span>
-                                            {opt.meta && <span className="block text-[11px] text-gray-400 truncate">{opt.meta}</span>}
+                                            {opt.serial_number
+                                                ? <span className="block text-[11px] text-emerald-600 font-medium truncate">SN: {opt.serial_number}</span>
+                                                : opt.meta && <span className="block text-[11px] text-gray-400 truncate">{opt.meta}</span>}
                                         </span>
                                     </button>
                                 ))}
@@ -672,7 +682,7 @@ function OutflowFormModal({
                         )}
                         {selected && (
                             <p className="mt-1 text-[11px] text-emerald-600 font-medium">
-                                Terpilih: [{KIND_LABEL[selected.kind]}] {selected.name}
+                                Terpilih: [{KIND_LABEL[selected.kind]}] {selected.name}{selected.serial_number ? ` - ${selected.serial_number}` : ""}
                             </p>
                         )}
                     </div>

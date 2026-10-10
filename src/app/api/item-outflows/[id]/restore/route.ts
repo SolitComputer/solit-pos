@@ -4,6 +4,8 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
+import { recalcLaptopParentQty } from "@/lib/laptopStock";
+import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -52,46 +54,48 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
             );
         }
 
-        // ── Baru kembalikan stok sesuai jenis barang ────────────────────────
-        // ✅ FIX (race condition): dulu read-modify-write polos — dua restore
-        // bersamaan pada barang yang sama bisa saling menimpa hasil tambah
-        // stok. Sekarang pakai compare-and-swap (retry kalau nilai berubah
-        // di antara baca & tulis).
-        if (outflow.item_ref_id) {
+        // ── Kembalikan UNIT ke stok & hitung ulang induk ──────────────────────
+        // Kebalikan dari POST: unit "KELUAR" dibalikin ke status tersedia, lalu
+        // qty/stock induk disamakan ulang lewat recalc*. Guard .eq("KELUAR")
+        // mencegah menimpa unit yang sudah berubah status (mis. benar-benar
+        // terjual setelah dikembalikan).
+        if (outflow.unit_id) {
+            if (outflow.item_kind === "ACCESSORY") {
+                await supabaseAdmin
+                    .from("accessory_units")
+                    .update({ status: "TERSEDIA" })
+                    .eq("id", outflow.unit_id)
+                    .eq("status", "KELUAR");
+                await recalcAccessoryParentStock(supabaseAdmin, outflow.item_ref_id);
+            } else if (outflow.item_kind === "LAPTOP") {
+                await supabaseAdmin
+                    .from("laptop_units")
+                    .update({ status: "SIAP_JUAL" })
+                    .eq("id", outflow.unit_id)
+                    .eq("status", "KELUAR");
+                await recalcLaptopParentQty(supabaseAdmin, outflow.item_ref_id);
+            }
+        } else if (outflow.item_ref_id) {
+            // ── Fallback data lama (outflow tanpa unit_id) ────────────────────
+            // Tetap pakai compare-and-swap pada qty/stock induk apa adanya.
             if (outflow.item_kind === "ACCESSORY") {
                 for (let attempt = 0; attempt < 5; attempt++) {
                     const { data: acc } = await supabaseAdmin
-                        .from("accessories")
-                        .select("stock")
-                        .eq("id", outflow.item_ref_id)
-                        .maybeSingle();
+                        .from("accessories").select("stock").eq("id", outflow.item_ref_id).maybeSingle();
                     if (!acc) break;
-
                     const { data: casRows } = await supabaseAdmin
-                        .from("accessories")
-                        .update({ stock: (Number(acc.stock) || 0) + 1 })
-                        .eq("id", outflow.item_ref_id)
-                        .eq("stock", acc.stock)
-                        .select("id");
-
+                        .from("accessories").update({ stock: (Number(acc.stock) || 0) + 1 })
+                        .eq("id", outflow.item_ref_id).eq("stock", acc.stock).select("id");
                     if (casRows && casRows.length > 0) break;
                 }
             } else if (outflow.item_kind === "LAPTOP") {
                 for (let attempt = 0; attempt < 5; attempt++) {
                     const { data: lp } = await supabaseAdmin
-                        .from("laptops")
-                        .select("qty")
-                        .eq("id", outflow.item_ref_id)
-                        .maybeSingle();
+                        .from("laptops").select("qty").eq("id", outflow.item_ref_id).maybeSingle();
                     if (!lp) break;
-
                     const { data: casRows } = await supabaseAdmin
-                        .from("laptops")
-                        .update({ qty: (Number(lp.qty) || 0) + 1 })
-                        .eq("id", outflow.item_ref_id)
-                        .eq("qty", lp.qty)
-                        .select("id");
-
+                        .from("laptops").update({ qty: (Number(lp.qty) || 0) + 1 })
+                        .eq("id", outflow.item_ref_id).eq("qty", lp.qty).select("id");
                     if (casRows && casRows.length > 0) break;
                 }
             }
