@@ -44,15 +44,20 @@ export default function CameraScanPage() {
             scannerRef.current = scanner;
 
             await scanner.start(
-                // Minta kamera belakang resolusi tinggi — makin banyak piksel,
-                // makin terbaca bar yang tipis. HP akan ambil yang terdekat yang
-                // didukung (ideal 1920 lebar).
+                // Argumen pertama HARUS objek 1-key (aturan html5-qrcode).
+                // Resolusi tinggi dipindah ke videoConstraints di argumen config
+                // bawah — di sinilah width/height yang benar diterima.
+                { facingMode: "environment" },
                 {
-                    facingMode: "environment",
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                } as MediaTrackConstraints,
-                {
+                    // Resolusi tinggi diminta DI SINI (videoConstraints) — makin
+                    // banyak piksel, makin terbaca bar yang tipis. HP ambil yang
+                    // terdekat yang didukung. facingMode diulang di sini karena
+                    // videoConstraints menggantikan argumen pertama saat diisi.
+                    videoConstraints: {
+                        facingMode: "environment",
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
                     // FPS lebih tinggi = lebih banyak frame dianalisa per detik,
                     // jadi barcode tipis/panjang lebih cepat "kekunci" saat tangan
                     // sedikit goyang. 10 → 15 masih ringan di HP modern.
