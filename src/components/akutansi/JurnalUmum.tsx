@@ -108,6 +108,9 @@ const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
     SERVICE: { label: "Service", color: "bg-violet-50 text-violet-700 border-violet-200" },
     CASHFLOW: { label: "Cashflow", color: "bg-amber-50 text-amber-700 border-amber-200" },
     MANUAL: { label: "Manual", color: "bg-gray-100 text-gray-600 border-gray-200" },
+    // Sparepart service: disimpan sbg MANUAL di DB (biar tidak ganggu draft
+    // SERVICE), tapi ditampilkan sebagai badge Service.
+    SPAREPART_SERVICE: { label: "Service", color: "bg-violet-50 text-violet-700 border-violet-200" },
 };
 
 const SOURCE_GROUP_RANK: Record<string, number> = {
@@ -118,6 +121,13 @@ const SOURCE_GROUP_RANK: Record<string, number> = {
 };
 
 const key = (d: { source_type: string; source_id: string }) => `${d.source_type}:${d.source_id}`;
+
+// Badge sumber: entry sparepart service disimpan sbg MANUAL tapi ditandai
+// lewat source_category "SPAREPART_SERVICE" → tampil sebagai badge Service.
+const badgeKeyOf = (e: { source_type: string; source_category?: string | null }) =>
+    e.source_type === "MANUAL" && e.source_category === "SPAREPART_SERVICE"
+        ? "SPAREPART_SERVICE"
+        : e.source_type;
 
 type SyncSnapshotLine = { account_code: string; account_name?: string; side: string; nominal: number | string };
 
@@ -1714,7 +1724,7 @@ function BookmarkJumpButton({ entry, onJump }: { entry: JournalEntry | null; onJ
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [open]);
 
-    const badge = entry ? SOURCE_BADGE[entry.source_type] : null;
+    const badge = entry ? (SOURCE_BADGE[badgeKeyOf(entry)] ?? SOURCE_BADGE[entry.source_type]) : null;
     const companyBadge = entry?.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
 
     const handleJump = () => {
@@ -2246,7 +2256,7 @@ function SyncPreviewModal({
     const totalDebitAfter = sumLinesBySide(entry.sync_preview.lines, "DEBIT");
     const totalKreditAfter = sumLinesBySide(entry.sync_preview.lines, "KREDIT");
 
-    const badge = SOURCE_BADGE[entry.source_type];
+    const badge = SOURCE_BADGE[badgeKeyOf(entry)] ?? SOURCE_BADGE[entry.source_type];
 
     return (
         <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
@@ -3097,7 +3107,7 @@ interface JournalEntryRowProps {
 }
 
 function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<string>) {
-    const badge = SOURCE_BADGE[entry.source_type];
+    const badge = SOURCE_BADGE[badgeKeyOf(entry)] ?? SOURCE_BADGE[entry.source_type];
     const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
     const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
     const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
