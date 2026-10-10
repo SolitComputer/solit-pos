@@ -2,17 +2,12 @@
 
 import { useState, useEffect } from "react";
 
-interface Accessory {
-  id: string;
-  name: string;
-  sell_price: number;
-  stock: number;
-  category: string;
-}
-
-interface AccessoryUnit {
-  id: string;
+interface SnResult {
+  unit_id: string;
   serial_number: string;
+  accessory_id: string;
+  accessory_name: string;
+  buy_price: number;
 }
 
 interface ServiceSparepartDialogProps {
@@ -23,10 +18,12 @@ interface ServiceSparepartDialogProps {
   defaultPrice?: number;
   onCancel: () => void;
   onConfirm: (payload: {
-    price: number;
-    reason?: string;
-    accessory_id?: string;
-    unit_id?: string;
+    mode: "stock" | "manual";
+    reason: string;
+    price?: number;          // manual saja (modal yang diketik)
+    accessory_id?: string;   // stok
+    unit_id?: string;        // stok
+    serial_number?: string;  // stok
   }) => Promise<void>;
 }
 
@@ -34,7 +31,6 @@ function fmtRupiah(n: number) {
   if (!n) return "";
   return new Intl.NumberFormat("id-ID").format(n);
 }
-
 function parseRupiah(s: string) {
   return parseInt(s.replace(/\D/g, ""), 10) || 0;
 }
@@ -43,95 +39,74 @@ export default function ServiceSparepartDialog({
   open,
   orderName,
   orderType,
-  defaultPrice = 0,
   onCancel,
   onConfirm,
 }: ServiceSparepartDialogProps) {
   const [mode, setMode] = useState<"manual" | "stock">("stock");
-  
-  // States untuk Mode Manual / Global
-  const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
-  
-  // States untuk Mode Stok
-  const [accessories, setAccessories] = useState<Accessory[]>([]);
+
+  // ── Mode Stok (search SN) ──
   const [search, setSearch] = useState("");
-  const [selectedAccessoryId, setSelectedAccessoryId] = useState("");
-  const [units, setUnits] = useState<AccessoryUnit[]>([]);
-  const [selectedUnitId, setSelectedUnitId] = useState("");
-  
+  const [results, setResults] = useState<SnResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<SnResult | null>(null);
+
+  // ── Keterangan (dipakai dua mode — jadi keterangan jurnal) ──
+  const [reason, setReason] = useState("");
+  // ── Mode Manual (biaya = modal) ──
+  const [amount, setAmount] = useState("");
+
   const [loading, setLoading] = useState(false);
-  const [loadingAccessories, setLoadingAccessories] = useState(false);
   const [error, setError] = useState("");
 
-  // Reset & load accessories
+  // Reset tiap dibuka
   useEffect(() => {
     if (open) {
-      setAmount(defaultPrice > 0 ? fmtRupiah(defaultPrice) : "");
-      setReason("");
-      setError("");
       setMode("stock");
       setSearch("");
-      setSelectedAccessoryId("");
-      setSelectedUnitId("");
-      setUnits([]);
-      fetchAccessories();
+      setResults([]);
+      setSelected(null);
+      setReason("");
+      setAmount("");
+      setError("");
     }
-  }, [open, defaultPrice]);
+  }, [open]);
 
-  const fetchAccessories = async (q = "") => {
-    setLoadingAccessories(true);
-    try {
-      const params = new URLSearchParams({ search: q, limit: "50" });
-      const res = await fetch(`/api/accessories?${params.toString()}`);
-      const json = await res.json();
-      if (json.success) {
-        setAccessories(json.data.filter((a: any) => a.stock > 0));
-      }
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setLoadingAccessories(false);
-    }
-  };
-
-  // Debounced search
+  // Debounced search SN (mode stok, belum memilih unit)
   useEffect(() => {
-    if (!open) return;
-    const timer = setTimeout(() => fetchAccessories(search), 500);
+    if (!open || mode !== "stock" || selected) return;
+    const q = search.trim();
+    if (q.length < 1) { setResults([]); return; }
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/accessory-units/search-sn-service?q=${encodeURIComponent(q)}`);
+        const json = await res.json();
+        if (json.success) setResults(json.data as SnResult[]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
     return () => clearTimeout(timer);
-  }, [search, open]);
-
-  // Handle accessory selection
-  useEffect(() => {
-    if (selectedAccessoryId) {
-      const acc = accessories.find(a => a.id === selectedAccessoryId);
-      if (acc) {
-        setAmount(fmtRupiah(acc.sell_price));
-        setReason(acc.name);
-        fetchUnits(acc.id);
-      }
-    } else {
-      setUnits([]);
-      setSelectedUnitId("");
-    }
-  }, [selectedAccessoryId, accessories]);
-
-  const fetchUnits = async (accId: string) => {
-    try {
-      const res = await fetch(`/api/accessories/${accId}`);
-      const json = await res.json();
-      if (json.success && json.data.units) {
-        setUnits(json.data.units.filter((u: any) => u.status === "TERSEDIA"));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  }, [search, open, mode, selected]);
 
   if (!open) return null;
   const amountNum = parseRupiah(amount);
-  const selectedAcc = accessories.find(a => a.id === selectedAccessoryId);
+
+  const selectUnit = (u: SnResult) => {
+    setSelected(u);
+    setSearch(`${u.accessory_name} - ${u.serial_number}`);
+    setResults([]);
+    if (!reason.trim()) setReason(u.accessory_name); // prefill, tetap bisa diedit
+    setError("");
+  };
+
+  const clearUnit = () => {
+    setSelected(null);
+    setSearch("");
+    setResults([]);
+  };
 
   const handleAmountChange = (v: string) => {
     const digits = v.replace(/\D/g, "");
@@ -140,40 +115,41 @@ export default function ServiceSparepartDialog({
   };
 
   const handleConfirm = async () => {
-    if (amountNum <= 0) {
-      setError("Biaya sparepart wajib diisi dan lebih dari 0.");
-      return;
-    }
     if (!reason.trim()) {
       setError("Keterangan sparepart wajib diisi.");
       return;
     }
-    
-    let payload_acc_id = undefined;
-    let payload_unit_id = undefined;
-    
+
     if (mode === "stock") {
-      if (!selectedAccessoryId) {
-        setError("Pilih aksesoris dari stok terlebih dahulu, atau gunakan mode Manual.");
+      if (!selected) {
+        setError("Cari & pilih SN aksesoris dari stok terlebih dahulu.");
         return;
       }
-      if (units.length > 0 && !selectedUnitId) {
-        setError("Pilih Unit (Serial Number) terlebih dahulu.");
+    } else {
+      if (amountNum <= 0) {
+        setError("Biaya sparepart (modal) wajib diisi dan lebih dari 0.");
         return;
       }
-      payload_acc_id = selectedAccessoryId;
-      payload_unit_id = selectedUnitId || undefined;
     }
 
     setLoading(true);
     setError("");
     try {
-      await onConfirm({
-        price: amountNum,
-        reason: reason.trim(),
-        accessory_id: payload_acc_id,
-        unit_id: payload_unit_id,
-      });
+      if (mode === "stock" && selected) {
+        await onConfirm({
+          mode: "stock",
+          reason: reason.trim(),
+          accessory_id: selected.accessory_id,
+          unit_id: selected.unit_id,
+          serial_number: selected.serial_number,
+        });
+      } else {
+        await onConfirm({
+          mode: "manual",
+          reason: reason.trim(),
+          price: amountNum,
+        });
+      }
     } catch (e: any) {
       setError(e.message || "Terjadi kesalahan, coba lagi");
     } finally {
@@ -222,57 +198,62 @@ export default function ServiceSparepartDialog({
 
           {mode === "stock" && (
             <div className="space-y-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Cari Aksesoris</label>
-                <input
-                  type="text"
-                  placeholder="Ketik nama aksesoris..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Pilih Barang</label>
-                <select
-                  value={selectedAccessoryId}
-                  onChange={(e) => setSelectedAccessoryId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition bg-white"
-                >
-                  <option value="">-- Pilih Aksesoris --</option>
-                  {accessories.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} (Stok: {a.stock})
-                    </option>
-                  ))}
-                </select>
-                {loadingAccessories && <p className="text-[10px] text-gray-400 mt-1">Memuat data...</p>}
+              <div className="relative">
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Cari Serial Number (SN) Aksesoris <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Ketik SN aksesoris..."
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setSelected(null); }}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition pr-8"
+                  />
+                  {selected && (
+                    <button
+                      onClick={clearUnit}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-sm"
+                      title="Hapus pilihan"
+                    >✕</button>
+                  )}
+                </div>
+
+                {/* Dropdown hasil */}
+                {!selected && search.trim().length >= 1 && (
+                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {searching ? (
+                      <div className="px-3 py-2.5 text-xs text-gray-400">Mencari...</div>
+                    ) : results.length === 0 ? (
+                      <div className="px-3 py-2.5 text-xs text-gray-400">SN tidak ditemukan / stok habis</div>
+                    ) : results.map((u) => (
+                      <button
+                        key={u.unit_id}
+                        onClick={() => selectUnit(u)}
+                        className="w-full text-left px-3 py-2 hover:bg-orange-50 transition"
+                      >
+                        <span className="block text-sm text-gray-800">{u.serial_number}</span>
+                        <span className="block text-[11px] text-gray-400">{u.accessory_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {units.length > 0 && (
-                <div>
-                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">Pilih Unit (Serial Number) <span className="text-red-500">*</span></label>
-                  <select
-                    value={selectedUnitId}
-                    onChange={(e) => setSelectedUnitId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition bg-white"
-                  >
-                    <option value="">-- Pilih S/N --</option>
-                    {units.map((u) => (
-                      <option key={u.id} value={u.id}>{u.serial_number}</option>
-                    ))}
-                  </select>
+              {selected && (
+                <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-2">
+                  Terpilih: <b>{selected.accessory_name}</b> — SN {selected.serial_number}
+                  <span className="block text-emerald-600/70 mt-0.5">Modal diambil otomatis dari SN ini.</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* Form Biaya & Keterangan (Selalu muncul tapi bisa di-edit) */}
-          <div className="space-y-3">
+          {/* Biaya Sparepart — HANYA mode manual */}
+          {mode === "manual" && (
             <div>
               <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                Biaya Sparepart <span className="text-red-500">*</span>
+                Biaya Sparepart (Modal) <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">Rp</span>
@@ -280,30 +261,30 @@ export default function ServiceSparepartDialog({
                   type="text"
                   inputMode="numeric"
                   value={amount}
-                  onChange={e => handleAmountChange(e.target.value)}
+                  onChange={(e) => handleAmountChange(e.target.value)}
                   placeholder="0"
                   disabled={loading}
                   className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 transition font-mono disabled:opacity-60"
                 />
               </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                Keterangan <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={reason}
-                onChange={e => { setReason(e.target.value); setError(""); }}
-                placeholder="Contoh: Butuh baterai 14.8V 4400mAh..."
-                rows={2}
-                disabled={loading}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 transition resize-none placeholder:text-gray-300 disabled:opacity-60"
-              />
-            </div>
+          {/* Keterangan — dua mode */}
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+              Keterangan <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => { setReason(e.target.value); setError(""); }}
+              placeholder="Contoh: Butuh baterai 14.8V 4400mAh..."
+              rows={2}
+              disabled={loading}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 transition resize-none placeholder:text-gray-300 disabled:opacity-60"
+            />
           </div>
 
-          {/* Error */}
           {error && (
             <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600">
               {error}
@@ -323,7 +304,7 @@ export default function ServiceSparepartDialog({
           <button
             onClick={handleConfirm}
             disabled={loading}
-            className={`flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700`}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700"
           >
             {loading ? "Memproses..." : "Simpan Sparepart"}
           </button>

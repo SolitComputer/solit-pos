@@ -34,6 +34,7 @@ interface ItemOutflow {
     transaction_invoice?: string | null;
     unit_id?: string | null;        // ✅ unit SN yang diambil
     serial_number?: string | null;  // ✅ SN untuk tampilan "nama - SN" & pencarian
+    read_only?: boolean;            // ✅ baris dari sistem (service) — aksi audit/restore disembunyikan
 }
 
 interface MasterItem {
@@ -44,7 +45,7 @@ interface MasterItem {
     unit_id?: string | null;        // ✅ unit SN; null = barang stok manual tanpa SN
     serial_number?: string | null;  // ✅ SN unit
 }
-    
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 const rupiah = (n: number | null | undefined) =>
     n == null ? "—" : "Rp " + Math.round(n).toLocaleString("id-ID");
@@ -406,8 +407,8 @@ export default function OutflowsContent() {
 
                                         {/* ── Kolom Audit ── */}
                                         <td className="px-4 py-3 text-center">
-                                            {row.outflow_type === "TRANSAKSI" ? (
-                                                <span className="text-[11px] text-gray-300" title="Tercatat otomatis dari transaksi — tidak ada audit manual di sini">—</span>
+                                            {row.outflow_type === "TRANSAKSI" || row.read_only ? (
+                                                <span className="text-[11px] text-gray-300" title="Tercatat otomatis dari sistem — tidak ada audit manual di sini">—</span>
                                             ) : (
                                                 <button
                                                     onClick={() => toggleAudit(row.id)}
@@ -449,7 +450,9 @@ export default function OutflowsContent() {
 
                                         {/* ── Kolom Restore ── */}
                                         <td className="px-4 py-3 text-center">
-                                            {row.is_restored ? (
+                                            {row.read_only ? (
+                                                <span className="text-[11px] text-gray-300" title="Dikelola dari halaman Servis — stok dikembalikan otomatis saat servis dibatalkan">—</span>
+                                            ) : row.is_restored ? (
                                                 <span
                                                     title={`Dikembalikan oleh ${row.restored_by ?? "—"} · ${row.restored_at ? formatDate(row.restored_at) : ""}`}
                                                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-sky-50 text-sky-700 border-sky-200"
@@ -535,7 +538,7 @@ function OutflowFormModal({
     onClose: () => void;
     onSuccess: () => void;
 }) {
-    const [type, setType] = useState<OutflowType>("SERVICE");
+    const [type, setType] = useState<OutflowType>("KEBUTUHAN");
     const [selected, setSelected] = useState<MasterItem | null>(null);
     const [purpose, setPurpose] = useState("");
     const [nominal, setNominal] = useState("");
@@ -629,8 +632,8 @@ function OutflowFormModal({
                     {/* Tipe */}
                     <div>
                         <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Tipe Pengambilan</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {(["SERVICE", "KEBUTUHAN"] as OutflowType[]).map(t => (
+                        <div className="grid grid-cols-1 gap-2">
+                            {(["KEBUTUHAN"] as OutflowType[]).map(t => (
                                 <button key={t} type="button" onClick={() => setType(t)}
                                     className={`py-2.5 rounded-xl text-sm font-semibold border transition
                     ${type === t ? "bg-zinc-900 text-white border-zinc-900 shadow-sm" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>

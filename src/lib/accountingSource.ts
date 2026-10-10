@@ -1203,6 +1203,13 @@ async function buildTransactionPaymentDrafts(
   return drafts;
 }
 
+// Sparepart service yang dicatat SEJAK waktu ini modalnya dijurnal INSTAN
+// (manual) saat klik Simpan Sparepart (api/service/[id]/route.ts case
+// "sparepart") — jadi TIDAK dibukukan lagi di draft. Sparepart LAMA (sebelum
+// waktu ini) tetap dibukukan di sini seperti dulu.
+// ⚠️ Set ke jam DEPLOY sebenarnya.
+const SPAREPART_INSTANT_CUTOFF_ISO = "2026-10-10T17:00:00+07:00";
+
 async function buildServiceDrafts(
   supabase: SupabaseClient,
   period: string
@@ -1306,12 +1313,15 @@ async function buildServiceDrafts(
     }
   }
 
-  // ── Modal sparepart SESUNGGUHNYA per service (tidak berubah dari sebelumnya) ──
+  // Modal sparepart LAMA (dicatat SEBELUM cutoff) tetap dihitung di sini.
+  // Sparepart SEJAK cutoff modalnya sudah dijurnal instan saat Simpan Sparepart
+  // → di-skip (.lt created_at) biar tidak DOBEL.
   const { data: outflows, error: outflowErr } = await supabase
     .from("accessory_outflows")
-    .select("service_id, accessory_id, qty")
+    .select("service_id, accessory_id, qty, created_at")
     .eq("source_type", "service")
     .eq("status", "active")
+    .lt("created_at", SPAREPART_INSTANT_CUTOFF_ISO) // ⬅️ hanya sparepart LAMA
     .in("service_id", serviceIds);
 
   if (outflowErr) {
@@ -1356,8 +1366,6 @@ async function buildServiceDrafts(
     if (delta <= 0) continue;
 
     const isDpOnly = s.payment_status === "DP";
-    // "Completion" = servis benar-benar sudah DONE/SUDAH_DIAMBIL DAN lunas
-    // penuh — cuma di titik inilah modal sparepart ikut dibukukan (sekali saja).
     const isCompletion = !isDpOnly && (s.status === "DONE" || s.status === "SUDAH_DIAMBIL");
 
     const refDate = (s.payment_confirmed_at || s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
@@ -1368,6 +1376,8 @@ async function buildServiceDrafts(
       { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: delta },
     ];
 
+    // modalByService sudah di-filter < cutoff → yang masuk sini HANYA modal
+    // sparepart lama. Sparepart baru sudah dijurnal instan, jadi tidak dobel.
     let sparepart = 0;
     if (isCompletion) {
       sparepart = modalByService.get(idStr) ?? 0;

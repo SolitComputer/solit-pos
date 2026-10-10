@@ -22,6 +22,7 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
         const wantsAll = !type || type === "ALL";
         const wantsItemOutflows = wantsAll || (VALID_TYPES as readonly string[]).includes(type as string);
         const wantsTransaksi = wantsAll || type === "TRANSAKSI";
+        const wantsService = wantsAll || type === "SERVICE";
 
         // ── Bagian 1: pengambilan manual (SERVICE / KEBUTUHAN) — dari item_outflows ──
         let manualRows: any[] = [];
@@ -181,8 +182,59 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
             }
         }
 
-        const combined = [...manualRows, ...transaksiRows, ...transaksiLaptopRows].sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        // ── Bagian 4: sparepart SERVICE (dari accessory_outflows source=service) ──
+        let serviceRows: any[] = [];
+        if (wantsService) {
+            const { data: svcOutflows, error: svcErr } = await supabaseAdmin
+                .from("accessory_outflows")
+                .select("id, accessory_id, unit_id, qty, status, service_id, notes, created_at, is_audited, audited_by, audited_at")
+                .eq("source_type", "service")
+                .eq("status", "active")
+                .order("created_at", { ascending: false });
+
+            if (svcErr) {
+                console.error("[item-outflows][GET] gagal ambil accessory_outflows (service):", svcErr.message);
+            } else if (svcOutflows && svcOutflows.length > 0) {
+                const accIds = [...new Set(svcOutflows.map((o) => o.accessory_id).filter(Boolean))];
+                const unitIds = [...new Set(svcOutflows.map((o) => o.unit_id).filter(Boolean))];
+                const serviceIds = [...new Set(svcOutflows.map((o) => o.service_id).filter(Boolean))];
+
+                const [{ data: accs }, { data: unitRows }, { data: svcs }] = await Promise.all([
+                    accIds.length ? supabaseAdmin.from("accessories").select("id, name").in("id", accIds) : Promise.resolve({ data: [] as any[] }),
+                    unitIds.length ? supabaseAdmin.from("accessory_units").select("id, serial_number").in("id", unitIds) : Promise.resolve({ data: [] as any[] }),
+                    serviceIds.length ? supabaseAdmin.from("service_orders").select("id, nama").in("id", serviceIds) : Promise.resolve({ data: [] as any[] }),
+                ]);
+                const accNameMap = new Map((accs ?? []).map((a: any) => [a.id, a.name]));
+                const unitSnMap = new Map((unitRows ?? []).map((u: any) => [u.id, u.serial_number]));
+                const svcNameMap = new Map((svcs ?? []).map((s: any) => [s.id, s.nama]));
+
+                serviceRows = svcOutflows.map((o: any) => ({
+                    id: o.id,
+                    outflow_type: "SERVICE",
+                    person_name: svcNameMap.get(o.service_id) ?? "—",
+                    item_kind: "ACCESSORY",
+                    item_ref_id: o.accessory_id,
+                    item_name: accNameMap.get(o.accessory_id) ?? "Aksesoris",
+                    purpose: o.notes ?? "Sparepart service",
+                    nominal: null,
+                    is_audited: Boolean(o.is_audited),
+                    audited_by: o.audited_by ?? null,
+                    audited_at: o.audited_at ?? null,
+                    is_restored: false,
+                    restored_by: null,
+                    restored_at: null,
+                    created_by_name: null,
+                    created_by_role: null,
+                    created_at: o.created_at,
+                    status: o.status,
+                    serial_number: unitSnMap.get(o.unit_id) ?? null,
+                    read_only: true, // dikelola dari halaman Servis → tidak diaudit/restore dari sini
+                }));
+            }
+        }
+
+        const combined = [...manualRows, ...transaksiRows, ...transaksiLaptopRows, ...serviceRows].sort(
+                        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
         return NextResponse.json({ success: true, data: combined });

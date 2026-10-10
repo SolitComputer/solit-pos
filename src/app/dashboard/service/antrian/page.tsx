@@ -629,16 +629,23 @@ export default function AntrianPage() {
     refresh();
   };
 
-  const handleSparepartConfirm = async (payload: { price: number; reason?: string; accessory_id?: string; unit_id?: string }) => {
+  const handleSparepartConfirm = async (payload: {
+    mode: "stock" | "manual";
+    reason: string;
+    price?: number;
+    accessory_id?: string;
+    unit_id?: string;
+    serial_number?: string;
+  }) => {
     const body: Record<string, unknown> = {
       action: "sparepart",
-      biaya_sparepart: payload.price,
-      alasan: payload.reason,
-      accessories_used: payload.accessory_id ? [{
-        accessory_id: payload.accessory_id,
-        unit_id: payload.unit_id,
-        qty: 1
-      }] : undefined
+      alasan: payload.reason,                               // dipakai utk log + keterangan jurnal
+      sparepart_mode: payload.mode,
+      sparepart_modal: payload.mode === "manual" ? payload.price : undefined,
+      accessories_used:
+        payload.mode === "stock" && payload.accessory_id
+          ? [{ accessory_id: payload.accessory_id, unit_id: payload.unit_id, qty: 1 }]
+          : undefined,
     };
 
     const res = await fetch(`/api/service/${sparepartDialog.orderId}`, {
@@ -649,7 +656,7 @@ export default function AntrianPage() {
     const json = await res.json();
     if (!json.success) throw new Error(json.message || "Gagal memperbarui status");
     setSparepartDialog(SPAREPART_DIALOG_CLOSED);
-    showToast(" Ditandai menunggu sparepart.");
+    showToast(" Sparepart dicatat & jurnal modal dibuat.");
     refresh();
   };
 

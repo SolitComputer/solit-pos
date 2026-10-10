@@ -5,6 +5,8 @@ import { SERVICE_VIEW_ROLES, SERVICE_TEKNISI_ROLES, expandRolesWithParents, hasA
 import { createClient } from "@supabase/supabase-js";
 import type { ServiceStatus } from "@/types/service";
 import { recordOutflow } from "@/lib/accessoryOutflow";
+import { AKUN, jakartaDate, periodFromDate, totalOf } from "@/lib/accounting";
+import { draftToLineRows } from "@/lib/accountingSource";
 
 function getAdmin() {
   return createClient(
@@ -12,6 +14,46 @@ function getAdmin() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false } }
   );
+}
+
+// Insert 1 jurnal MANUAL instan (dipakai saat Simpan Sparepart). Best-effort:
+// kalau gagal, dicatat ke log & pencatatan sparepart tetap lanjut.
+async function insertSparepartJournal(
+  supabase: ReturnType<typeof getAdmin>,
+  opts: { nominal: number; debit: string; kredit: string; keterangan: string; userId: string }
+) {
+  try {
+    const tanggal = jakartaDate(new Date().toISOString());
+    const period = periodFromDate(tanggal);
+    const lines = [
+      { account_code: opts.debit, side: "DEBIT" as const, nominal: opts.nominal },
+      { account_code: opts.kredit, side: "KREDIT" as const, nominal: opts.nominal },
+    ];
+    const { data: entry, error } = await supabase
+      .from("journal_entries")
+      .insert({
+        period, tanggal, keterangan: opts.keterangan,
+        ref: null, source_type: "MANUAL", source_id: null,
+        source_category: "SPAREPART_SERVICE",
+        total: totalOf(lines), created_by: opts.userId,
+      })
+      .select("id").single();
+    if (error || !entry) { console.error("[sparepart jurnal] entry:", error?.message); return; }
+
+    const { error: lineErr } = await supabase.from("journal_lines").insert(draftToLineRows(entry.id, lines));
+    if (lineErr) {
+      await supabase.from("journal_entries").delete().eq("id", entry.id);
+      console.error("[sparepart jurnal] lines:", lineErr.message);
+      return;
+    }
+    await supabase.from("journal_audit_logs").insert({
+      entry_id: entry.id, period, action: "CREATE",
+      before_data: null, after_data: { tanggal, keterangan: opts.keterangan, lines },
+      changed_by: opts.userId,
+    });
+  } catch (e) {
+    console.error("[sparepart jurnal] exception:", e);
+  }
 }
 
 async function getAuthUser(req: NextRequest) {
@@ -82,7 +124,6 @@ export async function PATCH(
     alasan,
     hasil_analisa,
     estimasi_harga,
-    biaya_sparepart,
     payment_amount,
     payment_note,
     payment_method,
@@ -91,12 +132,13 @@ export async function PATCH(
     total_tagihan, //  NEW
     cicilan_amount, //  NEW
     payment_proof_url, //  NEW — url foto bukti transfer
+    sparepart_mode,    //  NEW — "stock" | "manual"
+    sparepart_modal,   //  NEW — modal input manual
   } = body as {
     action: string;
     alasan?: string;
     hasil_analisa?: string;
     estimasi_harga?: number;
-    biaya_sparepart?: number;
     payment_amount?: number;
     payment_note?: string;
     payment_method?: string;
@@ -105,6 +147,8 @@ export async function PATCH(
     total_tagihan?: number; //  NEW
     cicilan_amount?: number; //  NEW
     payment_proof_url?: string; //  NEW — wajib untuk action "bayar_dimuka"
+    sparepart_mode?: "stock" | "manual"; //  NEW
+    sparepart_modal?: number; //  NEW
   };
 
   const supabase = getAdmin();
@@ -142,23 +186,41 @@ export async function PATCH(
         : "Mulai dikerjakan";
       break;
 
-    case "sparepart":
+    case "sparepart": {
       if (!hasAnyRole(getEffectiveRoles(user), SERVICE_TEKNISI_ROLES))
         return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
       if (oldStatus !== "SEDANG_DIKERJAKAN")
         return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
       newStatus = "MENUNGGU_SPAREPART";
-      updatePayload = {
-        ...(biaya_sparepart !== undefined ? { biaya_sparepart: Number(biaya_sparepart) } : {}),
-      };
-      logCatatan = biaya_sparepart
-        ? `Menunggu sparepart · Biaya: Rp ${Number(biaya_sparepart).toLocaleString("id-ID")}${alasan ? ` · ${alasan}` : ""}`
-        : (alasan ? `Menunggu sparepart: ${alasan}` : "Menunggu sparepart");
+      // biaya_sparepart TIDAK diubah di sini — "biaya sparepart" sekarang murni
+      // MODAL yang masuk jurnal, bukan tagihan customer.
+      updatePayload = {};
+      logCatatan = alasan ? `Menunggu sparepart: ${alasan}` : "Menunggu sparepart";
+
+      const ketServis = (alasan ?? "").trim() || "Sparepart";
 
       if (accessories_used && accessories_used.length > 0) {
+        // ── DARI STOK AKSESORIS → jurnal D450 / K170 (modal = buy_price × qty) ──
+        const accIds = [...new Set(accessories_used.map((a) => a.accessory_id).filter(Boolean))];
+        const unitIds = accessories_used.map((a) => a.unit_id).filter(Boolean) as string[];
+        const [{ data: accRows }, { data: unitRows }] = await Promise.all([
+          accIds.length
+            ? supabase.from("accessories").select("id, buy_price").in("id", accIds)
+            : Promise.resolve({ data: [] as any[] }),
+          unitIds.length
+            ? supabase.from("accessory_units").select("id, serial_number").in("id", unitIds)
+            : Promise.resolve({ data: [] as any[] }),
+        ]);
+        const buyPriceMap = new Map((accRows ?? []).map((a: any) => [a.id, Math.round(Number(a.buy_price ?? 0))]));
+        const snMap = new Map((unitRows ?? []).map((u: any) => [u.id, u.serial_number as string]));
+
+        let modalStok = 0;
+        const sns: string[] = [];
         for (const acc of accessories_used) {
           if (acc.unit_id) {
             await supabase.from("accessory_units").update({ status: "KELUAR" }).eq("id", acc.unit_id);
+            const sn = snMap.get(acc.unit_id);
+            if (sn) sns.push(sn);
           }
           await recordOutflow({
             accessory_id: acc.accessory_id,
@@ -166,7 +228,7 @@ export async function PATCH(
             source_type: "service",
             service_id: id,
             qty: acc.qty,
-            notes: `Dipakai untuk servis ${current.no_urut || id}`,
+            notes: `Sparepart service · ${ketServis}`,
             taken_by_role: "TEKNISI",
             created_by: user.id,
           });
@@ -174,9 +236,33 @@ export async function PATCH(
             p_accessory_id: acc.accessory_id,
             p_qty: acc.qty,
           });
+          modalStok += (buyPriceMap.get(acc.accessory_id) ?? 0) * Number(acc.qty || 1);
         }
+
+        if (modalStok > 0) {
+          const keterangan = `${ketServis} · ${current.nama ?? "—"}${sns.length ? ` · ${sns.join(", ")}` : ""}`;
+          await insertSparepartJournal(supabase, {
+            nominal: modalStok,
+            debit: AKUN.BIAYA_PRINTILAN,  // 450
+            kredit: AKUN.AKSESORIS,        // 170
+            keterangan,
+            userId: user.id,
+          });
+        }
+      } else if (sparepart_mode === "manual" && Number(sparepart_modal) > 0) {
+        // ── INPUT MANUAL → jurnal D460 / K171 ──
+        const modalManual = Math.round(Number(sparepart_modal));
+        const keterangan = `${ketServis} · ${current.nama ?? "—"}`;
+        await insertSparepartJournal(supabase, {
+          nominal: modalManual,
+          debit: AKUN.MODAL_SERVICE_KELUAR, // 460
+          kredit: AKUN.AKSESORIS_SERVICE,    // 171
+          keterangan,
+          userId: user.id,
+        });
       }
       break;
+    }
 
     case "done":
       if (!hasAnyRole(getEffectiveRoles(user), SERVICE_TEKNISI_ROLES))
