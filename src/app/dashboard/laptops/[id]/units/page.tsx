@@ -15,6 +15,7 @@ import UnitFormModal from "@/components/inventory/UnitFormModal";
 import EditablePriceCell from "@/components/inventory/EditablePriceCell";
 import { exportInventoryExcel } from "@/lib/inventoryExport";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import BarcodeModal from "@/components/ui/BarcodeModal";
 
 interface LaptopUnit {
     id: string;
@@ -261,6 +262,8 @@ export default function UnitsPage() {
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canAuditUnits = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canSOUnits = hasAnyRole(userRoles, SO_ROLES);
+    // Barcode per unit — sama seperti halaman Kelola Unit Aksesoris.
+    const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
     const canSeePriceInfo = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
@@ -283,6 +286,8 @@ export default function UnitsPage() {
     const canQuickCondition = !!canEditChecklist;
     //  Unit yang sedang dibuka di Pop-up Detail
     const [detailUnit, setDetailUnit] = useState<LaptopUnit | null>(null);
+    //  Unit yang barcode-nya sedang dibuka (1 unit = 1 barcode) — null = tidak ada
+    const [barcodeUnit, setBarcodeUnit] = useState<LaptopUnit | null>(null);
     //  Target & draft modal "Tes Kondisi" per unit
     const [conditionTarget, setConditionTarget] = useState<LaptopUnit | null>(null);
     const [conditionDraft, setConditionDraft] = useState<ConditionChecks>({});
@@ -1239,9 +1244,20 @@ export default function UnitsPage() {
                                     //  nutup penuh kalau bukan pengelola unit, jadi editor checklist
                                     //  yang bukan EDIT_UNITS tidak kebagian tombol apa pun. Sekarang
                                     //  dipisah per-tombol sesuai gate masing-masing.
-                                    if (!canQuickCondition && !canManageUnits) return null;
+                                    //  canViewBarcode ditambahkan ke guard supaya baris yang HANYA
+                                    //  boleh lihat barcode (tanpa checklist/manage) tetap dapat tombol.
+                                    if (!canQuickCondition && !canManageUnits && !canViewBarcode) return null;
                                     return (
                                         <>
+                                            {/* Barcode per unit — 1 unit = 1 barcode, pakai presetUnit
+                                                di BarcodeModal (tak perlu fetch, RESERVED pun muncul). */}
+                                            {canViewBarcode && (
+                                                <button onClick={() => setBarcodeUnit(u)}
+                                                    className="h-8 px-2 rounded-lg text-[11px] font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-center whitespace-nowrap"
+                                                    title="Cetak barcode unit ini">
+                                                    Barcode
+                                                </button>
+                                            )}
                                             {canQuickCondition && (
                                                 <button onClick={() => openCondition(u)}
                                                     className="h-8 px-2 rounded-lg text-[11px] font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 transition flex items-center justify-center whitespace-nowrap"
@@ -1289,6 +1305,25 @@ export default function UnitsPage() {
                     onClose={closeForm}
                     onSuccess={handleFormSuccess}
                     onError={(msg) => setAlertModal(msg)}
+                />
+            )}
+
+            {/*  Barcode per unit — 1 unit = 1 barcode. presetUnit = kirim unit
+                langsung, jadi modal tidak fetch & RESERVED/BELUM_SIAP pun bisa
+                dibarcode. grade dikirim untuk badge warna (A/B/C). */}
+            {barcodeUnit && (
+                <BarcodeModal
+                    laptopId={laptopId}
+                    laptopName={laptop?.laptop_name ?? "Laptop"}
+                    itemType="LAPTOP"
+                    presetUnit={{
+                        id: barcodeUnit.id,
+                        serial_number: barcodeUnit.serial_number,
+                        selling_price: barcodeUnit.selling_price,
+                        status: barcodeUnit.status,
+                        grade: barcodeUnit.grade,
+                    }}
+                    onClose={() => setBarcodeUnit(null)}
                 />
             )}
 
