@@ -11,6 +11,8 @@ export default function CameraScanPage() {
     const [decoded, setDecoded] = useState("");        // teks mentah hasil decode
     const [loading, setLoading] = useState(false);
     const [debug, setDebug] = useState<string | null>(null); // diagnostik di layar
+    const [torchOn, setTorchOn] = useState(false);
+    const [torchSupported, setTorchSupported] = useState(false);
 
     useEffect(() => {
         startScanner();
@@ -42,29 +44,73 @@ export default function CameraScanPage() {
             scannerRef.current = scanner;
 
             await scanner.start(
-                { facingMode: "environment" },
+                // Minta kamera belakang resolusi tinggi — makin banyak piksel,
+                // makin terbaca bar yang tipis. HP akan ambil yang terdekat yang
+                // didukung (ideal 1920 lebar).
                 {
-                    fps: 10,
-                    // Kotak 250x120 lama memotong barcode 1D yang panjang seperti
-                    // "CHARGER-DELL-071". Sekarang kotak ikut lebar viewport
-                    // (maks 320px) supaya barcode garis muat penuh & ke-decode.
-                    qrbox: (viewfinderWidth: number) => {
-                        const width = Math.min(viewfinderWidth - 40, 320);
-                        return { width, height: Math.max(120, Math.floor(width * 0.5)) };
+                    facingMode: "environment",
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                } as MediaTrackConstraints,
+                {
+                    // FPS lebih tinggi = lebih banyak frame dianalisa per detik,
+                    // jadi barcode tipis/panjang lebih cepat "kekunci" saat tangan
+                    // sedikit goyang. 10 → 15 masih ringan di HP modern.
+                    fps: 15,
+                    // Kotak scan dilebarkan (maks 400px) & dipendekkan tingginya.
+                    // Barcode 1D itu LEBAR tapi PENDEK — kotak yang lebih lebar &
+                    // tipis bikin barcode panjang seperti "HDD-750GB-890" muat
+                    // penuh tanpa terpotong, dan rasio tinggi 0.4 mengurangi area
+                    // noise di atas/bawah yang bikin decoder bingung.
+                    qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+                        const width = Math.min(viewfinderWidth - 32, 400);
+                        const height = Math.min(
+                            Math.max(110, Math.floor(width * 0.4)),
+                            viewfinderHeight - 32
+                        );
+                        return { width, height };
                     },
-                    aspectRatio: 1.0,
+                    // 1.777 (16:9) memberi frame lebih lebar daripada 1:1 — cocok
+                    // untuk barcode garis yang memanjang horizontal.
+                    aspectRatio: 1.777,
                 },
                 async (decodedText) => {
-                    setDecoded(decodedText);
+                    // Bersihkan karakter kontrol di titik decode juga (bukan cuma
+                    // di handleSearch) supaya SN yang ditampilkan & dicari konsisten.
+                    const clean = decodedText.replace(/[\u0000-\u001F\u007F]/g, "").trim();
+                    setDecoded(clean);
                     await stopScanner();
-                    handleSearch(decodedText);
+                    handleSearch(clean);
                 },
+                // Callback error per-frame SENGAJA dikosongkan: html5-qrcode
+                // memanggil ini tiap frame yang gagal decode (normal). Kalau diisi
+                // setDebug, layar akan spam error padahal cuma "belum ketemu".
                 () => { }
             );
+
+            // Cek apakah kamera HP ini punya torch (senter). Kalau ada, tombolnya
+            // dimunculkan. Tidak semua browser/HP mendukung, jadi dibungkus try.
+            try {
+                const track = scanner.getRunningTrackCameraCapabilities?.();
+                if (track && (track as any).torchFeature?.().isSupported?.()) {
+                    setTorchSupported(true);
+                }
+            } catch { /* torch tidak didukung — abaikan */ }
         } catch (err) {
             console.error(err);
             setDebug("Gagal membuka kamera: " + String(err));
         }
+    };
+
+    const toggleTorch = async () => {
+        try {
+            const track = scannerRef.current?.getRunningTrackCameraCapabilities?.();
+            const torch = (track as any)?.torchFeature?.();
+            if (torch?.isSupported?.()) {
+                await torch.apply(!torchOn);
+                setTorchOn(v => !v);
+            }
+        } catch { /* gagal nyalakan torch — abaikan */ }
     };
 
     const stopScanner = async () => {
