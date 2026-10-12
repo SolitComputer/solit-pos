@@ -216,7 +216,7 @@ function ConditionViewModal({ unit, checks, checkedBy, checkedAt, loading, onClo
                                     Tes kondisi unit ini belum diisi oleh penanggung jawab.
                                 </p>
                             )}
-                            <ConditionChecklist value={checks} onChange={() => {}} readOnly />
+                            <ConditionChecklist value={checks} onChange={() => { }} readOnly />
                         </>
                     )}
                 </div>
@@ -904,14 +904,23 @@ interface MsjGroup {
     created_at: string; items: MsjGroupItem[]; item_count: number; total_selling: number;
 }
 
-function AddGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-    const [name, setName] = useState("");
+function AddGroupModal({ editing, onClose, onSaved }: {
+    editing?: MsjGroup | null;          // null/undefined = mode CREATE, isi = mode EDIT
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const isEdit = !!editing;
+    const [name, setName] = useState(editing?.name ?? "");
     const [snSearch, setSnSearch] = useState("");
     const [results, setResults] = useState<MsjGroupItem[]>([]);
     const [searching, setSearching] = useState(false);
-    const [picked, setPicked] = useState<MsjGroupItem[]>([]);
+    // picked = daftar unit FINAL yang diinginkan. Mode edit diisi dari isi kelompok.
+    const [picked, setPicked] = useState<MsjGroupItem[]>(editing?.items ?? []);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+
+    // SN yang sudah ada di kelompok sejak awal (buat hitung add/remove di mode edit).
+    const originalIds = useMemo(() => new Set((editing?.items ?? []).map(i => i.unit_id)), [editing]);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !saving) onClose(); };
@@ -934,7 +943,7 @@ function AddGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated:
     const addItem = (it: MsjGroupItem) => {
         setPicked(prev => [...prev, it]);
         setResults(prev => prev.filter(r => r.unit_id !== it.unit_id));
-        setSnSearch(""); 
+        setSnSearch("");
     };
     const removeItem = (unitId: string) => setPicked(prev => prev.filter(p => p.unit_id !== unitId));
 
@@ -945,17 +954,34 @@ function AddGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated:
         if (picked.length === 0) { setError("Pilih minimal 1 SN"); return; }
         setSaving(true); setError("");
         try {
-            const res = await fetch("/api/msj-groups", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: name.trim(),
-                    items: picked.map(p => ({ item_type: p.item_type, unit_id: p.unit_id })),
-                }),
-            });
-            const json = await res.json();
-            if (!res.ok || !json.success) throw new Error(json.error || "Gagal membuat kelompok");
-            onCreated();
+            if (isEdit) {
+                // Mode EDIT → PATCH: hitung selisih tambah (add) & keluar (remove).
+                const add = picked.filter(p => !originalIds.has(p.unit_id))
+                    .map(p => ({ item_type: p.item_type, unit_id: p.unit_id }));
+                const remove = (editing!.items ?? [])
+                    .filter(o => !picked.some(p => p.unit_id === o.unit_id))
+                    .map(o => ({ item_type: o.item_type, unit_id: o.unit_id }));
+                const res = await fetch(`/api/msj-groups/${editing!.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: name.trim(), add, remove }),
+                });
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.error || "Gagal menyimpan perubahan");
+            } else {
+                // Mode CREATE → POST.
+                const res = await fetch("/api/msj-groups", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: name.trim(),
+                        items: picked.map(p => ({ item_type: p.item_type, unit_id: p.unit_id })),
+                    }),
+                });
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.error || "Gagal membuat kelompok");
+            }
+            onSaved();
         } catch (e) {
             setError(e instanceof Error ? e.message : "Terjadi kesalahan");
         } finally { setSaving(false); }
@@ -966,7 +992,7 @@ function AddGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated:
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
             <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-slideUp">
                 <div className={`${BRAND_GRADIENT} px-5 py-5 flex-shrink-0`}>
-                    <h3 className="font-bold text-white text-[15px]">Tambah Kelompok</h3>
+                    <h3 className="font-bold text-white text-[15px]">{isEdit ? "Edit Kelompok" : "Tambah Kelompok"}</h3>
                     <p className="text-xs text-gray-200 mt-0.5">Kelompokkan SN berstatus Minus Siap Jual</p>
                 </div>
 
@@ -1036,7 +1062,7 @@ function AddGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated:
                     <button onClick={handleSave} disabled={saving || !name.trim() || picked.length === 0}
                         className={`flex-1 h-11 ${BRAND_GRADIENT_H} text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2`}>
                         {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                        Simpan Kelompok
+                        {isEdit ? "Simpan Perubahan" : "Simpan Kelompok"}
                     </button>
                 </div>
             </div>
@@ -1048,6 +1074,7 @@ function GroupsSection() {
     const [groups, setGroups] = useState<MsjGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
+    const [editingGroup, setEditingGroup] = useState<MsjGroup | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -1104,6 +1131,10 @@ function GroupsSection() {
                                             <p className="text-[11px] text-gray-400">{g.item_count} barang · {fmt(g.total_selling)}</p>
                                         </div>
                                     </button>
+                                    <button onClick={() => setEditingGroup(g)}
+                                        className="h-8 px-2.5 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition flex-shrink-0">
+                                        Edit
+                                    </button>
                                     <button onClick={() => deleteGroup(g)} disabled={deletingId === g.id}
                                         className="h-8 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition disabled:opacity-40 flex-shrink-0">
                                         {deletingId === g.id ? "..." : "Hapus"}
@@ -1134,7 +1165,8 @@ function GroupsSection() {
                 </div>
             )}
 
-            {showAdd && <AddGroupModal onClose={() => setShowAdd(false)} onCreated={() => { setShowAdd(false); fetchGroups(); }} />}
+            {showAdd && <AddGroupModal onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); fetchGroups(); }} />}
+            {editingGroup && <AddGroupModal editing={editingGroup} onClose={() => setEditingGroup(null)} onSaved={() => { setEditingGroup(null); fetchGroups(); }} />}
         </div>
     );
 }
