@@ -368,20 +368,32 @@ export default function CreatePaymentPage() {
                 if (!result.success) return;
                 const unit = result.data;
                 const laptop = unit.laptop;
+                // FIX: dulu langsung baca laptop.id / laptop.laptop_name tanpa cek.
+                // Untuk unit non-laptop (PC/Printer via device_type) atau unit yang
+                // join `laptops`-nya null, `laptop` bisa undefined → CRASH
+                // (TypeError) ATAU laptop_id/laptop_name jadi "" yang GAGAL validasi
+                // zod (units.*.min(1)). Sekarang fallback ke field datar yang juga
+                // dikirim check-sn, lalu stop kalau tetap kosong.
+                const resolvedLaptopId = laptop?.id ?? unit.laptop_id ?? "";
+                const resolvedLaptopName = laptop?.laptop_name ?? unit.laptop_name ?? "";
+                if (!resolvedLaptopId || !resolvedLaptopName) {
+                    console.error("[loadScan] laptop_id/laptop_name kosong untuk SN:", unit.serial_number, { resolvedLaptopId, resolvedLaptopName });
+                    return;
+                }
                 const item: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number } = {
                     unit_id: unit.id,
-                    laptop_id: laptop.id,
+                    laptop_id: resolvedLaptopId,
                     serial_number: unit.serial_number,
-                    laptop_name: laptop.laptop_name,
+                    laptop_name: resolvedLaptopName,
                     grade: unit.grade,
                     selling_price: unit.selling_price ?? 0,
                     condition_note: unit.condition_note,
                 };
                 setSelectedUnits([item]);
                 setValue("units", [item]);
-                setValue("laptop_name", laptop.laptop_name);
+                setValue("laptop_name", resolvedLaptopName);
                 setValue("serial_number", unit.serial_number);
-                setValue("laptop_id", laptop.id);
+                setValue("laptop_id", resolvedLaptopId);
                 setValue("unit_id", unit.id);
             } catch { }
         };
@@ -424,11 +436,33 @@ export default function CreatePaymentPage() {
                     if (!ur.success || !ur.data) continue;
                     const u = ur.data;
                     const laptop = u.laptop;
+                    // FIX: unitItemSchema (validation.ts) mewajibkan laptop_id DAN
+                    // laptop_name sama-sama .min(1). Beberapa unit (PC/Printer via
+                    // device_type, atau join `laptops` null) tidak punya objek
+                    // `laptop`, jadi laptop?.id / laptop?.laptop_name = undefined →
+                    // sebelumnya di-fallback "" yang GAGAL validasi zod → seluruh
+                    // array `units` dianggap "tidak valid" (ini biang bug "units:
+                    // tidak valid"). Pakai fallback ke field datar yang juga dikirim
+                    // check-sn (u.laptop_id / u.laptop_name). Kalau salah satu tetap
+                    // kosong, skip unit ini supaya tidak memaksa form jadi invalid
+                    // total — unit yang di-skip tetap dilaporkan lewat prepResolveError
+                    // di bawah.
+                    const resolvedLaptopId = laptop?.id ?? u.laptop_id ?? "";
+                    const resolvedLaptopName =
+                        laptop?.laptop_name ?? u.laptop_name ?? it.laptop_name ?? "";
+                    if (!resolvedLaptopId || !resolvedLaptopName) {
+                        console.error(
+                            "[loadPrep] Unit dilewati — laptop_id/laptop_name kosong untuk SN:",
+                            u.serial_number,
+                            { resolvedLaptopId, resolvedLaptopName }
+                        );
+                        continue;
+                    }
                     resolved.push({
                         unit_id: u.id,
-                        laptop_id: laptop?.id ?? "",
+                        laptop_id: resolvedLaptopId,
                         serial_number: u.serial_number,
-                        laptop_name: laptop?.laptop_name ?? it.laptop_name ?? "",
+                        laptop_name: resolvedLaptopName,
                         grade: u.grade ?? undefined,
                         selling_price: u.selling_price ?? 0,
                         purchase_price: u.purchase_price ?? 0,
@@ -449,7 +483,7 @@ export default function CreatePaymentPage() {
                     console.error("[loadPrep] Unit gagal di-resolve via check-sn:", failedSNs);
                     setPrepResolveError(
                         resolved.length === 0
-                            ? `Semua unit gagal dimuat (SN: ${failedSNs}). Kemungkinan status unit sudah berubah dari SIAP_JUAL, sehingga tidak lolos pengecekan ketersediaan di /api/units/check-sn.`
+                            ? `Semua unit gagal dimuat (SN: ${failedSNs}). Kemungkinan status unit sudah berubah dari SIAP_JUAL, atau data produk (laptop_id/nama) unit tersebut kosong di master barang.`
                             : `${items.length - resolved.length} dari ${items.length} unit gagal dimuat (SN: ${failedSNs}).`
                     );
                 }
@@ -535,6 +569,18 @@ export default function CreatePaymentPage() {
         setSelectedAccessories(prev => prev.filter((_, i) => i !== idx));
 
     const handleSelectSnResult = (u: UnitOption) => {
+        // FIX: tolak item yang laptop_id ATAU laptop_name-nya bakal kosong
+        // (laptop tanpa laptop_id, aksesori tanpa accessory_id, atau nama produk
+        // kosong) — sebelumnya di-fallback "" yang gagal validasi zod
+        // (units.*.min(1)). Lebih baik tolak di sini dengan pesan jelas daripada
+        // lolos lalu seluruh form invalid "units: tidak valid".
+        const resolvedLaptopId =
+            u.unit_type === "accessory" ? (u.accessory_id ?? "") : (u.laptop_id ?? "");
+        const resolvedLaptopName = u.laptop_name ?? "";
+        if (!resolvedLaptopId || !resolvedLaptopName) {
+            alert(`Unit "${u.serial_number}" tidak punya ID/nama produk yang valid, tidak bisa ditambahkan.`);
+            return;
+        }
         const item: UnitItem & {
             grade?: string | null;
             condition_note?: string;
@@ -542,11 +588,10 @@ export default function CreatePaymentPage() {
             unit_type?: "laptop" | "accessory";
         } = {
             unit_id: u.id,
-            // Untuk aksesori, laptop_id diisi accessory_id (konsistensi field)
-            laptop_id: u.unit_type === "accessory" ? (u.accessory_id ?? "") : (u.laptop_id ?? ""),
+            laptop_id: resolvedLaptopId,
             serial_number: u.serial_number,
             purchase_price: u.purchase_price ?? 0,
-            laptop_name: u.laptop_name ?? "",
+            laptop_name: resolvedLaptopName,
             grade: u.grade ?? undefined,
             selling_price: u.selling_price ?? 0,
             condition_note: u.condition_note ?? "",
@@ -653,14 +698,29 @@ export default function CreatePaymentPage() {
     // Sebelumnya tidak ada handler ini → kegagalan validasi senyap total,
     // modal konfirmasi tidak muncul dan tidak ada pesan apapun ke user.
     const onInvalidSubmit = (errs: Record<string, any>) => {
-        const fieldErrors = Object.entries(errs).map(
-            ([field, err]) => `${field}: ${(err as any)?.message ?? "tidak valid"}`
-        );
-        console.error("[CreatePayment] Validasi form gagal:", fieldErrors);
+        // FIX: error untuk field array (mis. "units") TIDAK punya .message di
+        // root — pesan aslinya ada di elemen anak (errs.units[0].laptop_id.message).
+        // Dulu cuma baca err?.message → selalu jatuh ke "units: tidak valid" yang
+        // menyesatkan. Sekarang digali supaya langsung kelihatan field mana yang
+        // gagal (mis. "units[0] → laptop_id: laptop_id/produk unit kosong").
+        const describe = (field: string, err: any): string => {
+            if (err?.message) return `${field}: ${err.message}`;
+            if (Array.isArray(err)) {
+                const idx = err.findIndex((e) => e && Object.keys(e).length > 0);
+                if (idx >= 0) {
+                    const child = err[idx];
+                    const sub = Object.entries(child)
+                        .map(([k, v]) => `${k}: ${(v as any)?.message ?? "tidak valid"}`)
+                        .join(", ");
+                    return `${field}[${idx}] → ${sub}`;
+                }
+            }
+            return `${field}: tidak valid`;
+        };
+        const fieldErrors = Object.entries(errs).map(([field, err]) => describe(field, err));
+        console.error("[CreatePayment] Validasi form gagal:", fieldErrors, errs);
         const firstKey = Object.keys(errs)[0];
-        const firstMsg = firstKey
-            ? (errs[firstKey]?.message || `Field "${firstKey}" tidak valid`)
-            : "Form tidak valid";
+        const firstMsg = firstKey ? describe(firstKey, errs[firstKey]) : "Form tidak valid";
         alert(`Tidak bisa lanjut — ${firstMsg}\n\n(Cek Console untuk detail lengkap semua field yang error)\n\n${fieldErrors.join("\n")}`);
     };
 

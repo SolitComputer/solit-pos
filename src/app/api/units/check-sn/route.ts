@@ -3,6 +3,16 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
 
+// FIX: embed relasi to-one Supabase (`laptop:laptops(...)`) kadang balik
+// sebagai ARRAY [{...}], kadang objek — tergantung inference. Client membaca
+// `u.laptop?.id`, yang jadi undefined kalau bentuknya array → laptop_id kosong
+// → gagal validasi zod (units.laptop_id min(1)). Helper ini menyeragamkan jadi
+// objek tunggal (atau null) di SEMUA branch.
+function normalizeLaptop(lap: any): any | null {
+  if (!lap) return null;
+  return Array.isArray(lap) ? (lap[0] ?? null) : lap;
+}
+
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const { searchParams } = new URL(req.url);
@@ -36,11 +46,19 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     if (laptopErr) console.error("[check-sn] laptop_units:", laptopErr);
 
     if (laptopUnit) {
-      const safeUnit: Record<string, any> = { ...laptopUnit };
+      const lap = normalizeLaptop(laptopUnit.laptop);
+      const safeUnit: Record<string, any> = { ...laptopUnit, laptop: lap };
       if (!canSeePrivate) delete safeUnit.purchase_price;
       return NextResponse.json({
         success: true,
-        data: { ...safeUnit, type: "LAPTOP" },
+        data: {
+          ...safeUnit,
+          // Jaring pengaman: field datar biar client tidak bergantung pada
+          // bentuk `laptop` sama sekali.
+          laptop_id: lap?.id ?? null,
+          laptop_name: lap?.laptop_name ?? null,
+          type: "LAPTOP",
+        },
       });
     }
 
@@ -116,9 +134,17 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       if (partialUnits && partialUnits.length > 0) {
         // Cuma 1 unit ketemu → perlakukan sama seperti exact match biasa
         if (partialUnits.length === 1) {
+          const only = partialUnits[0];
+          const lap = normalizeLaptop(only.laptop);
           return NextResponse.json({
             success: true,
-            data: { ...partialUnits[0], type: "LAPTOP" },
+            data: {
+              ...only,
+              laptop: lap,
+              laptop_id: lap?.id ?? null,
+              laptop_name: lap?.laptop_name ?? null,
+              type: "LAPTOP",
+            },
           });
         }
 
