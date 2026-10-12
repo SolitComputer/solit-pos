@@ -7,7 +7,7 @@ import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTa
 import ConditionChecklist from "@/components/inventory/ConditionChecklist";
 import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { getAuthUser } from "@/hooks/useAuthUser";
-import { Trophy, ThumbsUp, AlertTriangle, Wrench, Laptop, ClipboardList } from "lucide-react";
+import { Trophy, ThumbsUp, AlertTriangle, Wrench, Laptop, ClipboardList, Boxes, Plus, Pencil, Trash2, Search, X, ChevronDown, Package, PackagePlus, Tag } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface LaptopUnit {
@@ -706,6 +706,7 @@ function MinusSiapJualContent() {
                         <StatCard label="Sedang Disiapkan" value={counts.prepared} icon={<Wrench size={18} className="text-white" />} color="text-orange-600" bg="bg-orange-50" bar="bg-orange-500" />
                         <StatCard label="Siap / Belum Disiapkan" value={counts.ready} icon={<AlertTriangle size={18} className="text-white" />} color="text-amber-600" bg="bg-amber-50" bar="bg-amber-500" />
                     </div>
+
                     {/* ── Kelompok Minus Siap Jual ── */}
                     <GroupsSection />
 
@@ -805,7 +806,7 @@ function MinusSiapJualContent() {
                             <div className="text-center px-4">
                                 <p className="text-gray-600 font-bold text-sm">Tidak ada unit ditemukan</p>
                                 <p className="text-gray-400 text-xs mt-1">
-                                    {hasActiveFilter ? "Coba ubah atau reset filter di atas" : "Belum ada unit berstatus Minus Siap Jual"}
+                                    {hasActiveFilter ? "Coba ubah atau reset filter di atas" : "Belum ada unit laptop satuan berstatus Minus Siap Jual"}
                                 </p>
                             </div>
                             {hasActiveFilter && (
@@ -904,14 +905,21 @@ interface MsjGroup {
     created_at: string; items: MsjGroupItem[]; item_count: number; total_selling: number;
 }
 
-function AddGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-    const [name, setName] = useState("");
+function AddGroupModal({ editing, onClose, onSaved }: {
+    editing?: MsjGroup | null;        // null = mode TAMBAH, isi = mode EDIT
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const isEdit = !!editing;
+    const [name, setName] = useState(editing?.name ?? "");
     const [snSearch, setSnSearch] = useState("");
     const [results, setResults] = useState<MsjGroupItem[]>([]);
     const [searching, setSearching] = useState(false);
-    const [picked, setPicked] = useState<MsjGroupItem[]>([]);
+    const [picked, setPicked] = useState<MsjGroupItem[]>(editing?.items ?? []);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+
+    const originalIds = useMemo(() => new Set((editing?.items ?? []).map(i => i.unit_id)), [editing]);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !saving) onClose(); };
@@ -934,7 +942,7 @@ function AddGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated:
     const addItem = (it: MsjGroupItem) => {
         setPicked(prev => [...prev, it]);
         setResults(prev => prev.filter(r => r.unit_id !== it.unit_id));
-        setSnSearch(""); 
+        setSnSearch("");
     };
     const removeItem = (unitId: string) => setPicked(prev => prev.filter(p => p.unit_id !== unitId));
 
@@ -945,98 +953,140 @@ function AddGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated:
         if (picked.length === 0) { setError("Pilih minimal 1 SN"); return; }
         setSaving(true); setError("");
         try {
-            const res = await fetch("/api/msj-groups", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: name.trim(),
-                    items: picked.map(p => ({ item_type: p.item_type, unit_id: p.unit_id })),
-                }),
-            });
-            const json = await res.json();
-            if (!res.ok || !json.success) throw new Error(json.error || "Gagal membuat kelompok");
-            onCreated();
+            if (isEdit) {
+                const add = picked.filter(p => !originalIds.has(p.unit_id)).map(p => ({ item_type: p.item_type, unit_id: p.unit_id }));
+                const remove = (editing!.items ?? []).filter(o => !picked.some(p => p.unit_id === o.unit_id)).map(o => ({ item_type: o.item_type, unit_id: o.unit_id }));
+                const res = await fetch(`/api/msj-groups/${editing!.id}`, {
+                    method: "PATCH", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: name.trim(), add, remove }),
+                });
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.error || "Gagal menyimpan perubahan");
+            } else {
+                const res = await fetch("/api/msj-groups", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: name.trim(), items: picked.map(p => ({ item_type: p.item_type, unit_id: p.unit_id })) }),
+                });
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.error || "Gagal membuat kelompok");
+            }
+            onSaved();
         } catch (e) {
             setError(e instanceof Error ? e.message : "Terjadi kesalahan");
         } finally { setSaving(false); }
     };
 
+    const TypeChip = ({ type }: { type: "LAPTOP" | "ACCESSORY" }) => (
+        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border tracking-wide ${type === "LAPTOP" ? "bg-zinc-100 text-zinc-600 border-zinc-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
+            {type === "LAPTOP" ? "LAPTOP" : "AKSESORIS"}
+        </span>
+    );
+
     return (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center animate-fadeIn">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
-            <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-slideUp">
+            <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl ring-1 ring-black/5 flex flex-col max-h-[92dvh] overflow-hidden animate-slideUp">
+                {/* Header */}
                 <div className={`${BRAND_GRADIENT} px-5 py-5 flex-shrink-0`}>
-                    <h3 className="font-bold text-white text-[15px]">Tambah Kelompok</h3>
-                    <p className="text-xs text-gray-200 mt-0.5">Kelompokkan SN berstatus Minus Siap Jual</p>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-white/15 ring-1 ring-white/10 flex items-center justify-center flex-shrink-0">
+                            <PackagePlus size={18} className="text-white" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="font-bold text-white text-[15px] leading-tight">{isEdit ? "Edit Kelompok" : "Tambah Kelompok"}</h3>
+                            <p className="text-[11px] text-white/60 mt-0.5">Bundel SN Minus Siap Jual untuk dijual borongan</p>
+                        </div>
+                        <button onClick={() => !saving && onClose()} className="ml-auto w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/15 transition flex-shrink-0">
+                            <X size={16} />
+                        </button>
+                    </div>
                 </div>
 
-                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+                {/* Body */}
+                <div className="overflow-y-auto flex-1 px-5 py-5 space-y-5">
+                    {/* Nama */}
                     <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nama Kelompok *</label>
-                        <input value={name} onChange={e => setName(e.target.value)} placeholder="Contoh: KELOMPOK HDD-256GB"
-                            className={fieldBase + " px-3"} autoFocus />
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                            <Tag size={12} /> Nama Kelompok <span className="text-red-400">*</span>
+                        </label>
+                        <input value={name} onChange={e => setName(e.target.value)} placeholder="Contoh: KELOMPOK HDD-256GB" className={fieldBase + " px-3.5"} autoFocus />
                     </div>
 
+                    {/* Cari SN */}
                     <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Cari SN (Minus Siap Jual)</label>
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                            <Search size={12} /> Cari SN (Minus Siap Jual)
+                        </label>
                         <div className="relative">
-                            <input value={snSearch} onChange={e => { setSnSearch(e.target.value); doSearch(e.target.value); }}
-                                placeholder="Ketik SN barang..." className={fieldBase + " px-3 font-mono"} />
-                            {searching && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin" />}
+                            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                            <input value={snSearch} onChange={e => { setSnSearch(e.target.value); doSearch(e.target.value); }} placeholder="Ketik SN barang..." className={fieldBase + " pl-10 pr-9 font-mono"} />
+                            {searching && <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin" />}
                         </div>
                         {results.length > 0 && (
-                            <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                            <div className="mt-1.5 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white divide-y divide-gray-100">
                                 {results.map(r => (
-                                    <button key={r.unit_id} type="button" onClick={() => addItem(r)}
-                                        className="w-full px-3.5 py-2.5 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-mono text-sm font-semibold text-gray-800">{r.serial_number}</span>
-                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${r.item_type === "LAPTOP" ? "bg-zinc-100 text-zinc-600 border-zinc-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
-                                                {r.item_type === "LAPTOP" ? "LAPTOP" : "AKSESORIS"}
-                                            </span>
+                                    <button key={r.unit_id} type="button" onClick={() => addItem(r)} className="w-full px-3 py-2.5 text-left hover:bg-violet-50/50 transition flex items-center gap-2.5">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${r.item_type === "LAPTOP" ? "bg-zinc-100 text-zinc-500" : "bg-blue-50 text-blue-500"}`}>
+                                            {r.item_type === "LAPTOP" ? <Laptop size={14} /> : <Package size={14} />}
                                         </div>
-                                        <p className="text-xs text-gray-500 mt-0.5">{r.name}{r.selling_price ? ` · ${fmt(r.selling_price)}` : ""}</p>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-mono text-sm font-semibold text-gray-800 truncate">{r.serial_number}</span>
+                                                <TypeChip type={r.item_type} />
+                                            </div>
+                                            <p className="text-[11px] text-gray-500 mt-0.5 truncate">{r.name}{r.selling_price ? ` · ${fmt(r.selling_price)}` : ""}</p>
+                                        </div>
+                                        <Plus size={16} className="text-violet-400 flex-shrink-0" />
                                     </button>
                                 ))}
                             </div>
                         )}
                         {snSearch.trim().length >= 2 && results.length === 0 && !searching && (
-                            <p className="text-xs text-gray-400 mt-1.5 px-1">SN tidak ditemukan / sudah dikelompokkan / bukan Minus Siap Jual</p>
+                            <p className="text-xs text-gray-400 mt-2 px-1">SN tidak ditemukan / sudah dikelompokkan / bukan Minus Siap Jual</p>
                         )}
                     </div>
 
+                    {/* Barang terpilih */}
                     {picked.length > 0 && (
-                        <div className="space-y-2">
+                        <div className="space-y-2.5">
                             <div className="flex items-center justify-between">
-                                <label className="text-xs font-semibold text-gray-600">Barang Terpilih ({picked.length})</label>
-                                <span className="text-xs font-bold text-amber-600 tabular-nums">{fmt(totalJual)}</span>
+                                <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                    Barang Terpilih
+                                    <span className="w-5 h-5 rounded-full bg-[#1a1545] text-white text-[10px] font-bold flex items-center justify-center">{picked.length}</span>
+                                </label>
+                                <span className="text-sm font-black text-amber-600 tabular-nums">{fmt(totalJual)}</span>
                             </div>
-                            {picked.map((p, i) => (
-                                <div key={p.unit_id} className="flex items-center justify-between bg-gray-50 rounded-xl border border-gray-200 px-3 py-2.5">
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">{i + 1}</span>
-                                            <span className="font-mono text-xs font-semibold text-gray-800 truncate">{p.serial_number}</span>
+                            <div className="space-y-1.5">
+                                {picked.map((p, i) => (
+                                    <div key={p.unit_id} className="flex items-center gap-2.5 bg-gray-50 rounded-xl border border-gray-200 px-3 py-2.5">
+                                        <span className="w-5 h-5 rounded-full bg-gradient-to-br from-[#1a1545] to-[#0f0c29] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-mono text-xs font-semibold text-gray-800 truncate">{p.serial_number}</span>
+                                                <TypeChip type={p.item_type} />
+                                            </div>
+                                            <p className="text-[10px] text-gray-500 mt-0.5 truncate">{p.name}</p>
                                         </div>
-                                        <p className="text-[10px] text-gray-500 mt-0.5 ml-5.5 truncate">{p.name}</p>
+                                        <span className="text-xs font-bold text-gray-700 tabular-nums flex-shrink-0">{fmt(p.selling_price)}</span>
+                                        <button onClick={() => removeItem(p.unit_id)} className="w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0">
+                                            <X size={15} />
+                                        </button>
                                     </div>
-                                    <button onClick={() => removeItem(p.unit_id)} className="ml-2 w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     )}
 
-                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2"><p className="text-xs text-red-700">{error}</p></div>}
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5"><p className="text-xs text-red-700">{error}</p></div>}
                 </div>
 
-                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                {/* Footer */}
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-white">
                     <button onClick={onClose} disabled={saving} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
                     <button onClick={handleSave} disabled={saving || !name.trim() || picked.length === 0}
-                        className={`flex-1 h-11 ${BRAND_GRADIENT_H} text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2`}>
+                        className={`flex-1 h-11 ${BRAND_GRADIENT_H} text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-[#1a1545]/25`}>
                         {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                        Simpan Kelompok
+                        {isEdit ? "Simpan Perubahan" : "Simpan Kelompok"}
                     </button>
                 </div>
             </div>
@@ -1048,6 +1098,7 @@ function GroupsSection() {
     const [groups, setGroups] = useState<MsjGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
+    const [editingGroup, setEditingGroup] = useState<MsjGroup | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -1073,57 +1124,101 @@ function GroupsSection() {
         finally { setDeletingId(null); }
     };
 
+    const totalNilai = groups.reduce((s, g) => s + (g.total_selling || 0), 0);
+
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] p-3.5 sm:p-4 space-y-3">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] p-3.5 sm:p-5 space-y-4">
+            {/* Header */}
             <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Kelompok Minus Siap Jual</span>
-                    {!loading && <span className="text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-lg">{groups.length}</span>}
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-9 h-9 rounded-xl ${BRAND_GRADIENT} flex items-center justify-center flex-shrink-0 shadow-md shadow-[#1a1545]/20`}>
+                        <Boxes size={17} className="text-white" />
+                    </div>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-black text-gray-900">Kelompok Minus Siap Jual</h3>
+                            {!loading && <span className="text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-lg tabular-nums">{groups.length}</span>}
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                            Bundel SN untuk dijual borongan di payment
+                            {!loading && groups.length > 0 && <> · <span className="font-semibold text-amber-600">{fmt(totalNilai)}</span></>}
+                        </p>
+                    </div>
                 </div>
                 <button onClick={() => setShowAdd(true)}
-                    className={`h-9 px-3.5 ${BRAND_GRADIENT_H} text-white rounded-xl text-xs font-semibold hover:opacity-90 transition active:scale-[0.97] flex-shrink-0`}>
-                    + Tambah Kelompok
+                    className={`h-9 px-3.5 ${BRAND_GRADIENT_H} text-white rounded-xl text-xs font-semibold hover:opacity-90 transition active:scale-[0.97] flex items-center gap-1.5 flex-shrink-0 shadow-md shadow-[#1a1545]/20`}>
+                    <Plus size={15} /> <span className="hidden sm:inline">Tambah Kelompok</span><span className="sm:hidden">Tambah</span>
                 </button>
             </div>
 
+            {/* List */}
             {loading ? (
-                <p className="text-sm text-gray-400 text-center py-6">Memuat kelompok...</p>
+                <p className="text-sm text-gray-400 text-center py-8">Memuat kelompok...</p>
             ) : groups.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-6">Belum ada kelompok. Klik "Tambah Kelompok" untuk membuat.</p>
+                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+                        <Boxes size={26} className="text-gray-300" />
+                    </div>
+                    <div className="text-center">
+                        <p className="text-sm font-bold text-gray-600">Belum ada kelompok</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Klik "Tambah Kelompok" untuk membuat bundel pertama</p>
+                    </div>
+                </div>
             ) : (
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                     {groups.map(g => {
                         const open = expandedId === g.id;
+                        const isSold = g.status === "SOLD";
                         return (
-                            <div key={g.id} className="border border-gray-200 rounded-xl overflow-hidden">
-                                <div className="flex items-center justify-between gap-2 px-3.5 py-3 bg-gray-50/60">
-                                    <button onClick={() => setExpandedId(open ? null : g.id)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
-                                        <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                            <div key={g.id} className="group relative rounded-xl border border-gray-200 overflow-hidden hover:border-[#1a1545]/25 hover:shadow-md transition-all">
+                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${BRAND_GRADIENT}`} />
+                                <div className="flex items-center justify-between gap-2 pl-4 pr-3 py-3 bg-gray-50/40">
+                                    <button onClick={() => setExpandedId(open ? null : g.id)} className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
+                                        <ChevronDown size={16} className={`text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
+                                        <div className="w-9 h-9 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
+                                            <Boxes size={16} className="text-amber-600" />
+                                        </div>
                                         <div className="min-w-0">
-                                            <p className="text-sm font-bold text-gray-800 truncate">{g.name}</p>
-                                            <p className="text-[11px] text-gray-400">{g.item_count} barang · {fmt(g.total_selling)}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-bold text-gray-800 truncate">{g.name}</p>
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border tracking-wide flex-shrink-0 ${isSold ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
+                                                    {isSold ? "TERJUAL" : "AKTIF"}
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">
+                                                <span className="font-semibold text-gray-600">{g.item_count} barang</span> · <span className="font-bold text-amber-600">{fmt(g.total_selling)}</span>
+                                            </p>
                                         </div>
                                     </button>
-                                    <button onClick={() => deleteGroup(g)} disabled={deletingId === g.id}
-                                        className="h-8 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition disabled:opacity-40 flex-shrink-0">
-                                        {deletingId === g.id ? "..." : "Hapus"}
-                                    </button>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                        <button onClick={() => setEditingGroup(g)} title="Edit kelompok"
+                                            className="h-8 px-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
+                                            <Pencil size={12} /> <span className="hidden sm:inline">Edit</span>
+                                        </button>
+                                        <button onClick={() => deleteGroup(g)} disabled={deletingId === g.id} title="Hapus kelompok"
+                                            className="h-8 px-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition disabled:opacity-40">
+                                            {deletingId === g.id ? <div className="w-3 h-3 border-2 border-red-200 border-t-red-500 rounded-full animate-spin" /> : <><Trash2 size={12} /> <span className="hidden sm:inline">Hapus</span></>}
+                                        </button>
+                                    </div>
                                 </div>
                                 {open && (
-                                    <div className="divide-y divide-gray-100">
+                                    <div className="divide-y divide-gray-100 bg-white">
                                         {g.items.map((it, i) => (
-                                            <div key={it.unit_id} className="flex items-center justify-between px-3.5 py-2.5">
-                                                <div className="min-w-0">
+                                            <div key={it.unit_id} className="flex items-center gap-2.5 pl-4 pr-3 py-2.5">
+                                                <span className="text-[10px] font-bold text-gray-400 w-4 flex-shrink-0 text-center">{i + 1}</span>
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${it.item_type === "LAPTOP" ? "bg-zinc-100 text-zinc-500" : "bg-blue-50 text-blue-500"}`}>
+                                                    {it.item_type === "LAPTOP" ? <Laptop size={12} /> : <Package size={12} />}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="text-[10px] text-gray-400 w-4">{i + 1}.</span>
                                                         <span className="font-mono text-xs font-semibold text-gray-800 truncate">{it.serial_number}</span>
-                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${it.item_type === "LAPTOP" ? "bg-zinc-100 text-zinc-600 border-zinc-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
+                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border tracking-wide flex-shrink-0 ${it.item_type === "LAPTOP" ? "bg-zinc-100 text-zinc-600 border-zinc-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
                                                             {it.item_type === "LAPTOP" ? "LAPTOP" : "AKSESORIS"}
                                                         </span>
                                                     </div>
-                                                    <p className="text-[10px] text-gray-500 mt-0.5 ml-5 truncate">{it.name}</p>
+                                                    <p className="text-[10px] text-gray-500 mt-0.5 truncate">{it.name}</p>
                                                 </div>
-                                                <span className="text-xs font-semibold text-gray-700 tabular-nums flex-shrink-0 ml-2">{fmt(it.selling_price)}</span>
+                                                <span className="text-xs font-semibold text-gray-700 tabular-nums flex-shrink-0">{fmt(it.selling_price)}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -1134,7 +1229,8 @@ function GroupsSection() {
                 </div>
             )}
 
-            {showAdd && <AddGroupModal onClose={() => setShowAdd(false)} onCreated={() => { setShowAdd(false); fetchGroups(); }} />}
+            {showAdd && <AddGroupModal onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); fetchGroups(); }} />}
+            {editingGroup && <AddGroupModal editing={editingGroup} onClose={() => setEditingGroup(null)} onSaved={() => { setEditingGroup(null); fetchGroups(); }} />}
         </div>
     );
 }
