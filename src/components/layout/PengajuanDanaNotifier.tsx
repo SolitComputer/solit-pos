@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CircleDollarSign, Volume2, VolumeX } from "lucide-react";
+import { CircleDollarSign, Volume2, VolumeX, ChevronUp, ChevronDown } from "lucide-react";
 import { usePengajuanDanaNotify } from "@/hooks/usePengajuanDanaNotify";
 
 function formatRupiah(n: number): string {
@@ -9,6 +10,30 @@ function formatRupiah(n: number): string {
 }
 
 const VISIBLE_LIMIT = 4;
+
+// ── Preferensi "sembunyikan card" — per-browser, disimpan di localStorage
+// supaya pilihan collapse/expand tidak ke-reset saat pindah halaman (komponen
+// ini remount tiap navigasi). TIDAK mempengaruhi suara alarm sama sekali —
+// suara tetap diatur mute/volume. Ini murni visibilitas kumpulan card.
+const COLLAPSED_STORAGE_KEY = "pengajuan_dana_notif_collapsed";
+
+function loadCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(COLLAPSED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveCollapsed(value: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(COLLAPSED_STORAGE_KEY, value ? "1" : "0");
+  } catch {
+    // localStorage diblokir — abaikan, bukan fitur kritikal
+  }
+}
 
 // ── Filter PENERIMA notifikasi: HANYA user ID di bawah ini yang boleh
 // dapat notifikasi Pengajuan Dana (card + suara), walaupun rolenya ADMIN.
@@ -41,6 +66,17 @@ export default function PengajuanDanaNotifier({ userRoles, userId }: PengajuanDa
   // penerima -> hook tidak polling sama sekali untuk user selain itu
   const canReceiveNotif = isAdmin && isAllowedListener;
   const { alerts, muted, volume, toggleMute, setVolume } = usePengajuanDanaNotify(canReceiveNotif);
+
+  // State collapse/expand untuk SEKUMPULAN card (bukan per-card). Nilai awal
+  // dibaca dari localStorage sekali saat mount.
+  const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed());
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      saveCollapsed(next);
+      return next;
+    });
+  };
 
   if (!canReceiveNotif || alerts.length === 0) return null;
 
@@ -103,9 +139,22 @@ export default function PengajuanDanaNotifier({ userRoles, userId }: PengajuanDa
           className="w-20 accent-indigo-600 disabled:opacity-40"
         />
         {muted && <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">Dibisukan</span>}
+
+        {/* Pemisah + tombol sembunyikan/tampilkan card (tidak mempengaruhi suara) */}
+        <span className="w-px h-4 bg-slate-200 flex-shrink-0" />
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-expanded={!collapsed}
+          title={collapsed ? "Tampilkan detail pengajuan" : "Sembunyikan daftar"}
+          className="flex items-center gap-1 h-6 pl-2 pr-1.5 rounded-full text-indigo-600 hover:bg-indigo-50 transition flex-shrink-0"
+        >
+          <span className="text-[11px] font-extrabold tabular-nums">{alerts.length}</span>
+          {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+        </button>
       </div>
 
-      {visible.map((alert) => (
+      {!collapsed && visible.map((alert) => (
         <button
           key={alert.id}
           type="button"
@@ -135,7 +184,7 @@ export default function PengajuanDanaNotifier({ userRoles, userId }: PengajuanDa
         </button>
       ))}
 
-      {hiddenCount > 0 && (
+      {!collapsed && hiddenCount > 0 && (
         <p className="hidden sm:block pointer-events-none text-[11px] font-semibold text-slate-500 bg-white/90 backdrop-blur px-2.5 py-1 rounded-full shadow-sm">
           +{hiddenCount} pengajuan lain menunggu persetujuan
         </p>
