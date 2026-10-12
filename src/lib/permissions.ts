@@ -482,6 +482,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"],
   "/api/laptops/minus-siap-jual-units": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES"],
+  // Kelompok MSJ — ditulis literal (bukan spread) karena MSJ_GROUP_VIEW_ROLES
+  // didefinisikan SETELAH ROUTE_PERMISSIONS. Samakan manual kalau daftar diubah.
+  // Prefix ini menutup /api/msj-groups, /api/msj-groups/[id], /api/msj-groups/search-sn.
+  "/api/msj-groups": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES"],
   "/api/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
   "/api/dashboard": [...ALL_ROLES],
   "/api/transaction/create": [
@@ -963,6 +967,16 @@ export const LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES: UserRole[] = [
   "PENGELOLA_BARANG",
   "KEPALA_PENGELOLA_BARANG",
   "PKL_SALES",
+];
+
+// ── Kelompok Minus Siap Jual (MSJ Groups) ───────────────────────────────────
+// VIEW: sama persis dengan whitelist halaman Minus Siap Jual (yang boleh buka
+// halaman = boleh lihat kelompoknya). MANAGE (buat/ubah/hapus kelompok): lebih
+// sempit — tim inti inventory + Kepala Sales, PKL & Crew Sales hanya lihat.
+export const MSJ_GROUP_VIEW_ROLES: UserRole[] = [...LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES];
+export const MSJ_GROUP_MANAGE_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "KEPALA_SALES",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
 ];
 
 export const LAPTOP_DELETE_ROLES: UserRole[] = [

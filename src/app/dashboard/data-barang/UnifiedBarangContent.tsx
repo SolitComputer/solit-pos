@@ -32,6 +32,7 @@ interface LaptopUnitLite {
     purchase_price?: number; sparepart_cost?: number;
     source?: string | null; created_at?: string;
     is_pedagang_listed?: boolean;
+    msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
 }
 interface LaptopRaw {
     id: string; laptop_name: string; category_id?: string | null; category_name?: string | null;
@@ -45,6 +46,7 @@ interface LaptopRaw {
 interface AccessoryUnitLite {
     id: string; serial_number: string; condition: string; status: string;
     buy_price?: number; selling_price?: number; created_at?: string;
+    msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
 }
 interface AccessoryRaw {
     id: string; name: string; category: string; brand: string | null; spec: string | null;
@@ -129,7 +131,9 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const units = l.laptop_units ?? [];
     // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok,
     // sama seperti SOLD, tapi tetap dibedakan dari penjualan di laporan.
-    const aktif = units.filter(u => u.status !== "SOLD" && u.status !== "KELUAR");
+    // msj_group_id terisi = unit sudah masuk Kelompok Minus Siap Jual → disembunyikan
+    // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
+    const aktif = units.filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id);
     const siapJual = aktif.filter(u => u.status === "SIAP_JUAL").length;
     // "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual (bisa dibikin
     // payment). Dihitung terpisah dari minus biasa (SERVICE/BELUM_SIAP) yang
@@ -170,7 +174,9 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
 function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     const units = a.accessory_units ?? [];
     // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok.
-    const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR");
+    // msj_group_id terisi = unit sudah masuk Kelompok Minus Siap Jual → disembunyikan
+    // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
+    const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && !u.msj_group_id);
     const one = aktif.length === 1 ? aktif[0] : null;
     const margin = (a.sell_price || 0) - (a.buy_price || 0);
     return {

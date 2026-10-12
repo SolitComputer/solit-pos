@@ -149,6 +149,16 @@ export default function CreatePaymentPage() {
     const [snResults, setSnResults] = useState<UnitOption[]>([]);
     const [isLoadingUnits, setIsLoadingUnits] = useState(false);
 
+    // ── Kelompok MSJ (jual borongan) ──
+    interface MsjGroupLite {
+        id: string; name: string;
+        items: { item_type: "LAPTOP" | "ACCESSORY"; unit_id: string; parent_id: string | null; serial_number: string; name: string; selling_price: number }[];
+        item_count: number; total_selling: number;
+    }
+    const [msjGroups, setMsjGroups] = useState<MsjGroupLite[]>([]);
+    const [showGroupPicker, setShowGroupPicker] = useState(false);
+    const [loadingGroups, setLoadingGroups] = useState(false);
+
     const [rawDealPrice, setRawDealPrice] = useState<number>(0);
     const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
     const [splitTF, setSplitTF] = useState<number>(0);
@@ -568,6 +578,52 @@ export default function CreatePaymentPage() {
     const removeAccessory = (idx: number) =>
         setSelectedAccessories(prev => prev.filter((_, i) => i !== idx));
 
+    const openGroupPicker = async () => {
+        setShowGroupPicker(true);
+        setLoadingGroups(true);
+        try {
+            const res = await fetch("/api/msj-groups?status=OPEN");
+            const json = await res.json();
+            setMsjGroups(json.success ? (json.data ?? []) : []);
+        } catch { setMsjGroups([]); }
+        finally { setLoadingGroups(false); }
+    };
+
+    // Panggil kelompok → semua SN di dalamnya masuk sebagai unit terpilih.
+    // item_type LAPTOP → unit_type "laptop", ACCESSORY → "accessory" (field
+    // laptop_id di-reuse untuk accessory_id, persis pola handleSelectSnResult).
+    const handlePickGroup = (g: MsjGroupLite) => {
+        const existing = new Set(selectedUnits.map(u => u.unit_id));
+        // Tolak item yang parent_id (laptop_id/accessory_id master) kosong —
+        // transaction/create mewajibkannya (gagal validasi kalau "").
+        const invalid = g.items.filter(it => !it.parent_id);
+        if (invalid.length > 0) {
+            alert(`Kelompok "${g.name}" punya ${invalid.length} barang tanpa data master (SN: ${invalid.map(i => i.serial_number).join(", ")}). Tidak bisa dijual sampai diperbaiki.`);
+            return;
+        }
+        const additions = g.items
+            .filter(it => !existing.has(it.unit_id))
+            .map(it => ({
+                unit_id: it.unit_id,
+                // Field laptop_id di-reuse untuk accessory_id juga (pola UnitItem
+                // existing di handleSelectSnResult) — transaction/create membaca
+                // accessory_id dari field ini untuk unit_type "accessory".
+                laptop_id: it.parent_id as string,
+                serial_number: it.serial_number,
+                laptop_name: it.name,
+                selling_price: it.selling_price ?? 0,
+                unit_type: it.item_type === "LAPTOP" ? ("laptop" as const) : ("accessory" as const),
+            }));
+        const newUnits = [...selectedUnits, ...additions];
+        setSelectedUnits(newUnits);
+        setValue("units", newUnits);
+        setUnitPrices(prev => {
+            const next = { ...prev };
+            for (const it of g.items) if (next[it.unit_id] === undefined) next[it.unit_id] = it.selling_price ?? 0;
+            return next;
+        });
+        setShowGroupPicker(false);
+    };
     const handleSelectSnResult = (u: UnitOption) => {
         // FIX: tolak item yang laptop_id ATAU laptop_name-nya bakal kosong
         // (laptop tanpa laptop_id, aksesori tanpa accessory_id, atau nama produk
@@ -1052,6 +1108,14 @@ export default function CreatePaymentPage() {
                         <>
                             {/* Search SN — CS cari SN aksesoris, role lain cari SN unit (laptop/aksesoris) */}
                             <>
+                                {/* Panggil Kelompok MSJ (jual borongan) — tidak untuk role accessory-only */}
+                                {!isAccessoryOnlyRole && (
+                                    <button type="button" onClick={openGroupPicker}
+                                        className="w-full mb-2 h-10 rounded-xl border border-violet-200 bg-violet-50 text-violet-700 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-violet-100 transition">
+                                        <Package size={14} /> Panggil Kelompok Minus Siap Jual
+                                    </button>
+                                )}
+
                                 {/* Search SN */}
                                 <div>
                                     <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
@@ -1696,6 +1760,45 @@ export default function CreatePaymentPage() {
                         </>
                     )}
                 </form>
+
+                {/* ── Modal Picker Kelompok MSJ ── */}
+                {showGroupPicker && (
+                    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowGroupPicker(false)} />
+                        <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh]">
+                            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <p className="font-bold text-gray-800 text-sm">Panggil Kelompok Minus Siap Jual</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">Pilih kelompok — semua SN di dalamnya masuk sekaligus</p>
+                                </div>
+                                <button type="button" onClick={() => setShowGroupPicker(false)} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 transition">
+                                    <X size={16} />
+                                </button>
+                            </div>
+                            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2">
+                                {loadingGroups ? (
+                                    <p className="text-sm text-gray-400 text-center py-8">Memuat kelompok...</p>
+                                ) : msjGroups.length === 0 ? (
+                                    <p className="text-sm text-gray-400 text-center py-8">Belum ada kelompok tersedia</p>
+                                ) : (
+                                    msjGroups.map(g => (
+                                        <button key={g.id} type="button" onClick={() => handlePickGroup(g)}
+                                            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-violet-300 hover:bg-violet-50/40 transition">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-sm font-bold text-gray-800 truncate">{g.name}</p>
+                                                <span className="text-xs font-bold text-amber-600 tabular-nums flex-shrink-0">{fmt(g.total_selling)}</span>
+                                            </div>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">{g.item_count} barang · {g.items.map(i => i.serial_number).slice(0, 4).join(", ")}{g.items.length > 4 ? "…" : ""}</p>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                            <div className="px-5 py-4 border-t border-gray-100">
+                                <button type="button" onClick={() => setShowGroupPicker(false)} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Tutup</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* ── Modal Konfirmasi ── */}
                 {showConfirmModal && (selectedUnits.length > 0 || selectedAccessories.length > 0) && (

@@ -187,8 +187,10 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 }
             }
 
+            // ✅ NEW: MINUS_SIAP_JUAL dianggap "tersedia" juga — unit minus yang
+            // dijual lewat Kelompok MSJ. Statusnya nanti diklaim atomik di 4c.
             const notAvailable = (checks ?? []).filter(
-                u => u.status !== "SIAP_JUAL" && !releasedFromPrep.has(u.id)
+                u => u.status !== "SIAP_JUAL" && u.status !== "MINUS_SIAP_JUAL" && !releasedFromPrep.has(u.id)
             );
             if (notAvailable.length > 0)
                 return NextResponse.json({ success: false, message: `Unit laptop tidak tersedia: ${notAvailable.map(u => u.serial_number).join(", ")}` }, { status: 409 });
@@ -225,7 +227,9 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             if (accUnitErr) throw accUnitErr;
             for (const r of accUnitRows ?? []) accUnitMap.set(r.id, { id: r.id, accessory_id: r.accessory_id, status: r.status });
 
-            const notAvailableAcc = accessoryUnits.filter(u => accUnitMap.get(u.unit_id)?.status !== "TERSEDIA");
+            // ✅ NEW: MINUS_SIAP_JUAL juga dianggap tersedia (dijual via Kelompok MSJ borongan).
+            const okAccStatus = new Set(["TERSEDIA", "MINUS_SIAP_JUAL"]);
+            const notAvailableAcc = accessoryUnits.filter(u => !okAccStatus.has(accUnitMap.get(u.unit_id)?.status ?? ""));
             if (notAvailableAcc.length > 0) {
                 const sns = notAvailableAcc.map(u => u.serial_number).join(", ");
                 return NextResponse.json({ success: false, message: `Unit aksesori tidak tersedia: ${sns}` }, { status: 409 });
@@ -348,8 +352,10 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 .in("id", laptopUnitIds)
                 // Hanya klaim unit yang MASIH di status pra-jual (semua id di sini
                 // sudah lolos validasi ketersediaan di atas, jadi pra-statusnya
-                // pasti salah satu dari dua ini).
-                .in("status", ["SIAP_JUAL", "DALAM_PENYIAPAN"])
+                // pasti salah satu dari tiga ini).
+                // ✅ NEW: MINUS_SIAP_JUAL ditambahkan — unit minus-siap-jual (lewat
+                // Kelompok MSJ borongan) juga boleh diklaim jadi SOLD/pending.
+                .in("status", ["SIAP_JUAL", "DALAM_PENYIAPAN", "MINUS_SIAP_JUAL"])
                 .select("id");
             if (claimErr) throw claimErr;
             claimedIds = (claimed ?? []).map((c: any) => c.id);
@@ -389,7 +395,8 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 .from("accessory_units")
                 .update({ status: accessoryUnitStatus })
                 .in("id", accUnitIdsToClaim)
-                .eq("status", "TERSEDIA")
+                // ✅ NEW: terima TERSEDIA & MINUS_SIAP_JUAL — unit MSJ juga bisa diklaim.
+                .in("status", ["TERSEDIA", "MINUS_SIAP_JUAL"])
                 .select("id");
             if (claimAccErr) {
                 if (claimedIds.length > 0) await revertClaim(claimedIds);
@@ -566,6 +573,33 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         try {
             if (txStatus === "PAID") {
                 const archivedAtISO = new Date().toISOString();
+
+                // ✅ NEW: Tutup Kelompok MSJ yang unitnya ikut terjual di transaksi
+                // ini. Ambil msj_group_id dari unit laptop & aksesoris yang barusan
+                // terjual, lalu set kelompoknya SOLD + catat invoice. Non-fatal.
+                try {
+                    const soldLaptopIds = laptopUnitIds;
+                    const soldAccUnitIds = accessoryUnits.map(u => u.unit_id);
+                    const groupIdSet = new Set<string>();
+
+                    if (soldLaptopIds.length > 0) {
+                        const { data: lg } = await supabase.from("laptop_units")
+                            .select("msj_group_id").in("id", soldLaptopIds).not("msj_group_id", "is", null);
+                        for (const r of lg ?? []) if (r.msj_group_id) groupIdSet.add(r.msj_group_id);
+                    }
+                    if (soldAccUnitIds.length > 0) {
+                        const { data: ag } = await supabase.from("accessory_units")
+                            .select("msj_group_id").in("id", soldAccUnitIds).not("msj_group_id", "is", null);
+                        for (const r of ag ?? []) if (r.msj_group_id) groupIdSet.add(r.msj_group_id);
+                    }
+                    if (groupIdSet.size > 0) {
+                        await supabase.from("msj_groups")
+                            .update({ status: "SOLD", sold_at: archivedAtISO, invoice: invoice_number })
+                            .in("id", [...groupIdSet]);
+                    }
+                } catch (gErr: any) {
+                    console.error("[transaction/create] tutup kelompok MSJ gagal (non-fatal):", gErr?.message ?? gErr);
+                }
 
                 // Laptop: arsip kalau SEMUA unit model ini sudah tidak aktif.
                 // "aktif" = status !== "SOLD" — sama persis dgn stok_tersedia
