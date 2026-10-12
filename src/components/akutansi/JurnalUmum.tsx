@@ -46,7 +46,7 @@ interface JournalEntry {
     tanggal: string;
     keterangan: string;
     ref: string | null;
-    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL";
+    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN";
     source_id: string | null;
     total: number;
     is_edited: boolean;
@@ -71,7 +71,7 @@ interface JournalEntry {
 }
 
 interface PendingDraft {
-    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW";
+    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "KEBUTUHAN";
     source_id: string;
     tanggal: string;
     sort_ts: string;
@@ -111,6 +111,8 @@ const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
     // Sparepart service: disimpan sbg MANUAL di DB (biar tidak ganggu draft
     // SERVICE), tapi ditampilkan sebagai badge Service.
     SPAREPART_SERVICE: { label: "Service", color: "bg-violet-50 text-violet-700 border-violet-200" },
+    // Kebutuhan: modal aksesoris pindah ke laptop (Pengambilan Barang).
+    KEBUTUHAN: { label: "Kebutuhan", color: "bg-cyan-50 text-cyan-700 border-cyan-200" },
 };
 
 const SOURCE_GROUP_RANK: Record<string, number> = {
@@ -118,6 +120,7 @@ const SOURCE_GROUP_RANK: Record<string, number> = {
     SERVICE: 1,
     TRANSACTION: 2,
     CASHFLOW: 3,
+    KEBUTUHAN: 4,
 };
 
 const key = (d: { source_type: string; source_id: string }) => `${d.source_type}:${d.source_id}`;

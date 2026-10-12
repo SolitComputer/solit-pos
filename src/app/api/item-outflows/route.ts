@@ -6,51 +6,10 @@ import { logActivity } from "@/lib/activityLogger";
 import { ITEM_OUTFLOW_ROLES, expandRolesWithParents } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
-import { AKUN, jakartaDate, periodFromDate, totalOf } from "@/lib/accounting";
-import { draftToLineRows } from "@/lib/accountingSource";
 
 const VALID_TYPES = ["SERVICE", "KEBUTUHAN"] as const;
 type OutflowType = (typeof VALID_TYPES)[number];
 
-
-// Jurnal MANUAL instan: modal aksesoris pindah ke modal laptop (D130/K170).
-async function insertModalTransferJournal(
-    admin: typeof supabaseAdmin,
-    opts: { modal: number; keterangan: string; userId: string }
-) {
-    try {
-        const tanggal = jakartaDate(new Date().toISOString());
-        const period = periodFromDate(tanggal);
-        const lines = [
-            { account_code: AKUN.HPP, side: "DEBIT" as const, nominal: opts.modal },       // 130
-            { account_code: AKUN.AKSESORIS, side: "KREDIT" as const, nominal: opts.modal }, // 170
-        ];
-        const { data: entry, error } = await admin
-            .from("journal_entries")
-            .insert({
-                period, tanggal, keterangan: opts.keterangan,
-                ref: null, source_type: "MANUAL", source_id: null,
-                source_category: "KEBUTUHAN_TRANSFER",
-                total: totalOf(lines), created_by: opts.userId,
-            })
-            .select("id").single();
-        if (error || !entry) { console.error("[kebutuhan jurnal] entry:", error?.message); return; }
-
-        const { error: lineErr } = await admin.from("journal_lines").insert(draftToLineRows(entry.id, lines));
-        if (lineErr) {
-            await admin.from("journal_entries").delete().eq("id", entry.id);
-            console.error("[kebutuhan jurnal] lines:", lineErr.message);
-            return;
-        }
-        await admin.from("journal_audit_logs").insert({
-            entry_id: entry.id, period, action: "CREATE",
-            before_data: null, after_data: { tanggal, keterangan: opts.keterangan, lines },
-            changed_by: opts.userId,
-        });
-    } catch (e) {
-        console.error("[kebutuhan jurnal] exception:", e);
-    }
-}
 
 async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
         try {
@@ -381,10 +340,9 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             .update({ purchase_price: newPurchase })
             .eq("id", laptop_unit_id);
 
-        // ── Jurnal instan D130 / K170 ──
-        if (modal > 0) {
-            await insertModalTransferJournal(supabaseAdmin, { modal, keterangan: purpose, userId: user.id });
-        }
+        // Jurnal TIDAK dibuat instan di sini — entry Kebutuhan ini muncul sebagai
+        // draft PENDING di Jurnal Umum (buildItemOutflowKebutuhanDrafts), baru
+        // masuk jurnal umum setelah dikonfirmasi.
 
         await logActivity({
             userId: user.id,

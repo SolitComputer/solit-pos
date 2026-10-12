@@ -1624,6 +1624,63 @@ async function buildTransactionReversalDrafts(
   return drafts;
 }
 
+// ── KEBUTUHAN: aksesoris keluar → modal pindah ke laptop (Pengambilan Barang) ──
+// Sumbernya tabel item_outflows (outflow_type KEBUTUHAN + dest_laptop_id terisi).
+// Jurnal: Dr 130 (HPP/Modal Laptop) / Cr 170 (Aksesoris). Muncul sebagai draft
+// PENDING — baru masuk jurnal umum setelah dikonfirmasi, sama seperti draft lain.
+async function buildItemOutflowKebutuhanDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: rows, error } = await supabase
+    .from("item_outflows")
+    .select("id, outflow_type, nominal, purpose, serial_number, dest_serial_number, dest_laptop_id, created_at")
+    .eq("outflow_type", "KEBUTUHAN")
+    .not("dest_laptop_id", "is", null)
+    .gte("created_at", startISO)
+    .lt("created_at", endISO)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch item_outflows (kebutuhan):", error.message);
+    return [];
+  }
+  if (!rows || rows.length === 0) return [];
+
+  const drafts: JournalDraft[] = [];
+  for (const r of rows as any[]) {
+    const modal = Math.round(Number(r.nominal ?? 0));
+    if (modal <= 0) continue;
+
+    const tanggal = jakartaDate(r.created_at as string);
+    const lines = mergeLines([
+      { account_code: AKUN.HPP, side: "DEBIT", nominal: modal },        // 130
+      { account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal }, // 170
+    ]);
+
+    drafts.push({
+      source_type: "KEBUTUHAN",
+      source_id: String(r.id),
+      source_category: "KEBUTUHAN_TRANSFER",
+      tanggal,
+      sort_ts: (r.created_at as string) || `${tanggal}T00:00:00+07:00`,
+      keterangan: (r.purpose as string) || "Kebutuhan · modal aksesoris pindah ke laptop",
+      ref: (r.dest_serial_number as string) || null,
+      lines,
+      total: totalOf(lines),
+      meta: {
+        nominal: modal,
+        serial_number: r.serial_number ?? null,
+        dest_serial_number: r.dest_serial_number ?? null,
+        modal_missing: false,
+      },
+    });
+  }
+
+  return drafts;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 export async function buildDraftsForPeriod(
   supabase: SupabaseClient,
@@ -1631,16 +1688,17 @@ export async function buildDraftsForPeriod(
 ): Promise<JournalDraft[]> {
   const { startISO, endISO, startDate, endDateExclusive } = periodRange(period);
 
-  const [tx, accrual, pay, svc, cf, reversal] = await Promise.all([
+  const [tx, accrual, pay, svc, cf, reversal, kebutuhan] = await Promise.all([
     buildTransactionDrafts(supabase, startISO, endISO),
     buildTransactionAccrualDrafts(supabase, startISO, endISO),
     buildTransactionPaymentDrafts(supabase, startISO, endISO),
     buildServiceDrafts(supabase, period),
     buildCashflowDrafts(supabase, startDate, endDateExclusive),
     buildTransactionReversalDrafts(supabase, startISO, endISO),
+    buildItemOutflowKebutuhanDrafts(supabase, startISO, endISO),
   ]);
 
-  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal].sort((a, b) => {
+  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan].sort((a, b) => {
     if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
     return a.sort_ts.localeCompare(b.sort_ts);
   });

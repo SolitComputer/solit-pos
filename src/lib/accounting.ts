@@ -3,7 +3,7 @@ import { categoryLabel } from "@/lib/cashflow";
 
 export type AccountType = "ASET" | "HUTANG" | "MODAL" | "PEMASUKAN" | "BEBAN";
 export type JournalSide = "DEBIT" | "KREDIT";
-export type JournalSourceType = "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL";
+export type JournalSourceType = "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN";
 export type DerivedSourceType = Exclude<JournalSourceType, "MANUAL">;
 
 export interface Account {
