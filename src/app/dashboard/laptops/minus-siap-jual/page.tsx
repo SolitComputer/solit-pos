@@ -706,6 +706,8 @@ function MinusSiapJualContent() {
                         <StatCard label="Sedang Disiapkan" value={counts.prepared} icon={<Wrench size={18} className="text-white" />} color="text-orange-600" bg="bg-orange-50" bar="bg-orange-500" />
                         <StatCard label="Siap / Belum Disiapkan" value={counts.ready} icon={<AlertTriangle size={18} className="text-white" />} color="text-amber-600" bg="bg-amber-50" bar="bg-amber-500" />
                     </div>
+                    {/* ── Kelompok Minus Siap Jual ── */}
+                    <GroupsSection />
 
                     {/* ── Filter ── */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] p-3.5 sm:p-4 space-y-3">
@@ -884,6 +886,256 @@ function MinusSiapJualContent() {
                 />
             )}
         </>
+    );
+}
+
+// ─── Kelompok MSJ ─────────────────────────────────────────────────────────────
+interface MsjGroupItem {
+    item_type: "LAPTOP" | "ACCESSORY";
+    unit_id: string;
+    serial_number: string;
+    name: string;
+    brand?: string;
+    selling_price: number;
+    status: string;
+}
+interface MsjGroup {
+    id: string; name: string; status: "OPEN" | "SOLD";
+    created_at: string; items: MsjGroupItem[]; item_count: number; total_selling: number;
+}
+
+function AddGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+    const [name, setName] = useState("");
+    const [snSearch, setSnSearch] = useState("");
+    const [results, setResults] = useState<MsjGroupItem[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [picked, setPicked] = useState<MsjGroupItem[]>([]);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !saving) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, saving]);
+
+    const doSearch = async (q: string) => {
+        if (q.trim().length < 2) { setResults([]); return; }
+        setSearching(true);
+        try {
+            const res = await fetch(`/api/msj-groups/search-sn?q=${encodeURIComponent(q.trim())}`);
+            const json = await res.json();
+            const pickedIds = new Set(picked.map(p => p.unit_id));
+            setResults((json.data ?? []).filter((r: MsjGroupItem) => !pickedIds.has(r.unit_id)));
+        } catch { setResults([]); }
+        finally { setSearching(false); }
+    };
+
+    const addItem = (it: MsjGroupItem) => {
+        setPicked(prev => [...prev, it]);
+        setResults(prev => prev.filter(r => r.unit_id !== it.unit_id));
+        setSnSearch(""); 
+    };
+    const removeItem = (unitId: string) => setPicked(prev => prev.filter(p => p.unit_id !== unitId));
+
+    const totalJual = picked.reduce((s, p) => s + (p.selling_price || 0), 0);
+
+    const handleSave = async () => {
+        if (!name.trim()) { setError("Nama kelompok wajib diisi"); return; }
+        if (picked.length === 0) { setError("Pilih minimal 1 SN"); return; }
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/msj-groups", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: name.trim(),
+                    items: picked.map(p => ({ item_type: p.item_type, unit_id: p.unit_id })),
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.error || "Gagal membuat kelompok");
+            onCreated();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Terjadi kesalahan");
+        } finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center animate-fadeIn">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
+            <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-slideUp">
+                <div className={`${BRAND_GRADIENT} px-5 py-5 flex-shrink-0`}>
+                    <h3 className="font-bold text-white text-[15px]">Tambah Kelompok</h3>
+                    <p className="text-xs text-gray-200 mt-0.5">Kelompokkan SN berstatus Minus Siap Jual</p>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nama Kelompok *</label>
+                        <input value={name} onChange={e => setName(e.target.value)} placeholder="Contoh: KELOMPOK HDD-256GB"
+                            className={fieldBase + " px-3"} autoFocus />
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Cari SN (Minus Siap Jual)</label>
+                        <div className="relative">
+                            <input value={snSearch} onChange={e => { setSnSearch(e.target.value); doSearch(e.target.value); }}
+                                placeholder="Ketik SN barang..." className={fieldBase + " px-3 font-mono"} />
+                            {searching && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin" />}
+                        </div>
+                        {results.length > 0 && (
+                            <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                                {results.map(r => (
+                                    <button key={r.unit_id} type="button" onClick={() => addItem(r)}
+                                        className="w-full px-3.5 py-2.5 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono text-sm font-semibold text-gray-800">{r.serial_number}</span>
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${r.item_type === "LAPTOP" ? "bg-zinc-100 text-zinc-600 border-zinc-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
+                                                {r.item_type === "LAPTOP" ? "LAPTOP" : "AKSESORIS"}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-0.5">{r.name}{r.selling_price ? ` · ${fmt(r.selling_price)}` : ""}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {snSearch.trim().length >= 2 && results.length === 0 && !searching && (
+                            <p className="text-xs text-gray-400 mt-1.5 px-1">SN tidak ditemukan / sudah dikelompokkan / bukan Minus Siap Jual</p>
+                        )}
+                    </div>
+
+                    {picked.length > 0 && (
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-semibold text-gray-600">Barang Terpilih ({picked.length})</label>
+                                <span className="text-xs font-bold text-amber-600 tabular-nums">{fmt(totalJual)}</span>
+                            </div>
+                            {picked.map((p, i) => (
+                                <div key={p.unit_id} className="flex items-center justify-between bg-gray-50 rounded-xl border border-gray-200 px-3 py-2.5">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                                            <span className="font-mono text-xs font-semibold text-gray-800 truncate">{p.serial_number}</span>
+                                        </div>
+                                        <p className="text-[10px] text-gray-500 mt-0.5 ml-5.5 truncate">{p.name}</p>
+                                    </div>
+                                    <button onClick={() => removeItem(p.unit_id)} className="ml-2 w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2"><p className="text-xs text-red-700">{error}</p></div>}
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                    <button onClick={onClose} disabled={saving} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
+                    <button onClick={handleSave} disabled={saving || !name.trim() || picked.length === 0}
+                        className={`flex-1 h-11 ${BRAND_GRADIENT_H} text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2`}>
+                        {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        Simpan Kelompok
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function GroupsSection() {
+    const [groups, setGroups] = useState<MsjGroup[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showAdd, setShowAdd] = useState(false);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const fetchGroups = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch("/api/msj-groups?status=OPEN");
+            const json = await res.json();
+            if (json.success) setGroups(json.data ?? []);
+        } catch { setGroups([]); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { fetchGroups(); }, []);
+
+    const deleteGroup = async (g: MsjGroup) => {
+        if (!confirm(`Hapus kelompok "${g.name}"? Barang di dalamnya akan dilepas & kembali ke Data Barang.`)) return;
+        setDeletingId(g.id);
+        try {
+            const res = await fetch(`/api/msj-groups/${g.id}`, { method: "DELETE" });
+            const json = await res.json();
+            if (json.success) setGroups(prev => prev.filter(x => x.id !== g.id));
+        } catch { /* ignore */ }
+        finally { setDeletingId(null); }
+    };
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] p-3.5 sm:p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Kelompok Minus Siap Jual</span>
+                    {!loading && <span className="text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-lg">{groups.length}</span>}
+                </div>
+                <button onClick={() => setShowAdd(true)}
+                    className={`h-9 px-3.5 ${BRAND_GRADIENT_H} text-white rounded-xl text-xs font-semibold hover:opacity-90 transition active:scale-[0.97] flex-shrink-0`}>
+                    + Tambah Kelompok
+                </button>
+            </div>
+
+            {loading ? (
+                <p className="text-sm text-gray-400 text-center py-6">Memuat kelompok...</p>
+            ) : groups.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">Belum ada kelompok. Klik "Tambah Kelompok" untuk membuat.</p>
+            ) : (
+                <div className="space-y-2">
+                    {groups.map(g => {
+                        const open = expandedId === g.id;
+                        return (
+                            <div key={g.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                                <div className="flex items-center justify-between gap-2 px-3.5 py-3 bg-gray-50/60">
+                                    <button onClick={() => setExpandedId(open ? null : g.id)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+                                        <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-gray-800 truncate">{g.name}</p>
+                                            <p className="text-[11px] text-gray-400">{g.item_count} barang · {fmt(g.total_selling)}</p>
+                                        </div>
+                                    </button>
+                                    <button onClick={() => deleteGroup(g)} disabled={deletingId === g.id}
+                                        className="h-8 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition disabled:opacity-40 flex-shrink-0">
+                                        {deletingId === g.id ? "..." : "Hapus"}
+                                    </button>
+                                </div>
+                                {open && (
+                                    <div className="divide-y divide-gray-100">
+                                        {g.items.map((it, i) => (
+                                            <div key={it.unit_id} className="flex items-center justify-between px-3.5 py-2.5">
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[10px] text-gray-400 w-4">{i + 1}.</span>
+                                                        <span className="font-mono text-xs font-semibold text-gray-800 truncate">{it.serial_number}</span>
+                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${it.item_type === "LAPTOP" ? "bg-zinc-100 text-zinc-600 border-zinc-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
+                                                            {it.item_type === "LAPTOP" ? "LAPTOP" : "AKSESORIS"}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 mt-0.5 ml-5 truncate">{it.name}</p>
+                                                </div>
+                                                <span className="text-xs font-semibold text-gray-700 tabular-nums flex-shrink-0 ml-2">{fmt(it.selling_price)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {showAdd && <AddGroupModal onClose={() => setShowAdd(false)} onCreated={() => { setShowAdd(false); fetchGroups(); }} />}
+        </div>
     );
 }
 

@@ -23,7 +23,8 @@ laptop_units (
           sparepart_cost,
           source,
           created_at,
-          is_pedagang_listed
+          is_pedagang_listed,
+          msj_group_id
         )
       `)
       .order("laptop_name", { ascending: true });
@@ -62,6 +63,7 @@ laptop_units (
             official_price: u.official_price,
             is_price_complete: u.is_price_complete,
             is_pedagang_listed: u.is_pedagang_listed,
+            msj_group_id: u.msj_group_id, // penanda sudah masuk Kelompok MSJ — dipakai filter Data Barang
           })),
       }));
 

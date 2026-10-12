@@ -30,6 +30,9 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
         )
       `)
       .eq("status", "MINUS_SIAP_JUAL")
+      // Unit yang sudah masuk Kelompok MSJ (msj_group_id terisi) tidak muncul
+      // lagi di list satuan ini — dia sudah "pindah rumah" ke dalam kelompok.
+      .is("msj_group_id", null)
       .order("created_at", { ascending: false });
 
     if (laptopId) query = query.eq("laptop_id", laptopId);

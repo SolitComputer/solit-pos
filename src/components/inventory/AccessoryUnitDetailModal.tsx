@@ -32,6 +32,9 @@ interface Props {
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
     TERSEDIA: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Tersedia" },
     RESERVED: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Reserved" },
+    // Minus Siap Jual — unit minus yang sudah boleh dijual (nanti via Kelompok MSJ).
+    // Amber disamakan dengan chip "MSJ" di Data Barang & halaman Minus Siap Jual.
+    MINUS_SIAP_JUAL: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", label: "Minus Siap Jual" },
     TERJUAL: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
 };
 const CONDITION_STYLE: Record<string, { badge: string }> = {
@@ -41,7 +44,10 @@ const CONDITION_STYLE: Record<string, { badge: string }> = {
 // ✅ FIX: tambah RESERVED sebagai status ketiga yang bisa dipilih — sebelumnya
 // cuma TERSEDIA/TERJUAL, padahal RESERVED sudah dipakai nyata di
 // api/accessory-units/[id]/route.ts (PATCH) dan halaman Units aksesori.
-const EDITABLE_STATUS = ["TERSEDIA", "RESERVED", "TERJUAL"] as const;
+// ✅ NEW: MINUS_SIAP_JUAL — status unit minus yang sudah boleh dijual.
+// Memilih status ini TIDAK memindahkan unit ke halaman Minus Siap Jual;
+// unit tetap di Data Barang sampai dimasukkan ke sebuah Kelompok MSJ (tahap 2+).
+const EDITABLE_STATUS = ["TERSEDIA", "MINUS_SIAP_JUAL", "RESERVED", "TERJUAL"] as const;
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 const fmtDate = (iso: string) =>
