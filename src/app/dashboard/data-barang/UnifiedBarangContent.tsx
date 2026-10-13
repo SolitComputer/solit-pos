@@ -1097,8 +1097,69 @@ export default function UnifiedBarangContent() {
         aksesoris: rows.filter(r => r.tipe === "AKSESORIS").length,
     }), [rows]);
 
-    // ── Export Excel ─────────────────────────────────────────────────────
-    const handleExportExcel = useCallback(() => {
+    // ── Export Excel: RINGKAS (1 baris per model) ──────────────────────────
+    const handleExportRingkas = useCallback(() => {
+        try {
+            const exportRows: Record<string, string | number>[] = [];
+            let no = 1;
+
+            filteredRows.forEach((row) => {
+                const auditLabel = isAuditActive(row) ? "Teraudit" : "Belum";
+                const soLabel = row.tipe === "LAPTOP" ? (isSoActive(row.so_at) ? "Sudah SO" : "Belum SO") : "-";
+
+                if (row.tipe === "LAPTOP") {
+                    // Total Modal = jumlah modal SEMUA unit aktif (bukan SOLD/KELUAR/MSJ)
+                    // supaya konsisten dengan angka Stok Tersedia di tabel layar.
+                    const aktif = ((row.raw as LaptopRaw).laptop_units ?? [])
+                        .filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id);
+                    const totalModal = aktif.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
+                    exportRows.push({
+                        No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
+                        Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                        CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
+                        "Harga Jual": row.harga_jual,
+                        "Total Modal": totalModal,
+                        "Total Jual": row.total_jual ?? (row.harga_jual * (row.stok_tersedia ?? 0)),
+                        Stok: row.stok_tersedia ?? 0,
+                        "Status Audit": auditLabel, "Status SO": soLabel,
+                    });
+                } else {
+                    const acc = row.raw as AccessoryRaw;
+                    const accAktif = (acc.accessory_units ?? [])
+                        .filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR");
+                    // Punya unit ber-SN → jumlahkan modal tiap unit. Belum pakai SN →
+                    // buy_price model × stok manual.
+                    const totalModal = accAktif.length > 0
+                        ? accAktif.reduce((s, u) => s + (u.buy_price ?? acc.buy_price ?? 0), 0)
+                        : (acc.buy_price ?? 0) * (row.stok ?? 0);
+                    exportRows.push({
+                        No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
+                        Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                        CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
+                        "Harga Jual": row.harga_jual,
+                        "Total Modal": totalModal,
+                        "Total Jual": row.harga_jual * (row.stok ?? 0),
+                        Stok: row.stok ?? 0,
+                        "Status Audit": auditLabel, "Status SO": soLabel,
+                    });
+                }
+            });
+
+            const cols = [
+                { wch: 5 }, { wch: 10 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+                { wch: 18 }, { wch: 8 }, { wch: 10 }, { wch: 16 },
+                { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 6 },
+                { wch: 11 }, { wch: 10 },
+            ];
+            writeStyledExcel(exportRows, cols, "Ringkas Barang", "Data-Barang-Ringkas");
+            toast.success(`Export ringkas berhasil — ${exportRows.length} baris`);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal export Excel");
+        }
+    }, [filteredRows]);
+
+    // ── Export Excel: PER-SN (tiap SN 1 baris + modal per-SN) ──────────────
+    const handleExportPerSn = useCallback(() => {
         try {
             const exportRows: Record<string, string | number>[] = [];
             let no = 1;
@@ -1139,59 +1200,54 @@ export default function UnifiedBarangContent() {
                     });
                 } else {
                     const acc = row.raw as AccessoryRaw;
-                    exportRows.push({
-                        No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
-                        Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
-                        CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
-                        SN: "-", "Status Unit": "-",
-                        "Harga Modal": acc.buy_price ?? 0, "Modal Sparepart": 0, "Harga Jual": row.harga_jual,
-                        Sumber: "-", "Tgl Masuk": "-", Stok: row.stok ?? 0,
-                        "Status Audit": auditLabel, "Status SO": soLabel,
+                    // Sama seperti laptop: iterasi SEMUA unit aktif aksesoris supaya
+                    // tiap SN + modal per-SN keluar 1 baris sendiri. "TERJUAL"/"KELUAR"
+                    // dibuang biar konsisten dengan normalizeAccessory().
+                    const accUnits = (acc.accessory_units ?? []).filter(
+                        u => u.status !== "TERJUAL" && u.status !== "KELUAR"
+                    );
+
+                    if (accUnits.length === 0) {
+                        // Aksesoris lama tanpa SN (stok manual) → tetap 1 baris ringkas.
+                        exportRows.push({
+                            No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
+                            Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                            CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
+                            SN: "-", "Status Unit": "-",
+                            "Harga Modal": acc.buy_price ?? 0, "Modal Sparepart": 0, "Harga Jual": row.harga_jual,
+                            Sumber: "-", "Tgl Masuk": "-", Stok: row.stok ?? 0,
+                            "Status Audit": auditLabel, "Status SO": soLabel,
+                        });
+                        return;
+                    }
+
+                    // Per unit: SN + modal masing-masing SN (fallback ke acc.buy_price
+                    // kalau unit-nya belum punya buy_price sendiri).
+                    accUnits.forEach((u) => {
+                        exportRows.push({
+                            No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
+                            Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                            CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
+                            SN: u.serial_number, "Status Unit": u.status,
+                            "Harga Modal": u.buy_price ?? acc.buy_price ?? 0, "Modal Sparepart": 0,
+                            "Harga Jual": row.harga_jual,
+                            Sumber: "-",
+                            "Tgl Masuk": u.created_at ? new Date(u.created_at).toLocaleDateString("id-ID") : "-",
+                            Stok: 1,
+                            "Status Audit": auditLabel, "Status SO": soLabel,
+                        });
                     });
                 }
             });
 
-            const ws = XLSX.utils.json_to_sheet(exportRows);
-            ws["!cols"] = [
+            const cols = [
                 { wch: 5 }, { wch: 10 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
                 { wch: 18 }, { wch: 8 }, { wch: 10 }, { wch: 16 }, { wch: 16 },
                 { wch: 12 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 12 },
                 { wch: 12 }, { wch: 6 }, { wch: 11 }, { wch: 10 },
             ];
-
-            const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-            const borderTipis = { style: "thin", color: { rgb: "D4D4D8" } } as const;
-
-            for (let R = range.s.r; R <= range.e.r; R++) {
-                const isHeader = R === 0;
-                const isBanded = !isHeader && R % 2 === 0;
-                for (let C = range.s.c; C <= range.e.c; C++) {
-                    const addr = XLSX.utils.encode_cell({ r: R, c: C });
-                    if (!ws[addr]) continue;
-                    ws[addr].s = {
-                        font: isHeader
-                            ? { bold: true, sz: 10, color: { rgb: "FFFFFF" } }
-                            : { sz: 10, color: { rgb: "27272A" } },
-                        fill: isHeader
-                            ? { fgColor: { rgb: "18181B" } }
-                            : isBanded ? { fgColor: { rgb: "F4F4F5" } } : undefined,
-                        alignment: { vertical: "center", horizontal: isHeader ? "center" : "left" },
-                        border: { top: borderTipis, bottom: borderTipis, left: borderTipis, right: borderTipis },
-                    };
-                }
-            }
-
-            ws["!autofilter"] = {
-                ref: XLSX.utils.encode_range({ s: { r: 0, c: range.s.c }, e: { r: 0, c: range.e.c } }),
-            };
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Data Barang");
-
-            const stamp = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
-            XLSX.writeFile(wb, `Data-Barang-${stamp}.xlsx`);
-
-            toast.success(`Export berhasil — ${exportRows.length} baris`);
+            writeStyledExcel(exportRows, cols, "Data Barang per-SN", "Data-Barang-perSN");
+            toast.success(`Export per-SN berhasil — ${exportRows.length} baris`);
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal export Excel");
         }
@@ -1650,9 +1706,15 @@ export default function UnifiedBarangContent() {
                                     {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
                                 {!canOnlyViewBasic && (
-                                    <button onClick={handleExportExcel} disabled={filteredRows.length === 0}
+                                    <button onClick={handleExportRingkas} disabled={filteredRows.length === 0}
                                         className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition whitespace-nowrap">
-                                        Export Excel
+                                        Export Ringkas
+                                    </button>
+                                )}
+                                {!canOnlyViewBasic && (
+                                    <button onClick={handleExportPerSn} disabled={filteredRows.length === 0}
+                                        className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 disabled:opacity-40 transition whitespace-nowrap">
+                                        Export per-SN
                                     </button>
                                 )}
                                 {!canOnlyViewBasic && (canCreateLaptop || canCreateAcc) && (
@@ -2559,6 +2621,52 @@ export default function UnifiedBarangContent() {
     );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Helper Export Excel — styling tabel dipakai BERSAMA kedua tombol export
+// (Ringkas & per-SN), biar tidak ada duplikasi logika border/header/autofilter.
+// ═══════════════════════════════════════════════════════════════════════════
+function writeStyledExcel(
+    exportRows: Record<string, string | number>[],
+    colWidths: { wch: number }[],
+    sheetName: string,
+    filePrefix: string,
+) {
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    ws["!cols"] = colWidths;
+
+    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+    const borderTipis = { style: "thin", color: { rgb: "D4D4D8" } } as const;
+
+    for (let R = range.s.r; R <= range.e.r; R++) {
+        const isHeader = R === 0;
+        const isBanded = !isHeader && R % 2 === 0;
+        for (let C = range.s.c; C <= range.e.c; C++) {
+            const addr = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws[addr]) continue;
+            ws[addr].s = {
+                font: isHeader
+                    ? { bold: true, sz: 10, color: { rgb: "FFFFFF" } }
+                    : { sz: 10, color: { rgb: "27272A" } },
+                fill: isHeader
+                    ? { fgColor: { rgb: "18181B" } }
+                    : isBanded ? { fgColor: { rgb: "F4F4F5" } } : undefined,
+                alignment: { vertical: "center", horizontal: isHeader ? "center" : "left" },
+                border: { top: borderTipis, bottom: borderTipis, left: borderTipis, right: borderTipis },
+            };
+        }
+    }
+
+    ws["!autofilter"] = {
+        ref: XLSX.utils.encode_range({ s: { r: 0, c: range.s.c }, e: { r: 0, c: range.e.c } }),
+    };
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    const stamp = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
+    XLSX.writeFile(wb, `${filePrefix}-${stamp}.xlsx`);
+}
+
 const inputCls = "w-full h-10 border border-zinc-200 rounded-xl px-3 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400";
 
 const cardActionCls = "h-8 w-full inline-flex items-center justify-center px-2 rounded-lg text-[11px] font-semibold truncate transition disabled:opacity-40";
@@ -2600,4 +2708,4 @@ function DetailItem({ label, value }: { label: string; value?: string | number |
             </p>
         </div>
     );
-} 
+}
