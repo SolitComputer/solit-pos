@@ -146,14 +146,13 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const modals = aktif.map(u => u.purchase_price).filter((n): n is number => n != null && n > 0);
     const min = modals.length ? Math.min(...modals) : 0;
     const max = modals.length ? Math.max(...modals) : 0;
-    const jt = (n: number) => (n / 1_000_000).toFixed(1).replace(".", ",");
 
     return {
         id: l.id, tipe: "LAPTOP", nama: l.laptop_name,
         kategori: l.category_name ?? null, kategori_id: l.category_id ?? null,
         brand: l.brand || null, cpu: l.cpu || null, ram: l.ram || null, storage: l.storage || null, spek: null,
         harga_modal: one ? (one.purchase_price ?? 0) : null,
-        harga_modal_note: one ? undefined : (modals.length ? (min === max ? `Rp ${jt(min)} jt` : `Rp ${jt(min)}–${jt(max)} jt`) : undefined),
+        harga_modal_note: one ? undefined : (modals.length ? (min === max ? fmt(min) : `${fmt(min)} - ${fmt(max)}`) : undefined),
         modal_sparepart: one ? (one.sparepart_cost ?? 0) : null,
         harga_jual: l.selling_price || 0,
         total_jual: (l.selling_price || 0) * stokTersedia,
@@ -178,11 +177,24 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
     const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && !u.msj_group_id);
     const one = aktif.length === 1 ? aktif[0] : null;
+    // Harga modal range aksesoris ber-SN banyak — mirror logika laptop:
+    // kumpulkan buy_price tiap unit aktif yang > 0, lalu ambil min & max.
+    const modals = aktif.map(u => u.buy_price).filter((n): n is number => n != null && n > 0);
+    const minModal = modals.length ? Math.min(...modals) : 0;
+    const maxModal = modals.length ? Math.max(...modals) : 0;
     const margin = (a.sell_price || 0) - (a.buy_price || 0);
     return {
         id: a.id, tipe: "AKSESORIS", nama: a.name, kategori: a.category,
         brand: a.brand || null, cpu: null, ram: null, storage: null, spek: a.spec || null,
-        harga_modal: one ? (one.buy_price ?? 0) : (a.buy_price ?? null), modal_sparepart: null,
+        harga_modal: one
+            ? (one.buy_price ?? 0)
+            : (aktif.length > 1 && modals.length ? null : (a.buy_price ?? null)),
+        harga_modal_note: one
+            ? undefined
+            : (aktif.length > 1 && modals.length
+                ? (minModal === maxModal ? fmt(minModal) : `${fmt(minModal)} - ${fmt(maxModal)}`)
+                : undefined),
+        modal_sparepart: null,
         harga_jual: a.sell_price || 0, total_jual: null,
         gross_profit: a.buy_price != null && a.buy_price > 0 ? margin : null,
         sumber: null,
@@ -752,7 +764,7 @@ export default function UnifiedBarangContent() {
     const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>(() => bootFilter?.tipeFilter ?? "ALL");
     const [kategoriFilter, setKategoriFilter] = useState<string[]>(() => bootFilter?.kategoriFilter ?? []);
     const [brandFilter, setBrandFilter] = useState(() => bootFilter?.brandFilter ?? "");
-    const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS" | "MINUS_SIAP_JUAL">(() => bootFilter?.stokFilter ?? "ALL");     const [minPrice, setMinPrice] = useState(() => bootFilter?.minPrice ?? "");
+    const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS" | "MINUS_SIAP_JUAL">(() => bootFilter?.stokFilter ?? "ALL"); const [minPrice, setMinPrice] = useState(() => bootFilter?.minPrice ?? "");
     const [maxPrice, setMaxPrice] = useState(() => bootFilter?.maxPrice ?? "");
     const [statusAuditSoFilter, setStatusAuditSoFilter] = useState<"ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE">(() => bootFilter?.statusAuditSoFilter ?? "ALL");
     const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST">(() => bootFilter?.sortBy ?? "NAMA_ASC");

@@ -25,7 +25,7 @@ function maskCustomerName(name: string): string {
 function getCorsHeaders(origin: string): Record<string, string> {
     const isAllowed = ALLOWED_ORIGINS.includes(origin);
     return {
-        "Access-Control-Allow-Origin": isAllowed ? origin : "https://solit03.com",
+        "Access-Control-Allow-Origin": isAllowed ? origin : "https://solit.id",
         "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Access-Control-Max-Age": "86400",
