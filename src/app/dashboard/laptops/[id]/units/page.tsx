@@ -61,8 +61,8 @@ const GRADE_STYLE: Record<string, { badge: string; label: string; desc: string; 
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
-    BELUM_SIAP: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Belum Siap" },
-    SERVICE: { badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500", label: "Service" },
+    MINUS_SIAP_JUAL: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Minus Siap Jual" },
+    BELUM_SIAP: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-400", label: "Belum Siap Jual" },
     SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
 };
 
@@ -623,7 +623,7 @@ export default function UnitsPage() {
         total: activeUnits.length,
         siap: activeUnits.filter(u => u.status === "SIAP_JUAL").length,
         sold: units.filter(u => u.status === "SOLD").length,
-        service: activeUnits.filter(u => u.status === "SERVICE").length,
+        minusSiapJual: activeUnits.filter(u => u.status === "MINUS_SIAP_JUAL").length,
         belum: activeUnits.filter(u => u.status === "BELUM_SIAP").length,
         gradeA: activeUnits.filter(u => u.grade === "A").length,
         gradeB: activeUnits.filter(u => u.grade === "B").length,
@@ -965,8 +965,8 @@ export default function UnitsPage() {
                             icon={<CheckCircle2 size={16} className="text-green-600" />} />
                         <StatCard label="Belum Siap" value={`${counts.belum} unit`} accent="bg-amber-400"
                             icon={<svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>} />
-                        <StatCard label="Service" value={`${counts.service} unit`} accent="bg-blue-500"
-                            icon={<Wrench size={16} className="text-blue-600" />} />
+                        <StatCard label="Minus Siap Jual" value={`${counts.minusSiapJual} unit`} accent="bg-amber-400"
+                            icon={<Wrench size={16} className="text-amber-500" />} />
                         <StatCard label="Terjual" value={`${counts.sold} unit`} accent="bg-gray-400"
                             icon={<Wallet size={16} className="text-gray-500" />} />
                     </div>
@@ -1002,8 +1002,8 @@ export default function UnitsPage() {
                             {[
                                 { value: "ALL", label: "Semua Status", count: filterGradeTab === "ALL" ? units.length : units.filter(u => u.grade === filterGradeTab).length },
                                 { value: "SIAP_JUAL", label: "Siap Jual", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SIAP_JUAL").length },
-                                { value: "BELUM_SIAP", label: "Belum Siap", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length },
-                                { value: "SERVICE", label: "Service", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SERVICE").length },
+                                { value: "MINUS_SIAP_JUAL", label: "Minus Siap Jual", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "MINUS_SIAP_JUAL").length },
+                                { value: "BELUM_SIAP", label: "Belum Siap Jual", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length },
                             ].map(opt => (
                                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterStatus === opt.value ? "bg-[#1a1a2e] text-white shadow-sm" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
@@ -1488,7 +1488,7 @@ function BulkEditUnitsModal({
     onSuccess: () => void;
 }) {
     const [grade, setGrade] = useState<"" | "A" | "B" | "C">("");
-    const [status, setStatus] = useState<"" | "SIAP_JUAL" | "BELUM_SIAP" | "SERVICE">("");
+    const [status, setStatus] = useState<"" | "SIAP_JUAL" | "BELUM_SIAP" | "MINUS_SIAP_JUAL">("");
     const [sellInput, setSellInput] = useState("");
     const [buyInput, setBuyInput] = useState("");
     const [spareInput, setSpareInput] = useState("");
@@ -1588,8 +1588,8 @@ function BulkEditUnitsModal({
                         <div className="grid grid-cols-3 gap-2">
                             {([
                                 { v: "SIAP_JUAL", l: "Siap Jual" },
-                                { v: "BELUM_SIAP", l: "Belum Siap" },
-                                { v: "SERVICE", l: "Service" },
+                                { v: "MINUS_SIAP_JUAL", l: "Minus Siap Jual" },
+                                { v: "BELUM_SIAP", l: "Belum Siap Jual" },
                             ] as const).map(o => (
                                 <button key={o.v} type="button" onClick={() => setStatus(prev => prev === o.v ? "" : o.v)}
                                     className={`h-10 rounded-xl text-[11px] font-semibold border transition ${status === o.v ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
