@@ -1225,6 +1225,19 @@ export default function UsersPage() {
     [users, activeTab]
   );
 
+  // Jumlah L / P / belum diisi — dihitung dari semua user di tab aktif
+  // (Karyawan atau PKL), tidak terpengaruh search & filter role.
+  const genderInTab = useMemo(() => {
+    const inTab = users.filter(u =>
+      activeTab === "pkl" ? isPKLRole(u.role) : !isPKLRole(u.role)
+    );
+    return {
+      male: inTab.filter(u => u.gender === "L").length,
+      female: inTab.filter(u => u.gender === "P").length,
+      unknown: inTab.filter(u => u.gender !== "L" && u.gender !== "P").length,
+    };
+  }, [users, activeTab]);
+
   const birthdayUsers = useMemo(
     () => users.filter(u => isBirthdayToday(u.birth_date)),
     [users]
@@ -1524,13 +1537,36 @@ export default function UsersPage() {
 
                     <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100"
                       style={{ background: "#fafbff" }}>
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
-                        <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
-                          {filtered.length === totalInTab
-                            ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
-                            : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
-                        </p>
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
+                          <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
+                            {filtered.length === totalInTab
+                              ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
+                              : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
+                          </p>
+                        </div>
+
+                        {/* Ringkasan jumlah gender untuk tab aktif */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                            style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" }}
+                            title="Jumlah laki-laki">
+                            <Mars className="w-2.5 h-2.5" /> {genderInTab.male}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                            style={{ background: "#fdf2f8", color: "#db2777", border: "1px solid #fbcfe8" }}
+                            title="Jumlah perempuan">
+                            <Venus className="w-2.5 h-2.5" /> {genderInTab.female}
+                          </span>
+                          {genderInTab.unknown > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                              style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0" }}
+                              title="Belum diisi jenis kelamin">
+                              ? {genderInTab.unknown}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {isAdmin && (
                         <div className="hidden sm:flex items-center gap-3 text-[10px] flex-shrink-0" style={{ color: "#94a3b8" }}>
