@@ -55,13 +55,13 @@ function buildInitialFormData(editingUnit: LaptopUnit | null, defaultSellingPric
     if (!editingUnit) {
         return { ...EMPTY_FORM, selling_price: String(defaultSellingPrice || "") };
     }
-    // Preserve status asli — hanya normalisasi saat form ditampilkan untuk pilihan user
-    // SOLD dan SERVICE tetap disimpan, bukan di-override ke BELUM_SIAP
+    // SOLD tetap dipertahankan (digerakkan transaksi). SERVICE sudah tidak
+    // dipakai lagi → unit lama berstatus SERVICE otomatis dianggap BELUM_SIAP
+    // saat form edit dibuka, lalu ikut tersimpan sebagai BELUM_SIAP.
     const editableStatus =
         editingUnit.status === "SIAP_JUAL" ? "SIAP_JUAL" :
             editingUnit.status === "SOLD" ? "SOLD" :
-                editingUnit.status === "SERVICE" ? "SERVICE" :
-                    "BELUM_SIAP";
+                "BELUM_SIAP";
     return {
         serial_number: editingUnit.serial_number,
         grade: editingUnit.grade,

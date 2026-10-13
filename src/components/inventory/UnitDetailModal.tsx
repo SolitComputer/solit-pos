@@ -81,7 +81,7 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
 // Status yang boleh dipilih manual. RESERVED/HELD/PACKING/SOLD digerakkan
 // oleh alur transaksi, bukan diedit tangan dari sini.
 // "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual / dibikin payment.
-const EDITABLE_STATUS = ["SIAP_JUAL", "MINUS_SIAP_JUAL", "BELUM_SIAP", "SERVICE"] as const;
+const EDITABLE_STATUS = ["SIAP_JUAL", "MINUS_SIAP_JUAL", "BELUM_SIAP"] as const;
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 const fmtDate = (iso: string) =>

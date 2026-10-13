@@ -23,7 +23,7 @@ interface AccessoryUnit {
     accessory_id: string;
     serial_number: string;
     condition: "BARU" | "BEKAS";
-    status: "TERSEDIA" | "TERJUAL" | "RESERVED";
+    status: string;
     buy_price: number;
     selling_price: number;
     so_at?: string | null;
@@ -67,8 +67,10 @@ const CONDITION_STYLE: Record<string, { badge: string; label: string }> = {
 };
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
-    TERSEDIA: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Tersedia" },
-    RESERVED: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Reserved" },
+    TERSEDIA: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
+    MINUS_SIAP_JUAL: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Minus Siap Jual" },
+    BELUM_SIAP: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-400", label: "Belum Siap Jual" },
+    RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-400", label: "Reserved" },
     TERJUAL: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
 };
 
@@ -82,7 +84,7 @@ const CATEGORY_ICON: Record<string, LucideIcon> = {
 const EMPTY_UNIT_FORM = {
     serial_number: "",
     condition: "BARU" as "BARU" | "BEKAS",
-    status: "TERSEDIA" as "TERSEDIA" | "TERJUAL" | "RESERVED",
+    status: "TERSEDIA" as "TERSEDIA" | "BELUM_SIAP" | "MINUS_SIAP_JUAL" | "TERJUAL" | "RESERVED",
     buy_price: "",
     selling_price: "",
     notes: "",
@@ -775,7 +777,7 @@ function BulkEditSNModal({
         setError("");
     };
 
-    const handleSubmit = async () => {  
+    const handleSubmit = async () => {
         setError("");
         // Cuma unit yang nilainya benar-benar berubah yang perlu di-PATCH.
         const changed = visibleUnits
@@ -1026,7 +1028,7 @@ function BulkEditUnitsModal({
     onSuccess: () => void;
 }) {
     const [condition, setCondition] = useState<"" | "BARU" | "BEKAS">("");
-    const [status, setStatus] = useState<"" | "TERSEDIA" | "RESERVED">("");
+    const [status, setStatus] = useState<"" | "TERSEDIA" | "BELUM_SIAP" | "MINUS_SIAP_JUAL">("");
     const [buyInput, setBuyInput] = useState("");
     const [sellInput, setSellInput] = useState("");
     const [notes, setNotes] = useState("");
@@ -1114,19 +1116,18 @@ function BulkEditUnitsModal({
                     {/* Status — sama, klik lagi untuk batal */}
                     <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {(["TERSEDIA", "RESERVED"] as const).map(s => (
-                                <button key={s} type="button"
-                                    onClick={() => setStatus(prev => prev === s ? "" : s)}
-                                    className={`py-2.5 px-3 rounded-xl text-left border-2 transition-all ${status === s
-                                        ? s === "TERSEDIA" ? "border-emerald-500 bg-emerald-50" : "border-amber-500 bg-amber-50"
-                                        : "border-gray-200 bg-white hover:border-gray-300"
-                                        }`}>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status === s ? (s === "TERSEDIA" ? "bg-emerald-500" : "bg-amber-400") : "bg-gray-300"}`} />
-                                        <p className={`text-xs font-bold ${status === s ? (s === "TERSEDIA" ? "text-emerald-700" : "text-amber-700") : "text-gray-600"}`}>
-                                            {s === "TERSEDIA" ? "Tersedia" : "Reserved"}
-                                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                            {([
+                                { v: "TERSEDIA", l: "Siap Jual", dot: "bg-emerald-500", on: "border-emerald-500 bg-emerald-50", txt: "text-emerald-700" },
+                                { v: "BELUM_SIAP", l: "Belum Siap Jual", dot: "bg-orange-400", on: "border-orange-500 bg-orange-50", txt: "text-orange-700" },
+                                { v: "MINUS_SIAP_JUAL", l: "Minus Siap Jual", dot: "bg-amber-400", on: "border-amber-500 bg-amber-50", txt: "text-amber-700" },
+                            ] as const).map(o => (
+                                <button key={o.v} type="button"
+                                    onClick={() => setStatus(prev => prev === o.v ? "" : o.v)}
+                                    className={`py-2.5 px-2 rounded-xl text-left border-2 transition-all ${status === o.v ? o.on : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status === o.v ? o.dot : "bg-gray-300"}`} />
+                                        <p className={`text-[11px] font-bold leading-tight ${status === o.v ? o.txt : "text-gray-600"}`}>{o.l}</p>
                                     </div>
                                 </button>
                             ))}
@@ -1501,6 +1502,8 @@ export default function AccessoryUnitsPage() {
         total: activeUnits.length,
         tersedia: activeUnits.filter(u => u.status === "TERSEDIA").length,
         reserved: activeUnits.filter(u => u.status === "RESERVED").length,
+        belumSiap: activeUnits.filter(u => u.status === "BELUM_SIAP").length,
+        minusSiapJual: activeUnits.filter(u => u.status === "MINUS_SIAP_JUAL").length,
         terjual: units.filter(u => u.status === "TERJUAL").length,
         baru: activeUnits.filter(u => u.condition === "BARU").length,
         bekas: activeUnits.filter(u => u.condition === "BEKAS").length,
@@ -1548,10 +1551,19 @@ export default function AccessoryUnitsPage() {
 
     const openEdit = (unit: AccessoryUnit) => {
         setEditingUnit(unit);
+        // unit.status bertipe string bebas (bisa RESERVED/HELD/PACKING/KELUAR
+        // dari sistem). Form cuma kenal 5 nilai → normalisasi: TERJUAL tetap
+        // (jadi badge read-only), 3 status manual dipertahankan, sisanya jatuh
+        // ke TERSEDIA (Siap Jual).
+        const formStatus: typeof EMPTY_UNIT_FORM["status"] =
+            unit.status === "TERJUAL" ? "TERJUAL" :
+                unit.status === "BELUM_SIAP" ? "BELUM_SIAP" :
+                    unit.status === "MINUS_SIAP_JUAL" ? "MINUS_SIAP_JUAL" :
+                        "TERSEDIA";
         setFormData({
             serial_number: unit.serial_number,
             condition: unit.condition,
-            status: unit.status,
+            status: formStatus,
             buy_price: fmtInput(unit.buy_price),
             selling_price: fmtInput(unit.selling_price),
             notes: unit.notes ?? "",
@@ -1745,8 +1757,8 @@ export default function AccessoryUnitsPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {[
                             { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: <Package size={16} /> },
-                            { label: "Tersedia", value: counts.tersedia, color: "text-emerald-600", icon: <CheckCircle2 size={16} /> },
-                            { label: "Reserved", value: counts.reserved, color: "text-amber-600", icon: <Lock size={16} /> },
+                            { label: "Siap Jual", value: counts.tersedia, color: "text-emerald-600", icon: <CheckCircle2 size={16} /> },
+                            { label: "Minus Siap Jual", value: counts.minusSiapJual, color: "text-amber-600", icon: <Lock size={16} /> },
                             { label: "Terjual", value: counts.terjual, color: "text-gray-500", icon: <Wallet size={16} /> },
                         ].map(stat => (
                             <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
@@ -1787,8 +1799,9 @@ export default function AccessoryUnitsPage() {
                         <div className="flex flex-wrap gap-1.5">
                             {[
                                 { value: "ALL", label: "Semua Status", count: units.length },
-                                { value: "TERSEDIA", label: "Tersedia", count: counts.tersedia },
-                                { value: "RESERVED", label: "Reserved", count: counts.reserved },
+                                { value: "TERSEDIA", label: "Siap Jual", count: counts.tersedia },
+                                { value: "BELUM_SIAP", label: "Belum Siap Jual", count: counts.belumSiap },
+                                { value: "MINUS_SIAP_JUAL", label: "Minus Siap Jual", count: counts.minusSiapJual },
                                 { value: "TERJUAL", label: "Terjual", count: counts.terjual },
                             ].map(opt => (
                                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
@@ -1888,7 +1901,7 @@ export default function AccessoryUnitsPage() {
                         </div>
                     )}
 
-                                       {/* Table */}
+                    {/* Table */}
                     {isLoading || autoGenerating ? (
                         <SkeletonUnits />
                     ) : filteredUnits.length === 0 ? (
@@ -2001,49 +2014,49 @@ export default function AccessoryUnitsPage() {
                                                             }
                                                         </td>
                                                     )}
-                                                                                                <td className="px-4 py-3 whitespace-nowrap">
-                                                {s && (
-                                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                                                        {s.label}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-center whitespace-nowrap">
-                                                {unit.status !== "TERJUAL" ? (
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        {canManageSo ? (
-                                                            <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(unit); }} disabled={soingId === unit.id}
-                                                                title={isSoActive(unit.so_at) ? `Di-SO oleh ${unit.so_by ?? "—"} · klik untuk tandai ulang` : "Tandai sudah SO hari ini"}
-                                                                className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
-                                                                {isSoActive(unit.so_at) ? "Sudah di SO" : "Tandai SO"}
-                                                            </button>
-                                                        ) : (
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
-                                                                {isSoActive(unit.so_at) ? "Sudah di SO" : "Belum SO"}
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        {s && (
+                                                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                                                                {s.label}
                                                             </span>
                                                         )}
-                                                        <button onClick={() => setSoHistoryTarget(unit)} title="Riwayat SO"
-                                                            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
-                                                            <History size={13} />
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-gray-300 text-xs">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    {/* Barcode hanya untuk unit yang SN-nya asli. SN placeholder
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                        {unit.status !== "TERJUAL" ? (
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                {canManageSo ? (
+                                                                    <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(unit); }} disabled={soingId === unit.id}
+                                                                        title={isSoActive(unit.so_at) ? `Di-SO oleh ${unit.so_by ?? "—"} · klik untuk tandai ulang` : "Tandai sudah SO hari ini"}
+                                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
+                                                                        {isSoActive(unit.so_at) ? "Sudah di SO" : "Tandai SO"}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
+                                                                        {isSoActive(unit.so_at) ? "Sudah di SO" : "Belum SO"}
+                                                                    </span>
+                                                                )}
+                                                                <button onClick={() => setSoHistoryTarget(unit)} title="Riwayat SO"
+                                                                    className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
+                                                                    <History size={13} />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            {/* Barcode hanya untuk unit yang SN-nya asli. SN placeholder
                                                         "ISI-SN-..." belum boleh dibarcode — isi SN dulu. */}
-                                                    {canViewBarcode && !unit.serial_number.startsWith("ISI-SN-") && (
-                                                        <button onClick={() => setBarcodeUnit(unit)} title="Cetak Barcode"
-                                                            className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
-                                                            Barcode
-                                                        </button>
-                                                    )}
-                                                    {unit.status !== "TERJUAL" && canManageUnits && (
-                                                        <button onClick={() => openEdit(unit)}
+                                                            {canViewBarcode && !unit.serial_number.startsWith("ISI-SN-") && (
+                                                                <button onClick={() => setBarcodeUnit(unit)} title="Cetak Barcode"
+                                                                    className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
+                                                                    Barcode
+                                                                </button>
+                                                            )}
+                                                            {unit.status !== "TERJUAL" && canManageUnits && (
+                                                                <button onClick={() => openEdit(unit)}
                                                                     className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
                                                                     Edit
                                                                 </button>
@@ -2137,19 +2150,18 @@ export default function AccessoryUnitsPage() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {(["TERSEDIA", "RESERVED"] as const).map(s => (
-                                                <button key={s} type="button"
-                                                    onClick={() => setFormData(p => ({ ...p, status: s }))}
-                                                    className={`py-2.5 px-3 rounded-xl text-left border-2 transition-all ${formData.status === s
-                                                        ? s === "TERSEDIA" ? "border-emerald-500 bg-emerald-50" : "border-amber-500 bg-amber-50"
-                                                        : "border-gray-200 bg-white hover:border-gray-300"
-                                                        }`}>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === s ? (s === "TERSEDIA" ? "bg-emerald-500" : "bg-amber-400") : "bg-gray-300"}`} />
-                                                        <p className={`text-xs font-bold ${formData.status === s ? (s === "TERSEDIA" ? "text-emerald-700" : "text-amber-700") : "text-gray-600"}`}>
-                                                            {s === "TERSEDIA" ? "Tersedia" : "Reserved"}
-                                                        </p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {([
+                                                { v: "TERSEDIA", l: "Siap Jual", dot: "bg-emerald-500", on: "border-emerald-500 bg-emerald-50", txt: "text-emerald-700" },
+                                                { v: "BELUM_SIAP", l: "Belum Siap Jual", dot: "bg-orange-400", on: "border-orange-500 bg-orange-50", txt: "text-orange-700" },
+                                                { v: "MINUS_SIAP_JUAL", l: "Minus Siap Jual", dot: "bg-amber-400", on: "border-amber-500 bg-amber-50", txt: "text-amber-700" },
+                                            ] as const).map(o => (
+                                                <button key={o.v} type="button"
+                                                    onClick={() => setFormData(p => ({ ...p, status: o.v }))}
+                                                    className={`py-2.5 px-2 rounded-xl text-left border-2 transition-all ${formData.status === o.v ? o.on : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === o.v ? o.dot : "bg-gray-300"}`} />
+                                                        <p className={`text-[11px] font-bold leading-tight ${formData.status === o.v ? o.txt : "text-gray-600"}`}>{o.l}</p>
                                                     </div>
                                                 </button>
                                             ))}
