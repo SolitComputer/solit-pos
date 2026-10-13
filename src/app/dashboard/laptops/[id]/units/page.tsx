@@ -659,6 +659,10 @@ export default function UnitsPage() {
         kelengkapan: u.kelengkapan ?? null,
         stok_tersisa: u.status !== "SOLD" ? 1 : 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
+        // MSJ dipisah dari M (Minus biasa): Minus Siap Jual TETAP kehitung ST
+        // (stok nyata & boleh dijual) tapi punya kolomnya sendiri. "SERVICE"
+        // masih dicek untuk unit lama yang belum dimigrasi ke BELUM_SIAP.
+        minus_siap_jual: u.status === "MINUS_SIAP_JUAL" ? 1 : 0,
         minus: (u.status === "SERVICE" || u.status === "BELUM_SIAP") ? 1 : 0,
         is_audited: isUnitAuditActive(u),
         audited_at: u.audited_at ?? null,
@@ -1182,6 +1186,7 @@ export default function UnitsPage() {
                                 canSeePrivate={canSeePriceInfo}
                                 canSeeStock={canSeePriceInfo}
                                 showSparepart
+                                showMinusSiapJual
                                 showTotalJual
                                 showKelengkapan
                                 sortBy={sortBy}

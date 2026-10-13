@@ -54,6 +54,8 @@ export interface InventoryRow {
 
     stok_tersisa: number;
     siap_jual: number;
+    /** Minus tapi sudah boleh dijual — kolom opt-in via showMinusSiapJual */
+    minus_siap_jual?: number;
     minus: number;
 
     is_audited?: boolean;
@@ -85,6 +87,8 @@ interface Props {
     canSeePrivate: boolean;
     /** Boleh lihat kolom ST & M (agregat stok internal) */
     canSeeStock: boolean;
+    /** Tampilkan kolom MSJ (Minus Siap Jual) — opt-in, dipakai halaman Units */
+    showMinusSiapJual?: boolean;
     /** Tampilkan kolom Modal Sparepart (opt-in — hanya Data Barang) */
     showSparepart?: boolean;
     /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
@@ -122,7 +126,7 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
-type SortKey = "NAMA" | "CATEGORY" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "TOTAL_MODAL" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "SO" | "AKSI";
+type SortKey = "NAMA" | "CATEGORY" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "TOTAL_MODAL" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MSJ" | "MINUS" | "AUDIT" | "SO" | "AKSI";
 //  Badge "NEW" — dipakai di kolom Nama Laptop saat row.is_new === true.
 //  Nilai is_new sudah dihitung di pemanggil (LaptopsContent.tsx / ready/page.tsx),
 //  jadi komponen ini murni presentasional, tidak menghitung TTL sendiri.
@@ -149,7 +153,7 @@ const BelumLunasBadge = ({ label }: { label?: string }) => (
 
 
 export default function InventoryTable({
-    rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual, showKelengkapan, dateColumnLabel,
+    rows, canSeePrivate, canSeeStock, showSparepart, showMinusSiapJual, showTotalJual, showKelengkapan, dateColumnLabel,
     onRowClick, renderActions, renderAudit, renderSo, renderPedagang, sortBy, onSort,
 }: Props) {
     const [localSort, setLocalSort] = useState<{ col: SortKey; dir: "asc" | "desc" } | null>(null);
@@ -182,6 +186,7 @@ export default function InventoryTable({
                 case "SN": valA = a.sn || a.sn_note || ""; valB = b.sn || b.sn_note || ""; break;
                 case "STOK": valA = a.stok_tersisa ?? 0; valB = b.stok_tersisa ?? 0; break;
                 case "SIAP": valA = a.siap_jual ?? 0; valB = b.siap_jual ?? 0; break;
+                case "MSJ": valA = a.minus_siap_jual ?? 0; valB = b.minus_siap_jual ?? 0; break;
                 case "MINUS": valA = a.minus ?? 0; valB = b.minus ?? 0; break;
                 case "AUDIT": valA = a.is_audited ? 1 : 0; valB = b.is_audited ? 1 : 0; break;
                 case "SO": valA = a.is_so_active ? 1 : 0; valB = b.is_so_active ? 1 : 0; break;
@@ -227,7 +232,8 @@ export default function InventoryTable({
                         <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
                         {showKelengkapan && <Th>Kelengkapan</Th>}
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
-                        <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
+                                                <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
+                        {showMinusSiapJual && <Th center sortKey="MSJ" activeSort={sortBy} onSort={onSort} title="Minus Siap Jual">MSJ</Th>}
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
                         {renderSo && <Th center sortKey="SO" activeSort={sortBy} onSort={onSort}>SO</Th>}
                         {renderAudit && <Th center sortKey="AUDIT" activeSort={sortBy} onSort={onSort}>Audit</Th>}
@@ -384,6 +390,14 @@ export default function InventoryTable({
                                     {row.siap_jual}
                                 </span>
                             </td>
+
+                            {showMinusSiapJual && (
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                                    <span className={`text-sm font-semibold tabular-nums ${(row.minus_siap_jual ?? 0) > 0 ? "text-amber-600" : "text-gray-200"}`}>
+                                        {(row.minus_siap_jual ?? 0) > 0 ? (row.minus_siap_jual ?? 0) : "—"}
+                                    </span>
+                                </td>
+                            )}
 
                             {canSeeStock && (
                                 <td className="px-3 py-3.5 text-center whitespace-nowrap">
