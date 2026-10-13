@@ -1010,6 +1010,173 @@ function BulkEditSNModal({
         </div>
     );
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// BULK EDIT UNITS MODAL — bentuknya DISAMAKAN dengan form "Edit Unit" tunggal.
+// Beda logikanya: nilai awal sengaja kosong/tak terpilih, jadi hanya kolom yang
+// KAMU isi atau KAMU pilih yang dikirim — sisanya dibiarkan apa adanya per unit
+// (tidak ter-reset). Berlaku ke semua unit tercentang (kecuali TERJUAL).
+// Serial Number tidak ada di sini (SN unik per unit → pakai "Edit Banyak SN").
+// ═══════════════════════════════════════════════════════════════════════════
+function BulkEditUnitsModal({
+    units, canSeePrivate, onClose, onSuccess,
+}: {
+    units: AccessoryUnit[];
+    canSeePrivate: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}) {
+    const [condition, setCondition] = useState<"" | "BARU" | "BEKAS">("");
+    const [status, setStatus] = useState<"" | "TERSEDIA" | "RESERVED">("");
+    const [buyInput, setBuyInput] = useState("");
+    const [sellInput, setSellInput] = useState("");
+    const [notes, setNotes] = useState("");
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    const handleSubmit = async () => {
+        setError("");
+        if (units.length === 0) { setError("Tidak ada unit yang bisa diedit (unit terjual dilewati)."); return; }
+
+        // Hanya kolom yang kamu isi/pilih yang masuk payload.
+        const patch: Record<string, unknown> = {};
+        if (condition) patch.condition = condition;
+        if (status) patch.status = status;
+        if (buyInput.trim() !== "") patch.buy_price = parseRupiah(buyInput);
+        if (sellInput.trim() !== "") patch.selling_price = parseRupiah(sellInput);
+        if (notes.trim() !== "") patch.notes = notes.trim();
+
+        if (Object.keys(patch).length === 0) {
+            setError("Belum ada yang diubah. Isi atau pilih minimal satu kolom di atas.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const results = await Promise.all(units.map(async (u) => {
+                try {
+                    const res = await fetch(`/api/accessory-units/${u.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(patch),
+                    });
+                    const json = await res.json().catch(() => null);
+                    return res.ok && json?.success !== false;
+                } catch { return false; }
+            }));
+            const failed = results.filter(ok => !ok).length;
+            if (failed > 0) toast.error(`${failed} dari ${results.length} unit gagal diperbarui. Sisanya berhasil.`);
+            else toast.success(`${results.length} unit berhasil diperbarui`);
+            onSuccess();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <h3 className="font-bold text-gray-900 text-[15px] tracking-tight">Edit {units.length} Unit</h3>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Hanya kolom yang kamu isi/pilih yang diubah — sisanya dibiarkan</p>
+                    </div>
+                    <button onClick={() => !loading && onClose()} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                    {/* Kondisi — klik untuk pilih, klik lagi untuk batal (biarkan) */}
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Kondisi</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(["BARU", "BEKAS"] as const).map(c => (
+                                <button key={c} type="button"
+                                    onClick={() => setCondition(prev => prev === c ? "" : c)}
+                                    className={`inline-flex items-center justify-center gap-1 h-10 rounded-xl text-xs font-bold border transition ${condition === c ? (c === "BARU" ? "bg-emerald-600 text-white border-emerald-600" : "bg-amber-500 text-white border-amber-500") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                    {c === "BARU" ? <><Sparkles size={13} /> Baru</> : <><RefreshCw size={13} /> Bekas</>}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Status — sama, klik lagi untuk batal */}
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(["TERSEDIA", "RESERVED"] as const).map(s => (
+                                <button key={s} type="button"
+                                    onClick={() => setStatus(prev => prev === s ? "" : s)}
+                                    className={`py-2.5 px-3 rounded-xl text-left border-2 transition-all ${status === s
+                                        ? s === "TERSEDIA" ? "border-emerald-500 bg-emerald-50" : "border-amber-500 bg-amber-50"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                        }`}>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status === s ? (s === "TERSEDIA" ? "bg-emerald-500" : "bg-amber-400") : "bg-gray-300"}`} />
+                                        <p className={`text-xs font-bold ${status === s ? (s === "TERSEDIA" ? "text-emerald-700" : "text-amber-700") : "text-gray-600"}`}>
+                                            {s === "TERSEDIA" ? "Tersedia" : "Reserved"}
+                                        </p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className={canSeePrivate ? "grid grid-cols-2 gap-3" : ""}>
+                        {canSeePrivate && (
+                            <PriceInput label="Harga Modal" value={buyInput} onChange={setBuyInput} />
+                        )}
+                        <PriceInput label="Harga Jual" value={sellInput} onChange={setSellInput} />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                            Catatan <span className="text-gray-400 font-normal">(opsional)</span>
+                        </label>
+                        <input
+                            placeholder="Kosongkan = tidak diubah"
+                            value={notes}
+                            onChange={e => setNotes(e.target.value)}
+                            className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition"
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                            <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <p className="text-xs text-red-700">{error}</p>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
+                        <button type="button" onClick={() => !loading && onClose()} disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                            Batal
+                        </button>
+                        <button onClick={handleSubmit} disabled={loading}
+                            className="flex-1 h-10 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-gray-800/20">
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Simpan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SO HISTORY MODAL — riwayat siapa yang menandai SO untuk 1 unit, kapan
@@ -1208,6 +1375,7 @@ export default function AccessoryUnitsPage() {
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+    const [showBulkEditUnitsModal, setShowBulkEditUnitsModal] = useState(false); // ✅ bulk edit unit tercentang
     const [soingId, setSoingId] = useState<string | null>(null);
     const [soHistoryTarget, setSoHistoryTarget] = useState<AccessoryUnit | null>(null);
     const [soConfirmTarget, setSoConfirmTarget] = useState<AccessoryUnit | null>(null);
@@ -1238,7 +1406,9 @@ export default function AccessoryUnitsPage() {
         }).catch(() => setUserRoles([]));
     }, []);
 
-    useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterCondition, searchSN]);
+    // ✅ FIX #2: searchSN DIHAPUS dari dependency — sama seperti di halaman laptop.
+    // Centang tidak lagi hilang saat mengetik pencarian SN berikutnya.
+    useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterCondition]);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -1696,6 +1866,15 @@ export default function AccessoryUnitsPage() {
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 transition">Batal pilih</button>
+                                {canManageUnits && (
+                                    <button onClick={() => setShowBulkEditUnitsModal(true)} disabled={bulkDeleting}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-50 transition disabled:opacity-50">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Edit {selectedIds.size} Unit
+                                    </button>
+                                )}
                                 <button onClick={handleBulkDelete} disabled={bulkDeleting}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50">
                                     {bulkDeleting
@@ -2047,12 +2226,13 @@ export default function AccessoryUnitsPage() {
                 />
             )}
 
-            {/* ── Bulk Edit SN Modal ── */}
-            {showBulkEditModal && (
-                <BulkEditSNModal
-                    units={units}
-                    onClose={() => setShowBulkEditModal(false)}
-                    onSuccess={fetchData}
+            {/* ── Bulk Edit Units Modal (unit tercentang) ── */}
+            {showBulkEditUnitsModal && (
+                <BulkEditUnitsModal
+                    units={units.filter(u => selectedIds.has(u.id) && u.status !== "TERJUAL")}
+                    canSeePrivate={canSeePrivate}
+                    onClose={() => setShowBulkEditUnitsModal(false)}
+                    onSuccess={() => { setShowBulkEditUnitsModal(false); setSelectedIds(new Set()); fetchData(); }}
                 />
             )}
 

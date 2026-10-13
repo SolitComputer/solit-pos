@@ -298,6 +298,7 @@ export default function UnitsPage() {
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
+    const [showBulkEditModal, setShowBulkEditModal] = useState(false); // ✅ bulk edit unit tercentang
     const [toast, setToast] = useState("");
     const [auditingUnitId, setAuditingUnitId] = useState<string | null>(null);
     const [soUnitId, setSoUnitId] = useState<string | null>(null);
@@ -373,7 +374,11 @@ export default function UnitsPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterGradeTab, searchSN]);
+    // ✅ FIX #2: searchSN DIHAPUS dari dependency. Dulu tiap ketikan di kotak
+    // Cari SN me-reset seluruh centang, jadi hasil centang pencarian sebelumnya
+    // hilang. Sekarang centang hanya reset saat ganti tab Status/Grade, bukan
+    // saat search — selection bertahan lintas pencarian.
+    useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterGradeTab]);
 
     const syncLaptopStats = useCallback(async (latestUnits: LaptopUnit[]) => {
         const siapCount = latestUnits.filter(u => u.status === "SIAP_JUAL").length;
@@ -1111,6 +1116,15 @@ export default function UnitsPage() {
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 active:opacity-60 transition">Batal pilih</button>
+                                {canManageUnits && (
+                                    <button onClick={() => setShowBulkEditModal(true)} disabled={bulkDeleting}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-50 transition disabled:opacity-50">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Edit {selectedIds.size} Unit
+                                    </button>
+                                )}
                                 <button onClick={handleBulkDelete} disabled={bulkDeleting}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold active:bg-red-600 transition disabled:opacity-50">
                                     {bulkDeleting ? (
@@ -1383,12 +1397,17 @@ export default function UnitsPage() {
                     loading={soUnitId === soPromptTarget.unit.id}
                 />
             )}
-            {showBulkModal && (
-                <BulkAddUnitModal
-                    laptopId={laptopId}
-                    defaultSellingPrice={laptop?.selling_price ?? 0}
-                    onClose={() => setShowBulkModal(false)}
-                    onSuccess={handleFormSuccess}
+            {showBulkEditModal && (
+                <BulkEditUnitsModal
+                    units={units.filter(u => selectedIds.has(u.id) && u.status !== "SOLD")}
+                    canSeePrivate={canSeePriceInfo}
+                    canEditPurchasePrice={canFullAccessBarang}
+                    onClose={() => setShowBulkEditModal(false)}
+                    onSuccess={async () => {
+                        setShowBulkEditModal(false);
+                        setSelectedIds(new Set());
+                        await handleFormSuccess(); // refetch units + sync stats parent
+                    }}
                 />
             )}
             {toast && <Toast message={toast} onDone={() => setToast("")} />}
@@ -1452,6 +1471,175 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
         <th className={`px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
             {children}
         </th>
+    );
+}
+
+//  Modal Bulk Edit unit TERCENTANG — bentuknya disamakan dengan form Edit Unit
+//  tunggal. Nilai awal kosong/tak terpilih → hanya kolom yang kamu isi/pilih
+//  yang dikirim, sisanya dibiarkan apa adanya per unit. Berlaku ke semua unit
+//  tercentang (kecuali SOLD). Semua lewat PUT /api/units/[id].
+function BulkEditUnitsModal({
+    units, canSeePrivate, canEditPurchasePrice, onClose, onSuccess,
+}: {
+    units: LaptopUnit[];
+    canSeePrivate: boolean;
+    canEditPurchasePrice: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}) {
+    const [grade, setGrade] = useState<"" | "A" | "B" | "C">("");
+    const [status, setStatus] = useState<"" | "SIAP_JUAL" | "BELUM_SIAP" | "SERVICE">("");
+    const [sellInput, setSellInput] = useState("");
+    const [buyInput, setBuyInput] = useState("");
+    const [spareInput, setSpareInput] = useState("");
+    const [notes, setNotes] = useState("");
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    const num = (s: string) => Number(s.replace(/\D/g, "")) || 0;
+
+    const handleSubmit = async () => {
+        setError("");
+        if (units.length === 0) { setError("Tidak ada unit yang bisa diedit (unit terjual dilewati)."); return; }
+
+        const patch: Record<string, unknown> = {};
+        if (grade) patch.grade = grade;
+        if (status) patch.status = status;
+        if (sellInput.trim() !== "") patch.selling_price = num(sellInput);
+        if (buyInput.trim() !== "") patch.purchase_price = num(buyInput);
+        if (spareInput.trim() !== "") patch.sparepart_cost = num(spareInput);
+        if (notes.trim() !== "") patch.notes = notes.trim();
+
+        if (Object.keys(patch).length === 0) {
+            setError("Belum ada yang diubah. Isi atau pilih minimal satu kolom di atas.");
+            return;
+        }
+
+        setLoading(true);
+        const results = await Promise.all(units.map(async (u) => {
+            try {
+                const res = await fetch(`/api/units/${u.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(patch),
+                });
+                const json = await res.json().catch(() => null);
+                return res.ok && json?.success !== false;
+            } catch { return false; }
+        }));
+        setLoading(false);
+
+        const failed = results.filter(ok => !ok).length;
+        if (failed > 0) { setError(`${failed} dari ${results.length} unit gagal diperbarui. Sisanya berhasil.`); return; }
+        onSuccess(); // sukses semua → parent menutup modal & refetch
+    };
+
+    const priceField = (label: string, val: string, set: (v: string) => void) => (
+        <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
+            <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">Rp</span>
+                <input inputMode="numeric" placeholder="Kosongkan = tidak diubah" value={val}
+                    onChange={e => { const raw = e.target.value.replace(/\D/g, ""); set(raw ? new Intl.NumberFormat("id-ID").format(parseInt(raw, 10)) : ""); }}
+                    className="w-full h-9 border border-gray-200 rounded-lg pl-8 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-700 focus:bg-white transition tabular-nums" />
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <h3 className="font-bold text-gray-900 text-[15px] tracking-tight">Edit {units.length} Unit</h3>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Hanya kolom yang kamu isi/pilih yang diubah — sisanya dibiarkan</p>
+                    </div>
+                    <button onClick={() => !loading && onClose()} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Grade</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {(["A", "B", "C"] as const).map(g => (
+                                <button key={g} type="button" onClick={() => setGrade(prev => prev === g ? "" : g)}
+                                    className={`h-10 rounded-xl text-xs font-bold border transition ${grade === g ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                    Grade {g}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {([
+                                { v: "SIAP_JUAL", l: "Siap Jual" },
+                                { v: "BELUM_SIAP", l: "Belum Siap" },
+                                { v: "SERVICE", l: "Service" },
+                            ] as const).map(o => (
+                                <button key={o.v} type="button" onClick={() => setStatus(prev => prev === o.v ? "" : o.v)}
+                                    className={`h-10 rounded-xl text-[11px] font-semibold border transition ${status === o.v ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                    {o.l}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className={canEditPurchasePrice ? "grid grid-cols-2 gap-3" : ""}>
+                        {priceField("Harga Store", sellInput, setSellInput)}
+                        {canEditPurchasePrice && priceField("Harga Modal", buyInput, setBuyInput)}
+                    </div>
+                    {canSeePrivate && priceField("Harga Sparepart", spareInput, setSpareInput)}
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                            Catatan <span className="text-gray-400 font-normal">(opsional)</span>
+                        </label>
+                        <input
+                            placeholder="Kosongkan = tidak diubah"
+                            value={notes}
+                            onChange={e => setNotes(e.target.value)}
+                            className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-700 focus:bg-white transition"
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                            <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <p className="text-xs text-red-700">{error}</p>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
+                        <button type="button" onClick={() => !loading && onClose()} disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                            Batal
+                        </button>
+                        <button onClick={handleSubmit} disabled={loading}
+                            className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-gray-800/20">
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Simpan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 
