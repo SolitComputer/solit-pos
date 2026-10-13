@@ -437,12 +437,12 @@ const ADMIN_TRANSAKSI: MenuGroup = {
 };
 
 const SERVICE_MENU: MenuGroup = {
-  label: "Servis",
+  label: "Service",
   items: [
-    { name: "Dashboard Servis", href: "/dashboard/service/statistik", icon: Icons.dashboard },
+    { name: "Dashboard Service", href: "/dashboard/service/statistik", icon: Icons.dashboard },
     { name: "Antrian", href: "/dashboard/service/antrian", icon: Icons.serviceQueue },
     { name: "Selesai (Done)", href: "/dashboard/service/done", icon: Icons.serviceDone },
-    { name: "Riwayat Servis", href: "/dashboard/service/history", icon: Icons.serviceHistory },
+    { name: "Riwayat Service", href: "/dashboard/service/history", icon: Icons.serviceHistory },
   ],
 };
 
