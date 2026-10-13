@@ -101,6 +101,34 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
             }
         }
 
+        // ── KEBUTUHAN: kembalikan modal yang sempat dipindah ke laptop tujuan ──
+        // Saat Kebutuhan dibuat, modal aksesoris ditambahkan ke purchase_price
+        // laptop tujuan (dest_unit_id). Di sini kita kurangi lagi sebesar nominal
+        // yang sama. Pakai compare-and-swap (pola sama dgn fallback qty/stock di
+        // atas) supaya aman kalau purchase_price laptop itu diubah proses lain.
+        if (outflow.outflow_type === "KEBUTUHAN" && outflow.dest_unit_id) {
+            const modal = Math.round(Number(outflow.nominal) || 0);
+            if (modal > 0) {
+                for (let attempt = 0; attempt < 5; attempt++) {
+                    const { data: lu } = await supabaseAdmin
+                        .from("laptop_units")
+                        .select("purchase_price")
+                        .eq("id", outflow.dest_unit_id)
+                        .maybeSingle();
+                    if (!lu) break;
+                    const current = Number(lu.purchase_price) || 0;
+                    const next = Math.max(0, current - modal);
+                    const { data: casRows } = await supabaseAdmin
+                        .from("laptop_units")
+                        .update({ purchase_price: next })
+                        .eq("id", outflow.dest_unit_id)
+                        .eq("purchase_price", lu.purchase_price)
+                        .select("id");
+                    if (casRows && casRows.length > 0) break;
+                }
+            }
+        }
+
         await logActivity({
             userId: user.id,
             userName: user.name,

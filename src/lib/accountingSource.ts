@@ -1638,6 +1638,7 @@ async function buildItemOutflowKebutuhanDrafts(
     .select("id, outflow_type, nominal, purpose, serial_number, dest_serial_number, dest_laptop_id, created_at")
     .eq("outflow_type", "KEBUTUHAN")
     .not("dest_laptop_id", "is", null)
+    .not("is_restored", "is", true) // sudah di-restore → tidak dibukukan lagi
     .gte("created_at", startISO)
     .lt("created_at", endISO)
     .order("created_at", { ascending: true });
@@ -1681,6 +1682,85 @@ async function buildItemOutflowKebutuhanDrafts(
   return drafts;
 }
 
+// ── KEBUTUHAN REVERSAL: Kebutuhan yang di-restore → balik jurnal D170/K130 ──
+// Membalik jurnal forward (D130/K170) yang SUDAH diposting untuk baris Kebutuhan
+// itu, di TANGGAL restore (restored_at). Kalau forward-nya belum pernah diposting
+// (masih pending saat di-restore), tidak ada yang dibalik — Edit 2a sudah bikin
+// draft forward-nya hilang, jadi net-nya tetap nol. Muncul sebagai draft PENDING.
+async function buildItemOutflowKebutuhanReversalDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: rows, error } = await supabase
+    .from("item_outflows")
+    .select("id, nominal, purpose, dest_serial_number, dest_laptop_id, restored_at")
+    .eq("outflow_type", "KEBUTUHAN")
+    .eq("is_restored", true)
+    .not("dest_laptop_id", "is", null)
+    .not("restored_at", "is", null)
+    .gte("restored_at", startISO)
+    .lt("restored_at", endISO)
+    .order("restored_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch item_outflows (kebutuhan reversal):", error.message);
+    return [];
+  }
+  if (!rows || rows.length === 0) return [];
+
+  // Ambil baris jurnal forward yang sudah diposting (source_id polos = forward;
+  // entry __REVERSAL tidak ikut karena .in() cuma match id polos).
+  const ids = rows.map((r) => String(r.id));
+  const postedLinesById = new Map<string, any[]>();
+  for (const batch of chunkArray(ids, 150)) {
+    const { data: existing } = await supabase
+      .from("journal_entries")
+      .select("source_id, lines:journal_lines(account_code, side, nominal)")
+      .eq("source_type", "KEBUTUHAN")
+      .in("source_id", batch);
+    for (const e of (existing ?? []) as any[]) {
+      postedLinesById.set(String(e.source_id), e.lines ?? []);
+    }
+  }
+
+  const drafts: JournalDraft[] = [];
+  for (const r of rows as any[]) {
+    const idStr = String(r.id);
+    const postedLines = postedLinesById.get(idStr);
+    if (!postedLines || postedLines.length === 0) continue; // forward belum diposting → tak ada yang dibalik
+
+    const flipped: DraftLine[] = [];
+    for (const l of postedLines) {
+      const nominal = Math.round(Number(l.nominal));
+      if (nominal <= 0) continue;
+      flipped.push({
+        account_code: l.account_code as string,
+        side: l.side === "DEBIT" ? "KREDIT" : "DEBIT", // ← balik sisi
+        nominal,
+      });
+    }
+    if (flipped.length === 0) continue;
+
+    const merged = mergeLines(flipped);
+    const tanggal = jakartaDate(r.restored_at as string);
+    drafts.push({
+      source_type: "KEBUTUHAN",
+      source_id: `${idStr}__REVERSAL`,
+      source_category: "KEBUTUHAN_REVERSAL",
+      tanggal,
+      sort_ts: (r.restored_at as string) || `${tanggal}T00:00:00+07:00`,
+      keterangan: `Pembatalan Kebutuhan · ${(r.purpose as string) || "modal aksesoris balik ke stok"}`,
+      ref: (r.dest_serial_number as string) || null,
+      lines: merged,
+      total: totalOf(merged),
+      meta: { nominal: Math.round(Number(r.nominal) || 0), is_reversal: true, modal_missing: false },
+    });
+  }
+
+  return drafts;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 export async function buildDraftsForPeriod(
   supabase: SupabaseClient,
@@ -1688,7 +1768,7 @@ export async function buildDraftsForPeriod(
 ): Promise<JournalDraft[]> {
   const { startISO, endISO, startDate, endDateExclusive } = periodRange(period);
 
-  const [tx, accrual, pay, svc, cf, reversal, kebutuhan] = await Promise.all([
+   const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal] = await Promise.all([
     buildTransactionDrafts(supabase, startISO, endISO),
     buildTransactionAccrualDrafts(supabase, startISO, endISO),
     buildTransactionPaymentDrafts(supabase, startISO, endISO),
@@ -1696,9 +1776,10 @@ export async function buildDraftsForPeriod(
     buildCashflowDrafts(supabase, startDate, endDateExclusive),
     buildTransactionReversalDrafts(supabase, startISO, endISO),
     buildItemOutflowKebutuhanDrafts(supabase, startISO, endISO),
+    buildItemOutflowKebutuhanReversalDrafts(supabase, startISO, endISO),
   ]);
 
-  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan].sort((a, b) => {
+  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan, ...kebutuhanReversal].sort((a, b) => {
     if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
     return a.sort_ts.localeCompare(b.sort_ts);
   });
