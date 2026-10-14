@@ -121,6 +121,14 @@ function formatDate(iso: string): string {
   });
 }
 
+// ⬅️ BARU: format jam saja (HH.MM) — dipakai di kolom Tanggal supaya kelihatan
+// jam input-nya, tanpa mengubah formatDate yang sudah dipakai di tempat lain.
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("id-ID", {
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
 function formatDateTime(iso: string | null): string {
   if (!iso) return "-";
   return new Date(iso).toLocaleString("id-ID", {
@@ -1954,7 +1962,10 @@ export default function PengajuanDanaPage() {
                         </td>
 
                         <td className="px-4 py-4 text-center">
-                          <span className="text-xs text-slate-500 font-medium whitespace-nowrap tabular-nums">{formatDate(row.created_at)}</span>
+                          <div className="flex flex-col items-center leading-tight">
+                            <span className="text-xs text-slate-500 font-medium whitespace-nowrap tabular-nums">{formatDate(row.created_at)}</span>
+                            <span className="text-[10px] text-slate-400 whitespace-nowrap tabular-nums">{formatTime(row.created_at)}</span>
+                          </div>
                         </td>
 
                       </tr>
@@ -1981,7 +1992,7 @@ export default function PengajuanDanaPage() {
                         <RequesterAvatar id={row.requester_id} name={row.requester_name} size="w-9 h-9" />
                         <div className="min-w-0">
                           <p className="font-bold text-slate-800 text-sm truncate">{row.requester_name}</p>
-                          <p className="text-[11px] text-slate-400">{formatDate(row.created_at)}</p>
+                          <p className="text-[11px] text-slate-400 tabular-nums">{formatDate(row.created_at)} · {formatTime(row.created_at)}</p>
                         </div>
                       </div>
                       <StatusPill approved={row.is_approved} executed={row.is_executed} rejected={row.is_rejected} cancelled={row.is_cancelled} />
