@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CalendarClock, Loader2, AlertCircle, CheckCircle2, Users } from "lucide-react";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 
 interface ExpiringRow {
@@ -64,13 +65,14 @@ export default function ContractExpiringPage() {
   }, []);
 
   return (
-    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+    <DashboardLayout>
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mb-1">
         <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0">
           <CalendarClock className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-slate-900">Kontrak Akan Habis</h1>
+          <h1 className="text-lg font-bold text-slate-900">Daftar Kontrak</h1>
           <p className="text-xs text-slate-500">
             Karyawan yang masa kontraknya berakhir dalam {windowDays} hari ke depan (H-{windowDays}).
           </p>
@@ -125,6 +127,7 @@ export default function ContractExpiringPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

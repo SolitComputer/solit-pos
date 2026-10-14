@@ -228,7 +228,7 @@ const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon:
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
 const ITEM_CONTRACT_SIGN: MenuItem = { name: "Tanda Tangan Kontrak", href: "/contract/pending-signature", icon: Icons.pklReport };
-const ITEM_CONTRACT_EXPIRING: MenuItem = { name: "Kontrak Akan Habis", href: "/dashboard/contract-expiring", icon: Icons.serviceHistory };
+const ITEM_CONTRACT_EXPIRING: MenuItem = { name: "Daftar Kontrak", href: "/dashboard/contract-expiring", icon: Icons.serviceHistory };
 const ITEM_KENDARAAN: MenuItem = { name: "Management Kendaraan", href: "/dashboard/kendaraan", icon: Icons.kendaraan };
 const ITEM_KENDARAAN_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard/kendaraan/dashboard", icon: Icons.reports };
 
