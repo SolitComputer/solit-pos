@@ -6,11 +6,13 @@ import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { useVehiclePendingBadge } from "@/hooks/useVehiclePendingBadge";
 import { usePengajuanDanaBadge } from "@/hooks/usePengajuanDanaBadge";
+import { useExpiringContractsBadge } from "@/hooks/useExpiringContractsBadge";
 import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES } from "@/lib/permissions";import { hasSopAccess } from "@/lib/sop";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES, CONTRACT_EXPIRING_VIEW_ROLES } from "@/lib/permissions";
+import { hasSopAccess } from "@/lib/sop";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
@@ -226,6 +228,7 @@ const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon:
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
 const ITEM_CONTRACT_SIGN: MenuItem = { name: "Tanda Tangan Kontrak", href: "/contract/pending-signature", icon: Icons.pklReport };
+const ITEM_CONTRACT_EXPIRING: MenuItem = { name: "Kontrak Akan Habis", href: "/dashboard/contract-expiring", icon: Icons.serviceHistory };
 const ITEM_KENDARAAN: MenuItem = { name: "Management Kendaraan", href: "/dashboard/kendaraan", icon: Icons.kendaraan };
 const ITEM_KENDARAAN_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard/kendaraan/dashboard", icon: Icons.reports };
 
@@ -1719,11 +1722,13 @@ export default function Sidebar() {
       : [];
 
   const isContractSigner = user?.id === YOGA_ADMIN_ID || user?.id === REINALDY_ADMIN_ID;
+  const isContractExpiringAdmin = userRoles.some((r) => (CONTRACT_EXPIRING_VIEW_ROLES as string[]).includes(r));
 
   const groups: MenuGroup[] = withSopGroup(withKendaraanGroup(
     dedupeGroups([
       ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
       ...(isContractSigner ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT_SIGN] }] : []),
+      ...(isContractExpiringAdmin ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT_EXPIRING] }] : []),
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
       ...dynamicGroups.map((g) => ({
@@ -1804,6 +1809,8 @@ export default function Sidebar() {
   const vehiclePending = useVehiclePendingBadge(userRoles, user?.id);
   // Badge senyap (tanpa bunyi) untuk admin: jumlah pengajuan dana yang belum di-approve
   const pengajuanDanaBadge = usePengajuanDanaBadge(userRoles, user?.id);
+  // Badge senyap (tanpa bunyi): jumlah karyawan yang kontraknya akan habis dalam H-7
+  const expiringContracts = useExpiringContractsBadge(userRoles, user?.id);
   const leadsChat = useLeadsChatNotify(effectiveRoles, user?.id);
   const { sound_key: notifSoundKey, custom_sound_url: notifCustomUrl } = useNotificationSettings(user?.id ?? null);
 
@@ -1841,6 +1848,7 @@ export default function Sidebar() {
     "/dashboard/ai-ceo": aiCeoEscalationCount,
 
     "/dashboard/leads-chat": leadsChat.unreadCount,
+    "/dashboard/contract-expiring": expiringContracts.count,
   };
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
   const displayGroups: MenuGroup[] = groups.map((g) => ({

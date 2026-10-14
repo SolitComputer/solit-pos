@@ -383,6 +383,13 @@ export const ROLE_ACCESS_MANAGER_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "AS
 
 export const AI_ASSISTANT_ROLES: UserRole[] = [...ALL_ROLES];
 export const NOTIFICATION_SETTINGS_ROLES: UserRole[] = [...FULL_ACCESS];
+
+// ─── Pengingat Kontrak Akan Habis (Expiring Contracts) ───────────────────────
+// Halaman monitoring karyawan yang kontraknya akan habis dalam H-7.
+// SENGAJA hanya Admin (requirement bisnis). Kalau nanti Programmer juga perlu
+// lihat, cukup tambahkan "PROGRAMMER" di array ini — satu-satunya sumber.
+export const CONTRACT_EXPIRING_VIEW_ROLES: UserRole[] = ["ADMIN"];
+
 export const NOTIF_SOUND_KEYS = ["default", "urgent", "bell", "double_beep", "custom"] as const;
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
@@ -645,6 +652,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
   "/dashboard/ai-ceo": [...AI_CEO_ROLES],
   "/api/ai-ceo": [...AI_CEO_ROLES],
+
+  // Pengingat kontrak akan habis (H-7) — Admin only
+  "/dashboard/contract-expiring": [...CONTRACT_EXPIRING_VIEW_ROLES],
+  "/api/contracts/expiring": [...CONTRACT_EXPIRING_VIEW_ROLES],
   "/dashboard/tanya-ceo": [...AI_ASSISTANT_ROLES],
   "/api/ai-assistant": [...AI_ASSISTANT_ROLES],
   "/api/admin/pages": [...ROLE_ACCESS_MANAGER_ROLES],
