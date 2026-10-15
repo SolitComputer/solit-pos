@@ -242,6 +242,7 @@ export const PREPARATION_DONE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
   ...PREPARATION_PENYEDIA_ROLES,
   ...PREPARATION_PENYEDIA_EXTRA_ROLES, // tambahan: role yg memang muncul di menu "Selesai Disiapkan"
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", // + akses Antrian Masuk & Selesai Disiapkan (otomatis propagate ke ANTRIAN_VIEW)
 ]));
 
 export const PREPARATION_DISPATCH_ROLES: UserRole[] = Array.from(new Set<UserRole>([
@@ -276,7 +277,6 @@ export const PROVIDER_PERFORMANCE_ROLES: UserRole[] = [
 ];
 
 export const PROVIDER_PERFORMANCE_VIEW_ROLES: UserRole[] = [...PREPARATION_ANTRIAN_VIEW_ROLES];
-
 export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
   "ACCOUNTING",
@@ -285,6 +285,7 @@ export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...PREPARATION_PENYEDIA_EXTRA_ROLES,
   ...PKL_PREP_ROLES,
   "KEPALA_ONPOINT", "PENGANTARAN",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", // + bisa buka "Semua Penyiapan" (Dashboard Penyiapan) & /api/preparation
 ]));
 
 export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = ["PENGANTARAN", "PKL_PENGANTARAN"];
