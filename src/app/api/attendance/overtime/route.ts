@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, resolveShiftConfigFromDB } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
-import { isPKLRole } from "@/lib/permissions";
+import { isPKLRole, isHolidayOvertimeCustomPayRole } from "@/lib/permissions";
 import {
   isValidOvertimeCategory,
   computeOvertimeNominal,
@@ -838,8 +838,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: false, message: "Lembur ini sudah pernah diaudit sebelumnya." }, { status: 400 });
       }
 
-      const { decision, note: auditNote } = body as { decision?: "APPROVE" | "REJECT"; note?: string };
-
+      const { decision, note: auditNote, total_pay: auditCustomPay } = body as { decision?: "APPROVE" | "REJECT"; note?: string; total_pay?: number | null };
       if (decision === "REJECT") {
         const { data, error } = await supabase.from("overtime_requests").update({
           audit_status: "REJECTED", audited_by: user.id, audited_at: new Date().toISOString(),
@@ -879,11 +878,26 @@ export async function PATCH(request: Request) {
         // ✅ NEW — cek override flat rate dulu; kalau user_id-nya terdaftar,
         // pakai nominal itu tanpa peduli status telat/PKL sama sekali.
         const flatOverride = HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES[overtime.user_id];
-        const holidayPay = flatOverride !== undefined
-          ? flatOverride
-          : isPKL
-            ? (late ? PKL_HOLIDAY_OVERTIME_PAY.LATE : PKL_HOLIDAY_OVERTIME_PAY.ON_TIME)
-            : (late ? HOLIDAY_OVERTIME_PAY.LATE : HOLIDAY_OVERTIME_PAY.ON_TIME);
+
+        // ✅ NEW — role dikecualikan (Pengantaran / PKL Pengantaran): nominal
+        // lembur hari libur boleh di-custom admin saat Audit. Kalau admin
+        // mengirim total_pay valid (>= 0), pakai itu; kalau tidak, jatuh ke
+        // aturan tetap seperti biasa.
+        const isCustomHolidayRole = isHolidayOvertimeCustomPayRole(targetUser?.role);
+        const hasValidCustomPay =
+          isCustomHolidayRole &&
+          auditCustomPay !== undefined &&
+          auditCustomPay !== null &&
+          Number.isFinite(Number(auditCustomPay)) &&
+          Number(auditCustomPay) >= 0;
+
+        const holidayPay = hasValidCustomPay
+          ? Math.round(Number(auditCustomPay))
+          : flatOverride !== undefined
+            ? flatOverride
+            : isPKL
+              ? (late ? PKL_HOLIDAY_OVERTIME_PAY.LATE : PKL_HOLIDAY_OVERTIME_PAY.ON_TIME)
+              : (late ? HOLIDAY_OVERTIME_PAY.LATE : HOLIDAY_OVERTIME_PAY.ON_TIME);
 
         const { data, error } = await supabase.from("overtime_requests").update({
           audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
