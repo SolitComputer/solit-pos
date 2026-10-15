@@ -391,6 +391,16 @@ export const NOTIFICATION_SETTINGS_ROLES: UserRole[] = [...FULL_ACCESS];
 // lihat, cukup tambahkan "PROGRAMMER" di array ini — satu-satunya sumber.
 export const CONTRACT_EXPIRING_VIEW_ROLES: UserRole[] = ["ADMIN"];
 
+// ─── Sistem Pelanggaran ───────────────────────────────────────────────────────
+// MANAGE: tambah / tetapkan pelaku / batalkan / PHK. Algoritma: "hanya Admin"
+//   — PROGRAMMER ikut utk maintenance (hapus di sini kalau mau strict Admin saja).
+// WARNING: menandai teguran sudah dikirim manual di grup WA — dikeluarkan ATASAN
+//   (kepala divisi terkait) + full access.
+export const VIOLATION_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
+export const VIOLATION_WARNING_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...VIOLATION_MANAGE_ROLES, "ASISTEN_CEO", ...KEPALA_DIVISI_ROLES,
+]));
+
 export const NOTIF_SOUND_KEYS = ["default", "urgent", "bell", "double_beep", "custom"] as const;
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
@@ -695,6 +705,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/achievements": [...ALL_ROLES],
   "/dashboard/lencana": [...ALL_ROLES],
   "/api/attendance/quality-rank": [...ALL_ROLES],
+
+  // Sistem Pelanggaran — GET (daftar kasus + net board) terbuka utk semua;
+  // POST/PATCH (tulis) di-gate di handler pakai VIOLATION_MANAGE/WARNING_ROLES.
+  "/api/violations": [...ALL_ROLES],
 
   // Solit Coins (gamifikasi) — semua role. UI berupa popup di halaman profil,
   // jadi tidak ada route halaman terpisah; cukup gate endpoint API-nya.
