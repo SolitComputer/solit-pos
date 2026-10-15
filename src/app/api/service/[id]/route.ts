@@ -56,6 +56,82 @@ async function insertSparepartJournal(
   }
 }
 
+// Jurnal SEMUA modal sparepart milik 1 service, dipanggil saat status jadi
+// Selesai/Gagal. Modal diambil dari 2 sumber:
+//   1. accessory_outflows (source=service, status active) → modal STOK, D450/K170
+//   2. biaya_sparepart di service_orders → modal MANUAL, D460/K171
+// Anti-dobel: cuma dipanggil sekali, di transisi menuju DONE/GAGAL_DIPERBAIKI.
+// Kalau outflow sudah pernah dijurnal (mis. data lama), skip lewat flag di notes.
+async function journalSparepartOnCompletion(
+  supabase: ReturnType<typeof getAdmin>,
+  opts: { serviceId: string; nama: string | null; userId: string }
+) {
+  const { serviceId, nama, userId } = opts;
+
+  // ── 1) Modal STOK dari accessory_outflows ──
+  const { data: outflows } = await supabase
+    .from("accessory_outflows")
+    .select("id, accessory_id, unit_id, qty, notes")
+    .eq("source_type", "service")
+    .eq("service_id", serviceId)
+    .eq("status", "active");
+
+  let modalStok = 0;
+  const sns: string[] = [];
+  if (outflows && outflows.length > 0) {
+    const accIds = [...new Set(outflows.map((o: any) => o.accessory_id).filter(Boolean))];
+    const unitIds = outflows.map((o: any) => o.unit_id).filter(Boolean) as string[];
+    const [{ data: accRows }, { data: unitRows }] = await Promise.all([
+      accIds.length
+        ? supabase.from("accessories").select("id, buy_price").in("id", accIds)
+        : Promise.resolve({ data: [] as any[] }),
+      unitIds.length
+        ? supabase.from("accessory_units").select("id, serial_number, buy_price").in("id", unitIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const accBuyMap = new Map((accRows ?? []).map((a: any) => [a.id, Math.round(Number(a.buy_price ?? 0))]));
+    const unitInfoMap = new Map(
+      (unitRows ?? []).map((u: any) => [u.id, { sn: u.serial_number as string, buy: Math.round(Number(u.buy_price ?? 0)) }])
+    );
+
+    for (const o of outflows as any[]) {
+      const info = o.unit_id ? unitInfoMap.get(o.unit_id) : undefined;
+      if (info?.sn) sns.push(info.sn);
+      const unitBuy = info?.buy ?? 0;
+      modalStok += (unitBuy > 0 ? unitBuy : (accBuyMap.get(o.accessory_id) ?? 0)) * Number(o.qty || 1);
+    }
+  }
+
+  if (modalStok > 0) {
+    const keterangan = `Sparepart · ${nama ?? "—"}${sns.length ? ` · ${sns.join(", ")}` : ""}`;
+    await insertSparepartJournal(supabase, {
+      nominal: modalStok,
+      debit: AKUN.BIAYA_PRINTILAN,  // 450
+      kredit: AKUN.AKSESORIS,        // 170
+      keterangan,
+      userId,
+    });
+  }
+
+  // ── 2) Modal MANUAL dari biaya_sparepart ──
+  const { data: svc } = await supabase
+    .from("service_orders")
+    .select("biaya_sparepart")
+    .eq("id", serviceId)
+    .single();
+
+  const modalManual = Math.round(Number(svc?.biaya_sparepart ?? 0));
+  if (modalManual > 0) {
+    await insertSparepartJournal(supabase, {
+      nominal: modalManual,
+      debit: AKUN.MODAL_SERVICE_KELUAR, // 460
+      kredit: AKUN.AKSESORIS_SERVICE,    // 171
+      keterangan: `Sparepart · ${nama ?? "—"}`,
+      userId,
+    });
+  }
+}
+
 async function getAuthUser(req: NextRequest) {
   const token = req.cookies.get("token")?.value;
   if (!token) return null;
@@ -192,37 +268,18 @@ export async function PATCH(
       if (oldStatus !== "SEDANG_DIKERJAKAN")
         return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
       newStatus = "MENUNGGU_SPAREPART";
-      // biaya_sparepart TIDAK diubah di sini — "biaya sparepart" sekarang murni
-      // MODAL yang masuk jurnal, bukan tagihan customer.
-      updatePayload = {};
       logCatatan = alasan ? `Menunggu sparepart: ${alasan}` : "Menunggu sparepart";
 
       const ketServis = (alasan ?? "").trim() || "Sparepart";
 
       if (accessories_used && accessories_used.length > 0) {
-        // ── DARI STOK AKSESORIS → jurnal D450 / K170 (modal = buy_price × qty) ──
-        const accIds = [...new Set(accessories_used.map((a) => a.accessory_id).filter(Boolean))];
-        const unitIds = accessories_used.map((a) => a.unit_id).filter(Boolean) as string[];
-        const [{ data: accRows }, { data: unitRows }] = await Promise.all([
-          accIds.length
-            ? supabase.from("accessories").select("id, buy_price").in("id", accIds)
-            : Promise.resolve({ data: [] as any[] }),
-          unitIds.length
-            ? supabase.from("accessory_units").select("id, serial_number, buy_price").in("id", unitIds)
-            : Promise.resolve({ data: [] as any[] }),
-        ]);
-        const accBuyMap = new Map((accRows ?? []).map((a: any) => [a.id, Math.round(Number(a.buy_price ?? 0))]));
-        const unitInfoMap = new Map(
-          (unitRows ?? []).map((u: any) => [u.id, { sn: u.serial_number as string, buy: Math.round(Number(u.buy_price ?? 0)) }])
-        );
-
-        let modalStok = 0;
-        const sns: string[] = [];
+        // ── DARI STOK AKSESORIS → cuma catat keluarnya stok + tandai alasan.
+        // JURNAL-nya DITUNDA sampai status Selesai/Gagal (lihat case done &
+        // gagal_diperbaiki). Jadi sparepart yang servisnya masih MENUNGGU_SPAREPART
+        // belum pernah masuk jurnal — sesuai permintaan.
         for (const acc of accessories_used) {
-          const info = acc.unit_id ? unitInfoMap.get(acc.unit_id) : undefined;
           if (acc.unit_id) {
             await supabase.from("accessory_units").update({ status: "KELUAR" }).eq("id", acc.unit_id);
-            if (info?.sn) sns.push(info.sn);
           }
           await recordOutflow({
             accessory_id: acc.accessory_id,
@@ -238,31 +295,16 @@ export async function PATCH(
             p_accessory_id: acc.accessory_id,
             p_qty: acc.qty,
           });
-          const unitBuy = info?.buy ?? 0;
-          modalStok += (unitBuy > 0 ? unitBuy : (accBuyMap.get(acc.accessory_id) ?? 0)) * Number(acc.qty || 1);
         }
-
-        if (modalStok > 0) {
-          const keterangan = `${ketServis} · ${current.nama ?? "—"}${sns.length ? ` · ${sns.join(", ")}` : ""}`;
-          await insertSparepartJournal(supabase, {
-            nominal: modalStok,
-            debit: AKUN.BIAYA_PRINTILAN,  // 450
-            kredit: AKUN.AKSESORIS,        // 170
-            keterangan,
-            userId: user.id,
-          });
-        }
+        // Modal stok tidak dititip di biaya_sparepart — nanti dihitung ulang dari
+        // accessory_outflows saat Selesai/Gagal (biar tetap akurat per SN).
+        updatePayload = {};
       } else if (sparepart_mode === "manual" && Number(sparepart_modal) > 0) {
-        // ── INPUT MANUAL → jurnal D460 / K171 ──
-        const modalManual = Math.round(Number(sparepart_modal));
-        const keterangan = `${ketServis} · ${current.nama ?? "—"}`;
-        await insertSparepartJournal(supabase, {
-          nominal: modalManual,
-          debit: AKUN.MODAL_SERVICE_KELUAR, // 460
-          kredit: AKUN.AKSESORIS_SERVICE,    // 171
-          keterangan,
-          userId: user.id,
-        });
+        // ── INPUT MANUAL → titip modal di biaya_sparepart, JANGAN jurnal dulu.
+        // Dijurnal nanti saat Selesai/Gagal (D460/K171).
+        updatePayload = { biaya_sparepart: Math.round(Number(sparepart_modal)) };
+      } else {
+        updatePayload = {};
       }
       break;
     }
@@ -311,6 +353,14 @@ export async function PATCH(
           });
         }
       }
+
+      // ── Jurnal modal sparepart SEKARANG (status jadi DONE) — baik yang
+      // dititip saat MENUNGGU_SPAREPART maupun yang baru diisi saat Selesai ini.
+      await journalSparepartOnCompletion(supabase, {
+        serviceId: id,
+        nama: current.nama ?? null,
+        userId: user.id,
+      });
       break;
 
     case "gagal_diperbaiki":
@@ -328,6 +378,14 @@ export async function PATCH(
         alasan_tidak_jadi: alasan.trim(),
       };
       logCatatan = `Gagal diperbaiki: ${alasan.trim()}`;
+
+      // ── Jurnal modal sparepart SEKARANG (status jadi GAGAL) — modal tetap
+      // diakui walau servis gagal, sesuai keputusan bisnis.
+      await journalSparepartOnCompletion(supabase, {
+        serviceId: id,
+        nama: current.nama ?? null,
+        userId: user.id,
+      });
       break;
 
     case "diambil":

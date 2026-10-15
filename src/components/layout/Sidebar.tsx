@@ -659,14 +659,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     GROUP_ABSENSI,
     { label: "Management", items: [ITEM_USERS] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_LAPTOP_MONITORING, ITEM_ALL_UNITS] },
-    {
-      label: "Transaksi",
-      items: [
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
-      ],
-    },
-    ADMIN_PENYEDIA_MENU,
+    { label: "Transaksi", items: [{ name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }] },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
@@ -681,14 +674,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
-    {
-      label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-        { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
-      ],
-    },
-    ADMIN_PENYEDIA_MENU,
+    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
