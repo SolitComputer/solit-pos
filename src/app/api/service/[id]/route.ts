@@ -373,7 +373,7 @@ export async function PATCH(
         return NextResponse.json({ success: false, message: "Alasan wajib diisi" }, { status: 400 });
       newStatus = "GAGAL_DIPERBAIKI";
       updatePayload = {
-        dikerjakan_by: user.id,
+      dikerjakan_by: user.id,
         tanggal_selesai: new Date().toISOString(),
         alasan_tidak_jadi: alasan.trim(),
       };

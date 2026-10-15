@@ -188,7 +188,7 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     const modals = aktif.map(u => u.buy_price).filter((n): n is number => n != null && n > 0);
     const minModal = modals.length ? Math.min(...modals) : 0;
     const maxModal = modals.length ? Math.max(...modals) : 0;
-    const margin = (a.sell_price || 0) - (a.buy_price || 0);
+const margin = (a.sell_price || 0) - (a.buy_price || 0);
     return {
         id: a.id, tipe: "AKSESORIS", nama: a.name, kategori: a.category,
         brand: a.brand || null, cpu: null, ram: null, storage: null, spek: a.spec || null,
