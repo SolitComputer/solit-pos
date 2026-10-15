@@ -201,10 +201,14 @@ export async function getTransactionSyncDraftsByInvoices(
     for (const batch of chunkArray(Array.from(unitIds), 150)) {
       const { data: units } = await supabase
         .from("laptop_units")
-        .select("id, purchase_price, serial_number")
+        .select("id, purchase_price, sparepart_cost, serial_number")
         .in("id", batch);
       for (const u of units ?? []) {
-        purchasePriceMap.set(u.id as string, Math.round(Number(u.purchase_price ?? 0)));
+        // Modal total unit = harga beli + modal sparepart yang tertanam di unit.
+        purchasePriceMap.set(
+          u.id as string,
+          Math.round(Number(u.purchase_price ?? 0)) + Math.round(Number(u.sparepart_cost ?? 0))
+        );
         if (u.serial_number) serialNumberMap.set(u.id as string, u.serial_number as string);
       }
     }
@@ -718,11 +722,13 @@ async function buildTransactionDrafts(
     for (const batch of chunkArray(Array.from(unitIds), 150)) {
       const { data: units } = await supabase
         .from("laptop_units")
-        .select("id, purchase_price, serial_number, laptop_id")
+        .select("id, purchase_price, sparepart_cost, serial_number, laptop_id")
         .in("id", batch);
       for (const u of units ?? []) {
+        // purchase_price di map ini = modal TOTAL (harga beli + sparepart_cost),
+        // supaya `modal += u.purchase_price` di bawah otomatis sudah gabungan.
         unitMap.set(u.id as string, {
-          purchase_price: Math.round(Number(u.purchase_price ?? 0)),
+          purchase_price: Math.round(Number(u.purchase_price ?? 0)) + Math.round(Number(u.sparepart_cost ?? 0)),
           serial_number: (u.serial_number as string) ?? undefined,
           laptop_id: (u.laptop_id as string) ?? undefined,
         });
@@ -930,11 +936,13 @@ async function buildTransactionAccrualDrafts(
     for (const batch of chunkArray(Array.from(unitIds), 150)) {
       const { data: units } = await supabase
         .from("laptop_units")
-        .select("id, purchase_price, serial_number, laptop_id")
+        .select("id, purchase_price, sparepart_cost, serial_number, laptop_id")
         .in("id", batch);
       for (const u of units ?? []) {
+        // purchase_price di map ini = modal TOTAL (harga beli + sparepart_cost),
+        // supaya `modal += u.purchase_price` di bawah otomatis sudah gabungan.
         unitMap.set(u.id as string, {
-          purchase_price: Math.round(Number(u.purchase_price ?? 0)),
+          purchase_price: Math.round(Number(u.purchase_price ?? 0)) + Math.round(Number(u.sparepart_cost ?? 0)),
           serial_number: (u.serial_number as string) ?? undefined,
           laptop_id: (u.laptop_id as string) ?? undefined,
         });

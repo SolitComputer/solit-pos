@@ -48,7 +48,7 @@ function isCustomAwardAdmin(user: any): boolean {
     return roles.some((r) => (CUSTOM_AWARD_MANAGE_ROLES as readonly string[]).includes(r));
 }
 
-const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const MONTH_NAMES = ["Januari","Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
 function initials(name: string): string {
     return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
