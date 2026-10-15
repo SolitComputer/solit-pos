@@ -706,8 +706,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/lencana": [...ALL_ROLES],
   "/api/attendance/quality-rank": [...ALL_ROLES],
 
-  // Sistem Pelanggaran — GET (daftar kasus + net board) terbuka utk semua;
-  // POST/PATCH (tulis) di-gate di handler pakai VIOLATION_MANAGE/WARNING_ROLES.
+  // Sistem Pelanggaran — halaman + API GET terbuka utk semua; POST/PATCH (tulis)
+  // di-gate di handler pakai VIOLATION_MANAGE/WARNING_ROLES.
+  "/dashboard/pelanggaran": [...ALL_ROLES],
   "/api/violations": [...ALL_ROLES],
 
   // Solit Coins (gamifikasi) — semua role. UI berupa popup di halaman profil,
