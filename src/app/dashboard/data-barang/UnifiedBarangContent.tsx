@@ -851,11 +851,23 @@ export default function UnifiedBarangContent() {
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     const canDoSo = (row: UnifiedRow) => {
         if (!canManageSo) return false;
-        if (row.tipe === "LAPTOP") return canSoLaptop(userRoles, userId, row.siap_jual ?? 0);
+        if (row.tipe === "LAPTOP") {
+            // Samakan dengan aksesoris: kalau 1 model punya >1 unit, tombol SO di
+            // baris luar DISEMBUNYIKAN — SO dikerjakan per-unit di Kelola Unit.
+            // Tombol SO luar hanya untuk model ber-unit tunggal.
+            if (row.unit_count > 1) return false;
+            return canSoLaptop(userRoles, userId, row.siap_jual ?? 0);
+        }
         const stok = row.stok ?? 0;
         if (stok > 1) return false;
         return stok > 0;
     };
+
+    // Baris model multi-unit — SO-nya dikerjakan per-unit di Kelola Unit.
+    // Dipakai untuk menampilkan badge read-only "Sudah SO" di baris luar saat
+    // SEMUA unit sudah di-SO (rollup backend → row.so_at).
+    const isSoManagedPerUnit = (row: UnifiedRow) =>
+        row.tipe === "LAPTOP" ? row.unit_count > 1 : (row.stok ?? 0) > 1;
     const canCreateAcc = hasAnyRole(userRoles, ACCESSORY_CREATE_ROLES) || matrixCanBarang.create;
     const canEditAcc = hasAnyRole(userRoles, ACCESSORY_EDIT_ROLES) || matrixCanBarang.edit;
     const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_DELETE_ROLES) || matrixCanBarang.delete;
@@ -2083,6 +2095,11 @@ export default function UnifiedBarangContent() {
                                                                     </button>
                                                                 </div>
                                                             )}
+                                                            {!canDoSo(row) && isSoManagedPerUnit(row) && soActive && (
+                                                                <div className="flex-1 min-w-0 flex items-center justify-center h-8 rounded-lg border bg-emerald-50 border-emerald-200">
+                                                                    <span className="text-[11px] font-semibold text-emerald-700">Sudah SO</span>
+                                                                </div>
+                                                            )}
                                                         </div>
 
                                                         {/* (2) GRID AKSI — 2 kolom seragam */}
@@ -2278,6 +2295,10 @@ export default function UnifiedBarangContent() {
                                                                                 <HistoryIcon size={13} />
                                                                             </button>
                                                                         </div>
+                                                                    ) : isSoManagedPerUnit(row) && soActive ? (
+                                                                        <span className="inline-flex items-center h-7 px-2 rounded-lg text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200" title="Semua unit sudah di-SO hari ini">
+                                                                            Sudah SO
+                                                                        </span>
                                                                     ) : <Dash />}
                                                                 </td>
                                                                 <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
