@@ -450,6 +450,23 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     ...TRANSACTION_VIEW,
     "PKL_SALES", "PKL_ZENITH", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
   ],
+  // ✅ FIX: dulu "/dashboard/pending-orders" TIDAK terdaftar di sini, jadi
+  // getEffectivePermissions() tidak pernah memasukkannya ke permission efektif
+  // user → menu "Riwayat Pending" ikut tersaring hilang untuk role yang
+  // mengandalkan daftar permission (mis. PENGELOLA_BARANG). Role di bawah ini
+  // disamakan dengan whitelist withAuth di /api/transaction/pending/route.ts.
+  "/dashboard/pending-orders": [
+    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+    "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "ACCOUNTING",
+    "PENGANTARAN", "KEPALA_SOTECH", "SOTECH", "KEPALA_ONPOINT", "ONPOINT",
+    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  ],
+  "/api/transaction/pending": [
+    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+    "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "ACCOUNTING",
+    "PENGANTARAN", "KEPALA_SOTECH", "SOTECH", "KEPALA_ONPOINT", "ONPOINT",
+    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  ],
   "/dashboard": [...ALL_ROLES],
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
   "/dashboard/users": ALL_ROLES.filter(r => !r.startsWith("PKL")),
