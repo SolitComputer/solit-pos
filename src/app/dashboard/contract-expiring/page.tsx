@@ -1,11 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CalendarClock, Loader2, AlertCircle, CheckCircle2, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import {
+  CalendarClock,
+  CalendarDays,
+  Clock3,
+  Users,
+  Inbox,
+  AlertTriangle,
+  Search,
+  X,
+  RotateCcw,
+  CheckCircle2,
+} from "lucide-react";
+import {
+  buildCustomRoleLookup,
+  getAvatarColor,
+  getInitials,
+  getRoleBadge,
+  getRoleLabel,
+  type CustomRoleRow,
+} from "@/lib/roleMeta";
+import { MONTH_NAMES_ID, startOfDay } from "@/lib/birthday";
 import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 
-interface ExpiringRow {
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface ApiRow {
   id: string;
   name: string;
   role: string | null;
@@ -14,140 +35,804 @@ interface ExpiringRow {
   days_left: number;
 }
 
-function formatTanggal(iso: string): string {
+interface ContractEntry extends ApiRow {
+  expiry: Date;
+  monthIndex: number;
+}
+
+type ViewMode = "terdekat" | "bulan";
+
+/** Kelompok waktu untuk mode "Terdekat". */
+type BucketKey = "minggu" | "bulan" | "nanti";
+
+const BUCKETS: { key: BucketKey; label: string; hint: string }[] = [
+  { key: "minggu", label: "7 hari ke depan", hint: "segera perpanjang" },
+  { key: "bulan", label: "30 hari ke depan", hint: "" },
+  { key: "nanti", label: "Setelah itu", hint: "" },
+];
+
+/** Item hasil flatten: label kelompok atau baris karyawan. */
+type ListItem =
+  | { kind: "label"; key: string; label: string; count: number; hint: string }
+  | { kind: "row"; key: string; person: ContractEntry };
+
+// ── Util kecil ────────────────────────────────────────────────────────────────
+const shortDate = (d: Date) => `${d.getDate()} ${MONTH_NAMES_ID[d.getMonth()].slice(0, 3)}`;
+
+const fullDate = (iso: string): string => {
   try {
-    return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    return new Date(iso).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
   } catch {
     return iso;
   }
-}
+};
 
-function labelSisaHari(days: number): string {
+const labelSisaHari = (days: number): string => {
   if (days <= 0) return "Habis hari ini";
   if (days === 1) return "Besok habis";
   return `${days} hari lagi`;
+};
+
+const bucketOf = (days: number): BucketKey =>
+  days <= 7 ? "minggu" : days <= 30 ? "bulan" : "nanti";
+
+// ── Avatar ────────────────────────────────────────────────────────────────────
+function Avatar({
+  name,
+  role,
+  size = "md",
+  highlight = false,
+}: {
+  name: string;
+  role: string;
+  size?: "md" | "lg";
+  highlight?: boolean;
+}) {
+  const color = getAvatarColor(role);
+  const box =
+    size === "lg" ? "w-12 h-12 sm:w-14 sm:h-14 text-sm sm:text-base" : "w-11 h-11 text-xs";
+
+  return (
+    <div className="relative flex-shrink-0">
+      <div
+        className={`${box} rounded-2xl flex items-center justify-center text-white font-black tracking-tight`}
+        style={{
+          background: `linear-gradient(135deg, ${color}dd, ${color})`,
+          boxShadow: `0 4px 14px ${color}33`,
+        }}
+      >
+        {getInitials(name)}
+      </div>
+      {highlight && (
+        <div
+          className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white flex items-center justify-center"
+          style={{ boxShadow: "0 2px 6px rgba(0,0,0,0.14)" }}
+        >
+          <Clock3 className="w-3 h-3" style={{ color: "#d97706" }} />
+        </div>
+      )}
+    </div>
+  );
 }
 
-function badgeClass(days: number): string {
-  if (days <= 2) return "bg-red-50 text-red-600 border border-red-200";
-  if (days <= 4) return "bg-orange-50 text-orange-600 border border-orange-200";
-  return "bg-amber-50 text-amber-600 border border-amber-200";
+// ── Pill countdown ────────────────────────────────────────────────────────────
+function CountdownPill({ days }: { days: number }) {
+  const tone =
+    days <= 0
+      ? { bg: "#fef3c7", text: "#92400e", border: "#fde68a" }
+      : days <= 7
+        ? { bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" }
+        : { bg: "#f8fafc", text: "#64748b", border: "#e8ecf5" };
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10.5px] font-black whitespace-nowrap tabular-nums ${
+        days <= 0 ? "animate-pulse" : ""
+      }`}
+      style={{ background: tone.bg, color: tone.text, border: `1px solid ${tone.border}` }}
+    >
+      {labelSisaHari(days)}
+    </span>
+  );
 }
 
-/**
- * Ubah role mentah DB (mis. "KEPALA_SALES", "PKL_MARKETING") jadi label rapi
- * ("Kepala Sales", "Pkl Marketing"). Self-contained — tidak perlu import
- * ROLE_META dari sidebar. Kalau butuh label persis sidebar, ganti ke roleMeta.
- */
-function formatRole(role: string): string {
-  return role
-    .toLowerCase()
-    .split("_")
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+// ── StatCard ──────────────────────────────────────────────────────────────────
+function StatCard({
+  icon,
+  value,
+  label,
+  sub,
+  accent,
+  muted = false,
+}: {
+  icon: React.ReactNode;
+  value: number;
+  label: string;
+  sub: string;
+  accent: string;
+  muted?: boolean;
+}) {
+  return (
+    <div
+      className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden transition-all hover:shadow-md"
+      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+    >
+      <div className="absolute top-0 left-0 w-1 h-full" style={{ background: accent }} />
+      <div className="pl-2.5 sm:pl-3">
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
+          <span style={{ color: muted ? "#cbd5e1" : "#334155" }}>{icon}</span>
+          <span
+            className="text-2xl sm:text-3xl font-black tabular-nums leading-none"
+            style={{ color: muted ? "#cbd5e1" : "#0f172a" }}
+          >
+            {value}
+          </span>
+        </div>
+        <p className="text-[10.5px] sm:text-[11px] font-bold truncate" style={{ color: "#475569" }}>
+          {label}
+        </p>
+        <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>
+          {sub}
+        </p>
+      </div>
+    </div>
+  );
 }
 
+// ── Banner: ada kontrak yang habis hari ini ───────────────────────────────────
+function TodayBanner({
+  people,
+  lookup,
+}: {
+  people: ContractEntry[];
+  lookup: Map<string, CustomRoleRow>;
+}) {
+  return (
+    <section
+      className="relative overflow-hidden rounded-2xl sm:rounded-3xl"
+      style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}
+    >
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            "radial-gradient(ellipse at 88% 15%, rgba(236,72,153,0.30) 0%, transparent 58%), radial-gradient(ellipse at 5% 95%, rgba(99,102,241,0.26) 0%, transparent 58%)",
+        }}
+      />
+
+      {/* konfeti halus — otomatis mati kalau user pilih reduced motion */}
+      <div className="confetti pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <span key={i} className={`confetti-bit bit-${i}`} />
+        ))}
+      </div>
+
+      <div className="relative z-10 px-4 sm:px-6 py-5 sm:py-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Clock3 className="w-4 h-4 flex-shrink-0" style={{ color: "#fbbf24" }} />
+          <p
+            className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em]"
+            style={{ color: "#fbbf24" }}
+          >
+            Kontrak habis hari ini
+          </p>
+        </div>
+
+        <ul className="space-y-2.5">
+          {people.map((p) => (
+            <li
+              key={p.id}
+              className="flex items-center gap-3 rounded-2xl px-3 py-2.5 sm:px-3.5 sm:py-3"
+              style={{
+                background: "rgba(255,255,255,0.07)",
+                border: "1px solid rgba(255,255,255,0.12)",
+              }}
+            >
+              <Avatar name={p.name} role={p.role ?? ""} size="lg" highlight />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm sm:text-base font-black text-white truncate leading-tight">
+                  {p.name}
+                </p>
+                <p
+                  className="text-[10.5px] sm:text-[11.5px] mt-1 truncate"
+                  style={{ color: "rgba(255,255,255,0.55)" }}
+                >
+                  {p.role ? getRoleLabel(p.role, lookup) : "—"}
+                </p>
+                {p.career_level && (
+                  <div className="mt-1">
+                    <CareerLevelBadge level={p.career_level} />
+                  </div>
+                )}
+                <p
+                  className="text-[10.5px] sm:text-[11.5px] font-bold mt-1"
+                  style={{ color: "#fbbf24" }}
+                >
+                  Berakhir {fullDate(p.contract_valid_until)}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+// ── Banner: tidak ada yang habis hari ini → tampilkan yang paling dekat ──────
+function NextUpBanner({
+  person,
+  lookup,
+}: {
+  person: ContractEntry;
+  lookup: Map<string, CustomRoleRow>;
+}) {
+  return (
+    <section
+      className="bg-white rounded-2xl sm:rounded-3xl px-4 sm:px-6 py-4 sm:py-5"
+      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+    >
+      <div className="flex items-center gap-2 mb-3.5">
+        <Clock3 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#7c3aed" }} />
+        <p
+          className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em]"
+          style={{ color: "#7c3aed" }}
+        >
+          Paling dekat habis
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3 sm:gap-3.5">
+        <Avatar name={person.name} role={person.role ?? ""} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p
+            className="text-sm sm:text-base font-black truncate leading-tight"
+            style={{ color: "#0f172a" }}
+          >
+            {person.name}
+          </p>
+          <p className="text-[10.5px] sm:text-xs mt-1 truncate" style={{ color: "#94a3b8" }}>
+            {person.role ? getRoleLabel(person.role, lookup) : "—"}
+          </p>
+          {person.career_level && (
+            <div className="mt-1">
+              <CareerLevelBadge level={person.career_level} />
+            </div>
+          )}
+          <p className="text-[10.5px] sm:text-xs mt-1 font-bold" style={{ color: "#64748b" }}>
+            Berakhir {shortDate(person.expiry)}
+          </p>
+        </div>
+        <div className="flex-shrink-0">
+          <CountdownPill days={person.days_left} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Baris karyawan ────────────────────────────────────────────────────────────
+function ContractRow({
+  person,
+  lookup,
+  isLast,
+}: {
+  person: ContractEntry;
+  lookup: Map<string, CustomRoleRow>;
+  isLast: boolean;
+}) {
+  const badge = person.role ? getRoleBadge(person.role, lookup) : null;
+  const isToday = person.days_left <= 0;
+
+  return (
+    <li
+      className="relative px-3.5 sm:px-5 py-3 sm:py-3.5 transition-colors hover:bg-slate-50/70"
+      style={{
+        borderBottom: isLast ? "none" : "1px solid #f5f5fb",
+        background: isToday ? "#fffdf5" : undefined,
+      }}
+    >
+      {isToday && (
+        <span
+          className="absolute left-0 top-0 bottom-0 w-[3px]"
+          style={{ background: "linear-gradient(180deg, #fbbf24, #d97706)" }}
+        />
+      )}
+
+      <div className="flex items-center gap-3 sm:gap-3.5">
+        <Avatar name={person.name} role={person.role ?? ""} highlight={isToday} />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span
+              className="text-[13px] sm:text-sm font-bold truncate max-w-[9.5rem] sm:max-w-none"
+              style={{ color: "#0f172a" }}
+            >
+              {person.name}
+            </span>
+            {badge && person.role && (
+              <span
+                className="inline-flex items-center text-[9.5px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 max-w-[8rem] truncate"
+                style={{ background: badge.bg, color: badge.text, border: `1px solid ${badge.border}` }}
+              >
+                {getRoleLabel(person.role, lookup)}
+              </span>
+            )}
+            {person.career_level && <CareerLevelBadge level={person.career_level} />}
+          </div>
+
+          <p
+            className="text-[10.5px] sm:text-[11px] font-medium mt-1 truncate"
+            style={{ color: "#94a3b8" }}
+          >
+            Berakhir{" "}
+            <span className="font-bold" style={{ color: "#64748b" }}>
+              {fullDate(person.contract_valid_until)}
+            </span>
+          </p>
+        </div>
+
+        <div className="flex-shrink-0">
+          <CountdownPill days={person.days_left} />
+        </div>
+      </div>
+    </li>
+  );
+}
+
+// ── Label kelompok di dalam list ─────────────────────────────────────────────
+function GroupLabel({ label, count, hint }: { label: string; count: number; hint: string }) {
+  return (
+    <li
+      className="px-3.5 sm:px-5 py-2 flex items-center gap-2"
+      style={{
+        background: "#fafbff",
+        borderTop: "1px solid #f5f5fb",
+        borderBottom: "1px solid #f5f5fb",
+      }}
+    >
+      <span className="text-[9.5px] font-black uppercase tracking-[0.14em]" style={{ color: "#94a3b8" }}>
+        {label}
+      </span>
+      <span
+        className="px-1.5 py-0.5 rounded-full text-[9.5px] font-black tabular-nums"
+        style={{ background: "#e8ecf5", color: "#64748b" }}
+      >
+        {count}
+      </span>
+      {hint && (
+        <span className="text-[9.5px] hidden sm:inline" style={{ color: "#cbd5e1" }}>
+          {hint}
+        </span>
+      )}
+    </li>
+  );
+}
+
+// ── Halaman ───────────────────────────────────────────────────────────────────
 export default function ContractExpiringPage() {
+  const [rows, setRows] = useState<ApiRow[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRoleRow[]>([]);
+  const [windowDays, setWindowDays] = useState(30);
   const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState<ExpiringRow[]>([]);
-  const [windowDays, setWindowDays] = useState(7);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<ViewMode>("terdekat");
+  const [month, setMonth] = useState(0);
+
+  // `today` di-set setelah mount supaya HTML server (UTC) dan client (WIB) tidak
+  // berbeda → tidak ada hydration mismatch (hanya dipakai untuk default bulan).
+  const [today, setToday] = useState<Date | null>(null);
 
   useEffect(() => {
-    let active = true;
-    const load = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch("/api/contracts/expiring", { cache: "no-store" });
-        const data = await res.json();
-        if (!active) return;
-        if (!data.success) {
-          setError(data.message || "Gagal memuat data kontrak");
-          return;
-        }
-        setRows(data.data ?? []);
-        setWindowDays(data.window_days ?? 7);
-      } catch {
-        if (active) setError("Terjadi kesalahan saat memuat data");
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    load();
-    return () => { active = false; };
+    const now = startOfDay();
+    setToday(now);
+    setMonth(now.getMonth());
   }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [listRes, rolesRes] = await Promise.all([
+        fetch("/api/contracts/expiring", { cache: "no-store" }),
+        fetch("/api/admin/roles"),
+      ]);
+
+      const listData = await listRes.json();
+      if (!listData.success) {
+        setError(listData.message ?? "Gagal memuat data kontrak");
+        return;
+      }
+      setRows(listData.data ?? []);
+      setWindowDays(listData.window_days ?? 30);
+
+      // Role custom opsional — kalau gagal, jatuh ke label bawaan.
+      if (rolesRes.ok) {
+        const rolesData = await rolesRes.json();
+        if (rolesData.success) setCustomRoles(rolesData.roles ?? []);
+      }
+    } catch {
+      setError("Tidak bisa terhubung ke server. Coba muat ulang.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const customLookup = useMemo(() => buildCustomRoleLookup(customRoles), [customRoles]);
+
+  const entries = useMemo<ContractEntry[]>(
+    () =>
+      rows.map((r) => {
+        const expiry = new Date(r.contract_valid_until);
+        return { ...r, expiry, monthIndex: expiry.getMonth() };
+      }),
+    [rows]
+  );
+
+  const todayList = useMemo(() => entries.filter((e) => e.days_left <= 0), [entries]);
+  const weekCount = useMemo(
+    () => entries.filter((e) => e.days_left > 0 && e.days_left <= 7).length,
+    [entries]
+  );
+  const monthCount = useMemo(
+    () => (today ? entries.filter((e) => e.monthIndex === today.getMonth()).length : 0),
+    [entries, today]
+  );
+  const nextUp = useMemo(
+    () => entries.filter((e) => e.days_left > 0).sort((a, b) => a.days_left - b.days_left)[0] ?? null,
+    [entries]
+  );
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const base = entries.filter((e) => !q || e.name.toLowerCase().includes(q));
+
+    if (view === "bulan") {
+      return base
+        .filter((e) => e.monthIndex === month)
+        .sort((a, b) => a.expiry.getDate() - b.expiry.getDate() || a.name.localeCompare(b.name));
+    }
+    return base.sort((a, b) => a.days_left - b.days_left || a.name.localeCompare(b.name));
+  }, [entries, search, view, month]);
+
+  const listItems = useMemo<ListItem[]>(() => {
+    if (view === "bulan") {
+      return visible.map((p) => ({ kind: "row", key: p.id, person: p }));
+    }
+
+    const map: Record<BucketKey, ContractEntry[]> = { minggu: [], bulan: [], nanti: [] };
+    for (const e of visible) map[bucketOf(e.days_left)].push(e);
+
+    const out: ListItem[] = [];
+    for (const b of BUCKETS) {
+      const items = map[b.key];
+      if (items.length === 0) continue;
+      out.push({ kind: "label", key: `label-${b.key}`, label: b.label, count: items.length, hint: b.hint });
+      for (const p of items) out.push({ kind: "row", key: p.id, person: p });
+    }
+    return out;
+  }, [visible, view]);
+
+  const isBusy = loading || !today;
+  const monthLabel = MONTH_NAMES_ID[today?.getMonth() ?? 0];
 
   return (
     <DashboardLayout>
-      <div className="p-4 sm:p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-1">
-        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0">
-          <CalendarClock className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <h1 className="text-lg font-bold text-slate-900">Daftar Kontrak</h1>
-          <p className="text-xs text-slate-500">
-            Karyawan yang masa kontraknya berakhir dalam {windowDays} hari ke depan (H-{windowDays}).
-          </p>
-        </div>
-      </div>
+      <div className="min-h-screen bg-[#F7F7F8]">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-3.5 sm:space-y-5">
 
-      {!loading && !error && rows.length > 0 && (
-        <div className="mt-4 inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-semibold px-3 py-1.5 rounded-lg">
-          <Users className="w-4 h-4" />
-          {rows.length} karyawan perlu perpanjangan kontrak
-        </div>
-      )}
-
-      <div className="mt-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-7 h-7 animate-spin text-slate-300" />
-          </div>
-        ) : error ? (
-          <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="text-center py-16 bg-white border border-slate-100 rounded-2xl">
-            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-            <p className="text-sm font-bold text-slate-600">Tidak ada kontrak yang akan habis</p>
-            <p className="text-xs text-slate-400 mt-1">
-              Belum ada karyawan dengan kontrak berakhir dalam {windowDays} hari ke depan.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {rows.map((row) => (
-              <div
-                key={row.id}
-                className="flex items-center justify-between gap-3 bg-white border border-slate-100 rounded-2xl px-4 py-3 shadow-sm"
+          {/* ── Header ──────────────────────────────────────────────── */}
+          <header className="flex items-center gap-3 min-w-0">
+            <div
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: "linear-gradient(135deg, #0f0c29, #1a1545)",
+                boxShadow: "0 4px 14px rgba(15,12,41,0.35)",
+              }}
+            >
+              <CalendarClock className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1
+                className="text-base sm:text-xl font-black tracking-tight truncate"
+                style={{ color: "#0f172a" }}
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">{row.name}</p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    {row.role && (
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100">
-                        {formatRole(row.role)}
-                      </span>
-                    )}
-                    {row.career_level && <CareerLevelBadge level={row.career_level} />}
-                    <span className="text-xs text-slate-400">
-                      Berakhir {formatTanggal(row.contract_valid_until)}
-                    </span>
-                  </div>
+                Daftar Kontrak
+              </h1>
+            </div>
+          </header>
+
+          {/* ── Error ───────────────────────────────────────────────── */}
+          {error && (
+            <div
+              className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-xs font-semibold"
+              style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}
+            >
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span className="flex-1 min-w-0">{error}</span>
+              <button
+                onClick={load}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex-shrink-0 transition-all active:scale-95"
+                style={{ background: "#fecdd3", color: "#9f1239" }}
+              >
+                <RotateCcw className="w-3 h-3" /> Coba lagi
+              </button>
+            </div>
+          )}
+
+          {/* ── Sorotan atas ────────────────────────────────────────── */}
+          {!isBusy && todayList.length > 0 && (
+            <TodayBanner people={todayList} lookup={customLookup} />
+          )}
+          {!isBusy && todayList.length === 0 && nextUp && (
+            <NextUpBanner person={nextUp} lookup={customLookup} />
+          )}
+
+          {/* ── Statistik ───────────────────────────────────────────── */}
+          {!isBusy && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+              <StatCard
+                icon={<Clock3 className="w-4 h-4 sm:w-5 sm:h-5" />}
+                value={todayList.length}
+                label="Habis Hari Ini"
+                sub={todayList.length > 0 ? "segera tindak lanjuti" : "aman"}
+                muted={todayList.length === 0}
+                accent={
+                  todayList.length > 0
+                    ? "linear-gradient(180deg, #fbbf24, #d97706)"
+                    : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"
+                }
+              />
+              <StatCard
+                icon={<CalendarClock className="w-4 h-4 sm:w-5 sm:h-5" />}
+                value={weekCount}
+                label="7 Hari ke Depan"
+                sub="siapkan perpanjangan"
+                accent="linear-gradient(180deg, #f472b6, #db2777)"
+              />
+              <StatCard
+                icon={<CalendarDays className="w-4 h-4 sm:w-5 sm:h-5" />}
+                value={monthCount}
+                label={`Bulan ${monthLabel}`}
+                sub="total di bulan ini"
+                accent="linear-gradient(180deg, #a78bfa, #7c3aed)"
+              />
+              <StatCard
+                icon={<Users className="w-4 h-4 sm:w-5 sm:h-5" />}
+                value={entries.length}
+                label="Total Kontrak"
+                sub={`dalam ${windowDays} hari`}
+                accent="linear-gradient(180deg, #34d399, #059669)"
+              />
+            </div>
+          )}
+
+          {/* ── Filter ──────────────────────────────────────────────── */}
+          <div
+            className="bg-white rounded-2xl overflow-hidden"
+            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+          >
+            <div className="p-3 sm:p-4 space-y-2.5 sm:space-y-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                {/* Search */}
+                <div className="relative flex-1 min-w-0">
+                  <Search
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
+                    style={{ color: "#94a3b8" }}
+                  />
+                  <input
+                    type="text"
+                    inputMode="search"
+                    placeholder="Cari nama karyawan..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full h-10 sm:h-9 rounded-xl pl-9 pr-9 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                    style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+                  />
+                  {search && (
+                    <button
+                      onClick={() => setSearch("")}
+                      aria-label="Hapus pencarian"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-slate-100 active:scale-90"
+                    >
+                      <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+                    </button>
+                  )}
                 </div>
-                <span className={`flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg ${badgeClass(row.days_left)}`}>
-                  {labelSisaHari(row.days_left)}
-                </span>
+
+                {/* Toggle tampilan — full width di HP, auto di laptop */}
+                <div
+                  className="flex gap-1 p-1 rounded-xl flex-shrink-0"
+                  style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}
+                >
+                  {(
+                    [
+                      { key: "terdekat", label: "Terdekat" },
+                      { key: "bulan", label: "Per Bulan" },
+                    ] as const
+                  ).map((t) => (
+                    <button
+                      key={t.key}
+                      onClick={() => setView(t.key)}
+                      aria-pressed={view === t.key}
+                      className="flex-1 sm:flex-initial h-8 px-3.5 rounded-lg text-[11px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      style={
+                        view === t.key
+                          ? {
+                              background: "linear-gradient(135deg, #0f0c29, #1a1545)",
+                              color: "#fff",
+                              boxShadow: "0 2px 8px rgba(15,12,41,0.22)",
+                            }
+                          : { background: "transparent", color: "#64748b" }
+                      }
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ))}
+
+              {/* Chip bulan — grid rapi, tidak berantakan di layar sempit */}
+              {view === "bulan" && (
+                <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 pt-0.5">
+                  {MONTH_NAMES_ID.map((m, i) => (
+                    <button
+                      key={m}
+                      onClick={() => setMonth(i)}
+                      title={m}
+                      aria-pressed={month === i}
+                      className="h-8 rounded-lg text-[10px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      style={
+                        month === i
+                          ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                          : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }
+                      }
+                    >
+                      {m.slice(0, 3)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* ── Daftar ──────────────────────────────────────────────── */}
+          <div
+            className="bg-white rounded-2xl overflow-hidden"
+            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+          >
+            <div
+              className="px-3.5 sm:px-5 py-3 flex items-center gap-2.5"
+              style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}
+            >
+              <span
+                className="w-1 h-4 rounded-full flex-shrink-0"
+                style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }}
+              />
+              <p
+                className="text-[10.5px] sm:text-[11px] font-bold truncate"
+                style={{ color: "#64748b" }}
+              >
+                {view === "bulan"
+                  ? `${visible.length} kontrak habis di ${MONTH_NAMES_ID[month]}`
+                  : `${visible.length} kontrak, diurutkan dari yang terdekat habis`}
+              </p>
+            </div>
+
+            {isBusy ? (
+              <ul>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <li
+                    key={i}
+                    className="px-3.5 sm:px-5 py-3.5 flex items-center gap-3 animate-pulse"
+                    style={{ borderBottom: "1px solid #f8f8fc" }}
+                  >
+                    <div className="w-11 h-11 rounded-2xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
+                    <div className="flex-1 space-y-2 min-w-0">
+                      <div className="h-3 rounded-full w-32 max-w-full" style={{ background: "#e2e8f0" }} />
+                      <div className="h-2.5 rounded-full w-24" style={{ background: "#f1f5f9" }} />
+                    </div>
+                    <div className="w-16 h-6 rounded-full flex-shrink-0" style={{ background: "#f1f5f9" }} />
+                  </li>
+                ))}
+              </ul>
+            ) : visible.length === 0 ? (
+              <div className="text-center py-14 sm:py-20 px-5">
+                <div className="flex justify-center mb-3">
+                  {search ? (
+                    <Inbox className="w-9 h-9" style={{ color: "#cbd5e1" }} />
+                  ) : (
+                    <CheckCircle2 className="w-10 h-10" style={{ color: "#34d399" }} />
+                  )}
+                </div>
+                <p className="text-sm font-bold" style={{ color: "#475569" }}>
+                  {search ? "Nama tidak ditemukan" : "Tidak ada kontrak yang akan habis"}
+                </p>
+                <p
+                  className="text-xs mt-1.5 leading-relaxed max-w-xs mx-auto"
+                  style={{ color: "#94a3b8" }}
+                >
+                  {search
+                    ? "Coba kata kunci lain."
+                    : view === "bulan"
+                      ? `Tidak ada kontrak yang habis di bulan ${MONTH_NAMES_ID[month]}.`
+                      : `Belum ada karyawan dengan kontrak berakhir dalam ${windowDays} hari ke depan.`}
+                </p>
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="mt-4 text-xs font-bold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95"
+                    style={{ color: "#6366f1", background: "#eff3ff" }}
+                  >
+                    Reset pencarian
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ul>
+                {listItems.map((item, i) =>
+                  item.kind === "label" ? (
+                    <GroupLabel
+                      key={item.key}
+                      label={item.label}
+                      count={item.count}
+                      hint={item.hint}
+                    />
+                  ) : (
+                    <ContractRow
+                      key={item.key}
+                      person={item.person}
+                      lookup={customLookup}
+                      isLast={i === listItems.length - 1}
+                    />
+                  )
+                )}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
-      </div>
+
+      <style jsx>{`
+        .confetti-bit {
+          position: absolute;
+          top: -14px;
+          width: 6px;
+          height: 10px;
+          border-radius: 2px;
+          opacity: 0;
+          animation: fall 6s linear infinite;
+        }
+        .bit-0 { left: 6%;  background: #fbbf24; animation-delay: 0s;   }
+        .bit-1 { left: 16%; background: #ec4899; animation-delay: 0.7s; }
+        .bit-2 { left: 27%; background: #6366f1; animation-delay: 1.4s; }
+        .bit-3 { left: 38%; background: #34d399; animation-delay: 2.1s; }
+        .bit-4 { left: 49%; background: #fbbf24; animation-delay: 2.8s; }
+        .bit-5 { left: 60%; background: #a78bfa; animation-delay: 0.4s; }
+        .bit-6 { left: 70%; background: #ec4899; animation-delay: 1.1s; }
+        .bit-7 { left: 80%; background: #34d399; animation-delay: 1.8s; }
+        .bit-8 { left: 88%; background: #6366f1; animation-delay: 2.5s; }
+        .bit-9 { left: 95%; background: #fbbf24; animation-delay: 3.2s; }
+
+        @keyframes fall {
+          0%   { transform: translateY(0) rotate(0deg);       opacity: 0;    }
+          12%  {                                              opacity: 0.55; }
+          100% { transform: translateY(260px) rotate(320deg); opacity: 0;    }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .confetti { display: none; }
+        }
+      `}</style>
     </DashboardLayout>
   );
 }
