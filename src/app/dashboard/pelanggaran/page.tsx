@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import {
     Trophy, ChevronLeft, ChevronRight, Lock, Clock, Crown,
     AlertTriangle, Ban, Plus, X, Check, Send, UserPlus, Copy, Loader2,
+    Boxes, Sparkles, UserCheck, ListChecks, CheckCircle2,
     type LucideIcon,
 } from "lucide-react";
 
@@ -206,6 +207,76 @@ type NetRow = {
     violation_points: number; net_points: number; rank: number; level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number;
 };
 
+/* ── 3 jenis pelanggaran tetap — HARUS sinkron dgn VIOLATION_TYPES di
+   /api/violations/route.ts (enforcement & validasi asli ada di API). ── */
+const VIOLATION_TYPES = ["Tempat barang salah", "Kebersihan dan kerapian", "Disiplin kerja"] as const;
+
+type VTypeMeta = { icon: LucideIcon; iconCls: string; selectedCls: string; desc: string };
+const VTYPE_META: Record<string, VTypeMeta> = {
+    "Tempat barang salah": { icon: Boxes, iconCls: "bg-indigo-100 text-indigo-600", selectedCls: "border-indigo-400 bg-indigo-50/70 ring-2 ring-indigo-100", desc: "Unit/aksesoris tidak pada tempatnya" },
+    "Kebersihan dan kerapian": { icon: Sparkles, iconCls: "bg-teal-100 text-teal-600", selectedCls: "border-teal-400 bg-teal-50/70 ring-2 ring-teal-100", desc: "Area kerja kotor / berantakan" },
+    "Disiplin kerja": { icon: UserCheck, iconCls: "bg-amber-100 text-amber-600", selectedCls: "border-amber-400 bg-amber-50/70 ring-2 ring-amber-100", desc: "Telat, meninggalkan jam kerja, dsb." },
+};
+// Fallback aman untuk kasus lama yg violation_type-nya masih teks bebas.
+function vtypeMeta(t: string): VTypeMeta {
+    return VTYPE_META[t] ?? { icon: AlertTriangle, iconCls: "bg-gray-100 text-gray-500", selectedCls: "border-gray-300 bg-gray-50", desc: "" };
+}
+
+// Selector kartu (ganti input teks bebas) — 1 tap, konsisten gaya Kategori.
+function VTypeSelector({ value, onChange }: { value: string; onChange: (t: string) => void }) {
+    return (
+        <div className="space-y-2">
+            {VIOLATION_TYPES.map((t) => {
+                const m = VTYPE_META[t]; const Icon = m.icon; const on = value === t;
+                return (
+                    <button key={t} type="button" onClick={() => onChange(t)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl border text-left transition-all active:scale-[0.99] ${on ? m.selectedCls : "border-gray-200 hover:bg-gray-50"}`}>
+                        <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${m.iconCls}`}><Icon className="w-4 h-4" /></span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-bold text-gray-800">{t}</span>
+                            <span className="block text-[11px] text-gray-400 truncate">{m.desc}</span>
+                        </span>
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border transition-colors ${on ? "bg-violet-600 border-violet-600" : "border-gray-300"}`}>{on && <Check className="w-3 h-3 text-white" />}</span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+// Garis aksen kiri kartu kasus (scannable per kategori beratnya).
+function severityAccent(sev: string): string {
+    switch (sev) {
+        case "SANGAT_BERAT": return "border-l-gray-900";
+        case "BERAT": return "border-l-red-400";
+        case "SEDANG": return "border-l-orange-400";
+        default: return "border-l-yellow-400";
+    }
+}
+
+// ── Ringkasan statistik di atas halaman ──
+function StatTile({ icon: Icon, ring, tone, label, value }: { icon: LucideIcon; ring: string; tone: string; label: string; value: ReactNode }) {
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300 p-3.5 flex items-center gap-3">
+            <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${ring}`}><Icon className="w-5 h-5" /></span>
+            <div className="min-w-0">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider truncate">{label}</p>
+                <p className={`text-xl font-black leading-tight ${tone}`}>{value}</p>
+            </div>
+        </div>
+    );
+}
+function SummaryStrip({ loading, summary }: { loading: boolean; summary: { total: number; needAction: number; running: number; done: number } }) {
+    const v = (n: number) => (loading ? "…" : n.toLocaleString("id-ID"));
+    return (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatTile icon={ListChecks} ring="bg-slate-100 text-slate-600" tone="text-slate-700" label="Total Kasus" value={v(summary.total)} />
+            <StatTile icon={AlertTriangle} ring="bg-orange-100 text-orange-600" tone="text-orange-600" label="Perlu Tindakan" value={v(summary.needAction)} />
+            <StatTile icon={Ban} ring="bg-rose-100 text-rose-600" tone="text-rose-600" label="Penalti Berjalan" value={v(summary.running)} />
+            <StatTile icon={CheckCircle2} ring="bg-emerald-100 text-emerald-600" tone="text-emerald-600" label="Selesai" value={v(summary.done)} />
+        </div>
+    );
+}
+
 const SEVERITY_META: Record<string, { label: string; points: string; cls: string }> = {
     RINGAN: { label: "Ringan", points: "−1", cls: "bg-yellow-100 text-yellow-700 border-yellow-200" },
     SEDANG: { label: "Sedang", points: "−5", cls: "bg-orange-100 text-orange-700 border-orange-200" },
@@ -324,6 +395,14 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
         fetch("/api/users").then((r) => r.json()).then((d) => { if (d.success) setUsers((d.users || []).map((u: any) => ({ id: u.id, name: u.name, role: u.role }))); }).catch(() => { });
     }, [isAdmin]);
 
+    // Ringkasan status kasus bulan ini (dihitung dari data yg sudah dimuat).
+    const caseSummary = useMemo(() => ({
+        total: cases.length,
+        needAction: cases.filter((c) => c.status === "PERLU_TINDAKAN_ATASAN").length,
+        running: cases.filter((c) => c.status === "PENALTI_BERJALAN").length,
+        done: cases.filter((c) => c.status === "SELESAI_TEGURAN").length,
+    }), [cases]);
+
     const changeMonth = (delta: number) => {
         let m = calMonth + delta; let y = calYear;
         if (m < 0) { m = 11; y -= 1; } if (m > 11) { m = 0; y += 1; }
@@ -392,6 +471,9 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
 
     return (
         <div className="space-y-5 sm:space-y-7">
+            {/* ── Ringkasan statistik ── */}
+            <SummaryStrip loading={loadingCases} summary={caseSummary} />
+
             {/* ── Bagian 1: Papan Poin Akhir ── */}
             <div className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-lg hover:shadow-gray-100 transition-shadow duration-300 overflow-hidden">
                 <SectionHeader icon={AlertTriangle} accent={ACC_ROSE} title="Poin Akhir Setelah Pelanggaran"
@@ -471,10 +553,15 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
                             const bisaTetapkan = isAdmin && c.severity !== "SANGAT_BERAT" && ["MENUNGGU_PENGAKUAN", "PERLU_TINDAKAN_ATASAN", "SELESAI_TEGURAN"].includes(c.status);
                             const bisaBatal = isAdmin && !["DIBATALKAN", "PHK"].includes(c.status);
                             const bisaTegur = canWarn && c.status === "PERLU_TINDAKAN_ATASAN";
+                            const vm = vtypeMeta(c.violation_type);
+                            const VIcon = vm.icon;
                             return (
-                                <div key={c.id} className={`rounded-2xl border border-gray-100 p-4 space-y-3 ${c.status === "DIBATALKAN" ? "bg-gray-50/60 opacity-75" : "bg-white"}`}>
+                                <div key={c.id} className={`rounded-2xl border border-gray-100 border-l-4 ${c.status === "DIBATALKAN" ? "border-l-gray-200 bg-gray-50/60 opacity-75" : `${severityAccent(c.severity)} bg-white`} p-4 space-y-3`}>
                                     <div className="flex items-start justify-between gap-2 flex-wrap">
-                                        <div className="min-w-0"><p className="text-sm font-black text-gray-900">{c.violation_type}</p><p className="text-[11px] text-gray-400 mt-0.5">{fmtTanggal(c.incident_date)}{c.area ? ` · ${c.area}` : ""}{c.shift ? ` · ${c.shift}` : ""}</p></div>
+                                        <div className="flex items-start gap-2.5 min-w-0">
+                                            <span className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${vm.iconCls}`}><VIcon className="w-4 h-4" /></span>
+                                            <div className="min-w-0"><p className="text-sm font-black text-gray-900">{c.violation_type}</p><p className="text-[11px] text-gray-400 mt-0.5">{fmtTanggal(c.incident_date)}{c.area ? ` · ${c.area}` : ""}{c.shift ? ` · ${c.shift}` : ""}</p></div>
+                                        </div>
                                         <div className="flex items-center gap-1.5 flex-wrap justify-end"><SeverityBadge severity={c.severity} /><VStatusBadge status={c.status} /></div>
                                     </div>
                                     <p className="text-xs text-gray-600 leading-relaxed bg-gray-50/70 rounded-lg px-3 py-2">{c.reason}</p>
@@ -503,34 +590,40 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
             {/* ── Modal: Tambah Pelanggaran ── */}
             {showCreate && (
                 <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setShowCreate(false)} />
-                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[88vh] overflow-y-auto">
-                        <div className="flex items-center justify-between"><h3 className="font-black text-gray-900">Tambah Pelanggaran</h3><button onClick={() => setShowCreate(false)} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-100"><X className="w-4 h-4 text-gray-500" /></button></div>
-                        <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Jenis Pelanggaran</label><input value={cType} onChange={(e) => setCType(e.target.value)} placeholder="Misal: Buang sampah sembarangan, Telat parah" className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 block mb-1.5">Kategori</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {(["RINGAN", "SEDANG", "BERAT", "SANGAT_BERAT"] as const).map((s) => <button key={s} type="button" onClick={() => setCSeverity(s)} className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${cSeverity === s ? "border-violet-400 bg-violet-50 text-violet-700" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>{SEVERITY_META[s].label} <span className="opacity-70">({SEVERITY_META[s].points})</span></button>)}
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreate(false)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[88vh] overflow-y-auto">
+                        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur px-6 pt-6 pb-4 border-b border-gray-100 flex items-center gap-3">
+                            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-100 to-rose-200 text-rose-600 flex items-center justify-center flex-shrink-0"><AlertTriangle className="w-4 h-4" /></span>
+                            <h3 className="font-black text-gray-900 flex-1">Tambah Pelanggaran</h3>
+                            <button onClick={() => setShowCreate(false)} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-100"><X className="w-4 h-4 text-gray-500" /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Jenis Pelanggaran</label><VTypeSelector value={cType} onChange={setCType} /></div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 block mb-1.5">Kategori</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(["RINGAN", "SEDANG", "BERAT", "SANGAT_BERAT"] as const).map((s) => <button key={s} type="button" onClick={() => setCSeverity(s)} className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${cSeverity === s ? "border-violet-400 bg-violet-50 text-violet-700" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>{SEVERITY_META[s].label} <span className="opacity-70">({SEVERITY_META[s].points})</span></button>)}
+                                </div>
+                                {cSeverity === "SANGAT_BERAT" && <p className="text-[11px] font-bold text-red-600 mt-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Ini akan menonaktifkan akun pelaku (PHK) permanen & minta konfirmasi 2×.</p>}
                             </div>
-                            {cSeverity === "SANGAT_BERAT" && <p className="text-[11px] font-bold text-red-600 mt-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Ini akan menonaktifkan akun pelaku (PHK) permanen & minta konfirmasi 2×.</p>}
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Tanggal</label><input type="date" value={cDate} onChange={(e) => setCDate(e.target.value)} className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
-                            <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Shift (opsional)</label><select value={cShift} onChange={(e) => setCShift(e.target.value)} className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"><option value="">—</option><option value="PAGI">Pagi</option><option value="SORE">Sore</option></select></div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Area (opsional)</label><input value={cArea} onChange={(e) => setCArea(e.target.value)} placeholder="Gudang, Toko…" className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
-                            <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Divisi/Tujuan Teguran</label><input value={cDivision} onChange={(e) => setCDivision(e.target.value)} placeholder="Divisi Kebersihan…" className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
-                        </div>
-                        <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Alasan / Keterangan</label><textarea value={cReason} onChange={(e) => setCReason(e.target.value)} rows={2} placeholder="Wajib diisi…" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 block mb-1.5">Pelaku {cSeverity === "BERAT" || cSeverity === "SANGAT_BERAT" ? <span className="text-red-500">(wajib)</span> : <span className="text-gray-400 font-normal">(kosongkan → masa tenang 3 hari)</span>}</label>
-                            <UserMultiPicker users={users} selected={cPelaku} onToggle={(id) => setCPelaku((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])} />
-                            {cPelaku.length > 0 && <p className="text-[11px] text-gray-400 mt-1.5">{cPelaku.length} pelaku dipilih</p>}
-                        </div>
-                        <div className="flex gap-2 pt-2">
-                            <button onClick={() => setShowCreate(false)} className="flex-1 h-10 rounded-xl text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">Batal</button>
-                            <button onClick={submitCreate} disabled={submitting || !cType.trim() || !cReason.trim()} className="flex-1 h-10 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#1a1a2e] to-[#16213e] disabled:opacity-50 flex items-center justify-center gap-2">{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Simpan"}</button>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Tanggal</label><input type="date" value={cDate} onChange={(e) => setCDate(e.target.value)} className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Shift (opsional)</label><select value={cShift} onChange={(e) => setCShift(e.target.value)} className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"><option value="">—</option><option value="PAGI">Pagi</option><option value="SORE">Sore</option></select></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Area (opsional)</label><input value={cArea} onChange={(e) => setCArea(e.target.value)} placeholder="Gudang, Toko…" className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Divisi/Tujuan Teguran</label><input value={cDivision} onChange={(e) => setCDivision(e.target.value)} placeholder="Divisi Kebersihan…" className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
+                            </div>
+                            <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Alasan / Keterangan</label><textarea value={cReason} onChange={(e) => setCReason(e.target.value)} rows={2} placeholder="Wajib diisi…" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 block mb-1.5">Pelaku {cSeverity === "BERAT" || cSeverity === "SANGAT_BERAT" ? <span className="text-red-500">(wajib)</span> : <span className="text-gray-400 font-normal">(kosongkan → masa tenang 3 hari)</span>}</label>
+                                <UserMultiPicker users={users} selected={cPelaku} onToggle={(id) => setCPelaku((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])} />
+                                {cPelaku.length > 0 && <p className="text-[11px] text-gray-400 mt-1.5">{cPelaku.length} pelaku dipilih</p>}
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <button onClick={() => setShowCreate(false)} className="flex-1 h-10 rounded-xl text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">Batal</button>
+                                <button onClick={submitCreate} disabled={submitting || !cType.trim() || !cReason.trim()} className="flex-1 h-10 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#1a1a2e] to-[#16213e] disabled:opacity-50 flex items-center justify-center gap-2">{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Simpan"}</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -539,7 +632,7 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
             {/* ── Modal: Tetapkan Pelaku ── */}
             {assignCase && (
                 <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setAssignCase(null)} />
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setAssignCase(null)} />
                     <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto">
                         <div className="flex items-center justify-between"><h3 className="font-black text-gray-900">Tetapkan Pelaku</h3><button onClick={() => setAssignCase(null)} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-100"><X className="w-4 h-4 text-gray-500" /></button></div>
                         <p className="text-xs text-gray-500">{assignCase.violation_type} · {fmtTanggal(assignCase.incident_date)}</p>
@@ -556,7 +649,7 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
             {/* ── Modal: Tandai Teguran ── */}
             {teguranCase && (
                 <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setTeguranCase(null)} />
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setTeguranCase(null)} />
                     <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto">
                         <div className="flex items-center justify-between"><h3 className="font-black text-gray-900">Teguran Grup (Manual)</h3><button onClick={() => setTeguranCase(null)} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-100"><X className="w-4 h-4 text-gray-500" /></button></div>
                         <p className="text-[11px] text-gray-500">Salin teks di bawah, kirim manual ke grup WA divisi, lalu tandai di sini untuk jejak audit. Sistem tidak mengirim WA.</p>
