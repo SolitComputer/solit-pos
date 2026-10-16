@@ -99,6 +99,16 @@ interface Props {
     dateColumnLabel?: string;
     onRowClick?: (row: InventoryRow) => void;
     renderActions?: (row: InventoryRow) => React.ReactNode;
+    /** Checkbox pilih-unit (opt-in — hanya halaman Kelola Unit). Kalau ketiga
+     *  prop ini tidak dikirim, kolom checkbox TIDAK muncul sama sekali — jadi
+     *  halaman lain (Data Barang/Ready/Minus) tetap seperti semula. */
+    selectedIds?: Set<string>;
+    onToggleSelect?: (id: string) => void;
+    onToggleSelectAll?: () => void;
+    /** true = semua baris tampil tercentang (untuk checkbox header) */
+    allSelected?: boolean;
+    /** true = sebagian tercentang (indeterminate di header) */
+    someSelected?: boolean;
     /** Render kolom Audit di samping Aksi (opt-in — Data Barang) */
     renderAudit?: (row: InventoryRow) => React.ReactNode;
     /** Render kolom SO (Stock Opname) — independen dari Audit (opt-in — Data Barang) */
@@ -155,7 +165,10 @@ const BelumLunasBadge = ({ label }: { label?: string }) => (
 export default function InventoryTable({
     rows, canSeePrivate, canSeeStock, showSparepart, showMinusSiapJual, showTotalJual, showKelengkapan, dateColumnLabel,
     onRowClick, renderActions, renderAudit, renderSo, renderPedagang, sortBy, onSort,
+    selectedIds, onToggleSelect, onToggleSelectAll, allSelected, someSelected,
 }: Props) {
+    // Checkbox aktif hanya kalau handler toggle dikirim oleh pemanggil.
+    const selectable = !!onToggleSelect;
     const [localSort, setLocalSort] = useState<{ col: SortKey; dir: "asc" | "desc" } | null>(null);
 
     // Apply local column sorting if selected
@@ -214,6 +227,21 @@ export default function InventoryTable({
             <table className="w-full text-sm border-collapse">
                 <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
+                        {selectable && (
+                            <th className="sticky top-0 z-20 px-3 py-3 bg-gray-50 w-12">
+                                <button
+                                    type="button"
+                                    onClick={onToggleSelectAll}
+                                    className={`w-4 h-4 rounded border-2 flex items-center justify-center transition flex-shrink-0 mx-auto ${allSelected ? "bg-gray-800 border-gray-800" : someSelected ? "bg-gray-300 border-gray-300" : "bg-white border-gray-300 hover:border-gray-400"}`}
+                                >
+                                    {(allSelected || someSelected) && (
+                                        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d={someSelected && !allSelected ? "M5 12h14" : "M5 13l4 4L19 7"} />
+                                        </svg>
+                                    )}
+                                </button>
+                            </th>
+                        )}
                         <Th center>No</Th>
                         <Th sortKey="NAMA" activeSort={sortBy} onSort={onSort}>Nama Laptop</Th>
                         <Th sortKey="CATEGORY" activeSort={sortBy} onSort={onSort}>Kategori</Th>
@@ -246,8 +274,29 @@ export default function InventoryTable({
                         <tr
                             key={row.unit_id ?? row.id}
                             onClick={onRowClick ? () => onRowClick(row) : undefined}
-                            className={`group data-row border-b border-gray-50 last:border-0 hover:bg-gray-50/60 ${onRowClick ? "cursor-pointer" : ""}`}
+                            className={`group data-row border-b border-gray-50 last:border-0 hover:bg-gray-50/60 ${onRowClick ? "cursor-pointer" : ""} ${selectable && (row.unit_id ?? row.id) && selectedIds?.has(row.unit_id ?? row.id) ? "bg-red-50/60" : ""}`}
                         >
+                            {selectable && (
+                                <td className="px-3 py-3.5 text-center w-12" onClick={e => e.stopPropagation()}>
+                                    {(() => {
+                                        const rid = row.unit_id ?? row.id;
+                                        const checked = !!selectedIds?.has(rid);
+                                        return (
+                                            <button
+                                                type="button"
+                                                onClick={() => onToggleSelect?.(rid)}
+                                                className={`w-4 h-4 rounded border-2 flex items-center justify-center transition flex-shrink-0 mx-auto ${checked ? "bg-red-500 border-red-500" : "bg-white border-gray-300 hover:border-gray-400"}`}
+                                            >
+                                                {checked && (
+                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                        );
+                                    })()}
+                                </td>
+                            )}
                             <td className="px-3 py-3.5 text-center w-10">
                                 <span className="text-xs font-semibold text-gray-300 tabular-nums">
                                     {String(idx + 1).padStart(2, "0")}
