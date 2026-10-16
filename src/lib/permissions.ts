@@ -1097,6 +1097,21 @@ export function canViewOvertimePay(role: string): boolean {
      "KEPALA_PENGELOLA_BARANG",
   ];
   return (PAY_VIEW as string[]).includes(role);
+  
+}
+// ─── Lembur Hari Libur: role yang nominalnya BOLEH di-custom admin ──────────
+// Default-nya nominal lembur hari libur terkunci (Tepat waktu / Terlambat,
+// beda untuk PKL). Role di bawah ini DIKECUALIKAN: admin boleh set nominal
+// lembur hari libur mereka secara bebas saat Audit. Tambah role lain di sini
+// kalau ke depan ada divisi lain yang perlu perlakuan sama.
+export const HOLIDAY_OVERTIME_CUSTOM_PAY_ROLES: UserRole[] = [
+  "PENGANTARAN",
+  "PKL_PENGANTARAN",
+];
+
+export function isHolidayOvertimeCustomPayRole(role?: string | null): boolean {
+  if (!role) return false;
+  return (HOLIDAY_OVERTIME_CUSTOM_PAY_ROLES as string[]).includes(role);
 }
 export function canViewSalary(role: string): boolean {
   return (["ADMIN", "ASISTEN_CEO", "PROGRAMMER"] as string[]).includes(role);

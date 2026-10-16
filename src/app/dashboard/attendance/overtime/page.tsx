@@ -12,7 +12,7 @@ import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { OvertimePendingPopup } from "@/components/attendance/OvertimePendingPopup";
 import { OvertimeRecapTable } from "@/components/attendance/OvertimeRecapTable"; // ✅ NEW — rekap bulanan
 import { CameraCapture } from "@/components/attendance/CameraCapture"; // ✅ NEW — kamera realtime, tanpa galeri
-import { isPKLRole } from "@/lib/permissions";
+import { isPKLRole, isHolidayOvertimeCustomPayRole } from "@/lib/permissions";
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -771,6 +771,9 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
 
   const isTargetPkl = isPKLRole(o.users?.role);
   const isHoliday = o.is_holiday === true;
+  // ✅ NEW — Pengantaran & PKL Pengantaran: nominal lembur hari libur boleh di-custom
+  const isCustomHolidayRole = isHolidayOvertimeCustomPayRole(o.users?.role);
+  const holidayEditable = isHoliday && isCustomHolidayRole;
 
   const [lateThreshold, setLateThreshold] = useState<{ h: number; m: number }>({ h: 8, m: 0 });
   useEffect(() => {
@@ -790,16 +793,22 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
   const [payMode, setPayMode] = useState<"PER_JAM" | "TETAP">(isFlatPay ? "TETAP" : "PER_JAM");
   const [rate, setRate] = useState(o.rate_per_hour || 100000);
   const [fixedPay, setFixedPay] = useState(holidayAutoPay ?? (o.total_pay ?? 0));
+  // ✅ NEW — nilai custom lembur hari libur (khusus role yang dikecualikan)
+  const [customHolidayPay, setCustomHolidayPay] = useState<number>(o.total_pay ?? holidayAutoPay ?? 0);
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
 
   // ✅ FIX: mode Per Jam sekarang proporsional per menit, bukan dibulatkan
   // ke bawah per jam penuh (mis. 6j30m bukan cuma dibayar 6 jam).
-  const totalPay = isHoliday ? (holidayAutoPay as number) : (payMode === "PER_JAM" ? Math.round((durationMinutes / 60) * rate) : fixedPay);
-
+  // ✅ CHANGED — kalau role-nya boleh custom, total pakai nilai custom; selain itu tetap terkunci aturan
+  const totalPay = isHoliday
+    ? (holidayEditable ? Math.round(Number(customHolidayPay) || 0) : (holidayAutoPay as number))
+    : (payMode === "PER_JAM" ? Math.round((durationMinutes / 60) * rate) : fixedPay);
   const save = async () => {
     if (!isHoliday) {
       if (payMode === "PER_JAM" && rate < 0) { setError("Tarif harus >= 0"); return; }
       if (payMode === "TETAP" && fixedPay < 0) { setError("Nominal harus >= 0"); return; }
+    } else if (holidayEditable) {
+      if (Number(customHolidayPay) < 0) { setError("Nominal harus >= 0"); return; }
     }
     setSaving(true); setError("");
     try {
@@ -810,8 +819,8 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
           id: o.id,
           action: "AUDIT",
           decision: "APPROVE",
-          total_pay: isHoliday ? holidayAutoPay : totalPay,
-          rate_per_hour: isHoliday ? null : (payMode === "PER_JAM" ? rate : null),
+          // ✅ CHANGED — kirim nominal custom untuk role yang dikecualikan
+          total_pay: isHoliday ? (holidayEditable ? Math.round(Number(customHolidayPay) || 0) : holidayAutoPay) : totalPay, rate_per_hour: isHoliday ? null : (payMode === "PER_JAM" ? rate : null),
         }),
       });
       const d = await res.json();
@@ -827,15 +836,27 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
         {error && <ErrorBanner msg={error} />}
         {/* ✅ NEW — lembur hari libur: tidak ada pilihan mode, langsung kunci ke aturan */}
         {isHoliday ? (
-          <div className={`rounded-xl p-3.5 border ${holidayLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
-            <p className={`text-xs font-bold ${holidayLate ? "text-amber-800" : "text-emerald-800"}`}>
-              Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"} {isTargetPkl ? "(PKL)" : ""}
-            </p>
-            <p className="text-[10px] text-gray-500 mt-1">
-              Aturan tetap sistem ({isTargetPkl ? "PKL" : "Karyawan"}): Tepat waktu = {formatRupiah(isTargetPkl ? 50000 : 100000)} · Terlambat = {formatRupiah(isTargetPkl ? 25000 : 50000)}.
-              Nominal ini terkunci dan tidak bisa diubah manual.
-            </p>
-          </div>
+          holidayEditable ? (
+            // ✅ NEW — role dikecualikan: nominal hari libur BISA di-custom
+            <div className="rounded-xl p-3.5 border bg-indigo-50 border-indigo-200">
+              <p className="text-xs font-bold text-indigo-800">
+                Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"} {isTargetPkl ? "(PKL)" : ""} · Nominal bisa di-custom
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Role {(o.users?.role ?? "").replace(/_/g, " ")} dikecualikan dari nominal tetap — kamu bisa isi bayaran lembur hari libur ini secara bebas di bawah.
+              </p>
+            </div>
+          ) : (
+            <div className={`rounded-xl p-3.5 border ${holidayLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
+              <p className={`text-xs font-bold ${holidayLate ? "text-amber-800" : "text-emerald-800"}`}>
+                Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"} {isTargetPkl ? "(PKL)" : ""}
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Aturan tetap sistem ({isTargetPkl ? "PKL" : "Karyawan"}): Tepat waktu = {formatRupiah(isTargetPkl ? 50000 : 100000)} · Terlambat = {formatRupiah(isTargetPkl ? 25000 : 50000)}.
+                Nominal ini terkunci dan tidak bisa diubah manual.
+              </p>
+            </div>
+          )
         ) : (
           <div className="grid grid-cols-2 gap-2">
             {(["PER_JAM", "TETAP"] as const).map(m => (
@@ -867,14 +888,24 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
                 : <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap · tidak dikali jam</p>}
           </div>
         </div>
-        {!isHoliday && (payMode === "PER_JAM" ? (
+        {/* ✅ NEW — input nominal custom untuk lembur hari libur role dikecualikan */}
+        {holidayEditable && (
           <div>
-            <label className={lbl}>Tarif Per Jam (Rp)</label>
+            <label className={lbl}>Nominal Lembur Hari Libur (Rp)</label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
-              <input type="number" min={0} value={rate} onChange={e => setRate(parseFloat(e.target.value) || 0)} className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all" />
+              <input type="number" min={0} value={customHolidayPay} onChange={e => setCustomHolidayPay(parseFloat(e.target.value) || 0)} placeholder={`Default aturan: ${formatRupiah(holidayAutoPay ?? 0)}`} className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all" />
             </div>
+            <p className="text-[9px] text-gray-400 mt-1">Bebas isi berapa saja. Status {holidayLate ? "Terlambat" : "Tepat waktu"} cuma catatan, tidak mengunci nominal.</p>
           </div>
+        )}
+        {!isHoliday && (payMode === "PER_JAM" ? (<div>
+          <label className={lbl}>Tarif Per Jam (Rp)</label>
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
+            <input type="number" min={0} value={rate} onChange={e => setRate(parseFloat(e.target.value) || 0)} className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all" />
+          </div>
+        </div>
         ) : (
           <div>
             <label className={lbl}>Nominal Tetap (Rp)</label>
@@ -2204,17 +2235,15 @@ export default function OvertimePage() {
                   <button
                     key={tab.key}
                     onClick={() => setUnifiedFilter(tab.key)}
-                    className={`flex-shrink-0 h-9 px-3.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 active:scale-95 ${
-                      active
+                    className={`flex-shrink-0 h-9 px-3.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 active:scale-95 ${active
                         ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
                         : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     {tab.dot && <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tab.dot}`} />}
                     <span>{tab.label}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black tabular-nums transition-colors ${
-                      active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-                    }`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black tabular-nums transition-colors ${active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                      }`}>
                       {count}
                     </span>
                   </button>
