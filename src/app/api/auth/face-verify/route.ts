@@ -96,9 +96,15 @@ export async function POST(request: Request) {
                                  // biar wajah sendiri tidak gampang salah-tolak saat
                                  // cahaya/sudut sedikit beda). Keamanan "tukar wajah"
                                  // TIDAK bergantung angka ini — itu dijaga cross-check (2).
-    // ✅ FIX: margin pembeda SWAP. Akun lain baru dianggap mencurigakan kalau
-    // jaraknya LEBIH DEKAT dari akun sendiri minimal sebesar margin ini.
-    const SWAP_MARGIN = 0.05;
+    // ✅ FIX (false-positive "akun lain"): margin dinaikkan 0.05 → 0.10 supaya
+    // beda tipis karena cahaya/sudut tidak lagi langsung dicap "tukar wajah".
+    const SWAP_MARGIN = 0.10;
+    // ✅ NEW: gate swap HANYA aktif kalau wajah benar-benar match ke akun lain.
+    // Tanpa ini, "tetangga terdekat" yang jaraknya masih jauh (mis. 0.44 — bukan
+    // match) ikut memblokir hanya karena distanceSelf membengkak akibat cahaya.
+    // Match asli antar-orang-sama biasanya < 0.30; 0.42 sudah sangat longgar
+    // untuk memastikan ini beneran orang yang sama, bukan sekadar mirip.
+    const SWAP_CONFIDENT_MATCH = 0.42;
 
      const normInput = normalizeEmbedding(embedding);
     const normStored = normalizeEmbedding(userFullData.face_embedding);
@@ -155,7 +161,14 @@ export async function POST(request: Request) {
     //    akun sendiri ≈ jarak ke akun lain (beda tipis) → LOLOS.
     //  • Orang lain pakai akun ini (swap): wajahnya pasti JAUH lebih cocok ke
     //    akun dia sendiri (≈0) ketimbang ke akun ini → DITOLAK.
-    if (closestOther && closestOther.distance + SWAP_MARGIN < distanceSelf) {
+    // ✅ FIX: tolak swap HANYA jika SEMUA benar:
+    //  (a) akun lain lebih cocok dari akun sendiri minimal sebesar SWAP_MARGIN, DAN
+    //  (b) jarak ke akun lain benar-benar kecil (< SWAP_CONFIDENT_MATCH) → beneran
+    //      match, bukan cuma "tetangga terdekat" yang kebetulan agak mirip.
+    // Dengan (b), kasus cahaya-jelek (distanceSelf membengkak tapi tidak ada akun
+    // lain yang BENERAN match) tidak lagi salah-tolak jadi "wajah akun lain".
+    const otherIsConfidentMatch = !!closestOther && closestOther.distance < SWAP_CONFIDENT_MATCH;
+    if (closestOther && otherIsConfidentMatch && closestOther.distance + SWAP_MARGIN < distanceSelf) {
       console.warn(
         `[face-verify] DITOLAK (swap) — wajah jauh lebih cocok ke ${closestOther.name} (${closestOther.distance.toFixed(3)}) daripada pemilik akun (${distanceSelf.toFixed(3)}). userId=${user.id}`
       );
