@@ -5,6 +5,10 @@ import { hasAnyRole, VIOLATION_MANAGE_ROLES } from "@/lib/permissions";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { getViolationNetBoard, VIOLATION_POINTS } from "@/lib/violation-points";
 
+// 3 jenis pelanggaran tetap — HARUS sinkron dgn VIOLATION_TYPES di page.tsx.
+// Divalidasi di server supaya tidak bisa dibypass lewat API langsung.
+const VIOLATION_TYPES = ["Tempat barang salah", "Kebersihan dan kerapian", "Disiplin kerja"] as const;
+
 function wibNow() {
   return new Date(Date.now() + 7 * 60 * 60 * 1000);
 }
@@ -112,6 +116,9 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   }
   if (!["RINGAN", "SEDANG", "BERAT", "SANGAT_BERAT"].includes(severity)) {
     return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
+  }
+  if (!(VIOLATION_TYPES as readonly string[]).includes(violation_type)) {
+    return NextResponse.json({ success: false, message: "Jenis pelanggaran tidak valid" }, { status: 400 });
   }
 
   const pelaku: string[] = Array.isArray(pelaku_ids) ? pelaku_ids.filter(Boolean) : [];
