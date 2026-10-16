@@ -6,12 +6,21 @@ import { hasAnyRole, SALES_REPORT_AUDIT_ROLES } from "@/lib/permissions";
 export const dynamic = "force-dynamic";
 
 // POST /api/sales-reports/audit  { id: string }
-// Menandai 1 laporan sebagai sudah diaudit. Client sudah menjalankan
-// konfirmasi 2 langkah sebelum memanggil ini — endpoint ini tetap mengecek
-// role di server (defense-in-depth), jadi tidak bisa dibypass dari luar.
+// Menandai 1 laporan sebagai sudah diaudit. Dipakai di 2 tempat:
+//   - Laporan Harian Sales
+//   - Audit Marketing (baris ber-source "sales_report")
+// Client sudah konfirmasi 2 langkah sebelum memanggil ini — endpoint tetap
+// mengecek role di server (defense-in-depth), jadi tidak bisa dibypass dari luar.
 export const POST = withAuth(async (req, _ctx, user) => {
   try {
-    const userRoles: string[] = user.roles?.length > 0 ? user.roles : [user.role];
+    // Guard roles: kalau user.roles kosong/undefined DAN user.role juga undefined,
+    // versi lama menghasilkan [undefined] yang lolos aneh ke hasAnyRole.
+    // filter(Boolean) buang nilai kosong — pola sama dgn getAuthedUser di route lain.
+    const userRoles: string[] =
+      Array.isArray(user.roles) && user.roles.length > 0
+        ? user.roles
+        : [user.role].filter(Boolean);
+
     if (!hasAnyRole(userRoles, SALES_REPORT_AUDIT_ROLES)) {
       return NextResponse.json({ success: false, message: "Tidak punya akses audit" }, { status: 403 });
     }
@@ -51,7 +60,9 @@ export const POST = withAuth(async (req, _ctx, user) => {
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
+    // Jangan bocorkan error.message mentah ke client (bisa ekspos nama
+    // tabel/kolom internal Supabase). Detail tetap masuk ke log PM2.
     console.error("Sales report audit error:", error);
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: "Gagal audit data." }, { status: 500 });
   }
 });

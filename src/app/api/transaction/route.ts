@@ -41,8 +41,7 @@ function applyCompanyFilter(query: any, companyName: string) {
       .not("company_name", "ilike", "%on point%");
   }
   if (q === "onpoint") return query.or("company_name.ilike.%onpoint%,company_name.ilike.%on point%");
-  if (q === "zenit.id") return query.ilike("company_name", "%zenit.id%");
-  if (q === "zenit") return query.ilike("company_name", "%zenit%").not("company_name", "ilike", "%zenit.id%");
+  if (q === "sultop") return query.ilike("company_name", "%sultop%");
   return query.eq("company_name", companyName);
 }
 
