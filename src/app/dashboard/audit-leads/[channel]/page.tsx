@@ -154,7 +154,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
     async function handleAudit(id: string) {
     try {
       const target = rows.find((r) => r.id === id);
-      const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" : "/api/audit-leads/audit";
+const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" : "/api/audit-leads/audit";
       const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
       });
