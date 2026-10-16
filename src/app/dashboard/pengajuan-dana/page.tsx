@@ -92,8 +92,9 @@ function avatarGradient(id: string): string {
   const sum = Math.abs(id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0));
   return AVATAR_GRADIENTS[sum % AVATAR_GRADIENTS.length];
 }
-function avatarInitials(name: string): string {
-  return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+function avatarInitials(name: string | null | undefined): string {
+  if (!name) return "?";
+  return name.split(" ").slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase() || "?";
 }
 function RequesterAvatar({ id, name, size = "w-8 h-8" }: { id: string; name: string; size?: string }) {
   return (
@@ -103,8 +104,9 @@ function RequesterAvatar({ id, name, size = "w-8 h-8" }: { id: string; name: str
   );
 }
 
-function formatRupiah(n: number): string {
-  return "Rp " + n.toLocaleString("id-ID");
+function formatRupiah(n: number | null | undefined): string {
+  const val = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  return "Rp " + val.toLocaleString("id-ID");
 }
 
 function fmtShort(n: number): string {
@@ -115,16 +117,22 @@ function fmtShort(n: number): string {
   return `Rp ${abs}`;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("id-ID", {
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("id-ID", {
     day: "2-digit", month: "short", year: "numeric",
   });
 }
 
 // ⬅️ BARU: format jam saja (HH.MM) — dipakai di kolom Tanggal supaya kelihatan
 // jam input-nya, tanpa mengubah formatDate yang sudah dipakai di tempat lain.
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("id-ID", {
+function formatTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("id-ID", {
     hour: "2-digit", minute: "2-digit",
   });
 }
@@ -1417,12 +1425,12 @@ export default function PengajuanDanaPage() {
       const haystack = [
         r.requester_name,
         r.purpose,
-        String(r.amount),
+        String(r.amount ?? ""),
         formatRupiah(r.amount),
         r.payment_method,
         statusText,
         formatDate(r.created_at),
-      ].join(" ").toLowerCase();
+      ].filter(Boolean).join(" ").toLowerCase();
       if (!haystack.includes(q)) return false;
     }
 
