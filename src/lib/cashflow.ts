@@ -82,6 +82,26 @@ export const MANUAL_EXPENSE_ONLY_CATEGORIES = {
   JASA_SERVICE_OUT: "Jasa Servis",                // 430
 } as const;
 
+// ⬅️ BARU — Kategori Kasbon & Cicilan. Valid di DUA arah (IN & OUT) dan WAJIB
+// punya target_user_id (karyawan pemilik). OUT = memberi kasbon/cicilan,
+// IN = karyawan membayar/menyicil. Ditawarkan di dropdown Uang Masuk & Keluar.
+export const KASBON_CICILAN_CATEGORIES = {
+  KASBON: "Kasbon",
+  CICILAN: "Cicilan",
+} as const;
+
+export function isKasbonCicilanCategory(category: string): boolean {
+  return Object.prototype.hasOwnProperty.call(KASBON_CICILAN_CATEGORIES, category);
+}
+
+/** Minggu ke-berapa dalam bulan dari tanggal "YYYY-MM-DD".
+ *  1–7 = Minggu 1, 8–14 = Minggu 2, …, 29–31 = Minggu 5. */
+export function weekOfMonth(dateStr: string): number {
+  const day = Number(String(dateStr).slice(8, 10));
+  if (!Number.isFinite(day) || day < 1) return 1;
+  return Math.min(5, Math.floor((day - 1) / 7) + 1);
+}
+
 // ── Kategori yang OTOMATIS dari sistem — tidak boleh diinput manual ───────────
 export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"] as const;
 
@@ -91,7 +111,8 @@ export function isManualIncomeCategory(category: string): boolean {
   return (
     Object.prototype.hasOwnProperty.call(CASHFLOW_CATEGORIES, category) ||
     Object.prototype.hasOwnProperty.call(LEGACY_CATEGORY_LABEL, category) ||
-    Object.prototype.hasOwnProperty.call(MANUAL_INCOME_ONLY_CATEGORIES, category)
+    Object.prototype.hasOwnProperty.call(MANUAL_INCOME_ONLY_CATEGORIES, category) ||
+    isKasbonCicilanCategory(category) // ⬅️ BARU: Kasbon/Cicilan boleh input manual sbg Uang Masuk (pembayaran)
   );
 }
 
@@ -104,8 +125,8 @@ export function isManualIncomeCategory(category: string): boolean {
 // Dana otomatis dapat 3 kategori Penjualan Laptop/Aksesoris/Jasa Servis (sisi
 // keluar) tanpa halaman UI-nya perlu diubah sama sekali (asal me-render dari
 // konstanta ini, bukan hardcode sendiri).
-export const INCOME_CATEGORIES = { ...CASHFLOW_CATEGORIES, ...MANUAL_INCOME_ONLY_CATEGORIES };
-export const EXPENSE_CATEGORIES = { ...CASHFLOW_CATEGORIES, ...MANUAL_EXPENSE_ONLY_CATEGORIES };
+export const INCOME_CATEGORIES = { ...CASHFLOW_CATEGORIES, ...MANUAL_INCOME_ONLY_CATEGORIES, ...KASBON_CICILAN_CATEGORIES };
+export const EXPENSE_CATEGORIES = { ...CASHFLOW_CATEGORIES, ...MANUAL_EXPENSE_ONLY_CATEGORIES, ...KASBON_CICILAN_CATEGORIES };
 
 export type IncomeCategory = keyof typeof INCOME_CATEGORIES;
 export type ExpenseCategory = keyof typeof EXPENSE_CATEGORIES; // ⬅️ UPDATE: dulu keyof typeof CASHFLOW_CATEGORIES
@@ -116,6 +137,7 @@ export function categoryLabel(_direction: CashflowDirection, category: string): 
     (CASHFLOW_CATEGORIES as Record<string, string>)[category] ??
     (MANUAL_INCOME_ONLY_CATEGORIES as Record<string, string>)[category] ??
     (MANUAL_EXPENSE_ONLY_CATEGORIES as Record<string, string>)[category] ?? // ⬅️ BARU
+    (KASBON_CICILAN_CATEGORIES as Record<string, string>)[category] ?? // ⬅️ BARU
     AUTO_CATEGORY_LABEL[category] ??
     LEGACY_CATEGORY_LABEL[category] ??
     category
@@ -123,6 +145,8 @@ export function categoryLabel(_direction: CashflowDirection, category: string): 
 }
 
 export function isValidCategory(direction: CashflowDirection, category: string): boolean {
+  // ⬅️ BARU: Kasbon & Cicilan valid di DUA arah (beri = OUT, bayar = IN).
+  if (isKasbonCicilanCategory(category)) return true;
   // 3 kategori Penjualan Laptop/Aksesoris/Service manual cuma valid utk arah IN —
   // supaya tidak bisa "nyasar" jadi kategori di Uang Keluar (Beban).
   if (direction === "IN" && Object.prototype.hasOwnProperty.call(MANUAL_INCOME_ONLY_CATEGORIES, category)) {

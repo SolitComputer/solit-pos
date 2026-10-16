@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { EXPENSE_CATEGORIES } from "@/lib/cashflow";
+import { EXPENSE_CATEGORIES, isKasbonCicilanCategory } from "@/lib/cashflow";
 import { notifyPengajuanDanaResolved } from "@/hooks/usePengajuanDanaNotify";
 import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
@@ -748,14 +748,19 @@ function RealisasiModal({
 }) {
   const isEdit = !!fundRequest.realisasi_cashflow_id;
   const categories = Object.entries(EXPENSE_CATEGORIES);
-  type RealisasiItem = { category: string; nominal: string };
+  type RealisasiItem = { category: string; nominal: string; target_user_id: string };
   const [items, setItems] = useState<RealisasiItem[]>([
-    { category: categories[0]?.[0] ?? "", nominal: fundRequest.realisasi_nominal ? String(fundRequest.realisasi_nominal) : "" },
+    { category: categories[0]?.[0] ?? "", nominal: fundRequest.realisasi_nominal ? String(fundRequest.realisasi_nominal) : "", target_user_id: "" },
   ]);
-  const addItem = () => setItems((prev) => [...prev, { category: categories[0]?.[0] ?? "", nominal: "" }]);
+  const addItem = () => setItems((prev) => [...prev, { category: categories[0]?.[0] ?? "", nominal: "", target_user_id: "" }]);
   const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
   const updateItem = (idx: number, patch: Partial<RealisasiItem>) =>
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  // ⬅️ BARU: daftar karyawan utk "Untuk Karyawan" per baris Kasbon/Cicilan
+  const [targetUsers, setTargetUsers] = useState<{ id: string; name: string; role: string }[]>([]);
+  useEffect(() => {
+    fetch("/api/cashflow/users").then((r) => r.json()).then((d) => { if (d.success) setTargetUsers(d.data || []); }).catch(() => {});
+  }, []);
   const [keterangan, setKeterangan] = useState(fundRequest.purpose);
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(fundRequest.payment_method);
@@ -773,6 +778,10 @@ function RealisasiModal({
   const submit = async () => {
     if (items.some((it) => !it.nominal || !Number.isFinite(Number(it.nominal)) || Number(it.nominal) <= 0)) {
       setError("Nominal setiap kategori harus lebih dari 0");
+      return;
+    }
+    if (items.some((it) => isKasbonCicilanCategory(it.category) && !it.target_user_id)) {
+      setError("Pilih karyawan dulu untuk baris Kasbon/Cicilan");
       return;
     }
     setSaving(true); setError("");
@@ -796,7 +805,11 @@ function RealisasiModal({
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: items.map((it) => ({ category: it.category, nominal: Number(it.nominal) })),
+          items: items.map((it) => ({
+            category: it.category,
+            nominal: Number(it.nominal),
+            target_user_id: isKasbonCicilanCategory(it.category) ? it.target_user_id : null, // ⬅️ BARU
+          })),
           keterangan: keterangan.trim() || fundRequest.purpose,
           tanggal,
           payment_method: paymentMethod,
@@ -850,15 +863,29 @@ function RealisasiModal({
             </div>
             <div className="space-y-2">
               {items.map((it, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-slate-200 text-[10px] font-bold text-slate-400">{idx + 1}</span>
-                  <select value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} className={`${inputCls} bg-white flex-1 min-w-0`}>
-                    {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                  </select>
-                  <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right`} autoFocus={idx === 0} />
-                  <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className={`shrink-0 w-8 h-8 rounded-xl text-slate-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none ${FOCUS_RING}`}>
-                    <X className="w-4 h-4" />
-                  </button>
+                <div key={idx} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-slate-200 text-[10px] font-bold text-slate-400">{idx + 1}</span>
+                    <select value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} className={`${inputCls} bg-white flex-1 min-w-0`}>
+                      {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                    </select>
+                    <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right`} autoFocus={idx === 0} />
+                    <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className={`shrink-0 w-8 h-8 rounded-xl text-slate-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none ${FOCUS_RING}`}>
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {/* ⬅️ BARU: pilih karyawan utk baris Kasbon/Cicilan */}
+                  {isKasbonCicilanCategory(it.category) && (
+                    <div className="flex items-center gap-2 pl-7">
+                      <span className="text-[10px] font-bold text-teal-600 shrink-0">Untuk:</span>
+                      <select value={it.target_user_id} onChange={(e) => updateItem(idx, { target_user_id: e.target.value })} className={`${inputCls} bg-white flex-1 min-w-0`}>
+                        <option value="">— Pilih karyawan —</option>
+                        {targetUsers.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}{u.role ? ` — ${u.role.replace(/_/g, " ")}` : ""}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

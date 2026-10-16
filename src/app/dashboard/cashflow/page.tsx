@@ -22,9 +22,11 @@ import {
     activeFilterCount,
     applyFilters,
     getEntryDisplayNama, // ⬅️ BARU
+    isKasbonCicilanCategory, // ⬅️ BARU
     CASHFLOW_START_DATE,
 } from "@/lib/cashflow";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import TargetUserSelect from "@/components/kasbon/TargetUserSelect"; // ⬅️ BARU
 import {
     ShoppingCart,
     Wrench,
@@ -1135,6 +1137,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
     const updateItem = (idx: number, patch: Partial<ExpenseItem>) =>
         setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+    const [targetUserId, setTargetUserId] = useState(""); // ⬅️ BARU: karyawan pemilik Kasbon/Cicilan
     const [keterangan, setKeterangan] = useState("");
     const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
     const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
@@ -1152,6 +1155,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     // Entry BARU tetap wajib > 0 (buat entry senilai 0 tidak ada gunanya)
     const submit = async () => {
         if (items.some((it) => !it.nominal || Number(it.nominal) <= 0)) return setError("Nominal setiap kategori harus lebih dari 0");
+        if (items.some((it) => isKasbonCicilanCategory(it.category)) && !targetUserId) return setError("Pilih karyawan dulu untuk Kasbon/Cicilan");
         setSaving(true); setError("");
         try {
             let photoUrl: string | null = null;
@@ -1171,7 +1175,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             for (const it of items) {
                 const res = await fetch("/api/cashflow", {
                     method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ direction: "OUT", category: it.category, nominal: Number(it.nominal), keterangan: keterangan.trim() || null, tanggal, payment_method: paymentMethod, photo_url: photoUrl }),
+                    body: JSON.stringify({ direction: "OUT", category: it.category, nominal: Number(it.nominal), keterangan: keterangan.trim() || null, tanggal, payment_method: paymentMethod, photo_url: photoUrl, target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null }),
                 });
                 const json = await res.json();
                 if (!json.success) return setError(json.message || "Gagal menyimpan");
@@ -1238,6 +1242,9 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                             </div>
                         )}
                     </div>
+                    {items.some((it) => isKasbonCicilanCategory(it.category)) && (
+                        <TargetUserSelect value={targetUserId} onChange={setTargetUserId} selectClassName={inputCls} />
+                    )}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
                         <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
@@ -1554,6 +1561,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
     const updateItem = (idx: number, patch: Partial<IncomeItem>) =>
         setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+    const [targetUserId, setTargetUserId] = useState(""); // ⬅️ BARU: karyawan pemilik Kasbon/Cicilan
     const [keterangan, setKeterangan] = useState("");
     // ⬅️ FIX: pakai tanggal WIB (dulu toISOString() = UTC, salah hari kalau input sebelum jam 07.00 WIB)
     const [tanggal, setTanggal] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }));
@@ -1572,6 +1580,8 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     const submit = async () => {
         if (items.some((it) => !it.nominal || !Number.isFinite(Number(it.nominal)) || Number(it.nominal) <= 0))
             return setError("Nominal setiap kategori harus lebih dari 0");
+        if (items.some((it) => isKasbonCicilanCategory(it.category)) && !targetUserId)
+            return setError("Pilih karyawan dulu untuk Kasbon/Cicilan");
         setSaving(true); setError("");
         let savedCount = 0;
         // Baris yang sudah tersimpan dibuang dari form supaya klik "Simpan" ulang tidak menyimpan dobel
@@ -1607,6 +1617,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                         tanggal,
                         payment_method: paymentMethod,
                         photo_url: photoUrl,
+                        target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null, // ⬅️ BARU
                     }),
                 });
                 const json = await res.json();
@@ -1683,6 +1694,9 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                             </div>
                         )}
                     </div>
+                    {items.some((it) => isKasbonCicilanCategory(it.category)) && (
+                        <TargetUserSelect value={targetUserId} onChange={setTargetUserId} selectClassName={inputCls} />
+                    )}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
                         <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />

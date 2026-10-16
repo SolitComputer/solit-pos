@@ -434,7 +434,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // Minus Siap Jual — ditulis literal (bukan spread) karena
   // LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES didefinisikan SETELAH ROUTE_PERMISSIONS.
   // HARUS disamakan manual dengan konstanta itu kalau daftar role diubah.
-  "/dashboard/laptops/minus-siap-jual": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES"],  "/dashboard/laptops/monitoring": [
+  "/dashboard/laptops/minus-siap-jual": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES"], "/dashboard/laptops/monitoring": [
     ...FULL_ACCESS, "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
   ],
   // Riwayat SO gabungan (lintas semua laptop). Sengaja ditulis literal, BUKAN
@@ -587,6 +587,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
     "KEPALA_PENGELOLA_BARANG",
   ], "/api/attendance/users": [...ALL_ROLES],
+  "/api/attendance/kasbon-cicilan": [...FULL_ACCESS, "ACCOUNTING"], // ⬅️ BARU: Admin, Programmer, Asisten CEO, Accounting
 
   "/api/attendance/overtime": [...ALL_ROLES],
   "/api/attendance/overtime/rates": [
@@ -694,7 +695,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // saudaranya di atas untuk defense-in-depth.f
   "/api/admin/roles": [...ROLE_ACCESS_MANAGER_ROLES],
 
-   "/dashboard/sop-divisi": [...ALL_ROLES],
+  "/dashboard/sop-divisi": [...ALL_ROLES],
   "/api/sop": [...ALL_ROLES],
 
   "/dashboard/profile": [...ALL_ROLES],
@@ -1109,10 +1110,10 @@ export function canViewOvertimePay(role: string): boolean {
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
     "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_PENYEDIA_BARANG", "KEPALA_ONPOINT", "KEPALA_SOTECH",
-     "KEPALA_PENGELOLA_BARANG",
+    "KEPALA_PENGELOLA_BARANG",
   ];
   return (PAY_VIEW as string[]).includes(role);
-  
+
 }
 // ─── Lembur Hari Libur: role yang nominalnya BOLEH di-custom admin ──────────
 // Default-nya nominal lembur hari libur terkunci (Tepat waktu / Terlambat,
@@ -1289,10 +1290,10 @@ export const CONDITION_CHECK_EDITOR_USER_IDS: string[] = [
   "7594367d-b27b-49a8-a427-5ecb7fa2d21f",
   "20c4df76-db02-4e36-977b-27b76c7fa803",
 ];
-export const CONDITION_CHECK_EDITOR_ROLES: UserRole[] = ["ADMIN", "PKL_PENGELOLA_BARANG", "PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG"]; 
+export const CONDITION_CHECK_EDITOR_ROLES: UserRole[] = ["ADMIN", "PKL_PENGELOLA_BARANG", "PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG"];
 
 export function canEditConditionChecks(
-  userId: string | null | undefined, 
+  userId: string | null | undefined,
   userRoles: string[]
 ): boolean {
   if (hasAnyRole(userRoles, CONDITION_CHECK_EDITOR_ROLES)) return true;

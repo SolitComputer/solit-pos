@@ -189,6 +189,12 @@ function canViewSalary(role?: string): boolean {
     return !!role && (SALARY_ACCESS_ROLES as readonly string[]).includes(role);
 }
 
+// ⬅️ BARU — akses tab Kasbon & Cicilan (Admin, Programmer, Asisten CEO, Accounting)
+const KASBON_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"] as const;
+function canAccessKasbon(role?: string): boolean {
+    return !!role && (KASBON_ACCESS_ROLES as readonly string[]).includes(role);
+}
+
 // Multi-role aware: baca dari currentUser.role ATAU currentUser.roles[]
 function getUserRoles(user: any): string[] {
     if (!user) return [];
@@ -200,6 +206,9 @@ function userIsAdmin(user: any): boolean {
 }
 function userCanViewSalary(user: any): boolean {
     return getUserRoles(user).some(r => canViewSalary(r));
+}
+function userCanAccessKasbon(user: any): boolean {
+    return getUserRoles(user).some(r => canAccessKasbon(r));
 }
 function userIsPKL(user: any): boolean {
     return getUserRoles(user).some(r => isPKLRole(r));
@@ -3359,8 +3368,191 @@ function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSa
     );
 }
 
+// ⬅️ BARU — Tab Kasbon & Cicilan
+function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpening }: {
+    data: any[];
+    loading: boolean;
+    calYear: number;
+    calMonth: number;
+    isAdmin: boolean;
+    onEditOpening: (u: { userId: string; userName: string; kasbon: number; cicilan: number }) => void;
+}) {
+    const cell = (n: number, color = "text-gray-700") =>
+        n && n !== 0
+            ? <span className={`font-mono font-semibold ${color}`}>{formatRupiah(n)}</span>
+            : <span className="text-gray-200 font-bold">—</span>;
+
+    const totals = useMemo(() => data.reduce((acc, r) => {
+        acc.totalKasbon += r.total_kasbon || 0;
+        acc.totalCicilan += r.total_cicilan || 0;
+        acc.sisaKasbon += r.sisa_kasbon || 0;
+        acc.sisaCicilan += r.sisa_cicilan || 0;
+        return acc;
+    }, { totalKasbon: 0, totalCicilan: 0, sisaKasbon: 0, sisaCicilan: 0 }), [data]);
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                <p className="text-base font-bold text-gray-800">Kasbon & Cicilan — {MONTH_NAMES[calMonth]} {calYear}</p>
+                <p className="text-[10px] text-gray-400 mt-1">
+                    Kasbon dipecah per minggu · Cicilan langsung ke total ·
+                    <span className="text-blue-500 font-semibold"> Sisa = Total − Dibayar</span>
+                </p>
+            </div>
+
+            {loading ? (
+                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[1200px]">
+                        <thead>
+                            <tr className="border-b border-gray-100 bg-gray-50/60">
+                                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">#</th>
+                                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Nama</th>
+                                <th className="px-3 py-3 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Kasbon Sebelumnya</th>
+                                <th className="px-3 py-3 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Cicilan Sebelumnya</th>
+                                {[1, 2, 3, 4, 5].map(w => (
+                                    <th key={w} className="px-3 py-3 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Minggu {w}</th>
+                                ))}
+                                <th className="px-3 py-3 text-right text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Kasbon</th>
+                                <th className="px-3 py-3 text-right text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Cicilan</th>
+                                <th className="px-3 py-3 text-right text-[10px] font-black text-blue-600 uppercase tracking-widest">Kasbon Dibayar</th>
+                                <th className="px-3 py-3 text-right text-[10px] font-black text-blue-600 uppercase tracking-widest">Cicilan Dibayar</th>
+                                <th className="px-3 py-3 text-right text-[10px] font-black text-red-600 uppercase tracking-widest">Sisa Kasbon</th>
+                                <th className="px-3 py-3 text-right text-[10px] font-black text-red-600 uppercase tracking-widest">Sisa Cicilan</th>
+                                {isAdmin && <th className="px-4 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldo Awal</th>}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {data.length === 0 ? (
+                                <tr><td colSpan={isAdmin ? 16 : 15} className="py-12 text-center text-sm text-gray-400">Belum ada data</td></tr>
+                            ) : data.map((r, i) => (
+                                <tr key={r.user_id} className="hover:bg-gray-50/60 transition-colors">
+                                    <td className="px-4 py-3 text-[11px] text-gray-400 font-black">{i + 1}</td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">{initials(r.name)}</div>
+                                            <div>
+                                                <p className="font-bold text-gray-800 text-sm leading-tight">{r.name}</p>
+                                                <p className="text-[10px] text-gray-400">{(r.role || "").replace(/_/g, " ")}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-3 py-3 text-right">{cell(r.kasbon_sebelumnya)}</td>
+                                    <td className="px-3 py-3 text-right">{cell(r.cicilan_sebelumnya)}</td>
+                                    {(r.minggu ?? [0, 0, 0, 0, 0]).map((w: number, idx: number) => (
+                                        <td key={idx} className="px-3 py-3 text-right">{cell(w)}</td>
+                                    ))}
+                                    <td className="px-3 py-3 text-right">{cell(r.total_kasbon, "text-emerald-700")}</td>
+                                    <td className="px-3 py-3 text-right">{cell(r.total_cicilan, "text-emerald-700")}</td>
+                                    <td className="px-3 py-3 text-right">{cell(r.kasbon_dibayar, "text-blue-600")}</td>
+                                    <td className="px-3 py-3 text-right">{cell(r.cicilan_dibayar, "text-blue-600")}</td>
+                                    <td className="px-3 py-3 text-right">{cell(r.sisa_kasbon, "text-red-600")}</td>
+                                    <td className="px-3 py-3 text-right">{cell(r.sisa_cicilan, "text-red-600")}</td>
+                                    {isAdmin && (
+                                        <td className="px-4 py-3 text-center">
+                                            <button
+                                                onClick={() => onEditOpening({ userId: r.user_id, userName: r.name, kasbon: r.kasbon_opening ?? 0, cicilan: r.cicilan_opening ?? 0 })}
+                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-all whitespace-nowrap"
+                                                title="Atur saldo awal kasbon/cicilan">
+                                                Atur
+                                            </button>
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                        </tbody>
+                        {data.length > 0 && (
+                            <tfoot>
+                                <tr className="border-t-2 border-gray-200 bg-gray-50/60">
+                                    <td colSpan={9} className="px-4 py-3 text-sm font-black text-gray-700">TOTAL</td>
+                                    <td className="px-3 py-3 text-right"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalKasbon)}</span></td>
+                                    <td className="px-3 py-3 text-right"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalCicilan)}</span></td>
+                                    <td colSpan={2}></td>
+                                    <td className="px-3 py-3 text-right"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaKasbon)}</span></td>
+                                    <td className="px-3 py-3 text-right"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaCicilan)}</span></td>
+                                    {isAdmin && <td></td>}
+                                </tr>
+                            </tfoot>
+                        )}
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ⬅️ BARU — modal atur saldo awal kasbon/cicilan per karyawan
+function SaldoAwalModal({ userId, userName, kasbon, cicilan, onClose, onSaved }: {
+    userId: string; userName: string; kasbon: number; cicilan: number;
+    onClose: () => void; onSaved: () => void;
+}) {
+    const [k, setK] = useState(String(kasbon ?? 0));
+    const [c, setC] = useState(String(cicilan ?? 0));
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const save = async () => {
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/attendance/kasbon-cicilan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userId,
+                    kasbon_opening: parseInt(k || "0", 10) || 0,
+                    cicilan_opening: parseInt(c || "0", 10) || 0,
+                }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+            onSaved();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-5 flex items-start justify-between">
+                    <div>
+                        <p className="font-bold text-white text-base">Saldo Awal Kasbon & Cicilan</p>
+                        <p className="text-xs text-white/70 mt-1">{userName}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-[11px] text-amber-700">
+                        Saldo awal = sisa utang kasbon/cicilan yang <strong>sudah ada sebelum</strong> dicatat di sistem. Carryover bulan berikutnya dihitung otomatis dari transaksi di atas angka ini.
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Saldo Awal Kasbon (Rp)</label>
+                        <input type="number" min={0} value={k} onChange={e => setK(e.target.value)} placeholder="0"
+                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400/20 font-mono" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Saldo Awal Cicilan (Rp)</label>
+                        <input type="number" min={0} value={c} onChange={e => setC(e.target.value)} placeholder="0"
+                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400/20 font-mono" />
+                    </div>
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
+                    <button onClick={save} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "Simpan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function AttendanceDashboardPage() {
-    const router = useRouter();
+        const router = useRouter();
     const searchParams = useSearchParams();
     const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(() => {
         if (typeof window === "undefined") return null;
@@ -3392,9 +3584,9 @@ export default function AttendanceDashboardPage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [todayStatus, setTodayStatus] = useState<any>(null);
     const [statusLoading, setStatusLoading] = useState(false);
-    type ActiveTab = "calendar" | "summary" | "salary" | "salary-pkl" | "salary-slip" | "salary-history" | "leave" | "my-salary" | "my-slip";
+    type ActiveTab = "calendar" | "summary" | "kasbon-cicilan" | "salary" | "salary-pkl" | "salary-slip" | "salary-history" | "leave" | "my-salary" | "my-slip";
 
-    const VALID_TABS: ActiveTab[] = ["calendar", "summary", "salary", "salary-pkl", "salary-slip", "salary-history", "leave", "my-salary", "my-slip"];
+    const VALID_TABS: ActiveTab[] = ["calendar", "summary", "kasbon-cicilan", "salary", "salary-pkl", "salary-slip", "salary-history", "leave", "my-salary", "my-slip"];
 
     const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
         const tabFromUrl = searchParams.get("tab");
@@ -3670,6 +3862,24 @@ export default function AttendanceDashboardPage() {
     const [mySlips, setMySlips] = useState<SalarySlip[]>([]);
     const [mySlipsLoading, setMySlipsLoading] = useState(false);
 
+    // ⬅️ BARU — tab Kasbon & Cicilan
+    const [kasbonData, setKasbonData] = useState<any[]>([]);
+    const [kasbonLoading, setKasbonLoading] = useState(false);
+    const [editOpeningUser, setEditOpeningUser] = useState<{ userId: string; userName: string; kasbon: number; cicilan: number } | null>(null);
+
+    const fetchKasbonCicilan = useCallback(async (y: number, m: number) => {
+        setKasbonLoading(true);
+        try {
+            const r = await fetch(`/api/attendance/kasbon-cicilan?year=${y}&month=${m + 1}`);
+            const d = await r.json();
+            if (d.success) setKasbonData(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch kasbon-cicilan:", err);
+        } finally {
+            setKasbonLoading(false);
+        }
+    }, []);
+
     const fetchMySlips = useCallback(async () => {
         setMySlipsLoading(true);
         try {
@@ -3809,6 +4019,13 @@ export default function AttendanceDashboardPage() {
         }
     }, [selectedSlipMonth, currentUser, fetchSalarySlips]);
 
+    // ⬅️ BARU — muat data Kasbon & Cicilan saat tab aktif / ganti bulan
+    useEffect(() => {
+        if (activeTab === "kasbon-cicilan" && userCanAccessKasbon(currentUser) && selectedMonth) {
+            fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
+        }
+    }, [activeTab, selectedMonth, currentUser, fetchKasbonCicilan]);
+
     const openAddManual = useCallback(async (date?: string, userId?: string) => {
         setEditManualData(null);
         setManualPrefillDate(date ?? selectedDate);
@@ -3878,7 +4095,7 @@ export default function AttendanceDashboardPage() {
         });
         return m;
     }, [allDateOffs, allUsers, currentUser]);
-    
+
     const dateWorkByName = useMemo(() => {
         const m: Record<string, Set<string>> = {};
         allDateWorks.forEach(d => {
@@ -5009,6 +5226,7 @@ export default function AttendanceDashboardPage() {
     const isAdmin = userIsAdmin(currentUser);
     const canManage = isAdmin || getEffectiveSubordinates(userRoles).length > 0;
     const canSalary = userCanViewSalary(currentUser);
+    const canKasbon = userCanAccessKasbon(currentUser);
 
     if (!selectedMonth) return (
         <DashboardLayout>
@@ -5162,6 +5380,7 @@ export default function AttendanceDashboardPage() {
                             { id: "calendar", label: "Kalender" },
                         ];
                         if (canManage) tabs.push({ id: "summary", label: "Ringkasan" });
+                        if (canKasbon) tabs.push({ id: "kasbon-cicilan", label: "Kasbon & Cicilan" });
                         if (canSalary) {
                             tabs.push({ id: "salary", label: "Rekap Gaji" });
                             tabs.push({ id: "salary-pkl", label: "Gaji PKL" });
@@ -6042,6 +6261,18 @@ export default function AttendanceDashboardPage() {
                             <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
                         </div>
                     </div>
+                )}
+
+                {/* ════ TAB KASBON & CICILAN ════ */}
+                {activeTab === "kasbon-cicilan" && canKasbon && (
+                    <KasbonCicilanTab
+                        data={kasbonData}
+                        loading={kasbonLoading}
+                        calYear={calYear}
+                        calMonth={calMonth}
+                        isAdmin={isAdmin}
+                        onEditOpening={(u) => setEditOpeningUser(u)}
+                    />
                 )}
 
                 {/* ════ TAB GAJI ════ */}
@@ -7619,6 +7850,20 @@ export default function AttendanceDashboardPage() {
                     dates={pendingDetail.dates}
                     monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
                     onClose={() => setPendingDetail(null)}
+                />
+            )}
+
+            {editOpeningUser && canKasbon && (
+                <SaldoAwalModal
+                    userId={editOpeningUser.userId}
+                    userName={editOpeningUser.userName}
+                    kasbon={editOpeningUser.kasbon}
+                    cicilan={editOpeningUser.cicilan}
+                    onClose={() => setEditOpeningUser(null)}
+                    onSaved={() => {
+                        if (selectedMonth) fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
+                        setEditOpeningUser(null);
+                    }}
                 />
             )}
 

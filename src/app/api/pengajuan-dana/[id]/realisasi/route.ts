@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { FUND_EXECUTOR_IDS } from "@/lib/fundConfig";
-import { isValidCategory } from "@/lib/cashflow";
+import { isValidCategory, isKasbonCicilanCategory } from "@/lib/cashflow";
 
 // ⬅️ BARU: role yang boleh membatalkan realisasi — Admin + Purchasing (biasanya
 // juga yang mengeksekusi & mengisi realisasi pengajuan dana).
@@ -45,7 +45,8 @@ export async function POST(
         tanggal?: string;
         payment_method?: string;
         photo_url?: string | null;
-        items?: { category: string; nominal: number | string }[]; // ⬅️ BARU: multi-kategori
+        items?: { category: string; nominal: number | string; target_user_id?: string | null }[]; // ⬅️ BARU
+        target_user_id?: string | null; // ⬅️ BARU: fallback target
     };
     try {
         body = await request.json();
@@ -59,16 +60,16 @@ export async function POST(
     // bisa nambah berapa pun baris Kategori+Nominal. Tetap backward-compatible:
     // kalau client lama masih kirim body lama (category/nominal tunggal tanpa
     // items), otomatis dibungkus jadi array isi 1 item.
-    type RealisasiItem = { category: string; nominal: number };
+    type RealisasiItem = { category: string; nominal: number; target_user_id: string | null };
 
-    const rawItems: { category?: string; nominal?: number | string }[] =
+    const rawItems: { category?: string; nominal?: number | string; target_user_id?: string | null }[] =
         Array.isArray(body.items) && body.items.length > 0
             ? body.items
-            : [{ category: body.category, nominal: body.nominal }];
+            : [{ category: body.category, nominal: body.nominal, target_user_id: body.target_user_id }];
 
-    // Gabungkan kategori kembar (jumlahkan nominalnya) supaya tidak melanggar
-    // unique index uniq_cashflow_source (source_type, source_id, category).
-    const merged = new Map<string, number>();
+    // Gabungkan per kategori + karyawan. Kasbon/Cicilan milik karyawan berbeda
+    // TIDAK digabung jadi satu baris.
+    const merged = new Map<string, RealisasiItem>();
     for (const it of rawItems) {
         const nom = Math.round(Number(it.nominal));
         if (!Number.isFinite(nom) || nom <= 0) {
@@ -77,10 +78,35 @@ export async function POST(
         if (!it.category || !isValidCategory("OUT", it.category)) {
             return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
         }
-        merged.set(it.category, (merged.get(it.category) ?? 0) + nom);
+        // Target hanya relevan utk Kasbon/Cicilan; kategori lain selalu null.
+        const target = isKasbonCicilanCategory(it.category)
+            ? ((it.target_user_id || body.target_user_id) ?? null)
+            : null;
+        if (isKasbonCicilanCategory(it.category) && !target) {
+            return NextResponse.json({ success: false, message: "Pilih karyawan dulu untuk baris Kasbon/Cicilan" }, { status: 400 });
+        }
+        const key = `${it.category}|${target ?? ""}`;
+        const prev = merged.get(key);
+        if (prev) prev.nominal += nom;
+        else merged.set(key, { category: it.category, nominal: nom, target_user_id: target });
     }
 
-    const items: RealisasiItem[] = Array.from(merged, ([category, nominal]) => ({ category, nominal }));
+    const items: RealisasiItem[] = Array.from(merged.values());
+
+    // ⬅️ Guard: unique index uniq_cashflow_source (source_type, source_id, category)
+    // cuma izinkan 1 baris per kategori per pengajuan — jadi 1 kategori tidak boleh
+    // dipakai utk 2 karyawan berbeda dalam SATU pengajuan dana.
+    const catSeen = new Set<string>();
+    for (const it of items) {
+        if (catSeen.has(it.category)) {
+            return NextResponse.json(
+                { success: false, message: `Kategori "${it.category}" dipakai untuk lebih dari satu karyawan dalam satu pengajuan. Pisahkan jadi pengajuan terpisah.` },
+                { status: 400 }
+            );
+        }
+        catSeen.add(it.category);
+    }
+
     const totalNominal = items.reduce((sum, it) => sum + it.nominal, 0);
     const pm = payment_method === "SALDO" ? "SALDO" : "CASH";
 
@@ -138,6 +164,7 @@ export async function POST(
                 source_id: id,
                 payment_method: pm,
                 photo_url: photo_url ?? null,
+                target_user_id: it.target_user_id, // ⬅️ BARU
                 created_by: userId,
                 is_audited: false,
             }))

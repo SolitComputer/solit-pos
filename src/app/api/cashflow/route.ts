@@ -8,6 +8,7 @@ import {
     isValidCategory,
     isModalAwalActive,
     isManualIncomeCategory,
+    isKasbonCicilanCategory, // ⬅️ BARU
     formatTxPaymentMethod,
 } from "@/lib/cashflow";
 import { fetchAllRows } from "@/lib/supabaseFetch";
@@ -1011,6 +1012,11 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     if (!Number.isFinite(nom) || nom <= 0)
         return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
 
+    // ⬅️ BARU: Kasbon & Cicilan wajib menunjuk karyawan pemilik (berlaku utk IN & OUT)
+    const targetUserId = (body.target_user_id as string | undefined) || null;
+    if (isKasbonCicilanCategory(category) && !targetUserId)
+        return NextResponse.json({ success: false, message: "Pilih karyawan dulu untuk Kasbon/Cicilan" }, { status: 400 });
+
     const supabase = getAdmin();
     const userName = (user?.name && String(user.name).trim()) || "—";
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
@@ -1100,6 +1106,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
                 source_type: "MANUAL",
                 payment_method: pm,
                 photo_url: (body.photo_url as string | undefined) ?? null, // ⬅️ BARU: foto bukti Uang Masuk
+                target_user_id: isKasbonCicilanCategory(category) ? targetUserId : null, // ⬅️ BARU
                 created_by: user.id,
             })
             .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)
@@ -1142,6 +1149,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
             source_type: "MANUAL",
             payment_method: pm,
             photo_url: photoUrl,
+            target_user_id: isKasbonCicilanCategory(category) ? targetUserId : null, // ⬅️ BARU
             created_by: user.id,
         })
         .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)
