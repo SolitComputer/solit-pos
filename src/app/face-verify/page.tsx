@@ -19,6 +19,16 @@ const AUTO_CAPTURE_CONFIDENCE = 0.75;
 const HOLD_FRAMES = 3;
 const DETECTION_INPUT_SIZE = 224;
 
+// ✅ NEW — ambang kualitas gambar sebelum boleh auto-capture.
+// Brightness rata-rata 0–255; di bawah MIN = terlalu gelap, di atas MAX = silau/overexposed.
+const MIN_BRIGHTNESS = 55;      // di bawah ini → minta cari tempat lebih terang
+const MAX_BRIGHTNESS = 235;     // di atas ini → terlalu silau/backlight
+// Ketajaman (variance Laplacian). Makin kecil makin blur. Nilai ini empiris
+// untuk video 640×480; turunkan kalau device bagus sering kena "blur".
+const MIN_SHARPNESS = 12;
+// Berapa frame berturut-turut gambar harus "bagus" sebelum auto-capture jalan.
+const QUALITY_HOLD_FRAMES = 2;
+
 const COMPANY_LAT = -6.402123;
 const COMPANY_LNG = 106.787296;
 const MAX_DISTANCE_METERS = 80;
@@ -36,6 +46,53 @@ type ShiftType = keyof typeof SHIFT_CONFIG_CLIENT;
 
 function ts() {
   return new Date().toLocaleTimeString("id-ID", { hour12: false });
+}
+
+// ✅ NEW — analisis kualitas frame kamera (brightness + ketajaman) langsung di
+// browser, TANPA kirim gambar ke mana pun. Menggambar video ke canvas kecil
+// (sampling) lalu menghitung rata-rata luminance & variance Laplacian.
+type FrameQuality = { ok: boolean; brightness: number; sharpness: number; reason: "DARK" | "BRIGHT" | "BLUR" | "OK" };
+function analyzeFrameQuality(
+  video: HTMLVideoElement,
+  work: HTMLCanvasElement
+): FrameQuality | null {
+  const W = 160, H = 120; // kecil = cepat, cukup untuk estimasi kualitas
+  if (video.videoWidth === 0) return null;
+  work.width = W; work.height = H;
+  const ctx = work.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(video, 0, 0, W, H);
+  const { data } = ctx.getImageData(0, 0, W, H);
+
+  // Luminance grayscale per pixel
+  const gray = new Float32Array(W * H);
+  let sum = 0;
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    gray[p] = lum;
+    sum += lum;
+  }
+  const brightness = sum / (W * H);
+
+  // Ketajaman: variance dari Laplacian 4-tetangga (makin besar makin tajam)
+  let lapSum = 0, lapSqSum = 0, n = 0;
+  for (let y = 1; y < H - 1; y++) {
+    for (let x = 1; x < W - 1; x++) {
+      const idx = y * W + x;
+      const lap = 4 * gray[idx] - gray[idx - 1] - gray[idx + 1] - gray[idx - W] - gray[idx + W];
+      lapSum += lap; lapSqSum += lap * lap; n++;
+    }
+  }
+  const mean = lapSum / n;
+  const sharpness = lapSqSum / n - mean * mean; // variance
+
+  let reason: FrameQuality["reason"] = "OK";
+  let ok = true;
+  if (brightness < MIN_BRIGHTNESS) { ok = false; reason = "DARK"; }
+  else if (brightness > MAX_BRIGHTNESS) { ok = false; reason = "BRIGHT"; }
+  else if (sharpness < MIN_SHARPNESS) { ok = false; reason = "BLUR"; }
+
+  return { ok, brightness, sharpness, reason };
 }
 
 function detectOS(): "android" | "ios" | "other" {
@@ -429,6 +486,8 @@ export default function FaceVerifyPage() {
   const holdCountRef = useRef(0);
   const isCapturingRef = useRef(false);
   const isDetectingRef = useRef(false);
+  const qualityOkCountRef = useRef(0); // ✅ NEW — berapa frame berturut gambar "bagus"
+  const qualityCanvasRef = useRef<HTMLCanvasElement | null>(null); // ✅ NEW — canvas kerja analisis
   const detectionErrLoggedRef = useRef(false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -440,6 +499,8 @@ export default function FaceVerifyPage() {
   const [faceDetected, setFaceDetected] = useState(false);
   const [confidence, setConfidence] = useState(0);
   const [holdProgress, setHoldProgress] = useState(0);
+  // ✅ NEW — peringatan kualitas gambar (cahaya/blur) yang tampil di layar
+  const [qualityWarning, setQualityWarning] = useState<null | "DARK" | "BRIGHT" | "BLUR">(null);
   const [clockStr, setClockStr] = useState(ts());
   const [logs, setLogs] = useState<LogEntry[]>([
     { time: ts(), msg: "solit biometric engine v3.0 started", type: "ok" },
@@ -835,6 +896,7 @@ export default function FaceVerifyPage() {
         setFaceDetected(detected);
         if (!detected) {
           holdCountRef.current = 0;
+          qualityOkCountRef.current = 0; // ✅ NEW
           setConfidence(0);
           setHoldProgress(0);
           return;
@@ -842,6 +904,24 @@ export default function FaceVerifyPage() {
 
         const score = detections[0].detection.score;
         setConfidence(Math.round(score * 100));
+
+        // ✅ NEW — cek kualitas gambar (cahaya/ketajaman) sebelum boleh capture.
+        // Kalau gelap/silau/blur: tahan auto-capture, reset hold, tampilkan warning.
+        if (!qualityCanvasRef.current) qualityCanvasRef.current = document.createElement("canvas");
+        const quality = analyzeFrameQuality(videoRef.current, qualityCanvasRef.current);
+        if (quality && !quality.ok) {
+          qualityOkCountRef.current = 0;
+          holdCountRef.current = 0;
+          setHoldProgress(0);
+          setQualityWarning(quality.reason as "DARK" | "BRIGHT" | "BLUR");
+          return; // jangan lanjut capture di frame jelek ini
+        }
+        // frame cukup bagus — butuh beberapa frame bagus berturut biar stabil
+        if (quality && quality.ok) {
+          qualityOkCountRef.current += 1;
+          if (qualityOkCountRef.current >= QUALITY_HOLD_FRAMES) setQualityWarning(null);
+          else { holdCountRef.current = 0; setHoldProgress(0); return; }
+        }
 
         if (score >= AUTO_CAPTURE_CONFIDENCE) {
           holdCountRef.current += 1;
@@ -1764,6 +1844,27 @@ export default function FaceVerifyPage() {
                 <div className="fail-badge-dot" />
                 <div className="fail-badge-text">Wajah tidak dikenali — coba lagi</div>
                 <div className="fail-badge-count">{attempts}/{MAX_ATTEMPTS}</div>
+              </div>
+            )}
+
+            {/* ✅ NEW — peringatan kualitas gambar (cahaya/blur) */}
+            {qualityWarning && !isProcessing && (
+              <div
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)",
+                  borderRadius: 10, padding: "9px 12px", marginBottom: 10,
+                  animation: "fadeSlide 0.2s ease",
+                }}
+              >
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", flexShrink: 0, animation: "pulse-amber 0.8s ease infinite" }} />
+                <div style={{ flex: 1, fontSize: 11, color: "#fbbf24", letterSpacing: 0.2, lineHeight: 1.5 }}>
+                  {qualityWarning === "DARK"
+                    ? "Ruangan terlalu gelap — cari tempat lebih terang atau hadap ke sumber cahaya."
+                    : qualityWarning === "BRIGHT"
+                      ? "Cahaya terlalu silau/backlight — hindari lampu/jendela tepat di belakangmu."
+                      : "Wajah kurang tajam — pegang HP lebih stabil & jaga jarak wajah."}
+                </div>
               </div>
             )}
 
