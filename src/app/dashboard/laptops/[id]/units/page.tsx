@@ -1485,7 +1485,7 @@ export default function UnitsPage() {
             )}
 
             {auditConfirm && (
-                <SoNotePromptModal
+                <AuditNotePromptModal
                     title={auditConfirm.kind === "bulk" ? `Tandai Audit ${selectedIds.size} Unit` : "Tandai Sudah Diaudit"}
                     label={auditConfirm.kind === "single" ? `SN: ${auditConfirm.unit.serial_number}` : `${selectedIds.size} unit terpilih`}
                     onConfirm={async (note) => {
@@ -2173,6 +2173,69 @@ interface SoHistoryEntry {
     so_by: string;
     so_at: string;
     notes?: string | null;
+}
+
+// Modal catatan AUDIT — kembar SoNotePromptModal tapi teks & tema khusus audit
+// (emerald), SAMA dengan AuditConfirmModal di Data Barang (luar). Dipakai untuk
+// audit 1 unit maupun bulk. Catatan opsional, ikut tersimpan ke riwayat audit.
+function AuditNotePromptModal({ title, label, initialNote = "", onConfirm, onClose, loading }: {
+    title: string;
+    label: string;
+    initialNote?: string;
+    onConfirm: (note: string) => void;
+    onClose: () => void;
+    loading: boolean;
+}) {
+    const [note, setNote] = useState(initialNote);
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-800" />
+                <div className="bg-emerald-600 px-5 py-4">
+                    <p className="text-sm font-bold text-white">{title}</p>
+                    <p className="text-[11px] text-white/70 mt-0.5 truncate">{label}</p>
+                </div>
+                <div className="p-5">
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                        Catatan Audit <span className="text-gray-400 font-normal">(opsional)</span>
+                    </label>
+                    <textarea
+                        autoFocus
+                        value={note}
+                        onChange={e => setNote(e.target.value)}
+                        placeholder="Kondisi barang, hasil audit, dll"
+                        className="w-full text-sm p-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white focus:outline-none min-h-[70px] resize-none transition"
+                        rows={3}
+                    />
+                    <div className="flex gap-2 mt-5">
+                        <button
+                            onClick={onClose}
+                            disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={() => onConfirm(note)}
+                            disabled={loading}
+                            className="flex-1 h-10 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25"
+                        >
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Konfirmasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function SoNotePromptModal({ title, label, initialNote = "", onConfirm, onClose, loading }: {
