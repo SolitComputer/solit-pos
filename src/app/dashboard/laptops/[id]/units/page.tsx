@@ -302,6 +302,8 @@ export default function UnitsPage() {
     const [toast, setToast] = useState("");
     const [auditingUnitId, setAuditingUnitId] = useState<string | null>(null);
     const [soUnitId, setSoUnitId] = useState<string | null>(null);
+    // Target modal catatan audit. "single" = 1 unit; "bulk" = unit tercentang.
+    const [auditConfirm, setAuditConfirm] = useState<{ kind: "single"; unit: LaptopUnit } | { kind: "bulk" } | null>(null);
     const [pedagangSavingId, setPedagangSavingId] = useState<string | null>(null);
     const [filterAudit, setFilterAudit] = useState<"ALL" | "AUDITED" | "UNAUDITED">("ALL");
     const [filterSO, setFilterSO] = useState<"ALL" | "SO" | "BELUM_SO">("ALL");
@@ -401,14 +403,25 @@ export default function UnitsPage() {
 
     const [soPromptTarget, setSoPromptTarget] = useState<{ unit: LaptopUnit; isActive: boolean } | null>(null);
 
-    const toggleUnitAudit = async (unit: LaptopUnit) => {
+    // Klik tombol audit per-baris: sudah teraudit → batal langsung; belum →
+    // buka modal catatan dulu (eksekusi di runUnitAudit).
+    const toggleUnitAudit = (unit: LaptopUnit) => {
+        if (isUnitAuditActive(unit)) {
+            runUnitAudit(unit, ""); // batalkan langsung, tanpa catatan
+        } else {
+            setAuditConfirm({ kind: "single", unit });
+        }
+    };
+
+    const runUnitAudit = async (unit: LaptopUnit, note: string) => {
         setAuditingUnitId(unit.id);
         try {
-            const res = await fetch(`/api/units/${unit.id}/audit`, { method: "PATCH" });
+            const res = await fetch(`/api/units/${unit.id}/audit`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+            });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal update audit");
             const wasActive = isUnitAuditActive(unit);
-            // Audit per-unit: hanya update unit yang diklik di state lokal
             setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, ...json.data } : u));
             setToast(wasActive ? "Audit unit dibatalkan" : "Unit ditandai sudah diaudit");
         } catch (e) {
@@ -578,9 +591,9 @@ export default function UnitsPage() {
     // endpoint /api/units/[id]/audit (yang sifatnya toggle) tidak malah
     // MEMBATALKAN audit unit yang sudah benar. Unit teraudit di-skip.
     const [bulkAuditing, setBulkAuditing] = useState(false);
-    const handleBulkAudit = async () => {
+    // Klik "Audit N Unit" → buka modal catatan dulu (1 catatan untuk semua).
+    const handleBulkAudit = () => {
         if (selectedIds.size === 0) return;
-        // Saring: unit tercentang, aktif (bukan SOLD), dan audit-nya BELUM aktif.
         const targets = units.filter(
             u => selectedIds.has(u.id) && u.status !== "SOLD" && !isUnitAuditActive(u)
         );
@@ -588,12 +601,23 @@ export default function UnitsPage() {
             setToast("Semua unit terpilih sudah teraudit");
             return;
         }
+        setAuditConfirm({ kind: "bulk" });
+    };
+
+    const runBulkAudit = async (note: string) => {
+        // Saring: unit tercentang, aktif (bukan SOLD), dan audit-nya BELUM aktif.
+        const targets = units.filter(
+            u => selectedIds.has(u.id) && u.status !== "SOLD" && !isUnitAuditActive(u)
+        );
+        if (targets.length === 0) return;
         setBulkAuditing(true);
         try {
             const results = await Promise.all(
                 targets.map(async (u) => {
                     try {
-                        const res = await fetch(`/api/units/${u.id}/audit`, { method: "PATCH" });
+                        const res = await fetch(`/api/units/${u.id}/audit`, {
+                            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+                        });
                         const json = await res.json().catch(() => null);
                         return res.ok && json?.success !== false;
                     } catch {
@@ -1457,6 +1481,20 @@ export default function UnitsPage() {
                     onConfirm={(note) => handleConfirmUnitSO(soPromptTarget.unit, note)}
                     onClose={() => setSoPromptTarget(null)}
                     loading={soUnitId === soPromptTarget.unit.id}
+                />
+            )}
+
+            {auditConfirm && (
+                <SoNotePromptModal
+                    title={auditConfirm.kind === "bulk" ? `Tandai Audit ${selectedIds.size} Unit` : "Tandai Sudah Diaudit"}
+                    label={auditConfirm.kind === "single" ? `SN: ${auditConfirm.unit.serial_number}` : `${selectedIds.size} unit terpilih`}
+                    onConfirm={async (note) => {
+                        if (auditConfirm.kind === "single") await runUnitAudit(auditConfirm.unit, note);
+                        else await runBulkAudit(note);
+                        setAuditConfirm(null);
+                    }}
+                    onClose={() => setAuditConfirm(null)}
+                    loading={auditConfirm.kind === "single" ? auditingUnitId === auditConfirm.unit.id : bulkAuditing}
                 />
             )}
             {showBulkEditModal && (

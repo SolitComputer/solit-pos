@@ -1373,6 +1373,63 @@ function SoHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose
 // SO CONFIRM MODAL — pengganti window.prompt(). Cancel benar-benar membatalkan
 // (tidak memanggil API sama sekali), beda dari bug window.prompt sebelumnya.
 // ═══════════════════════════════════════════════════════════════════════════
+// Modal catatan audit — kembar SoConfirmModal, tema emerald/audit. Dipakai
+// untuk audit 1 unit maupun bulk (1 catatan untuk semua unit tercentang).
+function AuditConfirmModal({
+    title, subtitle, notes, onNotesChange, onConfirm, onCancel, loading,
+}: {
+    title: string; subtitle: string; notes: string; onNotesChange: (v: string) => void;
+    onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel, loading]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !loading && onCancel()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-800" />
+                <div className="bg-emerald-600 px-5 py-4 flex items-center gap-3">
+                    <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center ring-1 ring-white/20 flex-shrink-0">
+                        <CheckCircle2 size={18} className="text-white" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-bold text-white">{title}</p>
+                        <p className="text-[11px] text-white/70 mt-0.5 font-mono truncate max-w-[220px]">{subtitle}</p>
+                    </div>
+                </div>
+                <div className="p-5">
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                        Catatan Audit <span className="text-gray-400 font-normal">(opsional)</span>
+                    </label>
+                    <textarea
+                        autoFocus
+                        rows={3}
+                        placeholder="Kondisi barang, hasil audit, dll"
+                        value={notes}
+                        onChange={e => onNotesChange(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white transition resize-none"
+                    />
+                    <div className="flex gap-2 mt-5">
+                        <button onClick={onCancel} disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                            Batal
+                        </button>
+                        <button onClick={onConfirm} disabled={loading}
+                            className="flex-1 h-10 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25">
+                            {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle2 size={15} />}
+                            Konfirmasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function SoConfirmModal({
     unit, notes, onNotesChange, onConfirm, onCancel, loading,
 }: {
@@ -1474,6 +1531,9 @@ export default function AccessoryUnitsPage() {
     // ── Audit per-unit (toggle, TTL 3 hari) ──
     const [auditingId, setAuditingId] = useState<string | null>(null);
     const [bulkAuditing, setBulkAuditing] = useState(false);
+    // Target modal catatan audit. kind "single" = 1 unit; "bulk" = unit tercentang.
+    const [auditConfirm, setAuditConfirm] = useState<{ kind: "single"; unit: AccessoryUnit } | { kind: "bulk" } | null>(null);
+    const [auditConfirmNotes, setAuditConfirmNotes] = useState("");
 
     // Confirm
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -1775,12 +1835,27 @@ export default function AccessoryUnitsPage() {
         }
     };
 
-    // ── Audit per-unit (toggle: tandai / batal). Gate = canManageSo (sama SO). ──
-    const toggleAudit = async (unit: AccessoryUnit) => {
+    // ── Klik tombol audit per-baris ──
+    // Belum teraudit → buka modal catatan dulu. Sudah teraudit → langsung batal
+    // (tanpa modal, sesuai keputusan). Eksekusi sebenarnya di runAudit().
+    const onAuditClick = (unit: AccessoryUnit) => {
+        if (!canManageSo) return;
+        if (isAuditActive(unit.audited_at)) {
+            runAudit(unit, ""); // batalkan langsung, tanpa catatan
+        } else {
+            setAuditConfirmNotes("");
+            setAuditConfirm({ kind: "single", unit });
+        }
+    };
+
+    // Eksekusi audit 1 unit (kirim notes ke endpoint — tersimpan ke riwayat).
+    const runAudit = async (unit: AccessoryUnit, note: string) => {
         if (!canManageSo) return;
         setAuditingId(unit.id);
         try {
-            const res = await fetch(`/api/accessory-units/${unit.id}/audit`, { method: "PATCH" });
+            const res = await fetch(`/api/accessory-units/${unit.id}/audit`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+            });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal update audit");
             setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, audited_at: json.data.audited_at, audited_by: json.data.audited_by } : u));
@@ -1792,9 +1867,9 @@ export default function AccessoryUnitsPage() {
         }
     };
 
-    // ── Bulk audit unit tercentang. "Selalu tandai": skip yang sudah teraudit
-    //    aktif supaya endpoint toggle tidak membatalkannya. ──
-    const handleBulkAudit = async () => {
+    // ── Klik "Audit N Unit" di bulk bar → buka modal catatan dulu (1 catatan
+    //    dipakai untuk semua unit tercentang). Eksekusi di runBulkAudit(). ──
+    const onBulkAuditClick = () => {
         if (selectedIds.size === 0) return;
         const targets = units.filter(
             u => selectedIds.has(u.id) && u.status !== "TERJUAL" && !isAuditActive(u.audited_at)
@@ -1803,12 +1878,25 @@ export default function AccessoryUnitsPage() {
             toast.success("Semua unit terpilih sudah teraudit");
             return;
         }
+        setAuditConfirmNotes("");
+        setAuditConfirm({ kind: "bulk" });
+    };
+
+    // "Selalu tandai": skip unit yang sudah teraudit aktif supaya endpoint
+    // toggle tidak membatalkannya. notes yang sama dikirim ke tiap unit.
+    const runBulkAudit = async (note: string) => {
+        const targets = units.filter(
+            u => selectedIds.has(u.id) && u.status !== "TERJUAL" && !isAuditActive(u.audited_at)
+        );
+        if (targets.length === 0) return;
         setBulkAuditing(true);
         try {
             const results = await Promise.all(
                 targets.map(async (u) => {
                     try {
-                        const res = await fetch(`/api/accessory-units/${u.id}/audit`, { method: "PATCH" });
+                        const res = await fetch(`/api/accessory-units/${u.id}/audit`, {
+                            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+                        });
                         const json = await res.json().catch(() => null);
                         return res.ok && json?.success !== false;
                     } catch {
@@ -2037,7 +2125,7 @@ export default function AccessoryUnitsPage() {
                                 {/* Audit Terpilih — tandai teraudit semua unit tercentang.
                                     Yang sudah teraudit di-skip (tidak dibatalkan). */}
                                 {canManageSo && (
-                                    <button onClick={handleBulkAudit} disabled={bulkDeleting || bulkAuditing}
+                                    <button onClick={onBulkAuditClick} disabled={bulkDeleting || bulkAuditing}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
                                         {bulkAuditing ? (
                                             <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengaudit...</>
@@ -2210,7 +2298,7 @@ export default function AccessoryUnitsPage() {
                                                         {unit.status !== "TERJUAL" ? (
                                                             <div className="flex items-center justify-center gap-1">
                                                                 {canManageSo ? (
-                                                                    <button onClick={() => toggleAudit(unit)} disabled={auditingId === unit.id}
+                                                                    <button onClick={() => onAuditClick(unit)} disabled={auditingId === unit.id}
                                                                         title={isAuditActive(unit.audited_at) ? `Diaudit oleh ${unit.audited_by ?? "—"} · klik untuk batalkan` : "Tandai sudah diaudit"}
                                                                         className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isAuditActive(unit.audited_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}>
                                                                         {isAuditActive(unit.audited_at) ? "Teraudit" : "Audit"}
@@ -2474,6 +2562,28 @@ export default function AccessoryUnitsPage() {
                     onConfirm={async () => {
                         await toggleSo(soConfirmTarget, soConfirmNotes);
                         setSoConfirmTarget(null);
+                    }}
+                />
+            )}
+
+            {auditConfirm && (
+                <AuditConfirmModal
+                    title={auditConfirm.kind === "bulk" ? `Audit ${selectedIds.size} Unit` : "Tandai Sudah Diaudit"}
+                    subtitle={auditConfirm.kind === "single" ? auditConfirm.unit.serial_number : `${selectedIds.size} unit terpilih`}
+                    notes={auditConfirmNotes}
+                    onNotesChange={setAuditConfirmNotes}
+                    loading={auditConfirm.kind === "single" ? auditingId === auditConfirm.unit.id : bulkAuditing}
+                    onCancel={() => {
+                        const busy = auditConfirm.kind === "single" ? auditingId === auditConfirm.unit.id : bulkAuditing;
+                        if (!busy) setAuditConfirm(null);
+                    }}
+                    onConfirm={async () => {
+                        if (auditConfirm.kind === "single") {
+                            await runAudit(auditConfirm.unit, auditConfirmNotes);
+                        } else {
+                            await runBulkAudit(auditConfirmNotes);
+                        }
+                        setAuditConfirm(null);
                     }}
                 />
             )}
