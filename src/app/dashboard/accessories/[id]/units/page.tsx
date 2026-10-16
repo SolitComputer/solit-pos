@@ -28,6 +28,8 @@ interface AccessoryUnit {
     selling_price: number;
     so_at?: string | null;
     so_by?: string | null;
+    audited_at?: string | null;
+    audited_by?: string | null;
     notes: string | null;
     created_at: string;
 }
@@ -52,6 +54,12 @@ const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
+
+// Audit unit aksesoris: reset otomatis 3 hari (disamakan dengan AUDIT_TTL_MS
+// di endpoint /api/accessory-units/[id]/audit & ACCESSORY_AUDIT_TTL_MS).
+const ACCESSORY_AUDIT_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+const isAuditActive = (auditedAt?: string | null) =>
+    !!auditedAt && Date.now() - new Date(auditedAt).getTime() < ACCESSORY_AUDIT_TTL_MS;
 
 function fmtInput(val: number): string {
     if (!val) return "";
@@ -1191,6 +1199,87 @@ interface SoHistoryEntry {
     notes?: string | null;
 }
 
+// Riwayat audit per-unit aksesoris — meniru SoHistoryModal, beda endpoint & field.
+function AuditHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose: () => void }) {
+    const [loading, setLoading] = useState(true);
+    const [history, setHistory] = useState<{ id: string; action: string; audited_by: string | null; audited_at: string; notes?: string | null }[]>([]);
+
+    useEffect(() => {
+        if (!unit) return;
+        let alive = true;
+        setLoading(true);
+        (async () => {
+            try {
+                const res = await fetch(`/api/accessory-units/${unit.id}/audit`);
+                const json = await res.json();
+                if (alive && json.success) setHistory(json.data?.history ?? []);
+            } finally {
+                if (alive) setLoading(false);
+            }
+        })();
+        return () => { alive = false; };
+    }, [unit]);
+
+    useEffect(() => {
+        if (!unit) return;
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [unit, onClose]);
+
+    if (!unit) return null;
+    const active = isAuditActive(unit.audited_at);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center px-0 sm:px-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] sm:mx-4 overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-600 to-gray-800 flex-shrink-0" />
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <p className="text-sm font-bold text-gray-900">Riwayat Audit</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 font-mono truncate max-w-[240px]">{unit.serial_number}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                        {active ? `Teraudit — ${unit.audited_by ?? "—"}` : "Belum teraudit (atau sudah lewat 3 hari)"}
+                    </span>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    {loading ? (
+                        <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Belum ada riwayat audit untuk unit ini</p>
+                    ) : (
+                        <ol className="space-y-2">
+                            {history.map(h => (
+                                <li key={h.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${h.action === "AUDIT" ? "bg-emerald-500" : "bg-gray-300"}`} />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">
+                                            {h.action === "AUDIT" ? "Ditandai sudah diaudit" : "Audit dibatalkan"} oleh {h.audited_by ?? "—"}
+                                        </p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                            {new Date(h.audited_at).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB
+                                        </p>
+                                        {h.notes && <p className="text-[11px] text-gray-500 italic mt-1">&quot;{h.notes}&quot;</p>}
+                                    </div>
+                                </li>
+                            ))}
+                        </ol>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function SoHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose: () => void }) {
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<SoHistoryEntry[]>([]);
@@ -1379,8 +1468,12 @@ export default function AccessoryUnitsPage() {
     const [showBulkEditUnitsModal, setShowBulkEditUnitsModal] = useState(false); // ✅ bulk edit unit tercentang
     const [soingId, setSoingId] = useState<string | null>(null);
     const [soHistoryTarget, setSoHistoryTarget] = useState<AccessoryUnit | null>(null);
+    const [auditHistoryTarget, setAuditHistoryTarget] = useState<AccessoryUnit | null>(null);
     const [soConfirmTarget, setSoConfirmTarget] = useState<AccessoryUnit | null>(null);
     const [soConfirmNotes, setSoConfirmNotes] = useState("");
+    // ── Audit per-unit (toggle, TTL 3 hari) ──
+    const [auditingId, setAuditingId] = useState<string | null>(null);
+    const [bulkAuditing, setBulkAuditing] = useState(false);
 
     // Confirm
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -1682,6 +1775,59 @@ export default function AccessoryUnitsPage() {
         }
     };
 
+    // ── Audit per-unit (toggle: tandai / batal). Gate = canManageSo (sama SO). ──
+    const toggleAudit = async (unit: AccessoryUnit) => {
+        if (!canManageSo) return;
+        setAuditingId(unit.id);
+        try {
+            const res = await fetch(`/api/accessory-units/${unit.id}/audit`, { method: "PATCH" });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal update audit");
+            setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, audited_at: json.data.audited_at, audited_by: json.data.audited_by } : u));
+            toast.success("Status audit diperbarui");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal update audit");
+        } finally {
+            setAuditingId(null);
+        }
+    };
+
+    // ── Bulk audit unit tercentang. "Selalu tandai": skip yang sudah teraudit
+    //    aktif supaya endpoint toggle tidak membatalkannya. ──
+    const handleBulkAudit = async () => {
+        if (selectedIds.size === 0) return;
+        const targets = units.filter(
+            u => selectedIds.has(u.id) && u.status !== "TERJUAL" && !isAuditActive(u.audited_at)
+        );
+        if (targets.length === 0) {
+            toast.success("Semua unit terpilih sudah teraudit");
+            return;
+        }
+        setBulkAuditing(true);
+        try {
+            const results = await Promise.all(
+                targets.map(async (u) => {
+                    try {
+                        const res = await fetch(`/api/accessory-units/${u.id}/audit`, { method: "PATCH" });
+                        const json = await res.json().catch(() => null);
+                        return res.ok && json?.success !== false;
+                    } catch {
+                        return false;
+                    }
+                })
+            );
+            const failed = results.filter(ok => !ok).length;
+            if (failed > 0) toast.error(`${failed} dari ${targets.length} unit gagal diaudit. Sisanya berhasil.`);
+            else toast.success(`${targets.length} unit berhasil ditandai teraudit`);
+            setSelectedIds(new Set());
+            fetchData();
+        } catch {
+            toast.error("Gagal mengaudit beberapa unit");
+        } finally {
+            setBulkAuditing(false);
+        }
+    };
+
     const buyVal = parseRupiah(buyInput);
     const sellVal = parseRupiah(sellInput);
     const marginPreview = sellVal - buyVal;
@@ -1880,12 +2026,26 @@ export default function AccessoryUnitsPage() {
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 transition">Batal pilih</button>
                                 {canManageUnits && (
-                                    <button onClick={() => setShowBulkEditUnitsModal(true)} disabled={bulkDeleting}
+                                    <button onClick={() => setShowBulkEditUnitsModal(true)} disabled={bulkDeleting || bulkAuditing}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-50 transition disabled:opacity-50">
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                         Edit {selectedIds.size} Unit
+                                    </button>
+                                )}
+                                {/* Audit Terpilih — tandai teraudit semua unit tercentang.
+                                    Yang sudah teraudit di-skip (tidak dibatalkan). */}
+                                {canManageSo && (
+                                    <button onClick={handleBulkAudit} disabled={bulkDeleting || bulkAuditing}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
+                                        {bulkAuditing ? (
+                                            <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengaudit...</>
+                                        ) : (
+                                            <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                            </svg>Audit {selectedIds.size} Unit</>
+                                        )}
                                     </button>
                                 )}
                                 <button onClick={handleBulkDelete} disabled={bulkDeleting}
@@ -1961,6 +2121,7 @@ export default function AccessoryUnitsPage() {
                                             {canSeePrivate && <Th right>Margin</Th>}
                                             <Th>Status</Th>
                                             <Th center>SO</Th>
+                                            <Th center>Audit</Th>
                                             <Th right>Aksi</Th>
                                         </tr>
                                     </thead>
@@ -2037,6 +2198,29 @@ export default function AccessoryUnitsPage() {
                                                                     </span>
                                                                 )}
                                                                 <button onClick={() => setSoHistoryTarget(unit)} title="Riwayat SO"
+                                                                    className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
+                                                                    <History size={13} />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                        {unit.status !== "TERJUAL" ? (
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                {canManageSo ? (
+                                                                    <button onClick={() => toggleAudit(unit)} disabled={auditingId === unit.id}
+                                                                        title={isAuditActive(unit.audited_at) ? `Diaudit oleh ${unit.audited_by ?? "—"} · klik untuk batalkan` : "Tandai sudah diaudit"}
+                                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isAuditActive(unit.audited_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}>
+                                                                        {isAuditActive(unit.audited_at) ? "Teraudit" : "Audit"}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${isAuditActive(unit.audited_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                                        {isAuditActive(unit.audited_at) ? "Teraudit" : "Belum"}
+                                                                    </span>
+                                                                )}
+                                                                <button onClick={() => setAuditHistoryTarget(unit)} title="Riwayat audit"
                                                                     className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
                                                                     <History size={13} />
                                                                 </button>
@@ -2258,6 +2442,10 @@ export default function AccessoryUnitsPage() {
 
             {soHistoryTarget && (
                 <SoHistoryModal unit={soHistoryTarget} onClose={() => setSoHistoryTarget(null)} />
+            )}
+
+            {auditHistoryTarget && (
+                <AuditHistoryModal unit={auditHistoryTarget} onClose={() => setAuditHistoryTarget(null)} />
             )}
 
             {barcodeUnit && (
