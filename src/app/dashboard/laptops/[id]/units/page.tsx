@@ -573,6 +573,61 @@ export default function UnitsPage() {
         });
     };
 
+    // ── Bulk AUDIT unit tercentang ──────────────────────────────────────────
+    // "Selalu tandai audit": hanya kirim unit yang BELUM teraudit aktif, supaya
+    // endpoint /api/units/[id]/audit (yang sifatnya toggle) tidak malah
+    // MEMBATALKAN audit unit yang sudah benar. Unit teraudit di-skip.
+    const [bulkAuditing, setBulkAuditing] = useState(false);
+    const handleBulkAudit = async () => {
+        if (selectedIds.size === 0) return;
+        // Saring: unit tercentang, aktif (bukan SOLD), dan audit-nya BELUM aktif.
+        const targets = units.filter(
+            u => selectedIds.has(u.id) && u.status !== "SOLD" && !isUnitAuditActive(u)
+        );
+        if (targets.length === 0) {
+            setToast("Semua unit terpilih sudah teraudit");
+            return;
+        }
+        setBulkAuditing(true);
+        try {
+            const results = await Promise.all(
+                targets.map(async (u) => {
+                    try {
+                        const res = await fetch(`/api/units/${u.id}/audit`, { method: "PATCH" });
+                        const json = await res.json().catch(() => null);
+                        return res.ok && json?.success !== false;
+                    } catch {
+                        return false;
+                    }
+                })
+            );
+            const failed = results.filter(ok => !ok).length;
+
+            // Refetch supaya audited_at/audited_by terbaru ikut (sumber kebenaran DB).
+            const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
+            const freshData = await freshRes.json();
+            const freshUnits: LaptopUnit[] = (freshData.data || []).map((u: LaptopUnit) => ({
+                ...u,
+                purchase_price: Math.round(Number(u.purchase_price) || 0),
+                sparepart_cost: Math.round(Number(u.sparepart_cost) || 0),
+                selling_price: Math.round(Number(u.selling_price) || 0),
+                official_price: Math.round(Number(u.official_price) || 0),
+            }));
+            setUnits(freshUnits);
+            setSelectedIds(new Set());
+
+            if (failed > 0) {
+                setAlertModal(`${failed} dari ${targets.length} unit gagal diaudit. Sisanya berhasil.`);
+            } else {
+                setToast(`${targets.length} unit berhasil ditandai teraudit`);
+            }
+        } catch {
+            setAlertModal("Gagal mengaudit beberapa unit");
+        } finally {
+            setBulkAuditing(false);
+        }
+    };
+
     const handleBulkDelete = () => {
         if (selectedIds.size === 0) return;
         setConfirmModal({
@@ -1121,12 +1176,26 @@ export default function UnitsPage() {
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 active:opacity-60 transition">Batal pilih</button>
                                 {canManageUnits && (
-                                    <button onClick={() => setShowBulkEditModal(true)} disabled={bulkDeleting}
+                                    <button onClick={() => setShowBulkEditModal(true)} disabled={bulkDeleting || bulkAuditing}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-50 transition disabled:opacity-50">
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                         Edit {selectedIds.size} Unit
+                                    </button>
+                                )}
+                                {/* Audit Terpilih — tandai teraudit semua unit tercentang sekaligus.
+                                    Yang sudah teraudit di-skip (tidak dibatalkan). */}
+                                {canAuditUnits && (
+                                    <button onClick={handleBulkAudit} disabled={bulkDeleting || bulkAuditing}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
+                                        {bulkAuditing ? (
+                                            <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengaudit...</>
+                                        ) : (
+                                            <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                            </svg>Audit {selectedIds.size} Unit</>
+                                        )}
                                     </button>
                                 )}
                                 <button onClick={handleBulkDelete} disabled={bulkDeleting}
