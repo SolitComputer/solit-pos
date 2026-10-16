@@ -33,6 +33,8 @@ interface LaptopUnitLite {
     source?: string | null; created_at?: string;
     is_pedagang_listed?: boolean;
     msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
+    so_at?: string | null; so_by?: string | null;       // SO per-unit (progress X/Y)
+    audited_at?: string | null; audited_by?: string | null; // Audit per-unit (progress X/Y)
 }
 interface LaptopRaw {
     id: string; laptop_name: string; category_id?: string | null; category_name?: string | null;
@@ -47,6 +49,8 @@ interface AccessoryUnitLite {
     id: string; serial_number: string; condition: string; status: string;
     buy_price?: number; selling_price?: number; created_at?: string;
     msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
+    so_at?: string | null; so_by?: string | null; // SO per-unit (progress X/Y)
+    // Audit aksesoris per-unit menyusul di Tahap R3 (butuh migrasi kolom DB).
 }
 interface AccessoryRaw {
     id: string; name: string; category: string; brand: string | null; spec: string | null;
@@ -68,6 +72,10 @@ interface UnifiedRow {
     stok: number | null; // aksesoris
     so_at: string | null; so_by: string | null;
     audited_at: string | null; audited_by: string | null;
+    // Progress per-unit "X/Y" — X = unit aktif yang sudah SO/Audit, Y = total
+    // unit aktif. Dihitung di normalizeLaptop/normalizeAccessory dari status
+    // per-unit, bukan dari flag model-level so_at/audited_at di atas.
+    so_done: number; audit_done: number;
     unit_id?: string; unit_count: number;
     is_pedagang_listed?: boolean; // laptop: true kalau ADA unit aktif yang masuk Pricelist Pedagang
     raw: LaptopRaw | AccessoryRaw;
@@ -111,6 +119,18 @@ const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
 
+// ── Helper per-unit untuk progress X/Y ─────────────────────────────────────
+// Logika reset DISAMAKAN dengan halaman Kelola Unit:
+//  • Audit unit laptop  → TTL 2 hari sejak audited_at.
+//  • SO unit (laptop & aksesoris) → aktif kalau di-SO pada TANGGAL WIB yang
+//    sama dengan hari ini (reset tiap 00:00 WIB), bukan rolling 24 jam.
+function isUnitAuditActiveLaptop(u: LaptopUnitLite): boolean {
+    return !!u.audited_at && Date.now() - new Date(u.audited_at).getTime() < LAPTOP_AUDIT_TTL_MS;
+}
+function isUnitSoActive(soAt?: string | null): boolean {
+    return !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
+}
+
 // Arsip MANUAL hanya boleh muncul saat stok BENAR-BENAR habis (0 semua).
 function isStockEmpty(row: UnifiedRow): boolean {
     const stok = row.tipe === "LAPTOP" ? (row.stok_tersedia ?? 0) : (row.stok ?? 0);
@@ -147,6 +167,9 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const minusSiapJual = aktif.filter(u => u.status === "MINUS_SIAP_JUAL").length;
     const stokMinus = aktif.filter(u => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
     const dalamPenyiapan = aktif.filter(u => u.status === "DALAM_PENYIAPAN").length;
+    // Progress X/Y: hitung unit aktif yang SO / Audit-nya masih aktif.
+    const soDone = aktif.filter(u => isUnitSoActive(u.so_at)).length;
+    const auditDone = aktif.filter(u => isUnitAuditActiveLaptop(u)).length;
     const stokTersedia = siapJual + stokMinus + dalamPenyiapan + minusSiapJual;
     const one = aktif.length === 1 ? aktif[0] : null;
     const modals = aktif.map(u => u.purchase_price).filter((n): n is number => n != null && n > 0);
@@ -170,6 +193,7 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
         stok_tersedia: stokTersedia, siap_jual: siapJual, minus: stokMinus, minus_siap_jual: minusSiapJual, stok: null,
         so_at: l.so_at ?? null, so_by: l.so_by ?? null,
         audited_at: l.audited_at ?? null, audited_by: l.audited_by ?? null,
+        so_done: soDone, audit_done: auditDone,
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         is_pedagang_listed: aktif.some(u => u.is_pedagang_listed === true),
         raw: l,
@@ -183,6 +207,9 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
     const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && !u.msj_group_id);
     const one = aktif.length === 1 ? aktif[0] : null;
+    // Progress SO per-unit aksesoris. Audit aksesoris per-unit menyusul di R3
+    // (belum ada kolomnya) → audit_done sementara 0.
+    const soDoneAcc = aktif.filter(u => isUnitSoActive(u.so_at)).length;
     // Harga modal range aksesoris ber-SN banyak — mirror logika laptop:
     // kumpulkan buy_price tiap unit aktif yang > 0, lalu ambil min & max.
     const modals = aktif.map(u => u.buy_price).filter((n): n is number => n != null && n > 0);
@@ -211,6 +238,7 @@ const margin = (a.sell_price || 0) - (a.buy_price || 0);
         stok: units.length > 0 ? aktif.length : (a.stock ?? 0),
         so_at: a.so_at ?? null, so_by: a.so_by ?? null,
         audited_at: a.audited_at ?? null, audited_by: a.audited_by ?? null,
+        so_done: soDoneAcc, audit_done: 0, // audit aksesoris per-unit → R3
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         raw: a,
     };
@@ -2063,21 +2091,39 @@ export default function UnifiedBarangContent() {
                                                 {!canOnlyViewBasic && (
                                                     <div className="pt-2.5 border-t border-zinc-100 space-y-1.5" onClick={(e) => e.stopPropagation()}>
 
-                                                        {/* (1) BARIS STATUS: Audit + SO */}
+                                                        {/* (1) BARIS STATUS: Audit + SO.
+                                                            Stok > 1 → badge progress X/Y (read-only, cerminan Kelola Unit).
+                                                            Stok ≤ 1 → tombol lama, TIDAK diubah. */}
                                                         <div className="flex items-stretch gap-1.5">
-                                                            <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${auditActive ? "bg-emerald-50 border-emerald-200" : "bg-zinc-50 border-zinc-200"}`}>
-                                                                <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
-                                                                    title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin/Accounting yang bisa mengubah status audit" : "Tidak punya akses") : ""}
-                                                                    className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${auditActive ? "text-emerald-700" : "text-zinc-400"}`}>
-                                                                    {auditActive ? "Teraudit" : "Audit"}
-                                                                </button>
-                                                                <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit"
-                                                                    className={`w-8 flex-shrink-0 flex items-center justify-center border-l transition ${auditActive ? "border-emerald-200 text-emerald-600" : "border-zinc-200 text-zinc-400"}`}>
-                                                                    <HistoryIcon size={13} />
-                                                                </button>
-                                                            </div>
+                                                            {/* ── Audit ── */}
+                                                            {row.unit_count > 1 ? (
+                                                                row.tipe === "LAPTOP" && (
+                                                                    <div className="flex-1 min-w-0 flex items-center justify-center h-8 rounded-lg border border-zinc-100 bg-zinc-50/60 gap-1.5">
+                                                                        <span className="text-[10px] font-semibold text-zinc-400 uppercase">Audit</span>
+                                                                        <ProgressBadge done={row.audit_done} total={row.unit_count} tone="audit" />
+                                                                    </div>
+                                                                )
+                                                            ) : (
+                                                                <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${auditActive ? "bg-emerald-50 border-emerald-200" : "bg-zinc-50 border-zinc-200"}`}>
+                                                                    <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                                        title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin/Accounting yang bisa mengubah status audit" : "Tidak punya akses") : ""}
+                                                                        className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${auditActive ? "text-emerald-700" : "text-zinc-400"}`}>
+                                                                        {auditActive ? "Teraudit" : "Audit"}
+                                                                    </button>
+                                                                    <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit"
+                                                                        className={`w-8 flex-shrink-0 flex items-center justify-center border-l transition ${auditActive ? "border-emerald-200 text-emerald-600" : "border-zinc-200 text-zinc-400"}`}>
+                                                                        <HistoryIcon size={13} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
 
-                                                            {canDoSo(row) && (
+                                                            {/* ── SO ── */}
+                                                            {row.unit_count > 1 ? (
+                                                                <div className="flex-1 min-w-0 flex items-center justify-center h-8 rounded-lg border border-zinc-100 bg-zinc-50/60 gap-1.5">
+                                                                    <span className="text-[10px] font-semibold text-zinc-400 uppercase">SO</span>
+                                                                    <ProgressBadge done={row.so_done} total={row.unit_count} tone="so" />
+                                                                </div>
+                                                            ) : canDoSo(row) && (
                                                                 <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${soActive ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
                                                                     <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
                                                                         className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${soActive ? "text-emerald-700" : "text-red-600"}`}>
@@ -2274,7 +2320,9 @@ export default function UnifiedBarangContent() {
                                                                     <span className={(row.stok ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok ?? <Dash />}</span>
                                                                 </td>
                                                                 <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                    {canDoSo(row) ? (
+                                                                    {row.unit_count > 1 ? (
+                                                                        <ProgressBadge done={row.so_done} total={row.unit_count} tone="so" />
+                                                                    ) : canDoSo(row) ? (
                                                                         <div className="flex items-center justify-center gap-1">
                                                                             <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
                                                                                 className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${soActive ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
@@ -2287,16 +2335,24 @@ export default function UnifiedBarangContent() {
                                                                     ) : <Dash />}
                                                                 </td>
                                                                 <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                    <div className="flex items-center justify-center gap-1">
-                                                                        <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
-                                                                            title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
-                                                                            className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
-                                                                            {auditActive ? "Teraudit" : "Audit"}
-                                                                        </button>
-                                                                        <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
-                                                                            <HistoryIcon size={13} />
-                                                                        </button>
-                                                                    </div>
+                                                                    {row.unit_count > 1 ? (
+                                                                        // Aksesoris: audit per-unit belum ada (R3) → total=0 bikin badge "0/0".
+                                                                        // Tampilkan Dash untuk aksesoris sampai R3 dikerjakan.
+                                                                        row.tipe === "LAPTOP"
+                                                                            ? <ProgressBadge done={row.audit_done} total={row.unit_count} tone="audit" />
+                                                                            : <Dash />
+                                                                    ) : (
+                                                                        <div className="flex items-center justify-center gap-1">
+                                                                            <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                                                title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
+                                                                                className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
+                                                                                {auditActive ? "Teraudit" : "Audit"}
+                                                                            </button>
+                                                                            <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
+                                                                                <HistoryIcon size={13} />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                 </td>
                                                                 <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                                                                     <div className="flex items-center gap-1 flex-nowrap min-w-max">
@@ -2697,6 +2753,26 @@ function Field({ label, children, required }: { label: string; children: React.R
             </label>
             {children}
         </div>
+    );
+}
+
+// Badge progress X/Y untuk kolom SO & Audit saat stok > 1 unit. Read-only —
+// angka murni cerminan status per-unit dari halaman Kelola Unit. "done" =
+// unit yang sudah SO/Audit aktif, "total" = total unit aktif (= Stok Tersedia).
+function ProgressBadge({ done, total, tone }: { done: number; total: number; tone: "so" | "audit" }) {
+    const complete = total > 0 && done >= total;
+    const started = done > 0;
+    // Penuh (semua unit) → warna solid; sebagian → warna muda; belum sama sekali → abu.
+    const cls = !started
+        ? "bg-zinc-50 text-zinc-400 border-zinc-200"
+        : complete
+            ? (tone === "so" ? "bg-emerald-100 text-emerald-700 border-emerald-300" : "bg-sky-100 text-sky-700 border-sky-300")
+            : (tone === "so" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-sky-50 text-sky-600 border-sky-200");
+    return (
+        <span title={`${done} dari ${total} unit sudah di-${tone === "so" ? "SO" : "audit"} — proses di halaman Kelola Unit`}
+            className={`inline-flex items-center justify-center px-2 py-0.5 rounded-lg text-[11px] font-bold border tabular-nums ${cls}`}>
+            {done}/{total}
+        </span>
     );
 }
 
