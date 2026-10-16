@@ -8,6 +8,7 @@ import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 interface ExpiringRow {
   id: string;
   name: string;
+  role: string | null;
   career_level: string | null;
   contract_valid_until: string;
   days_left: number;
@@ -31,6 +32,20 @@ function badgeClass(days: number): string {
   if (days <= 2) return "bg-red-50 text-red-600 border border-red-200";
   if (days <= 4) return "bg-orange-50 text-orange-600 border border-orange-200";
   return "bg-amber-50 text-amber-600 border border-amber-200";
+}
+
+/**
+ * Ubah role mentah DB (mis. "KEPALA_SALES", "PKL_MARKETING") jadi label rapi
+ * ("Kepala Sales", "Pkl Marketing"). Self-contained — tidak perlu import
+ * ROLE_META dari sidebar. Kalau butuh label persis sidebar, ganti ke roleMeta.
+ */
+function formatRole(role: string): string {
+  return role
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 export default function ContractExpiringPage() {
@@ -113,6 +128,11 @@ export default function ContractExpiringPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-slate-800 truncate">{row.name}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    {row.role && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100">
+                        {formatRole(row.role)}
+                      </span>
+                    )}
                     {row.career_level && <CareerLevelBadge level={row.career_level} />}
                     <span className="text-xs text-slate-400">
                       Berakhir {formatTanggal(row.contract_valid_until)}

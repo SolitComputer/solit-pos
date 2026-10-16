@@ -38,7 +38,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, name, career_level, contract_valid_until")
+    .select("id, name, role, career_level, contract_valid_until")
     .eq("contract_status", "APPROVED")
     .not("contract_valid_until", "is", null)
     .gte("contract_valid_until", todayWIB)      // dari hari ini (days_left >= 0)
@@ -56,6 +56,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return {
       id: u.id,
       name: u.name,
+      role: u.role,
       career_level: u.career_level,
       contract_valid_until: u.contract_valid_until,
       days_left: daysLeft,
