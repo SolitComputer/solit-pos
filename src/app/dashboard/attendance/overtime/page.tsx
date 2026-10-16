@@ -769,7 +769,7 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
   const durationMinutes = (!start || !end) ? 0 : Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
   const hours = Math.floor(durationMinutes / 60);
 
-   const isTargetPkl = isPKLRole(o.users?.role);
+  const isTargetPkl = isPKLRole(o.users?.role);
   const isHoliday = o.is_holiday === true;
   // ✅ NEW — Pengantaran & PKL Pengantaran: nominal lembur hari libur boleh di-custom
   const isCustomHolidayRole = isHolidayOvertimeCustomPayRole(o.users?.role);
@@ -820,7 +820,7 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
           action: "AUDIT",
           decision: "APPROVE",
           // ✅ CHANGED — kirim nominal custom untuk role yang dikecualikan
-          total_pay: isHoliday ? (holidayEditable ? Math.round(Number(customHolidayPay) || 0) : holidayAutoPay) : totalPay,          rate_per_hour: isHoliday ? null : (payMode === "PER_JAM" ? rate : null),
+          total_pay: isHoliday ? (holidayEditable ? Math.round(Number(customHolidayPay) || 0) : holidayAutoPay) : totalPay, rate_per_hour: isHoliday ? null : (payMode === "PER_JAM" ? rate : null),
         }),
       });
       const d = await res.json();
@@ -899,13 +899,13 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
             <p className="text-[9px] text-gray-400 mt-1">Bebas isi berapa saja. Status {holidayLate ? "Terlambat" : "Tepat waktu"} cuma catatan, tidak mengunci nominal.</p>
           </div>
         )}
-        {!isHoliday && (payMode === "PER_JAM" ? (          <div>
-            <label className={lbl}>Tarif Per Jam (Rp)</label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
-              <input type="number" min={0} value={rate} onChange={e => setRate(parseFloat(e.target.value) || 0)} className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all" />
-            </div>
+        {!isHoliday && (payMode === "PER_JAM" ? (<div>
+          <label className={lbl}>Tarif Per Jam (Rp)</label>
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
+            <input type="number" min={0} value={rate} onChange={e => setRate(parseFloat(e.target.value) || 0)} className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all" />
           </div>
+        </div>
         ) : (
           <div>
             <label className={lbl}>Nominal Tetap (Rp)</label>
@@ -2235,17 +2235,15 @@ export default function OvertimePage() {
                   <button
                     key={tab.key}
                     onClick={() => setUnifiedFilter(tab.key)}
-                    className={`flex-shrink-0 h-9 px-3.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 active:scale-95 ${
-                      active
+                    className={`flex-shrink-0 h-9 px-3.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 active:scale-95 ${active
                         ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
                         : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     {tab.dot && <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tab.dot}`} />}
                     <span>{tab.label}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black tabular-nums transition-colors ${
-                      active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-                    }`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black tabular-nums transition-colors ${active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                      }`}>
                       {count}
                     </span>
                   </button>

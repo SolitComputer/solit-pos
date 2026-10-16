@@ -8,8 +8,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Jendela peringatan: kontrak yang berakhir dalam 7 hari ke depan (H-7).
+// Jendela badge sidebar (?count=1) — tetap H-7 biar angka notif tetap "urgent".
 const WARNING_WINDOW_DAYS = 7;
+// Jendela halaman Daftar Kontrak — lebih lebar supaya 3 kelompok terisi.
+const LIST_WINDOW_DAYS = 30;
 
 function canView(user: AuthUser): boolean {
   const roles = user.roles?.length ? user.roles : [user.role];
@@ -27,7 +29,10 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   // Hitung tanggal berbasis WIB (UTC+7) — konsisten dengan /api/contracts/me.
   const nowWIBms = Date.now() + 7 * 60 * 60 * 1000;
   const todayWIB = new Date(nowWIBms).toISOString().slice(0, 10);
-  const boundaryWIB = new Date(nowWIBms + WARNING_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+
+  // count=1 (badge) pakai 7 hari; halaman daftar pakai 30 hari.
+  const windowDays = countOnly ? WARNING_WINDOW_DAYS : LIST_WINDOW_DAYS;
+  const boundaryWIB = new Date(nowWIBms + windowDays * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
 
@@ -37,7 +42,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     .eq("contract_status", "APPROVED")
     .not("contract_valid_until", "is", null)
     .gte("contract_valid_until", todayWIB)      // dari hari ini (days_left >= 0)
-    .lte("contract_valid_until", boundaryWIB)   // sampai H-7 (days_left <= 7)
+    .lte("contract_valid_until", boundaryWIB)   // sampai batas window (7 atau 30 hari)
     .order("contract_valid_until", { ascending: true });
 
   if (error) {
@@ -66,7 +71,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     success: true,
     data: rows,
     count: rows.length,
-    window_days: WARNING_WINDOW_DAYS,
+    window_days: windowDays,
   });
 }
 
