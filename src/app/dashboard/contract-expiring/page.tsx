@@ -569,12 +569,9 @@ export default function ContractExpiringPage() {
             </div>
           )}
 
-          {/* ── Sorotan atas ────────────────────────────────────────── */}
+          {/* ── Sorotan atas — hanya banner "habis hari ini" ────────── */}
           {!isBusy && todayList.length > 0 && (
             <TodayBanner people={todayList} lookup={customLookup} />
-          )}
-          {!isBusy && todayList.length === 0 && nextUp && (
-            <NextUpBanner person={nextUp} lookup={customLookup} />
           )}
 
           {/* ── Statistik ───────────────────────────────────────────── */}
