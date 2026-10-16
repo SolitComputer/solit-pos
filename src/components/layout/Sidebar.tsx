@@ -191,6 +191,7 @@ const Icons = {
   sopDivisi: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6" /><path d="M9 16h6" /></svg>),
   kendaraan: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 11l1.5-4.5A2 2 0 018.4 5h7.2a2 2 0 011.9 1.5L19 11" /><path d="M3 11h18v5a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1z" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></svg>),
   salesReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" /><path d="M9 12l2 2 4-4" /></svg>),
+  pelanggaran: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -224,6 +225,7 @@ const ITEM_PENGAJUAN_DANA: MenuItem = {
   ),
 }; const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 const ITEM_LENCANA: MenuItem = { name: "Lencana", href: "/dashboard/lencana", icon: Icons.lencana };
+const ITEM_PELANGGARAN: MenuItem = { name: "Pelanggaran", href: "/dashboard/pelanggaran", icon: Icons.pelanggaran };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
@@ -1092,8 +1094,11 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
     if (!utama.items.some((it) => it.href === ITEM_LENCANA.href)) {
       utama.items.push(ITEM_LENCANA);
     }
+    if (!utama.items.some((it) => it.href === ITEM_PELANGGARAN.href)) {
+      utama.items.push(ITEM_PELANGGARAN);
+    }
   } else {
-    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE, ITEM_LENCANA] }, ...ROLE_MENUS[role]];
+    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE, ITEM_LENCANA, ITEM_PELANGGARAN] }, ...ROLE_MENUS[role]];
   }
 });
 // Kendaraan: grup sendiri (collapsible) berisi Dashboard + Management Kendaraan.
