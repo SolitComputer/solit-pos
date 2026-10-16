@@ -88,7 +88,8 @@ const AVATAR_GRADIENTS = [
   "from-blue-500 to-teal-500",
   "from-violet-500 to-indigo-600",
 ];
-function avatarGradient(id: string): string {
+function avatarGradient(id: string | null | undefined): string {
+  if (!id) return AVATAR_GRADIENTS[0];
   const sum = Math.abs(id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0));
   return AVATAR_GRADIENTS[sum % AVATAR_GRADIENTS.length];
 }
@@ -1315,7 +1316,18 @@ export default function PengajuanDanaPage() {
       const res = await fetch("/api/pengajuan-dana");
       const json = await res.json();
       if (json.success) {
-        setData(json.data ?? []);
+        // Normalisasi: pastikan field yang dipakai fungsi format/avatar TIDAK
+        // pernah null — satu baris data cacat tak lagi bisa bikin halaman crash
+        // saat di-search (search memproses SEMUA baris, termasuk baris lama).
+        const safeRows: FundRequest[] = (json.data ?? []).map((r: FundRequest) => ({
+          ...r,
+          requester_id: r.requester_id ?? "",
+          requester_name: r.requester_name?.trim() || "Tanpa Nama",
+          amount: typeof r.amount === "number" && Number.isFinite(r.amount) ? r.amount : 0,
+          payment_method: r.payment_method === "SALDO" ? "SALDO" : "CASH",
+          created_at: r.created_at ?? new Date(0).toISOString(),
+        }));
+        setData(safeRows);
         if (json.meta) setMeta(json.meta);
       }
     } catch { if (!silent) toast.error("Gagal memuat data"); }
@@ -1431,6 +1443,7 @@ export default function PengajuanDanaPage() {
         statusText,
         formatDate(r.created_at),
       ].filter(Boolean).join(" ").toLowerCase();
+
       if (!haystack.includes(q)) return false;
     }
 
