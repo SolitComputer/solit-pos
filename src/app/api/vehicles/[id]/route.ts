@@ -48,6 +48,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ success: false, message: "Kendaraan tidak ditemukan." }, { status: 404 });
+
+  // Sinkronkan pengajuan saat Admin ubah status manual lewat modal Edit.
+  // Blok ini SELF-GUARDING: request APPROVED/PENDING hanya ada saat data tidak
+  // sinkron, jadi edit biasa (ganti nama/plat) pada kendaraan TERSEDIA normal
+  // TIDAK terdampak — tidak ada request aktif yang ke-match.
+  if (patch.status === "TERSEDIA" || patch.status === "MAINTENANCE") {
+    // Kendaraan dinyatakan bebas/diservis -> paksa tutup pemakaian yang masih APPROVED
+    // biar tidak jadi data hantu yang mengunci kendaraan saat diajukan lagi.
+    await supabaseVehicles
+      .from("vehicle_borrow_requests")
+      .update({ status: "COMPLETED", actual_end: patch.updated_at })
+      .eq("vehicle_id", id)
+      .eq("status", "APPROVED");
+  }
+  if (patch.status === "MAINTENANCE") {
+    // Masuk maintenance -> pengajuan PENDING tidak mungkin di-ACC (ACC butuh TERSEDIA),
+    // jadi batalkan biar tidak nyangkut.
+    await supabaseVehicles
+      .from("vehicle_borrow_requests")
+      .update({ status: "REJECTED", rejection_note: "Dibatalkan otomatis: kendaraan masuk maintenance oleh admin." })
+      .eq("vehicle_id", id)
+      .eq("status", "PENDING");
+  }
+
   return NextResponse.json({ success: true, data });
 }
 
