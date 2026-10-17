@@ -63,12 +63,16 @@ export async function GET(request: Request) {
 
     const users = (usersRaw ?? []).filter((u: any) => !isPKLRole(u.role)); // ⬅️ buang PKL
 
-    // Saldo awal manual
+    // Saldo awal manual — HANYA yang di-set pada/sesudah cutoff auto-sync.
+    // Opening balance lama (sebelum cutoff) sengaja diabaikan supaya tabel
+    // mulai bersih; admin isi ulang manual lewat tombol "Atur".
     const { data: openings } = await supabase
       .from("kasbon_opening_balances")
-      .select("user_id, kasbon_opening, cicilan_opening");
+      .select("user_id, kasbon_opening, cicilan_opening, updated_at");
     const openMap: Record<string, { k: number; c: number }> = {};
     (openings ?? []).forEach((o: any) => {
+      const updatedAt = String(o.updated_at ?? "").slice(0, 10); // YYYY-MM-DD
+      if (updatedAt && updatedAt < AUTO_SYNC_CUTOFF) return; // ⬅️ opening lama diabaikan
       openMap[o.user_id] = { k: Number(o.kasbon_opening ?? 0), c: Number(o.cicilan_opening ?? 0) };
     });
 
@@ -131,6 +135,11 @@ export async function GET(request: Request) {
     // bulan sebelumnya → ikut mengurangi saldo "Sebelumnya" (carryover).
     const validUserIds = new Set((users ?? []).map((u: any) => u.id));
     const viewIdx = year * 12 + (month - 1);
+    // ⬅️ BARU — index bulan cutoff (mis. 2026-10 → 2026*12 + 9). Potongan gaji
+    // sebelum bulan ini tidak ikut dihitung, biar carryover mulai bersih.
+    const cutoffYear = parseInt(AUTO_SYNC_CUTOFF.slice(0, 4), 10);
+    const cutoffMonth = parseInt(AUTO_SYNC_CUTOFF.slice(5, 7), 10); // 1..12
+    const cutoffIdx = cutoffYear * 12 + (cutoffMonth - 1);
     const { data: allowRows } = await supabase
       .from("user_allowances")
       .select("user_id, year, month, deduction_loan, deduction_cicilan");
@@ -145,6 +154,7 @@ export async function GET(request: Request) {
       if (kasbon === 0 && cicilan === 0) return;
       const aIdx = aYear * 12 + (aMonth - 1);
       if (aIdx > viewIdx) return; // potongan bulan depan → diabaikan
+      if (aIdx < cutoffIdx) return; // ⬅️ BARU — potongan sebelum cutoff tidak dihitung
       const a = ensure(uid);
       if (aIdx < viewIdx) {
         a.priorKasbonIn += kasbon;   // potongan bulan lalu → kurangi "Kasbon Sebelumnya"
