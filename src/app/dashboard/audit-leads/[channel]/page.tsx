@@ -314,14 +314,16 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                   <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><UserCircle2 className="w-3 h-3" /> Diinput Oleh</span>
                   </th>
+                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5"><Pencil className="w-3 h-3" /> Aksi</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   [1, 2, 3].map((i) => (
                     <tr key={i} className="border-b border-gray-50 last:border-0">
-                      <td colSpan={9} className="px-4 py-3.5">
-                        <div className="flex items-center gap-3 animate-pulse">
+                      <td colSpan={10} className="px-4 py-3.5">                        <div className="flex items-center gap-3 animate-pulse">
                           <div className="h-3 w-5 bg-gray-100 rounded-full" />
                           <div className="h-3 flex-1 max-w-[160px] bg-gray-100 rounded-full" />
                           <div className="h-3 flex-1 max-w-[100px] bg-gray-100 rounded-full" />
@@ -332,7 +334,7 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                   ))
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12">
+                    <td colSpan={10} className="px-4 py-12">
                       <div className="flex flex-col items-center text-center">
                         <div className="w-11 h-11 rounded-full bg-violet-50 flex items-center justify-center mb-3">
                           <Inbox className="w-5 h-5 text-violet-300" />
@@ -407,6 +409,28 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                           </span>
                           <span className="text-gray-600">{row.created_by_name}</span>
                         </div>
+                      </td>
+                      <td className="border border-gray-200 px-4 py-3.5 text-center whitespace-nowrap">
+                        {!row.audited && row.source === "manual" ? (
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={() => { setEditingRow(row); setShowForm(true); }}
+                              title="Edit leads"
+                              className="w-7 h-7 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:text-violet-600 hover:bg-violet-50 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(row.id)}
+                              title="Hapus leads"
+                              className="w-7 h-7 inline-flex items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-gray-300 font-medium">—</span>
+                        )}
                       </td>
                     </tr>
                   ))
