@@ -14,6 +14,11 @@ const supabase = createClient(
 // Sama seperti akses Rekap Gaji: hanya role ini yang boleh lihat/atur Kasbon & Cicilan
 const KASBON_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 
+// ⬅️ BARU — Entry cashflow KASBON/CICILAN SEBELUM tanggal ini tidak ditarik
+// otomatis ke tabel (data lama + testing jadi kosong). Transaksi pada/sesudah
+// tanggal ini tetap otomatis masuk seperti biasa.
+const AUTO_SYNC_CUTOFF = "2026-10-17"; // YYYY-MM-DD (WIB)
+
 function getRoles(user: any): string[] {
   return Array.isArray(user?.roles) && user.roles.length > 0
     ? user.roles
@@ -98,6 +103,7 @@ export async function GET(request: Request) {
       const nominal = Math.round(Number(e.nominal ?? 0));
       if (!Number.isFinite(nominal) || nominal <= 0) continue;
       const tgl = String(e.tanggal ?? "");
+      if (tgl < AUTO_SYNC_CUTOFF) continue; // ⬅️ BARU — entry lama (termasuk testing) tidak dihitung
       const isKasbon = e.category === "KASBON";
       const isOut = e.direction === "OUT";
       const a = ensure(uid);

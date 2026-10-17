@@ -18,6 +18,8 @@ export const AKUN = {
   KAS_CASH: "120",
   HPP: "130",
   PIUTANG: "140",
+  KASBON: "141",   // ⬅️ BARU
+  CICILAN: "142",  // ⬅️ BARU
   INVEST: "150",
   ASET_TETAP: "160",
   AKSESORIS: "170",
@@ -54,6 +56,8 @@ export const ACCOUNTS: Account[] = [
   { code: AKUN.KAS_CASH, name: "Kas Cash", type: "ASET", normal: "DEBIT" },
   { code: AKUN.HPP, name: "HPP (Modal)", type: "ASET", normal: "DEBIT" },
   { code: AKUN.PIUTANG, name: "Piutang", type: "ASET", normal: "DEBIT" },
+  { code: AKUN.KASBON, name: "Kasbon", type: "ASET", normal: "DEBIT" },
+  { code: AKUN.CICILAN, name: "Cicilan", type: "ASET", normal: "DEBIT" },
   { code: AKUN.INVEST, name: "Invest", type: "ASET", normal: "DEBIT" },
   { code: AKUN.ASET_TETAP, name: "Aset Tetap", type: "ASET", normal: "DEBIT" },
   { code: AKUN.AKSESORIS, name: "Aksesoris", type: "ASET", normal: "DEBIT" },
@@ -192,6 +196,8 @@ export const CASHFLOW_ACCOUNT: Record<string, string> = {
   // ── 16 kategori baru sesuai daftar divisi accounting ──
   BELANJA_LAPTOP: AKUN.HPP,                        // 130
   PIUTANG: AKUN.PIUTANG,                           // 140
+  KASBON: AKUN.KASBON,                             // 141 — ⬅️ BARU
+  CICILAN: AKUN.CICILAN,                           // 142 — ⬅️ BARU
   INVEST: AKUN.INVEST,                             // 150
   ASET_TETAP: AKUN.ASET_TETAP,                     // 160
   AKSESORIS: AKUN.AKSESORIS,                       // 170
