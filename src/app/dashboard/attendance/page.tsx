@@ -3400,7 +3400,7 @@ function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSa
 }
 
 // ⬅️ BARU — Tab Kasbon & Cicilan
-function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpening, onOpenDetail }: {
+function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpening, onOpenDetail, onExport }: {
     data: any[];
     loading: boolean;
     calYear: number;
@@ -3408,11 +3408,12 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
     isAdmin: boolean;
     onEditOpening: (u: { userId: string; userName: string; kasbon: number; cicilan: number }) => void;
     onOpenDetail: (u: { userId: string; userName: string }) => void;
+    onExport: () => void; // ⬅️ BARU
 }) {
     const cell = (n: number, color = "text-gray-700") =>
         n && n !== 0
             ? <span className={`font-mono font-semibold ${color}`}>{formatRupiah(n)}</span>
-            : <span className="text-gray-200 font-bold">—</span>;
+            : <span className="text-gray-300 font-bold">—</span>;
 
     const totals = useMemo(() => data.reduce((acc, r) => {
         acc.totalKasbon += r.total_kasbon || 0;
@@ -3424,44 +3425,52 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
 
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                <p className="text-base font-bold text-gray-800">Kasbon & Cicilan — {MONTH_NAMES[calMonth]} {calYear}</p>
-                <p className="text-[10px] text-gray-400 mt-1">
-                    Kasbon dipecah per minggu · Cicilan langsung ke total ·
-                    <span className="text-blue-500 font-semibold"> Sisa = Total − Dibayar</span>
-                </p>
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <p className="text-base font-bold text-gray-800">Kasbon & Cicilan — {MONTH_NAMES[calMonth]} {calYear}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                        Kasbon dipecah per minggu · Cicilan langsung ke total ·
+                        <span className="text-blue-500 font-semibold"> Sisa = Total − Dibayar</span>
+                    </p>
+                </div>
+                <button
+                    onClick={onExport}
+                    disabled={loading || data.length === 0}
+                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-50 whitespace-nowrap">
+                    <FileText className="w-3.5 h-3.5" /> Export Excel
+                </button>
             </div>
 
             {loading ? (
                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
             ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[1200px]">
+                                <div className="overflow-x-auto p-4">
+                    <table className="w-full text-sm border-collapse min-w-[1200px]">
                         <thead>
-                            <tr className="border-b border-gray-100 bg-gray-50/60">
-                                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">#</th>
-                                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Nama</th>
-                                <th className="px-3 py-3 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Kasbon Sebelumnya</th>
-                                <th className="px-3 py-3 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Cicilan Sebelumnya</th>
+                            <tr>
+                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest w-8">#</th>
+                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest">Nama</th>
+                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Sebelumnya</th>
+                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Sebelumnya</th>
                                 {[1, 2, 3, 4, 5].map(w => (
-                                    <th key={w} className="px-3 py-3 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Minggu {w}</th>
+                                    <th key={w} className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Minggu {w}</th>
                                 ))}
-                                <th className="px-3 py-3 text-right text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Kasbon</th>
-                                <th className="px-3 py-3 text-right text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Cicilan</th>
-                                <th className="px-3 py-3 text-right text-[10px] font-black text-blue-600 uppercase tracking-widest">Kasbon Dibayar</th>
-                                <th className="px-3 py-3 text-right text-[10px] font-black text-blue-600 uppercase tracking-widest">Cicilan Dibayar</th>
-                                <th className="px-3 py-3 text-right text-[10px] font-black text-red-600 uppercase tracking-widest">Sisa Kasbon</th>
-                                <th className="px-3 py-3 text-right text-[10px] font-black text-red-600 uppercase tracking-widest">Sisa Cicilan</th>
-                                {isAdmin && <th className="px-4 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldo Awal</th>}
+                                <th className="border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Kasbon</th>
+                                <th className="border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Cicilan</th>
+                                <th className="border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Dibayar</th>
+                                <th className="border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Dibayar</th>
+                                <th className="border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Kasbon</th>
+                                <th className="border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Cicilan</th>
+                                {isAdmin && <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest">Saldo Awal</th>}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody>
                             {data.length === 0 ? (
-                                <tr><td colSpan={isAdmin ? 16 : 15} className="py-12 text-center text-sm text-gray-400">Belum ada data</td></tr>
+                                <tr><td colSpan={isAdmin ? 16 : 15} className="border border-gray-300 py-12 text-center text-sm text-gray-400">Belum ada data</td></tr>
                             ) : data.map((r, i) => (
-                                <tr key={r.user_id} className="hover:bg-gray-50/60 transition-colors">
-                                    <td className="px-4 py-3 text-[11px] text-gray-400 font-black">{i + 1}</td>
-                                    <td className="px-4 py-3">
+                                <tr key={r.user_id} className="hover:bg-sky-50/40">
+                                    <td className="border border-gray-300 px-3 py-2 text-center text-[11px] text-gray-400 font-black bg-white">{i + 1}</td>
+                                    <td className="border border-gray-300 px-3 py-2 bg-white">
                                         <button
                                             onClick={() => onOpenDetail({ userId: r.user_id, userName: r.name })}
                                             className="flex items-center gap-2.5 text-left hover:opacity-80 transition-opacity group"
@@ -3477,19 +3486,19 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                             </div>
                                         </button>
                                     </td>
-                                    <td className="px-3 py-3 text-right">{cell(r.kasbon_sebelumnya)}</td>
-                                    <td className="px-3 py-3 text-right">{cell(r.cicilan_sebelumnya)}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right">{cell(r.kasbon_sebelumnya)}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right">{cell(r.cicilan_sebelumnya)}</td>
                                     {(r.minggu ?? [0, 0, 0, 0, 0]).map((w: number, idx: number) => (
-                                        <td key={idx} className="px-3 py-3 text-right">{cell(w)}</td>
+                                        <td key={idx} className="border border-gray-300 px-3 py-2 text-right">{cell(w)}</td>
                                     ))}
-                                    <td className="px-3 py-3 text-right">{cell(r.total_kasbon, "text-emerald-700")}</td>
-                                    <td className="px-3 py-3 text-right">{cell(r.total_cicilan, "text-emerald-700")}</td>
-                                    <td className="px-3 py-3 text-right">{cell(r.kasbon_dibayar, "text-blue-600")}</td>
-                                    <td className="px-3 py-3 text-right">{cell(r.cicilan_dibayar, "text-blue-600")}</td>
-                                    <td className="px-3 py-3 text-right">{cell(r.sisa_kasbon, "text-red-600")}</td>
-                                    <td className="px-3 py-3 text-right">{cell(r.sisa_cicilan, "text-red-600")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-emerald-50/40">{cell(r.total_kasbon, "text-emerald-700")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-emerald-50/40">{cell(r.total_cicilan, "text-emerald-700")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-blue-50/40">{cell(r.kasbon_dibayar, "text-blue-600")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-blue-50/40">{cell(r.cicilan_dibayar, "text-blue-600")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-red-50/40">{cell(r.sisa_kasbon, "text-red-600")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-red-50/40">{cell(r.sisa_cicilan, "text-red-600")}</td>
                                     {isAdmin && (
-                                        <td className="px-4 py-3 text-center">
+                                        <td className="border border-gray-300 px-3 py-2 text-center bg-white">
                                             <button
                                                 onClick={() => onEditOpening({ userId: r.user_id, userName: r.name, kasbon: r.kasbon_opening ?? 0, cicilan: r.cicilan_opening ?? 0 })}
                                                 className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-all whitespace-nowrap"
@@ -3503,14 +3512,14 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                         </tbody>
                         {data.length > 0 && (
                             <tfoot>
-                                <tr className="border-t-2 border-gray-200 bg-gray-50/60">
-                                    <td colSpan={9} className="px-4 py-3 text-sm font-black text-gray-700">TOTAL</td>
-                                    <td className="px-3 py-3 text-right"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalKasbon)}</span></td>
-                                    <td className="px-3 py-3 text-right"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalCicilan)}</span></td>
-                                    <td colSpan={2}></td>
-                                    <td className="px-3 py-3 text-right"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaKasbon)}</span></td>
-                                    <td className="px-3 py-3 text-right"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaCicilan)}</span></td>
-                                    {isAdmin && <td></td>}
+                                <tr>
+                                    <td colSpan={9} className="border border-gray-300 px-3 py-2.5 text-sm font-black text-gray-700 bg-gray-100">TOTAL</td>
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalKasbon)}</span></td>
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalCicilan)}</span></td>
+                                    <td colSpan={2} className="border border-gray-300 bg-gray-100"></td>
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaKasbon)}</span></td>
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaCicilan)}</span></td>
+                                    {isAdmin && <td className="border border-gray-300 bg-gray-100"></td>}
                                 </tr>
                             </tfoot>
                         )}
@@ -3763,12 +3772,13 @@ function KasbonDetailModal({ userId, userName, calYear, calMonth, canEdit, onClo
 }
 
 // ⬅️ BARU — Tab Dana Pensiun (tabel 12 bulan, gaya Excel dengan garis)
-function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual }: {
+function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }: {
     data: any[];
     loading: boolean;
     calYear: number;
     isAdmin: boolean;
     onManual: () => void;
+    onExport: () => void; // ⬅️ BARU
 }) {
     const grandTotal = useMemo(() => data.reduce((s, r) => s + (r.total || 0), 0), [data]);
     const monthTotals = useMemo(() => {
@@ -3791,13 +3801,21 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual }: {
                         Otomatis terisi dari potongan <span className="text-purple-500 font-semibold">Dana Pensiun</span> di tombol Tunjangan · bisa juga diisi manual
                     </p>
                 </div>
-                {isAdmin && (
+                <div className="flex items-center gap-2 flex-wrap">
                     <button
-                        onClick={onManual}
-                        className="flex items-center gap-1.5 text-xs font-bold text-purple-600 bg-purple-50 border border-purple-200 px-4 py-2 rounded-xl hover:bg-purple-100 transition-all whitespace-nowrap">
-                        ＋ Isi Manual
+                        onClick={onExport}
+                        disabled={loading || data.length === 0}
+                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-50 whitespace-nowrap">
+                        <FileText className="w-3.5 h-3.5" /> Export Excel
                     </button>
-                )}
+                    {isAdmin && (
+                        <button
+                            onClick={onManual}
+                            className="flex items-center gap-1.5 text-xs font-bold text-purple-600 bg-purple-50 border border-purple-200 px-4 py-2 rounded-xl hover:bg-purple-100 transition-all whitespace-nowrap">
+                            ＋ Isi Manual
+                        </button>
+                    )}
+                </div>
             </div>
 
             {loading ? (
@@ -5520,6 +5538,169 @@ export default function AttendanceDashboardPage() {
         URL.revokeObjectURL(url);
     }, [userSummary, allUsers, salaryMap, allowanceMap, overtimeTotal, calMonth, calYear]);
 
+    // ⬅️ BARU — Export tabel Kasbon & Cicilan ke Excel (gaya bergaris)
+    const exportKasbonCicilanToExcel = useCallback(async () => {
+        if (kasbonData.length === 0) { alert("Tidak ada data untuk di-export"); return; }
+        const { default: ExcelJS } = await import("exceljs");
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "Solit 03";
+        wb.created = new Date();
+        const ws = wb.addWorksheet("Kasbon & Cicilan", { views: [{ state: "frozen", xSplit: 2, ySplit: 3 }] });
+
+        const headers = ["No", "Nama", "Kasbon Sebelumnya", "Cicilan Sebelumnya", "Minggu 1", "Minggu 2", "Minggu 3", "Minggu 4", "Minggu 5", "Total Kasbon", "Total Cicilan", "Kasbon Dibayar", "Cicilan Dibayar", "Sisa Kasbon", "Sisa Cicilan"];
+        const colCount = headers.length;
+
+        ws.getColumn(1).width = 5;
+        ws.getColumn(2).width = 26;
+        for (let c = 3; c <= colCount; c++) ws.getColumn(c).width = 16;
+
+        ws.mergeCells(1, 1, 1, colCount);
+        const title = ws.getCell("A1");
+        title.value = `KASBON & CICILAN — ${MONTH_NAMES[calMonth].toUpperCase()} ${calYear}`;
+        title.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
+        title.alignment = { vertical: "middle", horizontal: "center" };
+        title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A1A2E" } };
+        ws.getRow(1).height = 26;
+
+        ws.mergeCells(2, 1, 2, colCount);
+        const sub = ws.getCell("A2");
+        sub.value = `Solit 03 · Diexport ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
+        sub.font = { italic: true, size: 10, color: { argb: "FF6B7280" } };
+        sub.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(2).height = 16;
+
+        const thin = { style: "thin" as const, color: { argb: "FF9CA3AF" } };
+        const border = { top: thin, left: thin, bottom: thin, right: thin };
+
+        const headerRow = ws.addRow(headers);
+        headerRow.height = 22;
+        headerRow.eachCell((cell) => {
+            cell.font = { bold: true, size: 10, color: { argb: "FF1F2937" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFBAE6FD" } };
+            cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+            cell.border = border;
+        });
+
+        const numCols = new Set([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+        const totals = { totalKasbon: 0, totalCicilan: 0, sisaKasbon: 0, sisaCicilan: 0 };
+
+        kasbonData.forEach((r: any, idx: number) => {
+            const weeks = r.minggu ?? [0, 0, 0, 0, 0];
+            const row = ws.addRow([
+                idx + 1, r.name,
+                r.kasbon_sebelumnya || 0, r.cicilan_sebelumnya || 0,
+                weeks[0] || 0, weeks[1] || 0, weeks[2] || 0, weeks[3] || 0, weeks[4] || 0,
+                r.total_kasbon || 0, r.total_cicilan || 0,
+                r.kasbon_dibayar || 0, r.cicilan_dibayar || 0,
+                r.sisa_kasbon || 0, r.sisa_cicilan || 0,
+            ]);
+            totals.totalKasbon += r.total_kasbon || 0;
+            totals.totalCicilan += r.total_cicilan || 0;
+            totals.sisaKasbon += r.sisa_kasbon || 0;
+            totals.sisaCicilan += r.sisa_cicilan || 0;
+            row.eachCell((cell, c) => {
+                cell.border = border;
+                cell.font = { size: 10 };
+                if (c === 1) cell.alignment = { horizontal: "center" };
+                else if (c === 2) cell.alignment = { horizontal: "left" };
+                else { cell.numFmt = "#,##0"; cell.alignment = { horizontal: "right" }; }
+            });
+        });
+
+        const totalRow = ws.addRow(["", "TOTAL", "", "", "", "", "", "", "", totals.totalKasbon, totals.totalCicilan, "", "", totals.sisaKasbon, totals.sisaCicilan]);
+        totalRow.eachCell((cell, c) => {
+            cell.border = border;
+            cell.font = { bold: true, size: 10 };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+            if (numCols.has(c)) { cell.numFmt = "#,##0"; cell.alignment = { horizontal: "right" }; }
+        });
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Kasbon_Cicilan_${MONTH_NAMES[calMonth]}_${calYear}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }, [kasbonData, calMonth, calYear]);
+
+    // ⬅️ BARU — Export tabel Dana Pensiun (12 bulan) ke Excel
+    const exportPensionToExcel = useCallback(async () => {
+        if (pensionData.length === 0) { alert("Tidak ada data untuk di-export"); return; }
+        const { default: ExcelJS } = await import("exceljs");
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "Solit 03";
+        wb.created = new Date();
+        const ws = wb.addWorksheet("Dana Pensiun", { views: [{ state: "frozen", xSplit: 1, ySplit: 3 }] });
+
+        const headers = ["Nama", ...MONTH_NAMES, "Total"];
+        const colCount = headers.length; // 14
+
+        ws.getColumn(1).width = 26;
+        for (let c = 2; c <= colCount; c++) ws.getColumn(c).width = 14;
+
+        ws.mergeCells(1, 1, 1, colCount);
+        const title = ws.getCell("A1");
+        title.value = `DANA PENSIUN — ${calYear}`;
+        title.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
+        title.alignment = { vertical: "middle", horizontal: "center" };
+        title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF6D28D9" } };
+        ws.getRow(1).height = 26;
+
+        ws.mergeCells(2, 1, 2, colCount);
+        const sub = ws.getCell("A2");
+        sub.value = `Solit 03 · Diexport ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
+        sub.font = { italic: true, size: 10, color: { argb: "FF6B7280" } };
+        sub.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(2).height = 16;
+
+        const thin = { style: "thin" as const, color: { argb: "FF9CA3AF" } };
+        const border = { top: thin, left: thin, bottom: thin, right: thin };
+
+        const headerRow = ws.addRow(headers);
+        headerRow.height = 20;
+        headerRow.eachCell((cell, c) => {
+            cell.font = { bold: true, size: 10, color: { argb: "FF1F2937" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: c === colCount ? "FF7DD3FC" : "FFBAE6FD" } };
+            cell.alignment = { vertical: "middle", horizontal: "center" };
+            cell.border = border;
+        });
+
+        const monthTotals = new Array(12).fill(0);
+        let grandTotal = 0;
+
+        pensionData.forEach((r: any) => {
+            const months = r.months ?? new Array(12).fill(0);
+            const row = ws.addRow([r.name, ...months.map((v: number) => v || 0), r.total || 0]);
+            months.forEach((v: number, i: number) => { monthTotals[i] += v || 0; });
+            grandTotal += r.total || 0;
+            row.eachCell((cell, c) => {
+                cell.border = border;
+                cell.font = { size: 10 };
+                if (c === 1) cell.alignment = { horizontal: "left" };
+                else { cell.numFmt = "#,##0"; cell.alignment = { horizontal: "right" }; }
+            });
+        });
+
+        const totalRow = ws.addRow(["TOTAL", ...monthTotals, grandTotal]);
+        totalRow.eachCell((cell, c) => {
+            cell.border = border;
+            cell.font = { bold: true, size: 10 };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+            if (c > 1) { cell.numFmt = "#,##0"; cell.alignment = { horizontal: "right" }; }
+        });
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Dana_Pensiun_${calYear}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }, [pensionData, calYear]);
+
     const buildAttendanceDetail = useCallback((
         userName: string,
         type: "present" | "late"
@@ -6675,6 +6856,7 @@ export default function AttendanceDashboardPage() {
                         isAdmin={isAdmin}
                         onEditOpening={(u) => setEditOpeningUser(u)}
                         onOpenDetail={(u) => setKasbonDetailUser(u)}
+                        onExport={exportKasbonCicilanToExcel}
                     />
                 )}
 
@@ -6686,6 +6868,7 @@ export default function AttendanceDashboardPage() {
                         calYear={calYear}
                         isAdmin={isAdmin}
                         onManual={async () => { if (allUsers.length === 0) await fetchAllUsers(); setShowPensionManual(true); }}
+                        onExport={exportPensionToExcel}
                     />
                 )}
 
