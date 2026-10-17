@@ -448,6 +448,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
         deal_price: Number(it.deal_price ?? 0),
         selling_price: Number(it.selling_price ?? 0),
         is_bonus: Boolean(it.is_bonus || Number(it.deal_price) === 0),
+        serial_number: it.serial_number && it.serial_number !== "-" ? it.serial_number : null,
       }));
 
     // Enrich names from accessories table if missing or generic
@@ -971,7 +972,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         unit_id: null,
         accessory_id: a.accessory_id && String(a.accessory_id).trim() ? a.accessory_id : null,
         laptop_id: fallbackLaptopId,
-        serial_number: "-",
+        serial_number: a.serial_number ? String(a.serial_number).trim() : "-",
         laptop_name: a.name || "Aksesori",
         item_name: a.name || "Aksesori",
         quantity: Number(a.quantity) || 1,
@@ -987,29 +988,62 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         if (accInsertErr) console.error("[PUT /api/transaction] insert accessory_items error:", accInsertErr.message);
       }
 
-      // 3. Reconcile accessory_outflows & stok aksesori
+      // 3. Reconcile accessory_outflows, stok, & status unit SN.
+      // cancelOutflowByInvoice mengembalikan unit SN lama (yang unit_id-nya
+      // tersimpan di outflow) ke TERSEDIA + menambah balik stok — jadi aman
+      // dipanggil ulang tiap edit, dan status unit ikut round-trip otomatis.
       await cancelOutflowByInvoice(invoice);
       for (const a of body.accessories) {
-        if (a.accessory_id && Number(a.quantity) > 0) {
-          await recordOutflow({
-            accessory_id: a.accessory_id,
-            source_type: "transaction",
-            transaction_invoice: invoice,
-            qty: Number(a.quantity),
-            notes: `Penjualan (Edit) ${invoice}`,
-            taken_by_role: "SALES",
-          });
-          const { data: acc } = await supabase
-            .from("accessories")
-            .select("stock")
-            .eq("id", a.accessory_id)
+        if (!a.accessory_id || Number(a.quantity) <= 0) continue;
+
+        // Resolusi unit SN: pakai unit_id dari form; kalau kosong (kasus re-edit,
+        // unit_id tidak terbawa ulang dari GET) → backfill dari serial_number.
+        let unitId = a.unit_id ? String(a.unit_id).trim() : null;
+        const accSn = a.serial_number ? String(a.serial_number).trim() : null;
+        if (!unitId && accSn) {
+          const { data: u } = await supabase
+            .from("accessory_units")
+            .select("id")
+            .eq("serial_number", accSn)
             .maybeSingle();
-          if (acc) {
-            await supabase
-              .from("accessories")
-              .update({ stock: Math.max(0, (Number(acc.stock) || 0) - Number(a.quantity)) })
-              .eq("id", a.accessory_id);
-          }
+          unitId = u?.id ?? null;
+        }
+
+        await recordOutflow({
+          accessory_id: a.accessory_id,
+          unit_id: unitId, // ✅ simpan unit_id → cancel/restore bisa balikin unit ini
+          source_type: "transaction",
+          transaction_invoice: invoice,
+          qty: Number(a.quantity),
+          notes: `Penjualan (Edit) ${invoice}`,
+          taken_by_role: "SALES",
+        });
+
+        // ✅ Tandai unit SN-nya KELUAR (atomic, cuma kalau masih TERSEDIA) supaya
+        // HILANG dari Data Barang & halaman Kelola Unit. Dipilih "KELUAR" (bukan
+        // "TERJUAL") karena status itulah yang sudah di-hide di semua halaman unit,
+        // DAN restockActiveOutflows mengembalikannya ke TERSEDIA saat transaksi
+        // dibatalkan — jadi unit otomatis muncul lagi kalau di-restore.
+        if (unitId) {
+          await supabase
+            .from("accessory_units")
+            .update({ status: "KELUAR" })
+            .eq("id", unitId)
+            .eq("status", "TERSEDIA");
+        }
+
+        // Stok bulk tetap dikurangi seperti sebelumnya (kolom ini dipakai aksesoris
+        // TANPA SN; untuk yang ber-SN tidak ditampilkan, jadi tidak bikin dobel).
+        const { data: acc } = await supabase
+          .from("accessories")
+          .select("stock")
+          .eq("id", a.accessory_id)
+          .maybeSingle();
+        if (acc) {
+          await supabase
+            .from("accessories")
+            .update({ stock: Math.max(0, (Number(acc.stock) || 0) - Number(a.quantity)) })
+            .eq("id", a.accessory_id);
         }
       }
 

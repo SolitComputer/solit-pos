@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
-import { cancelOutflowByInvoice } from "@/lib/accessoryOutflow";
+import { cancelOutflowByInvoice, recordOutflow } from "@/lib/accessoryOutflow";
 
 interface Props {
   params: Promise<{ invoice: string }>;
@@ -545,6 +545,55 @@ async function handlePartialRestore({
 
     if (updateTxError) {
       return NextResponse.json({ success: false, message: updateTxError.message }, { status: 400 });
+    }
+
+    // 5c. Sinkronkan ulang outflow aksesoris.
+    // Partial restore meng-update ulang baris transaksi tanpa menghitung aksesoris,
+    // jadi outflow lama (semua unit SSD yg KELUAR) dibatalkan dulu — unit balik
+    // TERSEDIA — lalu dicatat ulang HANYA untuk aksesoris yg masih aktif di
+    // transaction_items (restored=false). Tanpa ini, unit SSD nyangkut "KELUAR"
+    // padahal transaksinya masih jalan.
+    await cancelOutflowByInvoice(invoice);
+    {
+      const { data: activeAccItems } = await supabase
+        .from("transaction_items")
+        .select("accessory_id, serial_number, quantity")
+        .eq("invoice_number", invoice)
+        .eq("restored", false)
+        .or("item_type.eq.accessory,and(accessory_id.not.is.null,unit_id.is.null)");
+
+      for (const a of activeAccItems ?? []) {
+        if (!a.accessory_id) continue;
+
+        let unitId: string | null = null;
+        const accSn = a.serial_number && a.serial_number !== "-" ? String(a.serial_number).trim() : null;
+        if (accSn) {
+          const { data: u } = await supabase
+            .from("accessory_units")
+            .select("id")
+            .eq("serial_number", accSn)
+            .maybeSingle();
+          unitId = u?.id ?? null;
+        }
+
+        await recordOutflow({
+          accessory_id: a.accessory_id,
+          unit_id: unitId,
+          source_type: "transaction",
+          transaction_invoice: invoice,
+          qty: Number(a.quantity) || 1,
+          notes: `Penjualan (Partial Restore) ${invoice}`,
+          taken_by_role: "SALES",
+        });
+
+        if (unitId) {
+          await supabase
+            .from("accessory_units")
+            .update({ status: "KELUAR" })
+            .eq("id", unitId)
+            .eq("status", "TERSEDIA");
+        }
+      }
     }
 
     // 6. Log aktivitas — inilah "history" yang kamu minta

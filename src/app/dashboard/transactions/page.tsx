@@ -654,7 +654,7 @@ function ConfirmPaymentModal({
       // (dulu 1MB/1600px → sekarang 0.3MB/1280px, jauh lebih hemat storage)
       const file = await compressImage(rawFile, { maxSizeMB: 0.3, maxWidthOrHeight: 1280 });
       const fd = new FormData();
-    fd.append("file", file);
+      fd.append("file", file);
       fd.append("invoice", item.invoice_number);
       const res = await fetch("/api/receipt/upload-image", { method: "POST", body: fd });
       const r = await res.json();
@@ -1364,7 +1364,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
 
                   return (
                     <div key={idx} className="flex items-center justify-between text-xs text-[#1a1545]">
-                      <span className="truncate pr-2">• {name} <strong className="text-emerald-700">({qty}x)</strong></span>
+                      <span className="truncate pr-2">• {name}{a.serial_number ? ` · ${a.serial_number}` : ""} <strong className="text-emerald-700">({qty}x)</strong></span>
                       <span className="font-mono font-bold text-[11px] flex-shrink-0">
                         {isBonus ? <span className="text-amber-700 font-bold">BONUS</span> : `Rp${deal.toLocaleString("id-ID")}`}
                       </span>
@@ -2279,6 +2279,9 @@ function TransactionDetailModal({
                             </span>
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-[#1a1545] truncate">{name}</p>
+                              {a.serial_number && (
+                                <p className="text-[9px] font-mono text-gray-400">SN: {a.serial_number}</p>
+                              )}
                               {isBonus ? (
                                 <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 inline-block mt-0.5">
                                   BONUS
@@ -2491,6 +2494,7 @@ function EditTransactionModal({
             deal_price: Number(a.deal_price ?? 0),
             selling_price: Number(a.selling_price ?? 0),
             is_bonus: Boolean(a.is_bonus || Number(a.deal_price) === 0),
+            serial_number: a.serial_number ?? undefined,
           }));
           setAccessories(accs);
 
