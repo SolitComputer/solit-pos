@@ -69,6 +69,7 @@ export async function POST(request: Request) {
       allowance_wife = 0,
       allowance_child = 0,
       deduction_loan = 0,
+      deduction_cicilan = 0, // ⬅️ BARU — bayar Cicilan via potong gaji
       deduction_pension = 0,
     } = body;
 
@@ -104,8 +105,8 @@ export async function POST(request: Request) {
     }
 
     // Validasi field
-    const fields = { allowance_wife, allowance_child, deduction_loan, deduction_pension };
-    for (const [key, val] of Object.entries(fields)) {
+    const fields = { allowance_wife, allowance_child, deduction_loan, deduction_cicilan, deduction_pension };
+        for (const [key, val] of Object.entries(fields)) {
       if (typeof val !== "number" || val < 0) {
         return NextResponse.json(
           { success: false, message: `${key} harus angka non-negatif` },
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
           allowance_wife: Math.round(allowance_wife),
           allowance_child: Math.round(allowance_child),
           deduction_loan: Math.round(deduction_loan),
+          deduction_cicilan: Math.round(deduction_cicilan), // ⬅️ BARU
           deduction_pension: Math.round(deduction_pension),
           updated_at: new Date().toISOString(),
         },

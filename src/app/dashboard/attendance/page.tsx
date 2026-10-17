@@ -81,6 +81,7 @@ type UserAllowances = {
     allowance_wife: number;
     allowance_child: number;
     deduction_loan: number;
+    deduction_cicilan: number; // ⬅️ BARU — potong Cicilan dari gaji
     deduction_pension: number;
     updated_at: string;
 };
@@ -435,15 +436,16 @@ function computeMonthlySalary(
 
     // Potongan: selalu langsung (tidak disesuaikan %)
     const deductionLoan = allowance?.deduction_loan || 0;
+    const deductionCicilan = allowance?.deduction_cicilan || 0; // ⬅️ BARU
     const deductionPension = allowance?.deduction_pension || 0;
 
     const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtimeAmount;
-    const totalDeduction = deductionLoan + deductionPension;
+    const totalDeduction = deductionLoan + deductionCicilan + deductionPension;
     const netSalary = grossIncome - totalDeduction;
 
     return {
         salaryIncome, allowanceWife, allowanceChild, overtime: overtimeAmount,
-        grossIncome, deductionLoan, deductionPension, totalDeduction, netSalary,
+        grossIncome, deductionLoan, deductionCicilan, deductionPension, totalDeduction, netSalary,
     };
 }
 
@@ -998,6 +1000,7 @@ function EditAllowanceModal({
         allowance_wife: currentAllowance?.allowance_wife ?? 0,
         allowance_child: currentAllowance?.allowance_child ?? 0,
         deduction_loan: currentAllowance?.deduction_loan ?? 0,
+        deduction_cicilan: currentAllowance?.deduction_cicilan ?? 0, // ⬅️ BARU
         deduction_pension: currentAllowance?.deduction_pension ?? 0,
     });
     const [saving, setSaving] = useState(false);
@@ -1116,10 +1119,10 @@ function EditAllowanceModal({
                             Potongan (Langsung Potong, Tidak Disesuaikan %)
                         </p>
                         <div className="space-y-3">
-                            {/* Cicilan Kasbon */}
+                            {/* Bayar Kasbon (potong gaji) — mengurangi Sisa Kasbon */}
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                                    Cicilan Kasbon / Pinjaman
+                                    Bayar Kasbon (Potong Gaji)
                                 </label>
                                 <div className="relative">
                                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
@@ -1135,7 +1138,30 @@ function EditAllowanceModal({
                                     />
                                 </div>
                                 <p className="text-[10px] text-gray-400 mt-1">
-                                    Dipotong penuh setiap bulan, tidak disesuaikan kehadiran
+                                    Dipotong dari gaji & otomatis <strong className="text-emerald-600">mengurangi Sisa Kasbon</strong> karyawan di tab Kasbon &amp; Cicilan
+                                </p>
+                            </div>
+
+                            {/* Bayar Cicilan (potong gaji) — mengurangi Sisa Cicilan */}
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                                    Bayar Cicilan (Potong Gaji)
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={form.deduction_cicilan}
+                                        onChange={(e) =>
+                                            setForm((f) => ({ ...f, deduction_cicilan: parseInt(e.target.value) || 0 }))
+                                        }
+                                        placeholder="Contoh: 100000"
+                                        className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20 font-mono"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1">
+                                    Dipotong dari gaji & otomatis <strong className="text-emerald-600">mengurangi Sisa Cicilan</strong> karyawan di tab Kasbon &amp; Cicilan
                                 </p>
                             </div>
 
@@ -1177,8 +1203,12 @@ function EditAllowanceModal({
                                 <span className="font-bold text-gray-800">{formatRupiah(form.allowance_child)}</span>
                             </div>
                             <div className="flex justify-between text-gray-600">
-                                <span>Cicilan Kasbon</span>
+                                <span>Bayar Kasbon</span>
                                 <span className="font-bold text-red-600">-{formatRupiah(form.deduction_loan)}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-600">
+                                <span>Bayar Cicilan</span>
+                                <span className="font-bold text-red-600">-{formatRupiah(form.deduction_cicilan)}</span>
                             </div>
                             <div className="flex justify-between text-gray-600">
                                 <span>Dana Pensiun</span>
@@ -2620,6 +2650,7 @@ type SalarySlip = {
     total_income: number;
     deduction_violation: number;
     deduction_loan: number;
+    deduction_cicilan: number; // ⬅️ BARU
     deduction_pension: number;
     total_deduction: number;
     net_salary: number;
@@ -3438,8 +3469,11 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                         >
                                             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">{initials(r.name)}</div>
                                             <div>
-                                                <p className="font-bold text-gray-800 text-sm leading-tight group-hover:text-[#1a1a2e] group-hover:underline decoration-dotted underline-offset-2">{r.name}</p>
-                                                <p className="text-[10px] text-gray-400">{(r.role || "").replace(/_/g, " ")}</p>
+                                                <p className="font-bold text-gray-800 text-sm leading-tight flex items-center gap-1.5 group-hover:text-indigo-600">
+                                                    {r.name}
+                                                    <Pencil className="w-3 h-3 text-indigo-400 group-hover:text-indigo-600" />
+                                                </p>
+                                                <p className="text-[10px] text-indigo-400 group-hover:text-indigo-600 font-semibold">Klik untuk detail & edit →</p>
                                             </div>
                                         </button>
                                     </td>
@@ -5009,11 +5043,12 @@ export default function AttendanceDashboardPage() {
 
             // Potongan (langsung)
             const deductionLoan = allow?.deduction_loan || 0;
+            const deductionCicilan = allow?.deduction_cicilan || 0; // ⬅️ BARU
             const deductionPension = allow?.deduction_pension || 0;
 
             // Total
             const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtimeAmount;
-            const totalDeduction = deductionLoan + deductionPension;
+            const totalDeduction = deductionLoan + deductionCicilan + deductionPension;
             const netSalary = grossIncome - totalDeduction;
 
             console.log(`[generateSlipFromRecapan] Generate slip untuk ${userStat.name}:`, {
@@ -5042,6 +5077,7 @@ export default function AttendanceDashboardPage() {
                     overtime: overtimeAmount,
                     total_income: grossIncome,
                     deduction_loan: deductionLoan,
+                    deduction_cicilan: deductionCicilan, // ⬅️ BARU
                     deduction_pension: deductionPension,
                     total_deduction: totalDeduction,
                     net_salary: netSalary,
@@ -5192,7 +5228,7 @@ export default function AttendanceDashboardPage() {
             cell.alignment = { vertical: "middle", horizontal: "center" };
         });
 
-        const subHeaderLabels = ["Gaji Pokok", "Tunjangan Istri", "Tunjangan Anak", "Lemburan", "Kasbon", "Pensiun", "Gross", "Total Potongan", "Gaji Bersih (Net)"];
+        const subHeaderLabels = ["Gaji Pokok", "Tunjangan Istri", "Tunjangan Anak", "Lemburan", "Kasbon", "Cicilan", "Pensiun", "Gross", "Total Potongan", "Gaji Bersih (Net)"];
         subHeaderLabels.forEach((label, i) => {
             const cell = sheet.getCell(5, i + 3); // mulai kolom C
             cell.value = label;
@@ -6493,7 +6529,7 @@ export default function AttendanceDashboardPage() {
                                             </th>
 
                                             {/* POTONGAN SECTION */}
-                                            <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50/40 border-2 border-gray-300 whitespace-nowrap">
+                                            <th colSpan={3} className="px-4 py-4 text-center text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50/40 border-2 border-gray-300 whitespace-nowrap">
                                                 POTONGAN
                                             </th>
 
@@ -6518,6 +6554,7 @@ export default function AttendanceDashboardPage() {
 
                                             {/* Potongan sub-headers */}
                                             <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Kasbon</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Cicilan</th>
                                             <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Pensiun</th>
 
                                             {/* Total sub-headers */}
@@ -6541,7 +6578,7 @@ export default function AttendanceDashboardPage() {
 
                                                 const {
                                                     allowanceWife, allowanceChild,
-                                                    grossIncome, deductionLoan, deductionPension,
+                                                    grossIncome, deductionLoan, deductionCicilan, deductionPension,
                                                     netSalary,
                                                 } = computeMonthlySalary(sal, allow, overtime, u);
 
@@ -6678,6 +6715,17 @@ export default function AttendanceDashboardPage() {
                                                             )}
                                                         </td>
 
+                                                        {/* Cicilan */}
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            {deductionCicilan > 0 ? (
+                                                                <span className="font-mono font-bold text-red-600 text-xs">
+                                                                    -{formatRupiah(deductionCicilan)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 text-xs">—</span>
+                                                            )}
+                                                        </td>
+
                                                         {/* Pensiun */}
                                                         <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                             {deductionPension > 0 ? (
@@ -6806,6 +6854,18 @@ export default function AttendanceDashboardPage() {
                                                 <span className="text-[8px] text-gray-400">Total Kasbon</span>
                                             </td>
 
+                                            {/* Cicilan Total */}
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-red-600 text-xs block">
+                                                    -{formatRupiah(
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + (allowanceMap[u.userId]?.deduction_cicilan || 0), 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Total Cicilan</span>
+                                            </td>
+
                                             {/* Pensiun Total */}
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-red-600 text-xs block">
@@ -6824,7 +6884,7 @@ export default function AttendanceDashboardPage() {
                                                     -{formatRupiah(
                                                         userSummary
                                                             .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
-                                                            .reduce((sum, u) => sum + ((allowanceMap[u.userId]?.deduction_loan || 0) + (allowanceMap[u.userId]?.deduction_pension || 0)), 0)
+                                                            .reduce((sum, u) => sum + ((allowanceMap[u.userId]?.deduction_loan || 0) + (allowanceMap[u.userId]?.deduction_cicilan || 0) + (allowanceMap[u.userId]?.deduction_pension || 0)), 0)
                                                     )}
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Total Potongan</span>
