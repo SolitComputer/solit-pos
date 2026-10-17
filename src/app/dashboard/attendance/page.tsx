@@ -3415,13 +3415,20 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
             ? <span className={`font-mono font-semibold ${color}`}>{formatRupiah(n)}</span>
             : <span className="text-gray-300 font-bold">—</span>;
 
-    const totals = useMemo(() => data.reduce((acc, r) => {
+    const [search, setSearch] = useState(""); // ⬅️ BARU — cari nama karyawan
+    const filteredData = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return data;
+        return data.filter(r => (r.name ?? "").toLowerCase().includes(q));
+    }, [data, search]);
+
+    const totals = useMemo(() => filteredData.reduce((acc, r) => {
         acc.totalKasbon += r.total_kasbon || 0;
         acc.totalCicilan += r.total_cicilan || 0;
         acc.sisaKasbon += r.sisa_kasbon || 0;
         acc.sisaCicilan += r.sisa_cicilan || 0;
         return acc;
-    }, { totalKasbon: 0, totalCicilan: 0, sisaKasbon: 0, sisaCicilan: 0 }), [data]);
+    }, { totalKasbon: 0, totalCicilan: 0, sisaKasbon: 0, sisaCicilan: 0 }), [filteredData]);
 
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -3433,44 +3440,56 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                         <span className="text-blue-500 font-semibold"> Sisa = Total − Dibayar</span>
                     </p>
                 </div>
-                <button
-                    onClick={onExport}
-                    disabled={loading || data.length === 0}
-                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-50 whitespace-nowrap">
-                    <FileText className="w-3.5 h-3.5" /> Export Excel
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative">
+                        <svg className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Cari nama karyawan..."
+                            className="h-9 w-48 sm:w-56 border border-gray-200 rounded-xl pl-9 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400/20 transition-all"
+                        />
+                    </div>
+                    <button
+                        onClick={onExport}
+                        disabled={loading || data.length === 0}
+                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-50 whitespace-nowrap">
+                        <FileText className="w-3.5 h-3.5" /> Export Excel
+                    </button>
+                </div>
             </div>
 
             {loading ? (
                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
             ) : (
-                                <div className="overflow-x-auto p-4">
+                <div className="overflow-auto p-4 max-h-[70vh]">
                     <table className="w-full text-sm border-collapse min-w-[1200px]">
                         <thead>
                             <tr>
-                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest w-8">#</th>
-                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest">Nama</th>
-                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Sebelumnya</th>
-                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Sebelumnya</th>
+                                <th className="sticky top-0 left-0 z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest w-11">#</th>
+                                <th className="sticky top-0 left-[44px] z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest">Nama</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Sebelumnya</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Sebelumnya</th>
                                 {[1, 2, 3, 4, 5].map(w => (
-                                    <th key={w} className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Minggu {w}</th>
+                                    <th key={w} className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Minggu {w}</th>
                                 ))}
-                                <th className="border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Kasbon</th>
-                                <th className="border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Cicilan</th>
-                                <th className="border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Dibayar</th>
-                                <th className="border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Dibayar</th>
-                                <th className="border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Kasbon</th>
-                                <th className="border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Cicilan</th>
-                                {isAdmin && <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest">Saldo Awal</th>}
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Kasbon</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Cicilan</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Dibayar</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Dibayar</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Kasbon</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Cicilan</th>
+                                {isAdmin && <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest">Saldo Awal</th>}
                             </tr>
                         </thead>
                         <tbody>
-                            {data.length === 0 ? (
-                                <tr><td colSpan={isAdmin ? 16 : 15} className="border border-gray-300 py-12 text-center text-sm text-gray-400">Belum ada data</td></tr>
-                            ) : data.map((r, i) => (
-                                <tr key={r.user_id} className="hover:bg-sky-50/40">
-                                    <td className="border border-gray-300 px-3 py-2 text-center text-[11px] text-gray-400 font-black bg-white">{i + 1}</td>
-                                    <td className="border border-gray-300 px-3 py-2 bg-white">
+                            {filteredData.length === 0 ? (
+                                <tr><td colSpan={isAdmin ? 16 : 15} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
+                            ) : filteredData.map((r, i) => (
+                                <tr key={r.user_id} className="hover:bg-sky-50/40 group">
+                                    <td className="sticky left-0 z-10 border border-gray-300 px-3 py-2 text-center text-[11px] text-gray-400 font-black bg-white group-hover:bg-sky-50">{i + 1}</td>
+                                    <td className="sticky left-[44px] z-10 border border-gray-300 px-3 py-2 bg-white group-hover:bg-sky-50">
                                         <button
                                             onClick={() => onOpenDetail({ userId: r.user_id, userName: r.name })}
                                             className="flex items-center gap-2.5 text-left hover:opacity-80 transition-opacity group"
@@ -3510,10 +3529,10 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                 </tr>
                             ))}
                         </tbody>
-                        {data.length > 0 && (
+                        {filteredData.length > 0 && (
                             <tfoot>
                                 <tr>
-                                    <td colSpan={9} className="border border-gray-300 px-3 py-2.5 text-sm font-black text-gray-700 bg-gray-100">TOTAL</td>
+                                    <td colSpan={9} className="sticky left-0 z-10 border border-gray-300 px-3 py-2.5 text-sm font-black text-gray-700 bg-gray-100">TOTAL</td>
                                     <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalKasbon)}</span></td>
                                     <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalCicilan)}</span></td>
                                     <td colSpan={2} className="border border-gray-300 bg-gray-100"></td>
@@ -3780,12 +3799,19 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
     onManual: () => void;
     onExport: () => void; // ⬅️ BARU
 }) {
-    const grandTotal = useMemo(() => data.reduce((s, r) => s + (r.total || 0), 0), [data]);
+    const [search, setSearch] = useState(""); // ⬅️ BARU — cari nama karyawan
+    const filteredData = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return data;
+        return data.filter(r => (r.name ?? "").toLowerCase().includes(q));
+    }, [data, search]);
+
+    const grandTotal = useMemo(() => filteredData.reduce((s, r) => s + (r.total || 0), 0), [filteredData]);
     const monthTotals = useMemo(() => {
         const t = new Array(12).fill(0);
-        data.forEach(r => (r.months ?? []).forEach((v: number, i: number) => { t[i] += v || 0; }));
+        filteredData.forEach(r => (r.months ?? []).forEach((v: number, i: number) => { t[i] += v || 0; }));
         return t;
-    }, [data]);
+    }, [filteredData]);
 
     const cell = (n: number) =>
         n && n !== 0
@@ -3802,6 +3828,16 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative">
+                        <svg className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Cari nama karyawan..."
+                            className="h-9 w-48 sm:w-56 border border-gray-200 rounded-xl pl-9 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400/20 transition-all"
+                        />
+                    </div>
                     <button
                         onClick={onExport}
                         disabled={loading || data.length === 0}
@@ -3821,23 +3857,23 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
             {loading ? (
                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-12 bg-gray-50 rounded-xl animate-pulse" />)}</div>
             ) : (
-                <div className="overflow-x-auto p-4">
+                <div className="overflow-auto p-4 max-h-[70vh]">
                     <table className="w-full text-sm border-collapse min-w-[1400px]">
                         <thead>
                             <tr>
-                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-xs font-bold whitespace-nowrap">Nama</th>
+                                <th className="sticky top-0 left-0 z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-xs font-bold whitespace-nowrap">Nama</th>
                                 {MONTH_NAMES.map(m => (
-                                    <th key={m} className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">{m}</th>
+                                    <th key={m} className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">{m}</th>
                                 ))}
-                                <th className="border border-gray-300 bg-sky-300 text-gray-800 px-3 py-2.5 text-center text-xs font-bold">Total</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-sky-300 text-gray-800 px-3 py-2.5 text-center text-xs font-bold">Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {data.length === 0 ? (
-                                <tr><td colSpan={14} className="border border-gray-300 py-12 text-center text-sm text-gray-400">Belum ada data</td></tr>
-                            ) : data.map(r => (
-                                <tr key={r.user_id} className="hover:bg-sky-50/40">
-                                    <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-800 whitespace-nowrap bg-white">{r.name}</td>
+                            {filteredData.length === 0 ? (
+                                <tr><td colSpan={14} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
+                            ) : filteredData.map(r => (
+                                <tr key={r.user_id} className="hover:bg-sky-50/40 group">
+                                    <td className="sticky left-0 z-10 border border-gray-300 px-3 py-2 font-semibold text-gray-800 whitespace-nowrap bg-white group-hover:bg-sky-50">{r.name}</td>
                                     {(r.months ?? new Array(12).fill(0)).map((v: number, i: number) => (
                                         <td key={i} className="border border-gray-300 px-3 py-2 text-right">{cell(v)}</td>
                                     ))}
@@ -3845,10 +3881,10 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
                                 </tr>
                             ))}
                         </tbody>
-                        {data.length > 0 && (
+                        {filteredData.length > 0 && (
                             <tfoot>
                                 <tr>
-                                    <td className="border border-gray-300 px-3 py-2.5 font-black text-gray-800 bg-gray-100">TOTAL</td>
+                                    <td className="sticky left-0 z-10 border border-gray-300 px-3 py-2.5 font-black text-gray-800 bg-gray-100">TOTAL</td>
                                     {monthTotals.map((v, i) => (
                                         <td key={i} className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100 font-mono font-bold text-gray-700 text-xs">{v ? formatRupiah(v) : "—"}</td>
                                     ))}

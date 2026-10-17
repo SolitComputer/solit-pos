@@ -539,7 +539,12 @@ export default function JurnalUmum({ period }: { period: string }) {
     }, [bookmarkedId, entries, displayLimit, doScrollToBookmark]);
 
     const handleUpdated = useCallback(() => { load(false); }, [load]);
-    const handleToggleWarningState = useCallback((entryId: string, hasWarn: boolean) => {
+    // ✅ B: dipanggil setelah klik Sinkronkan — loncat + flash ke entry yg disinkronkan,
+    // memanfaatkan mekanisme pendingScrollId/doScrollToBookmark yg sudah ada.
+    const handleAfterSync = useCallback((entryId: string) => {
+        setPendingScrollId(entryId);
+    }, []);
+        const handleToggleWarningState = useCallback((entryId: string, hasWarn: boolean) => {
         setEntries((prev) =>
             prev.map((e) => (e.id === entryId ? { ...e, has_warning: hasWarn } : e))
         );
@@ -1474,6 +1479,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                             onDelete={handleDelete}
                             onToggleChecked={toggleEntryChecked}
                             onUpdated={handleUpdated}
+                            onSynced={handleAfterSync}
                             onToggleWarningState={handleToggleWarningState}
                             setToast={setToast}
                         />
@@ -2003,10 +2009,12 @@ function WarningToggle({
 function SyncHistoryToggle({
     entry,
     onUpdated,
+    onSynced,
     setToast,
 }: {
     entry: JournalEntry;
     onUpdated: () => void;
+    onSynced?: (entryId: string) => void;
     setToast: (msg: string) => void;
 }) {
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -2094,6 +2102,7 @@ function SyncHistoryToggle({
             setConfirming(false);
             setShowDetailModal(false);
             onUpdated();
+            onSynced?.(entry.id); // ✅ B: loncat + highlight ke entry ini (posisi tidak diubah)
         } catch {
             setToast("Koneksi bermasalah saat sinkronisasi");
         } finally {
@@ -3105,6 +3114,7 @@ interface JournalEntryRowProps {
     onDelete: (entry: JournalEntry) => void;
     onToggleChecked: (entry: JournalEntry, checked: boolean) => void;
     onUpdated: (showLoader?: boolean) => void;
+    onSynced?: (entryId: string) => void;
     onToggleWarningState: (entryId: string, hasWarn: boolean) => void;
     setToast: (msg: string) => void;
 }
@@ -3176,6 +3186,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     onDelete,
     onToggleChecked,
     onUpdated,
+    onSynced,
     onToggleWarningState,
     setToast,
 }: JournalEntryRowProps) {
@@ -3324,7 +3335,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                             <button onClick={() => onEdit(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150" title="Edit jurnal">
                                                 <Pencil className="w-4 h-4" />
                                             </button>
-                                            <SyncHistoryToggle entry={entry} onUpdated={() => onUpdated(false)} setToast={setToast} />
+                                            <SyncHistoryToggle entry={entry} onUpdated={() => onUpdated(false)} onSynced={onSynced} setToast={setToast} />
                                             <button onClick={() => onLog(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150" title="Riwayat perubahan">
                                                 <Clock className="w-4 h-4" />
                                             </button>

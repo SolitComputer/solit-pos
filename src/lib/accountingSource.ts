@@ -52,6 +52,59 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 /**
+ * Deal (harga jual) + modal (harga beli) aksesoris per invoice, dari
+ * transaction_items. Dipakai untuk memisah pendapatan laptop vs aksesoris
+ * (410 vs 420) DAN membukukan HPP aksesoris (D450 Biaya Printilan / K170
+ * Aksesoris) yang sebelumnya tidak pernah dibuat — ini yang bikin aksesoris
+ * tambahan lewat Edit Riwayat Transaksi tidak muncul di Jurnal Umum.
+ *
+ * Konvensi: untuk baris aksesoris, transaction_items.selling_price = MODAL
+ * per unit (bukan harga jual) — sama seperti yang ditampilkan "Modal" di
+ * detail transaksi. Fallback ke accessories.buy_price kalau kosong.
+ */
+async function getAccessoryDealModalByInvoices(
+  supabase: SupabaseClient,
+  invoiceNumbers: string[]
+): Promise<Map<string, { deal: number; modal: number }>> {
+  const map = new Map<string, { deal: number; modal: number }>();
+  if (invoiceNumbers.length === 0) return map;
+
+  const accRows: any[] = [];
+  for (const batch of chunkArray(invoiceNumbers, 150)) {
+    const { data } = await supabase
+      .from("transaction_items")
+      .select("invoice_number, item_type, accessory_id, unit_id, deal_price, selling_price, quantity")
+      .in("invoice_number", batch);
+    for (const it of (data ?? []) as any[]) {
+      const isAccessoryItem = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
+      if (isAccessoryItem) accRows.push(it);
+    }
+  }
+  if (accRows.length === 0) return map;
+
+  // Fallback modal dari accessories.buy_price untuk baris yg selling_price-nya 0.
+  const accIds = [...new Set(accRows.map((it) => it.accessory_id).filter(Boolean))];
+  const buyPriceMap = new Map<string, number>();
+  for (const batch of chunkArray(accIds, 150)) {
+    const { data: accs } = await supabase.from("accessories").select("id, buy_price").in("id", batch);
+    for (const a of accs ?? []) buyPriceMap.set(a.id as string, Math.round(Number(a.buy_price ?? 0)));
+  }
+
+  for (const it of accRows) {
+    const inv = it.invoice_number as string;
+    const qty = Math.max(1, Math.round(Number(it.quantity ?? 1)));
+    const deal = Math.round(Number(it.deal_price ?? 0));
+    const unitModal = Math.round(Number(it.selling_price ?? 0)) || (buyPriceMap.get(it.accessory_id) ?? 0);
+    const cur = map.get(inv) ?? { deal: 0, modal: 0 };
+    cur.deal += deal;
+    cur.modal += unitModal * qty;
+    map.set(inv, cur);
+  }
+
+  return map;
+}
+
+/**
  * Ambil company_name & spek laptop (CPU/RAM/Storage) untuk daftar invoice_number.
  * Dipakai untuk menampilkan badge toko + spek di Jurnal Umum (entry yang SUDAH
  * di-posting/dikonfirmasi) — datanya tidak disimpan di journal_entries, jadi
@@ -218,21 +271,8 @@ export async function getTransactionSyncDraftsByInvoices(
     .filter((t) => t.item_kind === "mixed")
     .map((t) => t.invoice_number as string);
 
-  const accessoryDealByInvoice = new Map<string, number>();
-  if (mixedInvoiceNumbers.length > 0) {
-    for (const batch of chunkArray(mixedInvoiceNumbers, 150)) {
-      const { data: itemRows } = await supabase
-        .from("transaction_items")
-        .select("invoice_number, item_type, accessory_id, unit_id, deal_price")
-        .in("invoice_number", batch);
-      for (const it of (itemRows ?? []) as any[]) {
-        const isAccessoryItem = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
-        if (!isAccessoryItem) continue;
-        const cur = accessoryDealByInvoice.get(it.invoice_number as string) ?? 0;
-        accessoryDealByInvoice.set(it.invoice_number as string, cur + Math.round(Number(it.deal_price ?? 0)));
-      }
-    }
-  }
+  // deal (harga jual) + modal (harga beli) aksesoris per invoice.
+  const accMap = await getAccessoryDealModalByInvoices(supabase, mixedInvoiceNumbers);
 
   for (const t of trxs as any[]) {
     if (t.status !== "PAID") continue; // lihat catatan di JSDoc — accrual/cancelled tidak disinkronkan
@@ -280,8 +320,8 @@ export async function getTransactionSyncDraftsByInvoices(
     if (effectiveItemKind === "accessory") {
       lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
     } else if (effectiveItemKind === "mixed") {
-      const accessoryDeal = Math.max(0, Math.min(deal, accessoryDealByInvoice.get(t.invoice_number as string) ?? 0));
-      const laptopDeal = deal - accessoryDeal;
+      const accessoryDeal = Math.max(0, Math.min(deal, accMap.get(t.invoice_number as string)?.deal ?? 0));
+            const laptopDeal = deal - accessoryDeal;
       if (laptopDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: laptopDeal });
       if (accessoryDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: accessoryDeal });
     } else {
@@ -295,6 +335,18 @@ export async function getTransactionSyncDraftsByInvoices(
       } else {
         lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
         lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      }
+    }
+
+    // ✅ HPP aksesoris (D450 Biaya Printilan / K170 Aksesoris) untuk transaksi MIXED.
+    // Modal aksesoris yang ditambahkan lewat Edit Riwayat Transaksi — dijual
+    // maupun bonus (deal 0) — sebelumnya TIDAK pernah dibukukan, makanya jurnalnya
+    // "cuma laptop". Modal laptop tetap lewat 440/130 di atas (tidak dobel).
+    if (effectiveItemKind === "mixed") {
+      const accessoryModal = Math.round(accMap.get(t.invoice_number as string)?.modal ?? 0);
+      if (accessoryModal > 0) {
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: accessoryModal });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: accessoryModal });
       }
     }
 
