@@ -1664,6 +1664,11 @@ export default function AccessoryUnitsPage() {
 
     // ── Filter ──
     const filteredUnits = units.filter(u => {
+        // Unit KELUAR = sudah diambil lewat Pengambilan Barang → hidden dari
+        // Kelola Unit (muncul lagi otomatis setelah di-Restore di Pengambilan
+        // Barang, karena status balik ke TERSEDIA). Konsisten dgn stok induk
+        // yang juga tidak menghitung KELUAR.
+        if (u.status === "KELUAR") return false;
         if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
         if (filterCondition !== "ALL" && u.condition !== filterCondition) return false;
         if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;

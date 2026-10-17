@@ -15,11 +15,17 @@ export async function recalcAccessoryParentStock(
     // accessories.stock konsisten dengan tampilan Data Barang. Penting setelah
     // ada status MINUS_SIAP_JUAL: unit MSJ tetap stok nyata (belum terjual),
     // jadi TIDAK boleh bikin kolom stock turun / barang ke-auto-arsip.
+    // Stok = unit yang BELUM terjual DAN belum keluar (diambil untuk kebutuhan/
+    // service). Unit berstatus KELUAR di-hidden dari stok — harus sama persis
+    // dengan filter di normalizeAccessory (UnifiedBarangContent): membuang
+    // TERJUAL & KELUAR. Dulu bug: cuma buang TERJUAL, jadi unit yang sudah
+    // diambil (KELUAR) tetap kehitung stok & tetap muncul di Data Barang.
     const { count } = await supabase
         .from("accessory_units")
         .select("id", { count: "exact", head: true })
         .eq("accessory_id", accessoryId)
-        .neq("status", "TERJUAL");
+        .neq("status", "TERJUAL")
+        .neq("status", "KELUAR");
 
     await supabase
         .from("accessories")
