@@ -12,8 +12,15 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-// Daftar karyawan utk dropdown "Untuk Karyawan" di modal Kasbon/Cicilan
-// (Cashflow Masuk/Keluar & Realisasi). Gate CASHFLOW_ROLES supaya PURCHASING pun bisa.
+// Deteksi role PKL (samakan dgn isPKLRole di page.tsx: "PKL" / "PKL_*" / "PKL-*")
+function isPKLRole(role?: string): boolean {
+  if (!role) return false;
+  return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-");
+}
+
+// Daftar KARYAWAN utk dropdown "Untuk Karyawan" di modal Kasbon/Cicilan
+// (Cashflow Masuk/Keluar & Realisasi Pengajuan Dana). Role PKL di-exclude —
+// kasbon/cicilan hanya untuk karyawan tetap. Gate CASHFLOW_ROLES supaya PURCHASING pun bisa.
 export const GET = withAuth(async () => {
   const { data, error } = await supabase
     .from("users")
@@ -21,5 +28,6 @@ export const GET = withAuth(async () => {
     .eq("is_active", true)
     .order("name", { ascending: true });
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, data: data ?? [] });
-}, CASHFLOW_ROLES); 
+  const karyawanOnly = (data ?? []).filter((u: any) => !isPKLRole(u.role)); // ⬅️ buang PKL
+  return NextResponse.json({ success: true, data: karyawanOnly });
+}, CASHFLOW_ROLES);

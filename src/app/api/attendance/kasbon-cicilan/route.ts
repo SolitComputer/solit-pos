@@ -19,6 +19,12 @@ function getRoles(user: any): string[] {
     ? user.roles
     : user?.role ? [user.role] : [];
 }
+
+// ⬅️ BARU — deteksi role PKL (samakan dgn isPKLRole di page.tsx: "PKL" / "PKL_*" / "PKL-*")
+function isPKLRole(role?: string): boolean {
+  if (!role) return false;
+  return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-");
+}
 function hasAccess(user: any): boolean {
   return getRoles(user).some((r) => KASBON_ACCESS_ROLES.includes(r));
 }
@@ -42,13 +48,15 @@ export async function GET(request: Request) {
       ? `${year + 1}-01-01`
       : `${year}-${String(month + 1).padStart(2, "0")}-01`;
 
-    // Semua user aktif (tab ini admin/accounting only → tampilkan semua)
-    const { data: users, error: uErr } = await supabase
+    // Tab ini hanya menampilkan KARYAWAN — role PKL di-exclude.
+    const { data: usersRaw, error: uErr } = await supabase
       .from("users")
       .select("id, name, role")
       .eq("is_active", true)
       .order("name", { ascending: true });
     if (uErr) return NextResponse.json({ success: false, message: uErr.message }, { status: 500 });
+
+    const users = (usersRaw ?? []).filter((u: any) => !isPKLRole(u.role)); // ⬅️ buang PKL
 
     // Saldo awal manual
     const { data: openings } = await supabase
@@ -110,6 +118,36 @@ export async function GET(request: Request) {
       }
       // tanggal bulan depan → diabaikan utk tampilan bulan ini
     }
+
+    // ── Pelunasan via POTONG GAJI (Rekap Gaji → Tunjangan) ──
+    // deduction_loan = potong Kasbon, deduction_cicilan = potong Cicilan.
+    // Diperlakukan sama seperti pembayaran (IN): bulan ini → "Dibayar",
+    // bulan sebelumnya → ikut mengurangi saldo "Sebelumnya" (carryover).
+    const validUserIds = new Set((users ?? []).map((u: any) => u.id));
+    const viewIdx = year * 12 + (month - 1);
+    const { data: allowRows } = await supabase
+      .from("user_allowances")
+      .select("user_id, year, month, deduction_loan, deduction_cicilan");
+    (allowRows ?? []).forEach((r: any) => {
+      const uid = r.user_id as string;
+      if (!uid || !validUserIds.has(uid)) return;
+      const aYear = Number(r.year);
+      const aMonth = Number(r.month); // 1..12
+      if (!Number.isFinite(aYear) || !Number.isFinite(aMonth)) return;
+      const kasbon = Math.max(0, Math.round(Number(r.deduction_loan ?? 0)));
+      const cicilan = Math.max(0, Math.round(Number(r.deduction_cicilan ?? 0)));
+      if (kasbon === 0 && cicilan === 0) return;
+      const aIdx = aYear * 12 + (aMonth - 1);
+      if (aIdx > viewIdx) return; // potongan bulan depan → diabaikan
+      const a = ensure(uid);
+      if (aIdx < viewIdx) {
+        a.priorKasbonIn += kasbon;   // potongan bulan lalu → kurangi "Kasbon Sebelumnya"
+        a.priorCicilanIn += cicilan; // potongan bulan lalu → kurangi "Cicilan Sebelumnya"
+      } else {
+        a.kasbonDibayar += kasbon;   // potongan bulan ini → "Kasbon Dibayar"
+        a.cicilanDibayar += cicilan; // potongan bulan ini → "Cicilan Dibayar"
+      }
+    });
 
     const rows = (users ?? []).map((u: any) => {
       const a = acc[u.id];
