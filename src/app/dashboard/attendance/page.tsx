@@ -3762,6 +3762,167 @@ function KasbonDetailModal({ userId, userName, calYear, calMonth, canEdit, onClo
     );
 }
 
+// ⬅️ BARU — Tab Dana Pensiun (tabel 12 bulan, gaya Excel dengan garis)
+function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual }: {
+    data: any[];
+    loading: boolean;
+    calYear: number;
+    isAdmin: boolean;
+    onManual: () => void;
+}) {
+    const grandTotal = useMemo(() => data.reduce((s, r) => s + (r.total || 0), 0), [data]);
+    const monthTotals = useMemo(() => {
+        const t = new Array(12).fill(0);
+        data.forEach(r => (r.months ?? []).forEach((v: number, i: number) => { t[i] += v || 0; }));
+        return t;
+    }, [data]);
+
+    const cell = (n: number) =>
+        n && n !== 0
+            ? <span className="font-mono font-semibold text-gray-700">{formatRupiah(n)}</span>
+            : <span className="text-gray-300">—</span>;
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <p className="text-base font-bold text-gray-800">Dana Pensiun — {calYear}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                        Otomatis terisi dari potongan <span className="text-purple-500 font-semibold">Dana Pensiun</span> di tombol Tunjangan · bisa juga diisi manual
+                    </p>
+                </div>
+                {isAdmin && (
+                    <button
+                        onClick={onManual}
+                        className="flex items-center gap-1.5 text-xs font-bold text-purple-600 bg-purple-50 border border-purple-200 px-4 py-2 rounded-xl hover:bg-purple-100 transition-all whitespace-nowrap">
+                        ＋ Isi Manual
+                    </button>
+                )}
+            </div>
+
+            {loading ? (
+                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-12 bg-gray-50 rounded-xl animate-pulse" />)}</div>
+            ) : (
+                <div className="overflow-x-auto p-4">
+                    <table className="w-full text-sm border-collapse min-w-[1400px]">
+                        <thead>
+                            <tr>
+                                <th className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-xs font-bold whitespace-nowrap">Nama</th>
+                                {MONTH_NAMES.map(m => (
+                                    <th key={m} className="border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">{m}</th>
+                                ))}
+                                <th className="border border-gray-300 bg-sky-300 text-gray-800 px-3 py-2.5 text-center text-xs font-bold">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.length === 0 ? (
+                                <tr><td colSpan={14} className="border border-gray-300 py-12 text-center text-sm text-gray-400">Belum ada data</td></tr>
+                            ) : data.map(r => (
+                                <tr key={r.user_id} className="hover:bg-sky-50/40">
+                                    <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-800 whitespace-nowrap bg-white">{r.name}</td>
+                                    {(r.months ?? new Array(12).fill(0)).map((v: number, i: number) => (
+                                        <td key={i} className="border border-gray-300 px-3 py-2 text-right">{cell(v)}</td>
+                                    ))}
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-sky-50 font-mono font-black text-gray-800">{formatRupiah(r.total || 0)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        {data.length > 0 && (
+                            <tfoot>
+                                <tr>
+                                    <td className="border border-gray-300 px-3 py-2.5 font-black text-gray-800 bg-gray-100">TOTAL</td>
+                                    {monthTotals.map((v, i) => (
+                                        <td key={i} className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100 font-mono font-bold text-gray-700 text-xs">{v ? formatRupiah(v) : "—"}</td>
+                                    ))}
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-200 font-mono font-black text-gray-900 text-xs">{formatRupiah(grandTotal)}</td>
+                                </tr>
+                            </tfoot>
+                        )}
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ⬅️ BARU — isi/koreksi Dana Pensiun manual per karyawan & bulan
+function PensionManualModal({ users, calYear, calMonth, onClose, onSaved }: {
+    users: UserInfo[]; calYear: number; calMonth: number;
+    onClose: () => void; onSaved: () => void;
+}) {
+    const karyawan = useMemo(() => users.filter(u => !isPKLRole(u.role)), [users]);
+    const [userId, setUserId] = useState(karyawan[0]?.id ?? "");
+    const [month, setMonth] = useState<number>(calMonth + 1); // 1..12
+    const [nominal, setNominal] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const save = async () => {
+        if (!userId) { setError("Pilih karyawan dulu"); return; }
+        const p = parseInt(nominal || "0", 10);
+        if (!Number.isFinite(p) || p < 0) { setError("Nominal tidak valid"); return; }
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/attendance/pension", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId, year: calYear, month, pension: p }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+            onSaved();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-purple-600 to-violet-700 px-6 py-5 flex items-start justify-between">
+                    <div>
+                        <p className="font-bold text-white text-base">Isi Dana Pensiun Manual</p>
+                        <p className="text-xs text-white/70 mt-1">Tahun {calYear}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 text-[11px] text-purple-700">
+                        Nominal ini juga jadi <strong>potongan Dana Pensiun</strong> di gaji bulan tsb — sama seperti mengisinya lewat tombol Tunjangan.
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Karyawan</label>
+                        <select value={userId} onChange={e => setUserId(e.target.value)} className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20">
+                            {!userId && <option value="" disabled>— Pilih karyawan —</option>}
+                            {karyawan.map(u => <option key={u.id} value={u.id}>{u.name} — {u.role.replace(/_/g, " ")}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Bulan</label>
+                        <select value={month} onChange={e => setMonth(parseInt(e.target.value, 10))} className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20">
+                            {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Nominal Dana Pensiun (Rp)</label>
+                        <input type="number" min={0} value={nominal} onChange={e => setNominal(e.target.value)} placeholder="Contoh: 150000"
+                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20 font-mono" />
+                    </div>
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
+                    <button onClick={save} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-purple-600 to-violet-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "Simpan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function AttendanceDashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -3795,9 +3956,9 @@ export default function AttendanceDashboardPage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [todayStatus, setTodayStatus] = useState<any>(null);
     const [statusLoading, setStatusLoading] = useState(false);
-    type ActiveTab = "calendar" | "summary" | "kasbon-cicilan" | "salary" | "salary-pkl" | "salary-slip" | "salary-history" | "leave" | "my-salary" | "my-slip";
+    type ActiveTab = "calendar" | "summary" | "kasbon-cicilan" | "dana-pensiun" | "salary" | "salary-pkl" | "salary-slip" | "salary-history" | "leave" | "my-salary" | "my-slip";
 
-    const VALID_TABS: ActiveTab[] = ["calendar", "summary", "kasbon-cicilan", "salary", "salary-pkl", "salary-slip", "salary-history", "leave", "my-salary", "my-slip"];
+    const VALID_TABS: ActiveTab[] = ["calendar", "summary", "kasbon-cicilan", "dana-pensiun", "salary", "salary-pkl", "salary-slip", "salary-history", "leave", "my-salary", "my-slip"];
 
     const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
         const tabFromUrl = searchParams.get("tab");
@@ -4079,6 +4240,11 @@ export default function AttendanceDashboardPage() {
     const [editOpeningUser, setEditOpeningUser] = useState<{ userId: string; userName: string; kasbon: number; cicilan: number } | null>(null);
     const [kasbonDetailUser, setKasbonDetailUser] = useState<{ userId: string; userName: string } | null>(null);
 
+    // ⬅️ BARU — tab Dana Pensiun
+    const [pensionData, setPensionData] = useState<any[]>([]);
+    const [pensionLoading, setPensionLoading] = useState(false);
+    const [showPensionManual, setShowPensionManual] = useState(false);
+
     const fetchKasbonCicilan = useCallback(async (y: number, m: number) => {
         setKasbonLoading(true);
         try {
@@ -4089,6 +4255,20 @@ export default function AttendanceDashboardPage() {
             console.error("Failed to fetch kasbon-cicilan:", err);
         } finally {
             setKasbonLoading(false);
+        }
+    }, []);
+
+    // ⬅️ BARU — Dana Pensiun 1 tahun penuh (Jan..Des)
+    const fetchPension = useCallback(async (y: number) => {
+        setPensionLoading(true);
+        try {
+            const r = await fetch(`/api/attendance/pension?year=${y}`);
+            const d = await r.json();
+            if (d.success) setPensionData(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch pension:", err);
+        } finally {
+            setPensionLoading(false);
         }
     }, []);
 
@@ -4237,6 +4417,13 @@ export default function AttendanceDashboardPage() {
             fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
         }
     }, [activeTab, selectedMonth, currentUser, fetchKasbonCicilan]);
+
+    // ⬅️ BARU — muat data Dana Pensiun saat tab aktif / ganti tahun
+    useEffect(() => {
+        if (activeTab === "dana-pensiun" && userCanAccessKasbon(currentUser) && selectedMonth) {
+            fetchPension(selectedMonth.year);
+        }
+    }, [activeTab, selectedMonth, currentUser, fetchPension]);
 
     const openAddManual = useCallback(async (date?: string, userId?: string) => {
         setEditManualData(null);
@@ -5595,6 +5782,7 @@ export default function AttendanceDashboardPage() {
                         ];
                         if (canManage) tabs.push({ id: "summary", label: "Ringkasan" });
                         if (canKasbon) tabs.push({ id: "kasbon-cicilan", label: "Kasbon & Cicilan" });
+                        if (canKasbon) tabs.push({ id: "dana-pensiun", label: "Dana Pensiun" }); // ⬅️ BARU
                         if (canSalary) {
                             tabs.push({ id: "salary", label: "Rekap Gaji" });
                             tabs.push({ id: "salary-pkl", label: "Gaji PKL" });
@@ -6487,6 +6675,17 @@ export default function AttendanceDashboardPage() {
                         isAdmin={isAdmin}
                         onEditOpening={(u) => setEditOpeningUser(u)}
                         onOpenDetail={(u) => setKasbonDetailUser(u)}
+                    />
+                )}
+
+                {/* ════ TAB DANA PENSIUN ════ */}
+                {activeTab === "dana-pensiun" && canKasbon && (
+                    <DanaPensiunTab
+                        data={pensionData}
+                        loading={pensionLoading}
+                        calYear={calYear}
+                        isAdmin={isAdmin}
+                        onManual={async () => { if (allUsers.length === 0) await fetchAllUsers(); setShowPensionManual(true); }}
                     />
                 )}
 
@@ -8038,6 +8237,7 @@ export default function AttendanceDashboardPage() {
                     onClose={() => setEditAllowanceUser(null)}
                     onSaved={() => {
                         fetchAllowances(calYear, calMonth);
+                        fetchPension(calYear); // ⬅️ BARU — tabel Dana Pensiun ikut ter-update otomatis
                         setEditAllowanceUser(null);
                     }}
                 />
@@ -8116,6 +8316,19 @@ export default function AttendanceDashboardPage() {
                     onClose={() => setKasbonDetailUser(null)}
                     onChanged={() => {
                         if (selectedMonth) fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
+                    }}
+                />
+            )}
+
+            {showPensionManual && canKasbon && (
+                <PensionManualModal
+                    users={allUsers}
+                    calYear={calYear}
+                    calMonth={calMonth}
+                    onClose={() => setShowPensionManual(false)}
+                    onSaved={() => {
+                        if (selectedMonth) fetchPension(selectedMonth.year);
+                        setShowPensionManual(false);
                     }}
                 />
             )}
