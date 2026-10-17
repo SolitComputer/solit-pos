@@ -3369,13 +3369,14 @@ function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSa
 }
 
 // ⬅️ BARU — Tab Kasbon & Cicilan
-function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpening }: {
+function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpening, onOpenDetail }: {
     data: any[];
     loading: boolean;
     calYear: number;
     calMonth: number;
     isAdmin: boolean;
     onEditOpening: (u: { userId: string; userName: string; kasbon: number; cicilan: number }) => void;
+    onOpenDetail: (u: { userId: string; userName: string }) => void;
 }) {
     const cell = (n: number, color = "text-gray-700") =>
         n && n !== 0
@@ -3430,13 +3431,17 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                 <tr key={r.user_id} className="hover:bg-gray-50/60 transition-colors">
                                     <td className="px-4 py-3 text-[11px] text-gray-400 font-black">{i + 1}</td>
                                     <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2.5">
+                                        <button
+                                            onClick={() => onOpenDetail({ userId: r.user_id, userName: r.name })}
+                                            className="flex items-center gap-2.5 text-left hover:opacity-80 transition-opacity group"
+                                            title="Lihat & edit detail kasbon/cicilan"
+                                        >
                                             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">{initials(r.name)}</div>
                                             <div>
-                                                <p className="font-bold text-gray-800 text-sm leading-tight">{r.name}</p>
+                                                <p className="font-bold text-gray-800 text-sm leading-tight group-hover:text-[#1a1a2e] group-hover:underline decoration-dotted underline-offset-2">{r.name}</p>
                                                 <p className="text-[10px] text-gray-400">{(r.role || "").replace(/_/g, " ")}</p>
                                             </div>
-                                        </div>
+                                        </button>
                                     </td>
                                     <td className="px-3 py-3 text-right">{cell(r.kasbon_sebelumnya)}</td>
                                     <td className="px-3 py-3 text-right">{cell(r.cicilan_sebelumnya)}</td>
@@ -3551,8 +3556,180 @@ function SaldoAwalModal({ userId, userName, kasbon, cicilan, onClose, onSaved }:
     );
 }
 
+// ⬅️ BARU — detail & edit entry kasbon/cicilan per karyawan (bulan terpilih)
+function KasbonDetailModal({ userId, userName, calYear, calMonth, canEdit, onClose, onChanged }: {
+    userId: string; userName: string; calYear: number; calMonth: number; canEdit: boolean;
+    onClose: () => void; onChanged: () => void;
+}) {
+    const [entries, setEntries] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [editId, setEditId] = useState<string | null>(null);
+    const [form, setForm] = useState<{ category: string; nominal: string; tanggal: string; keterangan: string }>({ category: "KASBON", nominal: "", tanggal: "", keterangan: "" });
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState("");
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/attendance/kasbon-cicilan/entries?user_id=${userId}&year=${calYear}&month=${calMonth + 1}`);
+            const d = await r.json();
+            if (d.success) setEntries(d.data || []);
+            else setError(d.message || "Gagal memuat");
+        } catch { setError("Gagal memuat"); }
+        finally { setLoading(false); }
+    }, [userId, calYear, calMonth]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const startEdit = (e: any) => {
+        setError("");
+        setEditId(e.id);
+        setForm({
+            category: e.category,
+            nominal: String(e.nominal ?? ""),
+            tanggal: String(e.tanggal ?? "").slice(0, 10),
+            keterangan: e.keterangan ?? "",
+        });
+    };
+
+    const saveEdit = async (e: any) => {
+        const nominal = parseInt(form.nominal || "0", 10);
+        if (!nominal || nominal <= 0) { setError("Nominal harus lebih dari 0"); return; }
+        if (!form.tanggal) { setError("Tanggal wajib diisi"); return; }
+        setBusy(true); setError("");
+        try {
+            const res = await fetch(`/api/cashflow/${e.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ category: form.category, nominal, tanggal: form.tanggal, keterangan: form.keterangan.trim() || null }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+            setEditId(null);
+            await load();
+            onChanged();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setBusy(false); }
+    };
+
+    const deleteEntry = async (e: any) => {
+        if (!confirm("Hapus entry kasbon/cicilan ini?")) return;
+        setBusy(true); setError("");
+        try {
+            const res = await fetch(`/api/cashflow/${e.id}`, { method: "DELETE" });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menghapus"); return; }
+            await load();
+            onChanged();
+        } catch { setError("Gagal menghapus"); }
+        finally { setBusy(false); }
+    };
+
+    const fmtDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[88dvh] overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">Detail Kasbon & Cicilan</p>
+                        <p className="text-xs text-white/70 mt-1">{userName} · {MONTH_NAMES[calMonth]} {calYear}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-3">
+                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
+                    {loading ? (
+                        <div className="space-y-2">{Array(3).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+                    ) : entries.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-10">Tidak ada transaksi kasbon/cicilan di bulan ini</p>
+                    ) : entries.map((e) => {
+                        const isEditing = editId === e.id;
+                        const isManual = e.source_type === "MANUAL";
+                        const locked = e.is_audited;
+                        const isOut = e.direction === "OUT";
+                        return (
+                            <div key={e.id} className="border border-gray-100 rounded-2xl p-3.5 bg-gradient-to-br from-gray-50 to-white">
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${e.category === "KASBON" ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-indigo-100 text-indigo-700 border-indigo-200"}`}>{e.category === "KASBON" ? "Kasbon" : "Cicilan"}</span>
+                                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${isOut ? "bg-red-50 text-red-600 border-red-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>{isOut ? "Beri (Keluar)" : "Bayar (Masuk)"}</span>
+                                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-gray-100 text-gray-500 border-gray-200">{isManual ? "Manual" : "Pengajuan Dana"}</span>
+                                    {locked && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-slate-100 text-slate-500 border-slate-200">Terkunci (diaudit)</span>}
+                                </div>
+
+                                {isEditing ? (
+                                    <div className="space-y-2.5">
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 block">Kategori</label>
+                                                <select value={form.category} onChange={(ev) => setForm(f => ({ ...f, category: ev.target.value }))} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white">
+                                                    <option value="KASBON">Kasbon</option>
+                                                    <option value="CICILAN">Cicilan</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 block">Tanggal</label>
+                                                <input type="date" value={form.tanggal} onChange={(ev) => setForm(f => ({ ...f, tanggal: ev.target.value }))} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 block">Nominal (Rp)</label>
+                                            <input type="number" min={0} value={form.nominal} onChange={(ev) => setForm(f => ({ ...f, nominal: ev.target.value }))} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white font-mono" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 block">Keterangan</label>
+                                            <input type="text" value={form.keterangan} onChange={(ev) => setForm(f => ({ ...f, keterangan: ev.target.value }))} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setEditId(null)} disabled={busy} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200">Batal</button>
+                                            <button onClick={() => saveEdit(e)} disabled={busy} className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-xs font-bold disabled:opacity-50">{busy ? "Menyimpan..." : "Simpan"}</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="font-mono font-black text-gray-800 text-sm">{formatRupiah(e.nominal)}</p>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">{fmtDate(e.tanggal)}{e.keterangan ? ` · ${e.keterangan}` : ""}</p>
+                                        </div>
+                                        {canEdit && (
+                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                <button
+                                                    onClick={() => startEdit(e)}
+                                                    disabled={locked}
+                                                    title={locked ? "Sudah diaudit — batalkan audit di Cashflow dulu" : "Edit entry"}
+                                                    className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteEntry(e)}
+                                                    disabled={locked || !isManual}
+                                                    title={locked ? "Sudah diaudit" : !isManual ? "Entry Pengajuan Dana — hapus lewat Batalkan Realisasi" : "Hapus entry"}
+                                                    className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed">
+                                                    Hapus
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Tutup</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function AttendanceDashboardPage() {
-        const router = useRouter();
+    const router = useRouter();
     const searchParams = useSearchParams();
     const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(() => {
         if (typeof window === "undefined") return null;
@@ -3866,6 +4043,7 @@ export default function AttendanceDashboardPage() {
     const [kasbonData, setKasbonData] = useState<any[]>([]);
     const [kasbonLoading, setKasbonLoading] = useState(false);
     const [editOpeningUser, setEditOpeningUser] = useState<{ userId: string; userName: string; kasbon: number; cicilan: number } | null>(null);
+    const [kasbonDetailUser, setKasbonDetailUser] = useState<{ userId: string; userName: string } | null>(null);
 
     const fetchKasbonCicilan = useCallback(async (y: number, m: number) => {
         setKasbonLoading(true);
@@ -6272,6 +6450,7 @@ export default function AttendanceDashboardPage() {
                         calMonth={calMonth}
                         isAdmin={isAdmin}
                         onEditOpening={(u) => setEditOpeningUser(u)}
+                        onOpenDetail={(u) => setKasbonDetailUser(u)}
                     />
                 )}
 
@@ -7863,6 +8042,20 @@ export default function AttendanceDashboardPage() {
                     onSaved={() => {
                         if (selectedMonth) fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
                         setEditOpeningUser(null);
+                    }}
+                />
+            )}
+
+            {kasbonDetailUser && canKasbon && selectedMonth && (
+                <KasbonDetailModal
+                    userId={kasbonDetailUser.userId}
+                    userName={kasbonDetailUser.userName}
+                    calYear={calYear}
+                    calMonth={calMonth}
+                    canEdit={getUserRoles(currentUser).some(r => ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING"].includes(r))}
+                    onClose={() => setKasbonDetailUser(null)}
+                    onChanged={() => {
+                        if (selectedMonth) fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
                     }}
                 />
             )}
