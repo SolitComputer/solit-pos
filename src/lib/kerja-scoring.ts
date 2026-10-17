@@ -158,9 +158,13 @@ export async function computeKerjaScores(startDate: Date, endDate: Date): Promis
       .lte("created_at", endIso)
       .eq("status", "DONE"),
 
+    // deleted_at IS NULL → laporan yang di-soft-delete marketing (akun mati /
+    // data invalid) TIDAK dihitung sebagai poin Lencana. HARUS sama dengan
+    // query sales_online_reports di api/leaderboard-kerja/route.ts.
     supabaseAdmin
       .from("sales_online_reports")
       .select("id, filled_by")
+      .is("deleted_at", null)
       .gte("created_at", startIso)
       .lte("created_at", endIso),
 

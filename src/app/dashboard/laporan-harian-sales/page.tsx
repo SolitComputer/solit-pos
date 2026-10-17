@@ -8,7 +8,6 @@ import {
   XCircle,
   Send,
   RefreshCw,
-  Trash2,
   Plus,
   X,
   Pencil,
@@ -297,9 +296,7 @@ export default function LaporanHarianSalesPage() {
   // --- Pagination ---
   const [currentPage, setCurrentPage] = useState(1);
 
-  // --- Konfirmasi hapus ---
-  const [deleteTarget, setDeleteTarget] = useState<SalesReportEntry | null>(null);
-  const [deleting, setDeleting] = useState(false);
+
 
   // --- Audit (verifikasi 2 langkah) ---
   const [auditTarget, setAuditTarget] = useState<SalesReportEntry | null>(null);
@@ -496,22 +493,7 @@ export default function LaporanHarianSalesPage() {
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      setDeleting(true);
-      const res = await fetch(`/api/sales-reports?id=${deleteTarget.id}`, { method: "DELETE" });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.message || "Gagal menghapus");
-      setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
-      setDeleteTarget(null);
-    } catch (err: any) {
-      setListError(err.message);
-      setDeleteTarget(null);
-    } finally {
-      setDeleting(false);
-    }
-  };
+
 
   // --- Audit flow: klik "Audit" -> Langkah 1 (review data) -> Langkah 2 (konfirmasi final) ---
   const openAuditModal = (entry: SalesReportEntry) => {
@@ -865,48 +847,7 @@ export default function LaporanHarianSalesPage() {
           </div>
         )}
 
-        {/* Modal Konfirmasi Hapus */}
-        {deleteTarget && (
-          <div
-            onClick={() => !deleting && setDeleteTarget(null)}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl border border-gray-200/70 w-full max-w-sm shadow-2xl p-5 max-h-[85vh] overflow-y-auto"
-            >
-              <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mb-3 ring-1 ring-red-100">
-                <AlertTriangle className="w-5 h-5 text-red-500" />
-              </div>
-              <h2 className="text-sm font-semibold text-gray-900">Hapus laporan ini?</h2>
-              <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
-                Laporan untuk{" "}
-                <span className="font-medium text-gray-700">
-                  {deleteTarget.phone_number || deleteTarget.partner_name}
-                </span>{" "}
-                ({deleteTarget.interest}) akan dihapus permanen dan tidak bisa dikembalikan.
-              </p>
 
-              <div className="flex gap-2 mt-5">
-                <button
-                  onClick={() => setDeleteTarget(null)}
-                  disabled={deleting}
-                  className="flex-1 py-2.5 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  disabled={deleting}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 active:scale-[0.99] transition-all disabled:opacity-50 disabled:active:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 shadow-sm shadow-red-200"
-                >
-                  {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  {deleting ? "Menghapus..." : "Hapus"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Modal Audit — verifikasi 2 langkah */}
         {auditTarget && (
@@ -1287,14 +1228,6 @@ export default function LaporanHarianSalesPage() {
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              onClick={() => setDeleteTarget(entry)}
-                              disabled={entry.audited}
-                              className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30"
-                              title={entry.audited ? "Sudah diaudit" : "Hapus"}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1356,13 +1289,6 @@ export default function LaporanHarianSalesPage() {
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30"
                       >
                         <Pencil className="w-3 h-3" /> Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(entry)}
-                        disabled={entry.audited}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-red-100 text-red-500 hover:bg-red-50 active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30"
-                      >
-                        <Trash2 className="w-3 h-3" /> Hapus
                       </button>
                     </div>
                   </div>

@@ -359,6 +359,11 @@ export const SALES_REPORT_AUDIT_ROLES: UserRole[] = [
 ];
 export const SALES_REPORT_DELETE_ROLES: UserRole[] = [...FULL_ACCESS];
 
+// Role yang boleh SOFT-DELETE & RESTORE Laporan Harian Sales dari halaman Audit
+// Marketing (akun mati / data invalid). Reuse SALES_REPORT_MARKETING_ROLES —
+// isinya persis PKL_MARKETING, MARKETING, KEPALA_MARKETING.
+export const SALES_REPORT_SOFT_DELETE_ROLES: UserRole[] = [...SALES_REPORT_MARKETING_ROLES];
+
 // ─── Audit Marketing (Leads Sales per channel WA/FB/OLX/Carousell/Mitra/Reseller) ──
 // Sengaja reuse role list yang sama persis dengan SALES_REPORT_* di atas — tim
 // yang input & audit di kedua fitur ini orangnya sama, biar tidak dobel-maintain
@@ -659,6 +664,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/laporan-harian-sales": [...SALES_REPORT_VIEW_ROLES],
   "/api/sales-reports": [...SALES_REPORT_VIEW_ROLES],
   "/api/sales-reports/audit": [...SALES_REPORT_AUDIT_ROLES],
+  "/api/sales-reports/soft-delete": [...SALES_REPORT_SOFT_DELETE_ROLES],
+  "/api/sales-reports/restore": [...SALES_REPORT_SOFT_DELETE_ROLES],
+  "/api/sales-reports/deleted": [...SALES_REPORT_SOFT_DELETE_ROLES],
+  "/dashboard/audit-leads/riwayat-hapus": [...SALES_REPORT_SOFT_DELETE_ROLES],
 
   "/dashboard/audit-leads": [...AUDIT_LEADS_VIEW_ROLES],
   "/api/audit-leads": [...AUDIT_LEADS_VIEW_ROLES],

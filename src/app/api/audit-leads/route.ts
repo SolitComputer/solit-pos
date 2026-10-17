@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
       .from("sales_online_reports")
       .select("*")
       .eq("channel", channel)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .range(from, to)

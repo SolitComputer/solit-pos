@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
-import { AUDIT_LEADS_INPUT_ROLES, AUDIT_LEADS_AUDIT_ROLES, hasAnyRole } from "@/lib/permissions";
+import { AUDIT_LEADS_INPUT_ROLES, AUDIT_LEADS_AUDIT_ROLES, SALES_REPORT_SOFT_DELETE_ROLES, hasAnyRole }from "@/lib/permissions";
 
 type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "TOKOPEDIA" | "SHOPEE" | "MITRA" | "RESELLER";
 
@@ -98,11 +98,13 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   const [showForm, setShowForm] = useState(false);
   const [editingRow, setEditingRow] = useState<LeadRow | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmSoftDeleteId, setConfirmSoftDeleteId] = useState<string | null>(null);
   const [confirmAuditId, setConfirmAuditId] = useState<string | null>(null);
   const [auditFilter, setAuditFilter] = useState<"all" | "audited" | "unaudited">("all");
 
   const canInput = hasAnyRole(userRoles, AUDIT_LEADS_INPUT_ROLES);
   const canAudit = hasAnyRole(userRoles, AUDIT_LEADS_AUDIT_ROLES);
+  const canDeleteSalesReport = hasAnyRole(userRoles, SALES_REPORT_SOFT_DELETE_ROLES);
 
   const fetchRows = useCallback(async () => {
     setLoading(true); setError(null);
@@ -175,6 +177,20 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
     finally { setConfirmDeleteId(null); }
   }
 
+  // Soft delete laporan sales (dari akun mati, dsb). Data tidak hilang permanen,
+  // bisa di-restore. Hanya role marketing (SALES_REPORT_DELETE_ROLES).
+  async function handleSoftDelete(id: string) {
+    try {
+      const res = await fetch("/api/sales-reports/soft-delete", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+      });
+      const json = await parseApiResponse(res);
+      if (!json.success) throw new Error(json.message);
+      await fetchRows();
+    } catch (err) { setError(err instanceof Error ? err.message : "Gagal menghapus laporan."); }
+    finally { setConfirmSoftDeleteId(null); }
+  }
+
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-5 p-3 sm:p-6 pb-16">
@@ -203,14 +219,24 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => fetchRows()}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-medium bg-white/15 hover:bg-white/25 backdrop-blur-sm transition-colors self-start shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </button>
-          </div>
+            <div className="flex items-center gap-2 self-start shrink-0">
+              {canDeleteSalesReport && (
+                <a
+                  href="/dashboard/audit-leads/riwayat-hapus"
+                  className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-medium bg-white/15 hover:bg-white/25 backdrop-blur-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Riwayat Hapus
+                </a>
+              )}
+              <button
+                onClick={() => fetchRows()}
+                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-medium bg-white/15 hover:bg-white/25 backdrop-blur-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>          </div>
 
           {/* Ringkasan kaca — angka murni dari data yang sudah dimuat */}
           <div className="relative grid grid-cols-3 gap-2.5 sm:gap-3 mt-5">
@@ -411,7 +437,19 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                         </div>
                       </td>
                       <td className="border border-gray-200 px-4 py-3.5 text-center whitespace-nowrap">
-                        {!row.audited && row.source === "manual" ? (
+                        {row.source === "sales_report" ? (
+                          canDeleteSalesReport ? (
+                            <button
+                              onClick={() => setConfirmSoftDeleteId(row.id)}
+                              title="Hapus laporan (bisa di-restore)"
+                              className="w-7 h-7 inline-flex items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-gray-300 font-medium">—</span>
+                          )
+                        ) : !row.audited && canInput ? (
                           <div className="inline-flex items-center gap-1.5">
                             <button
                               onClick={() => { setEditingRow(row); setShowForm(true); }}
@@ -523,6 +561,14 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                         </button>
                       </>
                     )}
+                    {row.source === "sales_report" && canDeleteSalesReport && (
+                      <button
+                        onClick={() => setConfirmSoftDeleteId(row.id)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-red-100 text-red-500 hover:bg-red-50 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30"
+                      >
+                        <Trash2 className="w-3 h-3" /> Hapus
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -567,6 +613,12 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
           <ConfirmModal title="Hapus leads ini?" description="Data yang dihapus tidak bisa dikembalikan."
             tone="red" icon={AlertTriangle}
             onCancel={() => setConfirmDeleteId(null)} onConfirm={() => handleDelete(confirmDeleteId)} />
+        )}
+        {confirmSoftDeleteId && (
+          <ConfirmModal title="Hapus laporan sales ini?"
+            description="Laporan dipindah ke Riwayat Hapus dan tidak dihitung lagi (poin & audit). Bisa di-restore kapan saja."
+            tone="red" icon={AlertTriangle}
+            onCancel={() => setConfirmSoftDeleteId(null)} onConfirm={() => handleSoftDelete(confirmSoftDeleteId)} />
         )}
       </div>
     </DashboardLayout>

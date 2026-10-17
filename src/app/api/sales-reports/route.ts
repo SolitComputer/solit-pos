@@ -110,6 +110,7 @@ async function getHandler(req: NextRequest) {
   supabaseAdmin
     .from(TABLE)
     .select("*")
+    .is("deleted_at", null)
     .gte("created_at", startUtc)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })

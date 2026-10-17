@@ -210,9 +210,13 @@ export const GET = withAuth(async (req, _ctx, user) => {
 
       // Sales Online: laporan harian sales (chat leads) — 1 baris = 1 chat
       // yang diisi manual lewat halaman Laporan Harian Sales.
+      // deleted_at IS NULL → laporan yang di-soft-delete marketing (akun mati /
+      // data invalid) TIDAK dihitung lagi sebagai poin. Lihat fitur Riwayat
+      // Hapus di Audit Marketing.
       supabaseAdmin
         .from("sales_online_reports")
         .select("id, filled_by")
+        .is("deleted_at", null)
         .gte("created_at", startIso)
         .lte("created_at", endIso),
 
