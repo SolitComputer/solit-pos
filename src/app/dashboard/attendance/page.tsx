@@ -3463,8 +3463,8 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
             {loading ? (
                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
             ) : (
-                <div className="overflow-auto p-4 max-h-[70vh]">
-                    <table className="w-full text-sm border-collapse min-w-[1200px]">
+                <div className="overflow-auto max-h-[70vh] p-4 pt-0">
+                    <table className="w-full text-sm border-separate border-spacing-0 min-w-[1200px]">
                         <thead>
                             <tr>
                                 <th className="sticky top-0 left-0 z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest w-11">#</th>
@@ -3857,8 +3857,8 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
             {loading ? (
                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-12 bg-gray-50 rounded-xl animate-pulse" />)}</div>
             ) : (
-                <div className="overflow-auto p-4 max-h-[70vh]">
-                    <table className="w-full text-sm border-collapse min-w-[1400px]">
+                <div className="overflow-auto max-h-[70vh] p-4 pt-0">
+                    <table className="w-full text-sm border-separate border-spacing-0 min-w-[1400px]">
                         <thead>
                             <tr>
                                 <th className="sticky top-0 left-0 z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-xs font-bold whitespace-nowrap">Nama</th>
