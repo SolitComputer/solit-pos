@@ -50,7 +50,7 @@ interface AccessoryUnitLite {
     buy_price?: number; selling_price?: number; created_at?: string;
     msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
     so_at?: string | null; so_by?: string | null; // SO per-unit (progress X/Y)
-    // Audit aksesoris per-unit menyusul di Tahap R3 (butuh migrasi kolom DB).
+    audited_at?: string | null; audited_by?: string | null; // Audit per-unit (progress X/Y)
 }
 interface AccessoryRaw {
     id: string; name: string; category: string; brand: string | null; spec: string | null;
@@ -207,9 +207,12 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
     const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && !u.msj_group_id);
     const one = aktif.length === 1 ? aktif[0] : null;
-    // Progress SO per-unit aksesoris. Audit aksesoris per-unit menyusul di R3
-    // (belum ada kolomnya) → audit_done sementara 0.
+    // Progress SO & Audit per-unit aksesoris (audit kolomnya sudah ada — R3 selesai).
     const soDoneAcc = aktif.filter(u => isUnitSoActive(u.so_at)).length;
+    // Audit aksesoris TTL 3 hari — disamakan dgn ACCESSORY_AUDIT_TTL_MS.
+    const auditDoneAcc = aktif.filter(
+        u => !!u.audited_at && Date.now() - new Date(u.audited_at).getTime() < ACCESSORY_AUDIT_TTL_MS
+    ).length;
     // Harga modal range aksesoris ber-SN banyak — mirror logika laptop:
     // kumpulkan buy_price tiap unit aktif yang > 0, lalu ambil min & max.
     const modals = aktif.map(u => u.buy_price).filter((n): n is number => n != null && n > 0);
@@ -238,7 +241,7 @@ const margin = (a.sell_price || 0) - (a.buy_price || 0);
         stok: units.length > 0 ? aktif.length : (a.stock ?? 0),
         so_at: a.so_at ?? null, so_by: a.so_by ?? null,
         audited_at: a.audited_at ?? null, audited_by: a.audited_by ?? null,
-        so_done: soDoneAcc, audit_done: 0, // audit aksesoris per-unit → R3
+        so_done: soDoneAcc, audit_done: auditDoneAcc,
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         raw: a,
     };
@@ -2097,12 +2100,10 @@ export default function UnifiedBarangContent() {
                                                         <div className="flex items-stretch gap-1.5">
                                                             {/* ── Audit ── */}
                                                             {row.unit_count > 1 ? (
-                                                                row.tipe === "LAPTOP" && (
-                                                                    <div className="flex-1 min-w-0 flex items-center justify-center h-8 rounded-lg border border-zinc-100 bg-zinc-50/60 gap-1.5">
-                                                                        <span className="text-[10px] font-semibold text-zinc-400 uppercase">Audit</span>
-                                                                        <ProgressBadge done={row.audit_done} total={row.unit_count} tone="audit" />
-                                                                    </div>
-                                                                )
+                                                                <div className="flex-1 min-w-0 flex items-center justify-center h-8 rounded-lg border border-zinc-100 bg-zinc-50/60 gap-1.5">
+                                                                    <span className="text-[10px] font-semibold text-zinc-400 uppercase">Audit</span>
+                                                                    <ProgressBadge done={row.audit_done} total={row.unit_count} tone="audit" />
+                                                                </div>
                                                             ) : (
                                                                 <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${auditActive ? "bg-emerald-50 border-emerald-200" : "bg-zinc-50 border-zinc-200"}`}>
                                                                     <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
@@ -2336,11 +2337,8 @@ export default function UnifiedBarangContent() {
                                                                 </td>
                                                                 <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                                     {row.unit_count > 1 ? (
-                                                                        // Aksesoris: audit per-unit belum ada (R3) → total=0 bikin badge "0/0".
-                                                                        // Tampilkan Dash untuk aksesoris sampai R3 dikerjakan.
-                                                                        row.tipe === "LAPTOP"
-                                                                            ? <ProgressBadge done={row.audit_done} total={row.unit_count} tone="audit" />
-                                                                            : <Dash />
+                                                                        // Laptop & Aksesoris: badge progress audit X/Y (R3 selesai).
+                                                                        <ProgressBadge done={row.audit_done} total={row.unit_count} tone="audit" />
                                                                     ) : (
                                                                         <div className="flex items-center justify-center gap-1">
                                                                             <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}

@@ -18,16 +18,15 @@ function resolveActorName(user: AuthUser): string {
 export const GET = withAuth(async (_req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
     const { id } = await ctx.params;
 
-    const { data: current, error: curErr } = await supabaseAdmin
+    // FIX: pakai maybeSingle() — kalau unit tidak ketemu, current = null TANPA
+    // melempar error. Error pengambilan status unit TIDAK boleh menggagalkan
+    // seluruh response, karena riwayat audit tetap harus tampil (dulu bug:
+    // current error → success:false → history yang ADA di DB ikut tidak tampil).
+    const { data: current } = await supabaseAdmin
         .from("accessory_units")
         .select("audited_at, audited_by")
         .eq("id", id)
-        .single();
-
-    if (curErr) {
-        console.error("[GET /api/accessory-units/[id]/audit] current", curErr);
-        return NextResponse.json({ success: false, message: curErr.message }, { status: 500 });
-    }
+        .maybeSingle();
 
     const { data: history, error: histErr } = await supabaseAdmin
         .from("accessory_unit_audit_history")
@@ -38,12 +37,13 @@ export const GET = withAuth(async (_req: NextRequest, ctx: { params: Promise<{ i
 
     if (histErr) {
         console.error("[GET /api/accessory-units/[id]/audit] history", histErr);
-        return NextResponse.json({ success: false, message: histErr.message }, { status: 500 });
+        // Walau history gagal dibaca, balas success dengan history kosong +
+        // pesan — supaya modal tidak blank/crash, dan error-nya kelihatan di log.
+        return NextResponse.json({ success: true, data: { current: current ?? null, history: [] }, warning: histErr.message });
     }
 
-    return NextResponse.json({ success: true, data: { current, history: history ?? [] } });
+    return NextResponse.json({ success: true, data: { current: current ?? null, history: history ?? [] } });
 });
-
 // ─── PATCH /api/accessory-units/[id]/audit — toggle audit (tandai / batal) ───
 export const PATCH = withAuth(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }, user: AuthUser) => {
     // Role sama dengan SO aksesoris (keputusan: samakan dengan SO).
