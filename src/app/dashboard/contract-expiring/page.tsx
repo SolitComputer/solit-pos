@@ -57,7 +57,6 @@ type ListItem =
   | { kind: "row"; key: string; person: ContractEntry };
 
 // ── Util kecil ────────────────────────────────────────────────────────────────
-const shortDate = (d: Date) => `${d.getDate()} ${MONTH_NAMES_ID[d.getMonth()].slice(0, 3)}`;
 
 const fullDate = (iso: string): string => {
   try {
@@ -158,7 +157,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden min-w-0 transition-all hover:shadow-md hover:-translate-y-0.5"
+      className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden transition-all hover:shadow-md"
       style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
     >
       <div className="absolute top-0 left-0 w-1 h-full" style={{ background: accent }} />
@@ -263,57 +262,8 @@ function TodayBanner({
   );
 }
 
-// ── Banner: tidak ada yang habis hari ini → tampilkan yang paling dekat ──────
-function NextUpBanner({
-  person,
-  lookup,
-}: {
-  person: ContractEntry;
-  lookup: Map<string, CustomRoleRow>;
-}) {
-  return (
-    <section
-      className="bg-white rounded-2xl sm:rounded-3xl px-4 sm:px-6 py-4 sm:py-5"
-      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
-    >
-      <div className="flex items-center gap-2 mb-3.5">
-        <Clock3 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#7c3aed" }} />
-        <p
-          className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em]"
-          style={{ color: "#7c3aed" }}
-        >
-          Paling dekat habis
-        </p>
-      </div>
 
-      <div className="flex items-center gap-3 sm:gap-3.5">
-        <Avatar name={person.name} role={person.role ?? ""} size="lg" />
-        <div className="min-w-0 flex-1">
-          <p
-            className="text-sm sm:text-base font-black truncate leading-tight"
-            style={{ color: "#0f172a" }}
-          >
-            {person.name}
-          </p>
-          <p className="text-[10.5px] sm:text-xs mt-1 truncate" style={{ color: "#94a3b8" }}>
-            {person.role ? getRoleLabel(person.role, lookup) : "—"}
-          </p>
-          {person.career_level && (
-            <div className="mt-1">
-              <CareerLevelBadge level={person.career_level} />
-            </div>
-          )}
-          <p className="text-[10.5px] sm:text-xs mt-1 font-bold" style={{ color: "#64748b" }}>
-            Berakhir {shortDate(person.expiry)}
-          </p>
-        </div>
-        <div className="flex-shrink-0">
-          <CountdownPill days={person.days_left} />
-        </div>
-      </div>
-    </section>
-  );
-}
+
 
 // ── Baris karyawan ────────────────────────────────────────────────────────────
 function ContractRow({
@@ -487,10 +437,7 @@ export default function ContractExpiringPage() {
     () => (today ? entries.filter((e) => e.monthIndex === today.getMonth()).length : 0),
     [entries, today]
   );
-  const nextUp = useMemo(
-    () => entries.filter((e) => e.days_left > 0).sort((a, b) => a.days_left - b.days_left)[0] ?? null,
-    [entries]
-  );
+
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -527,7 +474,7 @@ export default function ContractExpiringPage() {
 
   return (
     <DashboardLayout>
-      <div className="min-h-screen bg-[#F7F7F8] overflow-x-hidden">
+      <div className="min-h-screen bg-[#F7F7F8]">
         <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-3.5 sm:space-y-5">
 
           {/* ── Header ──────────────────────────────────────────────── */}
@@ -541,44 +488,14 @@ export default function ContractExpiringPage() {
             >
               <CalendarClock className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />
             </div>
-
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0">
               <h1
                 className="text-base sm:text-xl font-black tracking-tight truncate"
                 style={{ color: "#0f172a" }}
               >
                 Daftar Kontrak
               </h1>
-              <p
-                className="text-[10.5px] sm:text-xs font-medium truncate mt-0.5"
-                style={{ color: "#94a3b8" }}
-              >
-                Pantau masa berlaku kontrak karyawan
-              </p>
             </div>
-
-            {/* Pill jumlah kontrak — sembunyi di HP agar header lega */}
-            {!isBusy && entries.length > 0 && (
-              <span
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black tabular-nums flex-shrink-0"
-                style={{ background: "#f5f3ff", color: "#6d28d9", border: "1px solid #ddd6fe" }}
-              >
-                <Users className="w-3.5 h-3.5" />
-                {entries.length}
-              </span>
-            )}
-
-            {/* Tombol muat ulang — ikon berputar saat loading */}
-            <button
-              onClick={load}
-              disabled={loading}
-              aria-label="Muat ulang"
-              title="Muat ulang"
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all hover:bg-white active:scale-90 disabled:opacity-50"
-              style={{ border: "1px solid #e8ecf5", background: "#fff", color: "#64748b" }}
-            >
-              <RotateCcw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
           </header>
 
           {/* ── Error ───────────────────────────────────────────────── */}
@@ -599,12 +516,10 @@ export default function ContractExpiringPage() {
             </div>
           )}
 
-          {/* ── Sorotan atas — habis hari ini, atau yang paling dekat ── */}
-          {!isBusy && todayList.length > 0 ? (
+          {/* ── Sorotan atas — hanya banner "habis hari ini" ────────── */}
+          {!isBusy && todayList.length > 0 && (
             <TodayBanner people={todayList} lookup={customLookup} />
-          ) : !isBusy && nextUp ? (
-            <NextUpBanner person={nextUp} lookup={customLookup} />
-          ) : null}
+          )}
 
           {/* ── Statistik ───────────────────────────────────────────── */}
           {!isBusy && (
@@ -693,7 +608,7 @@ export default function ContractExpiringPage() {
                       key={t.key}
                       onClick={() => setView(t.key)}
                       aria-pressed={view === t.key}
-                      className="flex-1 sm:flex-initial h-9 sm:h-8 px-3.5 rounded-lg text-[11px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      className="flex-1 sm:flex-initial h-8 px-3.5 rounded-lg text-[11px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                       style={
                         view === t.key
                           ? {
@@ -719,7 +634,7 @@ export default function ContractExpiringPage() {
                       onClick={() => setMonth(i)}
                       title={m}
                       aria-pressed={month === i}
-                      className="h-9 sm:h-8 rounded-lg text-[10px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      className="h-8 rounded-lg text-[10px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                       style={
                         month === i
                           ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
