@@ -69,9 +69,22 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
   ),
   "golden-crown": (s) => (
     <svg {...svgProps(s)}>
-      <path d="M3 18 5 8.5l4 3 3-6 3 6 4-3L21 18z" fill="#fbbf24" stroke="#b45309" strokeWidth="1" strokeLinejoin="round" />
-      <path d="M3 18h18" stroke="#b45309" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="5" cy="8" r="1.1" fill="#fff7cd" /><circle cx="12" cy="4.5" r="1.2" fill="#fff7cd" /><circle cx="19" cy="8" r="1.1" fill="#fff7cd" />
+      <defs>
+        <linearGradient id="sb-gcg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff3b0" />
+          <stop offset=".5" stopColor="#fbbf24" />
+          <stop offset="1" stopColor="#b45309" />
+        </linearGradient>
+      </defs>
+      <path d="M3 18.5 4 7.5l4.2 4.2L12 4l3.8 7.7L20 7.5l1 11z" fill="url(#sb-gcg)" stroke="#92400e" strokeWidth=".8" strokeLinejoin="round" />
+      <path d="M7 16.2 8 11.6l2 2.1" stroke="#fffbeb" strokeWidth=".6" strokeLinecap="round" opacity=".7" />
+      <rect x="3" y="16.5" width="18" height="3" rx=".8" fill="#f59e0b" stroke="#92400e" strokeWidth=".6" />
+      <circle cx="12" cy="18" r="1.1" fill="#ef4444" stroke="#fff" strokeWidth=".3" />
+      <circle cx="7.5" cy="18" r=".8" fill="#3b82f6" stroke="#fff" strokeWidth=".25" />
+      <circle cx="16.5" cy="18" r=".8" fill="#3b82f6" stroke="#fff" strokeWidth=".25" />
+      <circle cx="3.8" cy="6.7" r="1.1" fill="#fffbeb" stroke="#d97706" strokeWidth=".35" />
+      <circle cx="12" cy="3.2" r="1.3" fill="#fffbeb" stroke="#d97706" strokeWidth=".35" />
+      <circle cx="20.2" cy="6.7" r="1.1" fill="#fffbeb" stroke="#d97706" strokeWidth=".35" />
     </svg>
   ),
   "dragon-flame": (s) => Flame(s, "#f97316", "#fde047"),
@@ -610,6 +623,13 @@ export function SolitBorder({
           aria-hidden="true"
         />
 
+        {/* Layer 1b: God rays — sinar berputar di belakang frame, warna ikut aksen preset */}
+        <span
+          className={`sb-asset-rays ${code === "golden-crown" ? "sb-asset-rays-royal" : ""}`}
+          style={{ width: `${scale * 175}%`, height: `${scale * 175}%`, "--accent": ACCENT_COLOR[code] ?? "#fde68a" } as React.CSSProperties}
+          aria-hidden="true"
+        />
+
         {/* Layer 2: Avatar User */}
         <span className="sb-inner">{children}</span>
 
@@ -645,6 +665,8 @@ export function SolitBorder({
         >
           <span className="sb-sp sb-sp-1">✦</span>
           <span className="sb-sp sb-sp-2">✦</span>
+          <span className="sb-sp sb-sp-3">✦</span>
+          <span className="sb-sp sb-sp-4">✦</span>
         </span>
 
         {asset.overlayVideo && (
@@ -914,6 +936,60 @@ export function SolitBorder({
             animation-delay: 1.3s;
             font-size: 10px;
           }
+          .sb-sp-3 {
+            top: 38%;
+            left: 1%;
+            animation-delay: 0.65s;
+            font-size: 9px;
+          }
+          .sb-sp-4 {
+            bottom: 32%;
+            right: 1%;
+            animation-delay: 1.95s;
+            font-size: 11px;
+          }
+
+          /* God rays untuk bingkai PNG — sinar tipis berputar di belakang
+             frame. Di-center pakai translate, jadi keyframe-nya sendiri
+             (bukan sb-spin) supaya translate-nya gak hilang. Mask radial
+             bikin sinar cuma kelihatan di LUAR frame & memudar ke tepi. */
+          .sb-asset-rays {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 9999px;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.4;
+            background: repeating-conic-gradient(
+              from 0deg,
+              transparent 0deg 8deg,
+              var(--accent, #fde68a) 12deg,
+              transparent 16deg 30deg
+            );
+            -webkit-mask: radial-gradient(circle, transparent 0 40%, #000 49%, transparent 70%);
+            mask: radial-gradient(circle, transparent 0 40%, #000 49%, transparent 70%);
+            animation: sb-asset-rays-spin 26s linear infinite, sb-asset-rays-breathe 4.5s ease-in-out infinite;
+          }
+          .sb-asset-rays-royal {
+            opacity: 0.6;
+            background: repeating-conic-gradient(
+              from 0deg,
+              transparent 0deg 5deg,
+              var(--accent, #fde68a) 9deg,
+              transparent 13deg 22.5deg
+            );
+            animation: sb-asset-rays-spin 20s linear infinite, sb-asset-rays-breathe 3.4s ease-in-out infinite;
+          }
+          @keyframes sb-asset-rays-spin {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+          }
+          @keyframes sb-asset-rays-breathe {
+            0%, 100% { opacity: 0.28; }
+            50% { opacity: 0.62; }
+          }
 
           @keyframes sb-sparkle-twinkle {
             0%, 100% {
@@ -1029,6 +1105,7 @@ export function SolitBorder({
 
           @media (prefers-reduced-motion: reduce) {
             .sb-asset-frame,
+            .sb-asset-rays,
             .sb-asset-aura,
             .sb-shine-sweep,
             .sb-sp {
@@ -1112,6 +1189,15 @@ export function SolitBorder({
   const isMoonGoddess = preset === "moon-goddess";
   const isAngelFeather = preset === "angel-feather";
   const isCrystalTiara = preset === "crystal-tiara";
+  const isGoldenCrown = preset === "golden-crown";
+  // Rays = sinar berputar di belakang ring. Semua tier dapat, intensitas &
+  // kecepatan naik per tier (common samar & pelan → limited terang & cepat).
+  const raysOp = fx === "limited" ? 0.5 : fx === "legendary" ? 0.42 : fx === "epic" ? 0.32 : fx === "rare" ? 0.24 : 0.16;
+  const raysDur = fx === "limited" ? "20s" : fx === "legendary" ? "26s" : fx === "epic" ? "32s" : fx === "rare" ? "38s" : "46s";
+  // Mahkota Golden Crown dibuat lebih besar biar terasa "raja".
+  const ornSize = isGoldenCrown ? Math.round(ornamentSize * 1.3) : ornamentSize;
+  const glintSize = Math.max(6, Math.round(ornSize * 0.42));
+  const glintDelay = `${((preset?.length ?? 0) % 5) * 0.7}s`;
   const accent = preset ? (ACCENT_COLOR[preset] ?? "#ffffff") : "#ffffff";
 
   return (
@@ -1119,6 +1205,13 @@ export function SolitBorder({
       className={`sb-ring ${className}`}
       style={{ padding: thickness, "--accent": accent, "--sb-t": `${thickness}px` } as React.CSSProperties}
     >
+      {!lite && (
+        <span
+          className={`sb-rays ${isGoldenCrown ? "sb-rays-royal" : ""}`}
+          style={{ "--rays-op": raysOp, "--rays-dur": raysDur } as React.CSSProperties}
+          aria-hidden="true"
+        />
+      )}
       {!lite && <span className="sb-intro" aria-hidden="true" />}
       {!lite && (
         <span
@@ -1428,10 +1521,16 @@ export function SolitBorder({
             !lite && isNightmareEye ? "sb-orn-dilate" : ""
           } ${!lite && isVoidStare ? "sb-orn-blink" : ""} ${!lite && isShadowFang ? "sb-orn-bite" : ""} ${
             !lite && isCandyHeart ? "sb-orn-heartbeat" : ""
-          } ${!lite && isMermaidTide ? "sb-orn-sway" : ""}`}
+          } ${!lite && isMermaidTide ? "sb-orn-sway" : ""} ${!lite && isGoldenCrown ? "sb-orn-royal" : ""}`}
           aria-hidden="true"
         >
-          {orn(ornamentSize)}
+          {orn(ornSize)}
+          {!lite && (
+            <span
+              className="sb-orn-glint"
+              style={{ width: glintSize, height: glintSize, animationDelay: glintDelay }}
+            />
+          )}
         </span>
       )}
       {!lite && hasParticles && (
@@ -2523,12 +2622,23 @@ export function SolitBorder({
 
         /* ══ LEGENDARY — mewah + glow kuat ════════════════════════════════ */
         .sb-p-golden-crown {
-          background: conic-gradient(from 0deg, #7c5a00, #fbbf24, #fff7cd, #f59e0b, #fde68a, #7c5a00);
+          background: conic-gradient(
+            from 0deg,
+            #78350f,
+            #b45309,
+            #fbbf24,
+            #fff7cd,
+            #fbbf24,
+            #92400e,
+            #fde68a,
+            #b45309,
+            #78350f
+          );
           animation: sb-spin 5s linear infinite, sb-g-gold 2.6s ease-in-out infinite;
         }
         @keyframes sb-g-gold {
           0%, 100% { filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.75)) brightness(1.02); }
-          50% { filter: drop-shadow(0 0 16px rgba(253, 230, 138, 1)) brightness(1.25); }
+          50% { filter: drop-shadow(0 0 18px rgba(253, 230, 138, 1)) brightness(1.28); }
         }
         .sb-p-dragon-flame {
           background: conic-gradient(from 0deg, #7f1d1d, #ef4444, #f97316, #fde047, #f97316, #7f1d1d);
@@ -3458,7 +3568,94 @@ export function SolitBorder({
           opacity: 1;
         }
 
+        /* ══ RAYS — sinar berputar di belakang ring (semua tier) ═════════════
+           Elemen ini z-index negatif, jadi selalu DI BELAKANG ring & foto.
+           Mask radial memotong bagian tengah, sehingga sinar hanya tampak
+           di halo luar lalu memudar. Intensitas lewat --rays-op (per tier). */
+        .sb-rays {
+          position: absolute;
+          inset: -28%;
+          border-radius: 9999px;
+          z-index: -3;
+          pointer-events: none;
+          opacity: var(--rays-op, 0.3);
+          background: repeating-conic-gradient(
+            from 0deg,
+            transparent 0deg 8deg,
+            var(--accent, #fff) 12deg,
+            transparent 16deg 30deg
+          );
+          -webkit-mask: radial-gradient(circle, transparent 0 43%, #000 52%, transparent 70%);
+          mask: radial-gradient(circle, transparent 0 43%, #000 52%, transparent 70%);
+          animation: sb-spin var(--rays-dur, 30s) linear infinite, sb-rays-breathe 4.2s ease-in-out infinite;
+        }
+        @keyframes sb-rays-breathe {
+          0%, 100% { opacity: calc(var(--rays-op, 0.3) * 0.55); }
+          50% { opacity: var(--rays-op, 0.3); }
+        }
+        /* Royal — sinar lebih lebar, lebih rapat & lebih terang (Golden Crown) */
+        .sb-rays-royal {
+          inset: -40%;
+          background: repeating-conic-gradient(
+            from 0deg,
+            transparent 0deg 5deg,
+            var(--accent, #fde68a) 9deg,
+            transparent 13deg 22.5deg
+          );
+          -webkit-mask: radial-gradient(circle, transparent 0 37%, #000 46%, transparent 70%);
+          mask: radial-gradient(circle, transparent 0 37%, #000 46%, transparent 70%);
+          animation: sb-spin 20s linear infinite, sb-rays-breathe 3.2s ease-in-out infinite;
+        }
+
+        /* ══ ORN GLINT — bintang kecil yang berkilat di ornamen (semua) ═════ */
+        .sb-orn-glint {
+          position: absolute;
+          top: -6%;
+          right: -8%;
+          pointer-events: none;
+          background: #ffffff;
+          clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+          opacity: 0;
+          animation: sb-orn-glint 3.6s ease-in-out infinite;
+        }
+        @keyframes sb-orn-glint {
+          0%, 62%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+          72% { opacity: 1; transform: scale(1) rotate(45deg); }
+          86% { opacity: 0; transform: scale(0.2) rotate(90deg); }
+        }
+
+        /* ══ ROYAL ORNAMENT — mahkota Golden Crown: melayang pelan, glow emas
+           berdenyut, dan kilatan di permata puncak. ═════════════════════════ */
+        .sb-ring > .sb-orn.sb-orn-royal {
+          animation: sb-orn-royal 3.4s ease-in-out infinite;
+        }
+        @keyframes sb-orn-royal {
+          0%, 100% {
+            transform: translate(-50%, -54%) rotate(-3deg) scale(1);
+            filter: drop-shadow(0 0 5px var(--accent, #fde68a)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          50% {
+            transform: translate(-50%, -64%) rotate(3deg) scale(1.08);
+            filter: drop-shadow(0 0 13px var(--accent, #fde68a)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.25);
+          }
+        }
+        .sb-orn-royal .sb-orn-glint {
+          left: 50%;
+          right: auto;
+          top: 0;
+          animation-name: sb-glint-royal;
+          animation-duration: 2.8s;
+        }
+        @keyframes sb-glint-royal {
+          0%, 55%, 100% { opacity: 0; transform: translateX(-50%) scale(0) rotate(0deg); }
+          66% { opacity: 1; transform: translateX(-50%) scale(1.15) rotate(45deg); }
+          82% { opacity: 0; transform: translateX(-50%) scale(0.2) rotate(90deg); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
+          .sb-rays,
+          .sb-orn-glint,
+          .sb-orn-royal,
           .sb-sg::before,
           .sb-holo,
           .sb-heart::before,
