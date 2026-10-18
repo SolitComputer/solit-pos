@@ -4,8 +4,7 @@ import { verifyToken } from "@/lib/auth";
 import { AUDIT_LEADS_INPUT_ROLES, hasAnyRole } from "@/lib/permissions";
 import { fetchAllRows } from "@/lib/supabase-paginate";
 
-const VALID_CHANNELS = ["WA", "FB", "IG", "TIKTOK", "OLX", "CAROUSEL", "TOKOPEDIA", "SHOPEE", "MITRA", "RESELLER"];
-
+const VALID_CHANNELS = ["WA", "FB", "IG", "TIKTOK", "OLX", "CAROUSEL", "TOKOPEDIA", "SHOPEE", "THREADS", "MITRA", "RESELLER"];
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
