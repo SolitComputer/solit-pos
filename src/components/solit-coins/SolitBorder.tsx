@@ -544,7 +544,6 @@ export function SolitBorder({
   ornament = true,
   ornamentSize = 18,
   lite = false,
-  lite = false,
   children,
 }: {
   style?: BorderStyle | null;
@@ -554,14 +553,6 @@ export function SolitBorder({
   ornament?: boolean;
   /** Ukuran ornamen (px). */
   ornamentSize?: number;
-  /**
-   * Mode ringan — matiin layer mahal (blur, mix-blend-mode, banyak
-   * elemen partikel/sparkle sekaligus) yang bedanya nyaris gak kelihatan
-   * di ukuran kecil. Pakai di grid katalog (banyak border dirender
-   * bersamaan) biar scroll HP gak patah-patah; JANGAN pakai di preview
-   * besar (cuma 1 border, biaya render-nya kecil).
-   */
-  lite?: boolean;
   /**
    * Mode ringan — matiin layer mahal (blur, mix-blend-mode, banyak
    * elemen partikel/sparkle sekaligus) yang bedanya nyaris gak kelihatan
