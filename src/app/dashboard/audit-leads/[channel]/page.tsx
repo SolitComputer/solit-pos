@@ -29,14 +29,14 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { AUDIT_LEADS_INPUT_ROLES, AUDIT_LEADS_AUDIT_ROLES, SALES_REPORT_SOFT_DELETE_ROLES, hasAnyRole }from "@/lib/permissions";
 
-type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "TOKOPEDIA" | "SHOPEE" | "MITRA" | "RESELLER";
+type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "TOKOPEDIA" | "SHOPEE" | "THREADS" | "MITRA" | "RESELLER";
 
 const SLUG_TO_CHANNEL: Record<string, Channel> = {
-  wa: "WA", fb: "FB", ig: "IG", tiktok: "TIKTOK", olx: "OLX", carousell: "CAROUSEL", tokopedia: "TOKOPEDIA", shopee: "SHOPEE", mitra: "MITRA", reseller: "RESELLER",
+  wa: "WA", fb: "FB", ig: "IG", tiktok: "TIKTOK", olx: "OLX", carousell: "CAROUSEL", tokopedia: "TOKOPEDIA", shopee: "SHOPEE", threads: "THREADS", mitra: "MITRA", reseller: "RESELLER",
 };
 
 const channelLabels: Record<Channel, string> = {
-  WA: "WhatsApp", FB: "Facebook", IG: "Instagram", TIKTOK: "TikTok", OLX: "OLX", CAROUSEL: "Carousell", TOKOPEDIA: "Tokopedia", SHOPEE: "Shopee", MITRA: "Mitra", RESELLER: "Reseller",
+  WA: "WhatsApp", FB: "Facebook", IG: "Instagram", TIKTOK: "TikTok", OLX: "OLX", CAROUSEL: "Carousell", TOKOPEDIA: "Tokopedia", SHOPEE: "Shopee", THREADS: "Threads", MITRA: "Mitra", RESELLER: "Reseller",
 };
 
 interface LeadRow {

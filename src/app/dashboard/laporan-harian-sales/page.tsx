@@ -27,9 +27,9 @@ import {
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserClient } from "@/lib/auth-client";
 
-type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "ECOMMERCE" | "TOKOPEDIA" | "SHOPEE" | "SOSMED" | "MITRA" | "RESELLER";
+type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "ECOMMERCE" | "TOKOPEDIA" | "SHOPEE" | "SOSMED" | "THREADS" | "MITRA" | "RESELLER";
 
-const CHANNELS: Channel[] = ["WA", "FB", "IG", "TIKTOK", "SOSMED", "OLX", "CAROUSEL", "ECOMMERCE", "TOKOPEDIA", "SHOPEE", "MITRA", "RESELLER"];
+const CHANNELS: Channel[] = ["WA", "FB", "IG", "TIKTOK", "SOSMED", "OLX", "CAROUSEL", "ECOMMERCE", "TOKOPEDIA", "SHOPEE", "THREADS", "MITRA", "RESELLER"];
 
 const channelLabels: Record<Channel, string> = {
   WA: "WhatsApp",
@@ -44,6 +44,7 @@ const channelLabels: Record<Channel, string> = {
   TIKTOK: "TikTok",
   TOKOPEDIA: "Tokopedia",
   SHOPEE: "Shopee",
+  THREADS: "Threads",
 };
 const channelBadgeClass: Record<Channel, string> = {
   WA: "bg-emerald-50 text-emerald-600",
@@ -58,6 +59,7 @@ const channelBadgeClass: Record<Channel, string> = {
   TIKTOK: "bg-zinc-100 text-zinc-700",
   TOKOPEDIA: "bg-green-50 text-green-600",
   SHOPEE: "bg-red-50 text-red-600",
+  THREADS: "bg-neutral-100 text-neutral-800",
 };
 
 // Aksen warna kecil per-channel (dot di tab & garis kiri baris tabel) —
@@ -75,6 +77,7 @@ const channelDotClass: Record<Channel, string> = {
   TIKTOK: "bg-zinc-700",
   TOKOPEDIA: "bg-green-500",
   SHOPEE: "bg-red-500",
+  THREADS: "bg-neutral-800",
 };
 
 const channelBorderClass: Record<Channel, string> = {
@@ -90,6 +93,7 @@ const channelBorderClass: Record<Channel, string> = {
   TIKTOK: "border-l-zinc-500",
   TOKOPEDIA: "border-l-green-400",
   SHOPEE: "border-l-red-400",
+  THREADS: "border-l-neutral-500",
 };
 
 // Warna badge angka pada tab channel saat aktif (di-invert jadi soft-on-dark).
@@ -106,6 +110,7 @@ const channelActiveCountClass: Record<Channel, string> = {
   TIKTOK: "bg-zinc-400/25 text-zinc-100",
   TOKOPEDIA: "bg-green-400/25 text-green-100",
   SHOPEE: "bg-red-400/25 text-red-100",
+  THREADS: "bg-neutral-400/25 text-neutral-100",
 };
 
 // FB/OLX/Carousell -> input Username. Mitra/Reseller -> input Nama Mitra/Reseller.
@@ -125,6 +130,7 @@ const CHANNEL_CONTACT_MODE: Record<Channel, ContactMode> = {
   TIKTOK: "username",
   TOKOPEDIA: "username",
   SHOPEE: "username",
+  THREADS: "username",
 };
 
 const contactFieldConfig: Record<"username" | "partner", { label: string; placeholder: string }> = {
