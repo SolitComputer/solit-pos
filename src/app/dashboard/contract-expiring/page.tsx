@@ -158,7 +158,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden transition-all hover:shadow-md"
+      className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden min-w-0 transition-all hover:shadow-md hover:-translate-y-0.5"
       style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
     >
       <div className="absolute top-0 left-0 w-1 h-full" style={{ background: accent }} />
@@ -527,7 +527,7 @@ export default function ContractExpiringPage() {
 
   return (
     <DashboardLayout>
-      <div className="min-h-screen bg-[#F7F7F8]">
+      <div className="min-h-screen bg-[#F7F7F8] overflow-x-hidden">
         <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-3.5 sm:space-y-5">
 
           {/* ── Header ──────────────────────────────────────────────── */}
@@ -541,14 +541,44 @@ export default function ContractExpiringPage() {
             >
               <CalendarClock className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />
             </div>
-            <div className="min-w-0">
+
+            <div className="min-w-0 flex-1">
               <h1
                 className="text-base sm:text-xl font-black tracking-tight truncate"
                 style={{ color: "#0f172a" }}
               >
                 Daftar Kontrak
               </h1>
+              <p
+                className="text-[10.5px] sm:text-xs font-medium truncate mt-0.5"
+                style={{ color: "#94a3b8" }}
+              >
+                Pantau masa berlaku kontrak karyawan
+              </p>
             </div>
+
+            {/* Pill jumlah kontrak — sembunyi di HP agar header lega */}
+            {!isBusy && entries.length > 0 && (
+              <span
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black tabular-nums flex-shrink-0"
+                style={{ background: "#f5f3ff", color: "#6d28d9", border: "1px solid #ddd6fe" }}
+              >
+                <Users className="w-3.5 h-3.5" />
+                {entries.length}
+              </span>
+            )}
+
+            {/* Tombol muat ulang — ikon berputar saat loading */}
+            <button
+              onClick={load}
+              disabled={loading}
+              aria-label="Muat ulang"
+              title="Muat ulang"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all hover:bg-white active:scale-90 disabled:opacity-50"
+              style={{ border: "1px solid #e8ecf5", background: "#fff", color: "#64748b" }}
+            >
+              <RotateCcw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
           </header>
 
           {/* ── Error ───────────────────────────────────────────────── */}
@@ -569,10 +599,12 @@ export default function ContractExpiringPage() {
             </div>
           )}
 
-          {/* ── Sorotan atas — hanya banner "habis hari ini" ────────── */}
-          {!isBusy && todayList.length > 0 && (
+          {/* ── Sorotan atas — habis hari ini, atau yang paling dekat ── */}
+          {!isBusy && todayList.length > 0 ? (
             <TodayBanner people={todayList} lookup={customLookup} />
-          )}
+          ) : !isBusy && nextUp ? (
+            <NextUpBanner person={nextUp} lookup={customLookup} />
+          ) : null}
 
           {/* ── Statistik ───────────────────────────────────────────── */}
           {!isBusy && (
@@ -661,7 +693,7 @@ export default function ContractExpiringPage() {
                       key={t.key}
                       onClick={() => setView(t.key)}
                       aria-pressed={view === t.key}
-                      className="flex-1 sm:flex-initial h-8 px-3.5 rounded-lg text-[11px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      className="flex-1 sm:flex-initial h-9 sm:h-8 px-3.5 rounded-lg text-[11px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                       style={
                         view === t.key
                           ? {
@@ -687,7 +719,7 @@ export default function ContractExpiringPage() {
                       onClick={() => setMonth(i)}
                       title={m}
                       aria-pressed={month === i}
-                      className="h-8 rounded-lg text-[10px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      className="h-9 sm:h-8 rounded-lg text-[10px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                       style={
                         month === i
                           ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
