@@ -57,7 +57,6 @@ type ListItem =
   | { kind: "row"; key: string; person: ContractEntry };
 
 // ── Util kecil ────────────────────────────────────────────────────────────────
-const shortDate = (d: Date) => `${d.getDate()} ${MONTH_NAMES_ID[d.getMonth()].slice(0, 3)}`;
 
 const fullDate = (iso: string): string => {
   try {
@@ -263,57 +262,8 @@ function TodayBanner({
   );
 }
 
-// ── Banner: tidak ada yang habis hari ini → tampilkan yang paling dekat ──────
-function NextUpBanner({
-  person,
-  lookup,
-}: {
-  person: ContractEntry;
-  lookup: Map<string, CustomRoleRow>;
-}) {
-  return (
-    <section
-      className="bg-white rounded-2xl sm:rounded-3xl px-4 sm:px-6 py-4 sm:py-5"
-      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
-    >
-      <div className="flex items-center gap-2 mb-3.5">
-        <Clock3 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#7c3aed" }} />
-        <p
-          className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em]"
-          style={{ color: "#7c3aed" }}
-        >
-          Paling dekat habis
-        </p>
-      </div>
 
-      <div className="flex items-center gap-3 sm:gap-3.5">
-        <Avatar name={person.name} role={person.role ?? ""} size="lg" />
-        <div className="min-w-0 flex-1">
-          <p
-            className="text-sm sm:text-base font-black truncate leading-tight"
-            style={{ color: "#0f172a" }}
-          >
-            {person.name}
-          </p>
-          <p className="text-[10.5px] sm:text-xs mt-1 truncate" style={{ color: "#94a3b8" }}>
-            {person.role ? getRoleLabel(person.role, lookup) : "—"}
-          </p>
-          {person.career_level && (
-            <div className="mt-1">
-              <CareerLevelBadge level={person.career_level} />
-            </div>
-          )}
-          <p className="text-[10.5px] sm:text-xs mt-1 font-bold" style={{ color: "#64748b" }}>
-            Berakhir {shortDate(person.expiry)}
-          </p>
-        </div>
-        <div className="flex-shrink-0">
-          <CountdownPill days={person.days_left} />
-        </div>
-      </div>
-    </section>
-  );
-}
+
 
 // ── Baris karyawan ────────────────────────────────────────────────────────────
 function ContractRow({
@@ -487,10 +437,7 @@ export default function ContractExpiringPage() {
     () => (today ? entries.filter((e) => e.monthIndex === today.getMonth()).length : 0),
     [entries, today]
   );
-  const nextUp = useMemo(
-    () => entries.filter((e) => e.days_left > 0).sort((a, b) => a.days_left - b.days_left)[0] ?? null,
-    [entries]
-  );
+
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();

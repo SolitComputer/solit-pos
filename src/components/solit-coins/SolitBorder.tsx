@@ -69,9 +69,22 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
   ),
   "golden-crown": (s) => (
     <svg {...svgProps(s)}>
-      <path d="M3 18 5 8.5l4 3 3-6 3 6 4-3L21 18z" fill="#fbbf24" stroke="#b45309" strokeWidth="1" strokeLinejoin="round" />
-      <path d="M3 18h18" stroke="#b45309" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="5" cy="8" r="1.1" fill="#fff7cd" /><circle cx="12" cy="4.5" r="1.2" fill="#fff7cd" /><circle cx="19" cy="8" r="1.1" fill="#fff7cd" />
+      <defs>
+        <linearGradient id="sb-gcg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff3b0" />
+          <stop offset=".5" stopColor="#fbbf24" />
+          <stop offset="1" stopColor="#b45309" />
+        </linearGradient>
+      </defs>
+      <path d="M3 18.5 4 7.5l4.2 4.2L12 4l3.8 7.7L20 7.5l1 11z" fill="url(#sb-gcg)" stroke="#92400e" strokeWidth=".8" strokeLinejoin="round" />
+      <path d="M7 16.2 8 11.6l2 2.1" stroke="#fffbeb" strokeWidth=".6" strokeLinecap="round" opacity=".7" />
+      <rect x="3" y="16.5" width="18" height="3" rx=".8" fill="#f59e0b" stroke="#92400e" strokeWidth=".6" />
+      <circle cx="12" cy="18" r="1.1" fill="#ef4444" stroke="#fff" strokeWidth=".3" />
+      <circle cx="7.5" cy="18" r=".8" fill="#3b82f6" stroke="#fff" strokeWidth=".25" />
+      <circle cx="16.5" cy="18" r=".8" fill="#3b82f6" stroke="#fff" strokeWidth=".25" />
+      <circle cx="3.8" cy="6.7" r="1.1" fill="#fffbeb" stroke="#d97706" strokeWidth=".35" />
+      <circle cx="12" cy="3.2" r="1.3" fill="#fffbeb" stroke="#d97706" strokeWidth=".35" />
+      <circle cx="20.2" cy="6.7" r="1.1" fill="#fffbeb" stroke="#d97706" strokeWidth=".35" />
     </svg>
   ),
   "dragon-flame": (s) => Flame(s, "#f97316", "#fde047"),
@@ -309,6 +322,67 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
       <path d="M9.5 6 8 4M14.5 6l1.5-2M9.8 18l-1.5 2" stroke="#86198f" strokeWidth=".45" strokeLinecap="round" />
     </svg>
   ),
+  "candy-heart": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M12 21.5S3 15.8 3 9.6A4.9 4.9 0 0 1 12 7a4.9 4.9 0 0 1 9 2.6c0 6.2-9 11.9-9 11.9z"
+        fill="#fb7185"
+        stroke={stroke}
+        strokeWidth=".6"
+        strokeLinejoin="round"
+      />
+      <path d="M6.6 9.2c.3-1.4 1.4-2.2 2.7-2.1" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" />
+      <circle cx="17.5" cy="3.5" r="1" fill="#fff" />
+    </svg>
+  ),
+  "mermaid-tide": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M12 3C6.5 3 3 7.5 3 12.5c0 3 1.2 5.5 3 7h12c1.8-1.5 3-4 3-7C21 7.5 17.5 3 12 3z"
+        fill="#5eead4"
+        stroke={stroke}
+        strokeWidth=".6"
+        strokeLinejoin="round"
+      />
+      <path d="M12 3v16.5M7.5 5.2 9 19.5M16.5 5.2 15 19.5M4 10.5l4 9M20 10.5l-4 9" stroke="#0f766e" strokeWidth=".7" strokeLinecap="round" />
+      <circle cx="12" cy="20.5" r="2" fill="#ecfeff" stroke="#99f6e4" strokeWidth=".5" />
+    </svg>
+  ),
+  "moon-goddess": (s) => (
+    <svg {...svgProps(s)}>
+      <path
+        d="M15.5 2.5a9.5 9.5 0 1 0 6 13.8A8 8 0 0 1 15.5 2.5z"
+        fill="#e0e7ff"
+        stroke={stroke}
+        strokeWidth=".6"
+        strokeLinejoin="round"
+      />
+      <path d="M19 4.5l.7 1.6 1.6.7-1.6.7-.7 1.6-.7-1.6-1.6-.7 1.6-.7z" fill="#fff" />
+    </svg>
+  ),
+  "angel-feather": (s) => (
+    <svg {...svgProps(s)}>
+      <ellipse cx="12" cy="4" rx="6" ry="1.9" stroke="#fde68a" strokeWidth="1.3" />
+      <path
+        d="M12 21C6 18 5 11 9 8c1-.8 2.4-1 3-1 .6 0 2 .2 3 1 4 3 3 10-3 13z"
+        fill="#ffffff"
+        stroke="#fde68a"
+        strokeWidth=".6"
+        strokeLinejoin="round"
+      />
+      <path d="M12 8.5V19" stroke="#fcd34d" strokeWidth=".8" strokeLinecap="round" />
+    </svg>
+  ),
+  "crystal-tiara": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M3 18 4.5 8l4.5 4.2L12 5l3 7.2L19.5 8 21 18z" fill="#a5f3fc" stroke={stroke} strokeWidth=".7" strokeLinejoin="round" />
+      <path d="M3 18h18v2.5H3z" fill="#67e8f9" stroke={stroke} strokeWidth=".6" />
+      <circle cx="12" cy="4.2" r="1.3" fill="#f0abfc" stroke="#fff" strokeWidth=".4" />
+      <circle cx="4.5" cy="7.4" r="1" fill="#fbcfe8" />
+      <circle cx="19.5" cy="7.4" r="1" fill="#fbcfe8" />
+      <path d="M12 10.5l1.6 3L12 16.5 10.4 13.5z" fill="#fff" opacity=".85" />
+    </svg>
+  ),
 };
 
 // Level efek tambahan per preset, dipetakan manual sesuai tier rarity:
@@ -354,6 +428,11 @@ const FX_TIER: Record<string, "common" | "rare" | "epic" | "legendary" | "limite
   "cyber-samurai": "epic",
   "stardust-fairy": "rare",
   "void-stare": "limited",
+  "candy-heart": "rare",
+  "mermaid-tide": "epic",
+  "moon-goddess": "epic",
+  "angel-feather": "legendary",
+  "crystal-tiara": "limited",
 };
 
 // Warna aksen tematik per preset — dipakai buat recolor elemen kelap-kelip
@@ -401,7 +480,52 @@ const ACCENT_COLOR: Record<string, string> = {
   "cyber-samurai": "#f43f5e",
   "stardust-fairy": "#fbcfe8",
   "void-stare": "#d946ef",
+  "candy-heart": "#ff6ea8",
+  "mermaid-tide": "#2dd4bf",
+  "moon-goddess": "#c7d2fe",
+  "angel-feather": "#fef08a",
+  "crystal-tiara": "#a5f3fc",
 };
+
+// Signature effect — satu "kepribadian" animasi untuk tiap border generik
+// (yang belum punya efek eksklusif). Semuanya partikel kecil yang bergerak
+// KELUAR dari tepi ring, jadi gak pernah nutup foto. Jumlah partikel naik
+// per tier (common 2 → limited 6).
+type SigType = "ember" | "frost" | "bolt" | "bubble" | "star" | "gem" | "leaf" | "mist" | "meteor";
+const SIGNATURE: Record<string, SigType> = {
+  "emerald-minimal": "leaf",
+  "royal-blue": "gem",
+  "obsidian-black": "mist",
+  "silver-frost": "frost",
+  "blush-rose": "leaf",
+  "cyber-neon": "bolt",
+  "amber-flame": "ember",
+  "amethyst-violet": "gem",
+  "toxic-venom": "mist",
+  "storm-thunder": "bolt",
+  "rgb-spin": "star",
+  "aurora-wave": "mist",
+  "galaxy-pulse": "star",
+  "phoenix-wing": "ember",
+  "void-eclipse": "mist",
+  "golden-crown": "gem",
+  "dragon-flame": "ember",
+  "cosmic-starfield": "star",
+  "celestial-throne": "gem",
+  "abyssal-tide": "bubble",
+  "infinity-halo": "star",
+  "titan-ascendant": "gem",
+  "frostbite-claw": "frost",
+  "crimson-blade": "ember",
+  "nova-burst": "meteor",
+  "meteor-shower": "meteor",
+  "phantom-veil": "mist",
+  "solar-flare": "ember",
+  "razor-storm": "bolt",
+  "inferno-core": "ember",
+  "quantum-rift": "bolt",
+};
+const SIG_ANGLES = [70, 190, 310, 130, 250, 10];
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
 // Rasionya disesuaikan dari ukuran lubang transparan asli tiap PNG (500x500).
@@ -499,6 +623,13 @@ export function SolitBorder({
           aria-hidden="true"
         />
 
+        {/* Layer 1b: God rays — sinar berputar di belakang frame, warna ikut aksen preset */}
+        <span
+          className={`sb-asset-rays ${code === "golden-crown" ? "sb-asset-rays-royal" : ""}`}
+          style={{ width: `${scale * 175}%`, height: `${scale * 175}%`, "--accent": ACCENT_COLOR[code] ?? "#fde68a" } as React.CSSProperties}
+          aria-hidden="true"
+        />
+
         {/* Layer 2: Avatar User */}
         <span className="sb-inner">{children}</span>
 
@@ -534,6 +665,8 @@ export function SolitBorder({
         >
           <span className="sb-sp sb-sp-1">✦</span>
           <span className="sb-sp sb-sp-2">✦</span>
+          <span className="sb-sp sb-sp-3">✦</span>
+          <span className="sb-sp sb-sp-4">✦</span>
         </span>
 
         {asset.overlayVideo && (
@@ -803,6 +936,60 @@ export function SolitBorder({
             animation-delay: 1.3s;
             font-size: 10px;
           }
+          .sb-sp-3 {
+            top: 38%;
+            left: 1%;
+            animation-delay: 0.65s;
+            font-size: 9px;
+          }
+          .sb-sp-4 {
+            bottom: 32%;
+            right: 1%;
+            animation-delay: 1.95s;
+            font-size: 11px;
+          }
+
+          /* God rays untuk bingkai PNG — sinar tipis berputar di belakang
+             frame. Di-center pakai translate, jadi keyframe-nya sendiri
+             (bukan sb-spin) supaya translate-nya gak hilang. Mask radial
+             bikin sinar cuma kelihatan di LUAR frame & memudar ke tepi. */
+          .sb-asset-rays {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 9999px;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.4;
+            background: repeating-conic-gradient(
+              from 0deg,
+              transparent 0deg 8deg,
+              var(--accent, #fde68a) 12deg,
+              transparent 16deg 30deg
+            );
+            -webkit-mask: radial-gradient(circle, transparent 0 40%, #000 49%, transparent 70%);
+            mask: radial-gradient(circle, transparent 0 40%, #000 49%, transparent 70%);
+            animation: sb-asset-rays-spin 26s linear infinite, sb-asset-rays-breathe 4.5s ease-in-out infinite;
+          }
+          .sb-asset-rays-royal {
+            opacity: 0.6;
+            background: repeating-conic-gradient(
+              from 0deg,
+              transparent 0deg 5deg,
+              var(--accent, #fde68a) 9deg,
+              transparent 13deg 22.5deg
+            );
+            animation: sb-asset-rays-spin 20s linear infinite, sb-asset-rays-breathe 3.4s ease-in-out infinite;
+          }
+          @keyframes sb-asset-rays-spin {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+          }
+          @keyframes sb-asset-rays-breathe {
+            0%, 100% { opacity: 0.28; }
+            50% { opacity: 0.62; }
+          }
 
           @keyframes sb-sparkle-twinkle {
             0%, 100% {
@@ -918,6 +1105,7 @@ export function SolitBorder({
 
           @media (prefers-reduced-motion: reduce) {
             .sb-asset-frame,
+            .sb-asset-rays,
             .sb-asset-aura,
             .sb-shine-sweep,
             .sb-sp {
@@ -972,7 +1160,21 @@ export function SolitBorder({
   // memudar (rare ke atas). Sudutnya tetap (bukan random) biar aman
   // dari hydration mismatch.
   const SPARK_ANGLES = [20, 160, 95, 255, 320, 200, 55, 290];
-  const sparkCount = fx === "limited" ? 8 : fx === "legendary" ? 6 : fx === "epic" ? 4 : fx === "rare" ? 3 : 0;
+  // Border generik punya signature sendiri (lihat SIGNATURE), jadi gak
+  // perlu percikan universal lagi supaya gak dobel/ramai.
+  const sig = preset ? SIGNATURE[preset] : undefined;
+  const sigCount = !sig ? 0 : fx === "limited" ? 6 : fx === "legendary" ? 5 : fx === "epic" ? 4 : fx === "rare" ? 3 : 2;
+  const sparkCount = sig
+    ? 0
+    : fx === "limited" ? 8 : fx === "legendary" ? 6 : fx === "epic" ? 4 : fx === "rare" ? 3 : 0;
+  // Holo foil (kilau pelangi tipis) untuk legendary & limited, kecuali
+  // tema gelap/serem yang memang sengaja tanpa warna pelangi.
+  const hasHolo =
+    (fx === "legendary" || fx === "limited") &&
+    preset !== "cursed-reaper" &&
+    preset !== "nightmare-eye" &&
+    preset !== "void-stare" &&
+    preset !== "crystal-tiara";
   const isCodeTerminal = preset === "code-terminal";
   const isSakura = preset === "sakura-bloom";
   const isButterfly = preset === "butterfly-waltz";
@@ -982,6 +1184,20 @@ export function SolitBorder({
   const isStardustFairy = preset === "stardust-fairy";
   const isVoidStare = preset === "void-stare";
   const isShadowFang = preset === "shadow-fang";
+  const isCandyHeart = preset === "candy-heart";
+  const isMermaidTide = preset === "mermaid-tide";
+  const isMoonGoddess = preset === "moon-goddess";
+  const isAngelFeather = preset === "angel-feather";
+  const isCrystalTiara = preset === "crystal-tiara";
+  const isGoldenCrown = preset === "golden-crown";
+  // Rays = sinar berputar di belakang ring. Semua tier dapat, intensitas &
+  // kecepatan naik per tier (common samar & pelan → limited terang & cepat).
+  const raysOp = fx === "limited" ? 0.5 : fx === "legendary" ? 0.42 : fx === "epic" ? 0.32 : fx === "rare" ? 0.24 : 0.16;
+  const raysDur = fx === "limited" ? "20s" : fx === "legendary" ? "26s" : fx === "epic" ? "32s" : fx === "rare" ? "38s" : "46s";
+  // Mahkota Golden Crown dibuat lebih besar biar terasa "raja".
+  const ornSize = isGoldenCrown ? Math.round(ornamentSize * 1.3) : ornamentSize;
+  const glintSize = Math.max(6, Math.round(ornSize * 0.42));
+  const glintDelay = `${((preset?.length ?? 0) % 5) * 0.7}s`;
   const accent = preset ? (ACCENT_COLOR[preset] ?? "#ffffff") : "#ffffff";
 
   return (
@@ -989,10 +1205,17 @@ export function SolitBorder({
       className={`sb-ring ${className}`}
       style={{ padding: thickness, "--accent": accent, "--sb-t": `${thickness}px` } as React.CSSProperties}
     >
+      {!lite && (
+        <span
+          className={`sb-rays ${isGoldenCrown ? "sb-rays-royal" : ""}`}
+          style={{ "--rays-op": raysOp, "--rays-dur": raysDur } as React.CSSProperties}
+          aria-hidden="true"
+        />
+      )}
       {!lite && <span className="sb-intro" aria-hidden="true" />}
       {!lite && (
         <span
-          className={`sb-aura-wrap ${isCursedReaper || isNightmareEye || isVoidStare || isShadowFang ? "sb-aura-heartbeat" : ""}`}
+          className={`sb-aura-wrap ${isCursedReaper || isNightmareEye || isVoidStare || isShadowFang || isCandyHeart ? "sb-aura-heartbeat" : ""}`}
           style={{ "--aura-max": auraOpacity } as React.CSSProperties}
           aria-hidden="true"
         >
@@ -1022,8 +1245,10 @@ export function SolitBorder({
           <span className={`sb-bg sb-bg-counter ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
         )}
         {!lite && <span className="sb-facets" aria-hidden="true" />}
+        {!lite && hasHolo && <span className="sb-holo" aria-hidden="true" />}
         <span className="sb-bevel" aria-hidden="true" />
         <span className="sb-specular" aria-hidden="true" />
+        <span className="sb-lip" aria-hidden="true" />
         {!lite && isCodeTerminal && <span className="sb-circuit" aria-hidden="true" />}
       </span>
       {!lite && hasTrace && <span className="sb-trace" style={{ animationDuration: traceSpeed }} aria-hidden="true" />}
@@ -1047,6 +1272,23 @@ export function SolitBorder({
           style={{ "--flare-dur": flareDur, "--flare-op": flareOp } as React.CSSProperties}
           aria-hidden="true"
         />
+      )}
+      {!lite && sig && sigCount > 0 && (
+        <span className={`sb-sig sb-sig-${sig}`} aria-hidden="true">
+          {SIG_ANGLES.slice(0, sigCount).map((rot, i) => (
+            <span
+              key={rot}
+              className="sb-sg"
+              style={
+                {
+                  "--sg-rot": `${rot}deg`,
+                  "--sg-delay": `${i * 0.65}s`,
+                  "--sg-dur": `${3 + (i % 3) * 0.7}s`,
+                } as React.CSSProperties
+              }
+            />
+          ))}
+        </span>
       )}
       {!lite && sparkCount > 0 && (
         <span className="sb-sparks" aria-hidden="true">
@@ -1197,17 +1439,98 @@ export function SolitBorder({
           />
         </span>
       )}
+      {!lite && isCandyHeart && (
+        <span className="sb-hearts" aria-hidden="true">
+          {[25, 115, 205, 295].map((rot, i) => (
+            <span
+              key={rot}
+              className="sb-heart"
+              style={{ "--heart-rot": `${rot}deg`, "--heart-delay": `${i * 0.8}s` } as React.CSSProperties}
+            />
+          ))}
+        </span>
+      )}
+      {!lite && isMermaidTide && (
+        <span className="sb-bubbles" aria-hidden="true">
+          {[40, 150, 235, 320].map((rot, i) => (
+            <span
+              key={rot}
+              className="sb-bubble"
+              style={
+                {
+                  "--bub-rot": `${rot}deg`,
+                  "--bub-delay": `${i * 0.9}s`,
+                  "--bub-dur": `${3.4 + (i % 2) * 0.8}s`,
+                } as React.CSSProperties
+              }
+            />
+          ))}
+        </span>
+      )}
+      {!lite && isMoonGoddess && (
+        <>
+          <span className="sb-moon" aria-hidden="true">
+            <span className="sb-moon-body" />
+          </span>
+          <span className="sb-twinkles" aria-hidden="true">
+            {[60, 200, 300].map((rot, i) => (
+              <span
+                key={rot}
+                className="sb-twinkle"
+                style={
+                  { "--tw-rot": `${rot}deg`, "--tw-size": "7px", "--tw-delay": `${i * 0.95}s` } as React.CSSProperties
+                }
+              />
+            ))}
+          </span>
+        </>
+      )}
+      {!lite && isAngelFeather && (
+        <>
+          <span className="sb-halo" aria-hidden="true" />
+          <span className="sb-feathers" aria-hidden="true">
+            {[65, 185, 305].map((rot, i) => (
+              <span
+                key={rot}
+                className="sb-feather"
+                style={{ "--fe-rot": `${rot}deg`, "--fe-delay": `${i * 1.5}s` } as React.CSSProperties}
+              />
+            ))}
+          </span>
+        </>
+      )}
+      {!lite && isCrystalTiara && (
+        <span className="sb-twinkles" aria-hidden="true">
+          {[35, 125, 215, 305].map((rot, i) => (
+            <span
+              key={rot}
+              className="sb-twinkle"
+              style={
+                { "--tw-rot": `${rot}deg`, "--tw-size": "12px", "--tw-delay": `${i * 0.7}s` } as React.CSSProperties
+              }
+            />
+          ))}
+        </span>
+      )}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
         <span
           className={`sb-orn ${
-            !lite && (fx === "legendary" || fx === "limited" || isCodeTerminal || isCyberSamurai) ? "sb-orn-glow" : ""
+            !lite && (fx === "legendary" || fx === "limited" || isCodeTerminal || isCyberSamurai || isMoonGoddess) ? "sb-orn-glow" : ""
           } ${!lite && isCodeTerminal ? "sb-orn-type" : ""} ${!lite && isButterfly ? "sb-orn-flutter" : ""} ${
             !lite && isNightmareEye ? "sb-orn-dilate" : ""
-          } ${!lite && isVoidStare ? "sb-orn-blink" : ""} ${!lite && isShadowFang ? "sb-orn-bite" : ""}`}
+          } ${!lite && isVoidStare ? "sb-orn-blink" : ""} ${!lite && isShadowFang ? "sb-orn-bite" : ""} ${
+            !lite && isCandyHeart ? "sb-orn-heartbeat" : ""
+          } ${!lite && isMermaidTide ? "sb-orn-sway" : ""} ${!lite && isGoldenCrown ? "sb-orn-royal" : ""}`}
           aria-hidden="true"
         >
-          {orn(ornamentSize)}
+          {orn(ornSize)}
+          {!lite && (
+            <span
+              className="sb-orn-glint"
+              style={{ width: glintSize, height: glintSize, animationDelay: glintDelay }}
+            />
+          )}
         </span>
       )}
       {!lite && hasParticles && (
@@ -2299,12 +2622,23 @@ export function SolitBorder({
 
         /* ══ LEGENDARY — mewah + glow kuat ════════════════════════════════ */
         .sb-p-golden-crown {
-          background: conic-gradient(from 0deg, #7c5a00, #fbbf24, #fff7cd, #f59e0b, #fde68a, #7c5a00);
+          background: conic-gradient(
+            from 0deg,
+            #78350f,
+            #b45309,
+            #fbbf24,
+            #fff7cd,
+            #fbbf24,
+            #92400e,
+            #fde68a,
+            #b45309,
+            #78350f
+          );
           animation: sb-spin 5s linear infinite, sb-g-gold 2.6s ease-in-out infinite;
         }
         @keyframes sb-g-gold {
           0%, 100% { filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.75)) brightness(1.02); }
-          50% { filter: drop-shadow(0 0 16px rgba(253, 230, 138, 1)) brightness(1.25); }
+          50% { filter: drop-shadow(0 0 18px rgba(253, 230, 138, 1)) brightness(1.28); }
         }
         .sb-p-dragon-flame {
           background: conic-gradient(from 0deg, #7f1d1d, #ef4444, #f97316, #fde047, #f97316, #7f1d1d);
@@ -2727,7 +3061,611 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 19px rgba(192, 38, 211, 0.95)) brightness(1.3) hue-rotate(10deg); }
         }
 
+        /* ══ 5 BORDER CEWEK BARU ═══════════════════════════════════════════
+           Semua efek eksklusif di bawah ini mengikuti aturan yang sama:
+           wrapper diputar ke sudut tetap, elemen anaknya bergerak KELUAR
+           dari tepi ring (translateY negatif), jadi gak pernah numpuk ke
+           foto profil. ═══════════════════════════════════════════════════ */
+
+        /* ── CANDY HEART (RARE) — pink permen, detak jantung ─────────────── */
+        .sb-p-candy-heart {
+          background: conic-gradient(from 0deg, #be185d, #fb7185, #ffe4e6, #f472b6, #fda4af, #be185d);
+          animation: sb-spin 4.8s linear infinite, sb-g-candy 1.6s ease-in-out infinite;
+        }
+        @keyframes sb-g-candy {
+          0%, 60%, 100% { filter: drop-shadow(0 0 3px rgba(244, 114, 182, 0.65)) brightness(1); }
+          12% { filter: drop-shadow(0 0 14px rgba(255, 228, 230, 1)) brightness(1.3); }
+          24% { filter: drop-shadow(0 0 5px rgba(244, 114, 182, 0.8)) brightness(1.05); }
+          36% { filter: drop-shadow(0 0 12px rgba(255, 228, 230, 0.95)) brightness(1.22); }
+        }
+        .sb-hearts {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          pointer-events: none;
+          filter: drop-shadow(0 0 4px var(--accent, #ff6ea8));
+        }
+        .sb-heart {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--heart-rot, 0deg));
+        }
+        .sb-heart::before {
+          content: "";
+          position: absolute;
+          top: -3px;
+          left: 50%;
+          width: 9px;
+          height: 9px;
+          margin-left: -4.5px;
+          background: linear-gradient(135deg, #ffffff 0%, var(--accent, #ff6ea8) 75%);
+          -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 21.5S3 15.8 3 9.6A4.9 4.9 0 0 1 12 7a4.9 4.9 0 0 1 9 2.6c0 6.2-9 11.9-9 11.9z'/></svg>") center / contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 21.5S3 15.8 3 9.6A4.9 4.9 0 0 1 12 7a4.9 4.9 0 0 1 9 2.6c0 6.2-9 11.9-9 11.9z'/></svg>") center / contain no-repeat;
+          opacity: 0;
+          animation: sb-heart-float 3.4s ease-out infinite;
+          animation-delay: var(--heart-delay, 0s);
+        }
+        @keyframes sb-heart-float {
+          0% { transform: translateY(0) scale(0.3) rotate(-10deg); opacity: 0; }
+          18% { transform: translateY(-4px) scale(1) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(-24px) scale(0.6) rotate(14deg); opacity: 0; }
+        }
+        .sb-ring > .sb-orn.sb-orn-heartbeat {
+          animation: sb-orn-heartbeat 1.6s ease-in-out infinite;
+        }
+        @keyframes sb-orn-heartbeat {
+          0%, 50%, 100% {
+            transform: translate(-50%, -52%) scale(1);
+            filter: drop-shadow(0 0 4px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          12% {
+            transform: translate(-50%, -52%) scale(1.3);
+            filter: drop-shadow(0 0 12px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.3);
+          }
+          24% { transform: translate(-50%, -52%) scale(1.02); }
+          36% {
+            transform: translate(-50%, -52%) scale(1.22);
+            filter: drop-shadow(0 0 10px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.2);
+          }
+        }
+
+        /* ── MERMAID TIDE (EPIC) — aqua mutiara, gelembung naik ──────────── */
+        .sb-p-mermaid-tide {
+          background: conic-gradient(from 0deg, #0f766e, #2dd4bf, #ecfeff, #38bdf8, #a78bfa, #5eead4, #0f766e);
+          animation: sb-spin 5s linear infinite, sb-g-mermaid 3s ease-in-out infinite;
+        }
+        @keyframes sb-g-mermaid {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(45, 212, 191, 0.75)) hue-rotate(-14deg) brightness(1); }
+          50% { filter: drop-shadow(0 0 17px rgba(167, 139, 250, 0.9)) hue-rotate(16deg) brightness(1.22); }
+        }
+        .sb-bubbles {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-bubble {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--bub-rot, 0deg));
+        }
+        .sb-bubble::before {
+          content: "";
+          position: absolute;
+          top: -2px;
+          left: 50%;
+          width: 7px;
+          height: 7px;
+          margin-left: -3.5px;
+          border-radius: 9999px;
+          border: 1px solid rgba(255, 255, 255, 0.85);
+          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.95) 0 1.2px, rgba(94, 234, 212, 0.22) 2px, transparent 70%);
+          box-shadow: 0 0 4px var(--accent, #2dd4bf), inset 0 0 3px rgba(255, 255, 255, 0.5);
+          opacity: 0;
+          animation: sb-bubble-rise var(--bub-dur, 3.6s) ease-in infinite;
+          animation-delay: var(--bub-delay, 0s);
+        }
+        @keyframes sb-bubble-rise {
+          0% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+          15% { opacity: 0.95; }
+          50% { transform: translate(3px, -12px) scale(1); }
+          80% { transform: translate(-2px, -20px) scale(1.1); opacity: 0.8; }
+          100% { transform: translate(0, -26px) scale(1.35); opacity: 0; }
+        }
+        .sb-ring > .sb-orn.sb-orn-sway {
+          animation: sb-orn-sway 3.6s ease-in-out infinite;
+        }
+        @keyframes sb-orn-sway {
+          0%, 100% {
+            transform: translate(-50%, -52%) rotate(-12deg) scale(1);
+            filter: drop-shadow(0 0 4px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          50% {
+            transform: translate(-50%, -64%) rotate(12deg) scale(1.1);
+            filter: drop-shadow(0 0 11px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.2);
+          }
+        }
+
+        /* ── MOON GODDESS (EPIC) — indigo perak, bulan sabit mengorbit ───── */
+        .sb-p-moon-goddess {
+          background: conic-gradient(from 0deg, #1e1b4b, #4338ca, #c7d2fe, #ffffff, #c7d2fe, #4338ca, #1e1b4b);
+          animation: sb-spin 6s linear infinite, sb-g-moon 3.4s ease-in-out infinite;
+        }
+        @keyframes sb-g-moon {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.7)) brightness(1); }
+          50% { filter: drop-shadow(0 0 16px rgba(224, 231, 255, 1)) brightness(1.2); }
+        }
+        .sb-moon {
+          position: absolute;
+          inset: -9px;
+          z-index: 3;
+          pointer-events: none;
+          animation: sb-spin 8s linear infinite;
+        }
+        .sb-moon-body {
+          position: absolute;
+          top: -4px;
+          left: 50%;
+          width: 9px;
+          height: 9px;
+          margin-left: -4.5px;
+          border-radius: 9999px;
+          box-shadow: -3.5px 0 0 0 #e0e7ff;
+          filter: drop-shadow(0 0 4px var(--accent, #c7d2fe));
+        }
+        /* Twinkle — bintang 4 sudut yang membesar lalu mengecil sambil
+           muter. Dipakai Moon Goddess (kecil) & Crystal Tiara (besar).
+           Posisinya DI LUAR tepi ring, glow-nya lewat filter di wrapper
+           (clip-path memotong filter kalau ditaruh di elemen bintangnya). */
+        .sb-twinkles {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          pointer-events: none;
+          filter: drop-shadow(0 0 4px var(--accent, #fff));
+        }
+        .sb-twinkle {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--tw-rot, 0deg));
+        }
+        .sb-twinkle::before {
+          content: "";
+          position: absolute;
+          top: calc(var(--tw-size, 8px) * -1 - 2px);
+          left: 50%;
+          width: var(--tw-size, 8px);
+          height: var(--tw-size, 8px);
+          margin-left: calc(var(--tw-size, 8px) / -2);
+          background: #ffffff;
+          clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+          opacity: 0;
+          animation: sb-twinkle-pop 2.8s ease-in-out infinite;
+          animation-delay: var(--tw-delay, 0s);
+        }
+        @keyframes sb-twinkle-pop {
+          0%, 100% { transform: scale(0) rotate(0deg); opacity: 0; }
+          50% { transform: scale(1) rotate(90deg); opacity: 1; }
+        }
+
+        /* ── ANGEL FEATHER (LEGENDARY) — putih emas, halo + bulu melayang ── */
+        .sb-p-angel-feather {
+          background: conic-gradient(from 0deg, #fef3c7, #ffffff, #fde68a, #fffbeb, #fcd34d, #ffffff, #fef3c7);
+          animation: sb-spin 5.5s linear infinite, sb-g-angel 2.4s ease-in-out infinite;
+        }
+        @keyframes sb-g-angel {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(253, 230, 138, 0.8)) brightness(1.02); }
+          50% { filter: drop-shadow(0 0 18px rgba(255, 251, 235, 1)) brightness(1.2); }
+        }
+        .sb-halo {
+          position: absolute;
+          top: -17px;
+          left: 50%;
+          width: 56%;
+          height: 7px;
+          border: 1.5px solid #fef08a;
+          border-radius: 50%;
+          box-shadow: 0 0 6px 1px var(--accent, #fef08a), inset 0 0 4px var(--accent, #fef08a);
+          z-index: 3;
+          pointer-events: none;
+          transform: translateX(-50%);
+          animation: sb-halo-glow 2.8s ease-in-out infinite;
+        }
+        @keyframes sb-halo-glow {
+          0%, 100% { opacity: 0.6; transform: translateX(-50%) translateY(0) scale(1); }
+          50% { opacity: 1; transform: translateX(-50%) translateY(-2px) scale(1.07); }
+        }
+        .sb-feathers {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-feather {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--fe-rot, 0deg));
+        }
+        .sb-feather::before {
+          content: "";
+          position: absolute;
+          top: -3px;
+          left: 50%;
+          width: 5px;
+          height: 11px;
+          margin-left: -2.5px;
+          background: linear-gradient(to bottom, #ffffff, var(--accent, #fef08a));
+          border-radius: 100% 0 100% 0;
+          box-shadow: 0 0 4px rgba(254, 240, 138, 0.8);
+          opacity: 0;
+          animation: sb-feather-drift 4.6s ease-in-out infinite;
+          animation-delay: var(--fe-delay, 0s);
+        }
+        @keyframes sb-feather-drift {
+          0% { transform: translate(0, 0) rotate(0deg) scale(0.5); opacity: 0; }
+          15% { opacity: 1; }
+          45% { transform: translate(5px, -12px) rotate(35deg) scale(1); }
+          75% { transform: translate(-4px, -20px) rotate(-20deg) scale(0.9); opacity: 0.8; }
+          100% { transform: translate(2px, -28px) rotate(40deg) scale(0.7); opacity: 0; }
+        }
+
+        /* ── CRYSTAL TIARA (LIMITED) — pelangi kristal, warna berputar ───── */
+        .sb-p-crystal-tiara {
+          background: conic-gradient(from 0deg, #e0f2fe, #f0abfc, #a5f3fc, #fde68a, #fbcfe8, #a5f3fc, #e0f2fe);
+          animation: sb-spin 5s linear infinite, sb-g-tiara 8s linear infinite;
+        }
+        @keyframes sb-g-tiara {
+          0% { filter: drop-shadow(0 0 7px rgba(165, 243, 252, 0.9)) hue-rotate(0deg) brightness(1.1); }
+          50% { filter: drop-shadow(0 0 17px rgba(240, 171, 252, 0.95)) hue-rotate(180deg) brightness(1.3); }
+          100% { filter: drop-shadow(0 0 7px rgba(165, 243, 252, 0.9)) hue-rotate(360deg) brightness(1.1); }
+        }
+        .sb-outer-ring.sb-p-crystal-tiara {
+          animation: sb-spin-rev 9s linear infinite, sb-hue-cycle 6s linear infinite !important;
+        }
+        @keyframes sb-hue-cycle {
+          to { filter: hue-rotate(360deg); }
+        }
+
+        /* ══ SIGNATURE — kepribadian animasi border generik ═════════════════
+           Satu wrapper (.sb-sig), tiap partikel (.sb-sg) diputar ke sudut
+           tetap lewat --sg-rot lalu partikelnya (::before) bergerak ke arah
+           translateY NEGATIF = menjauh dari pusat. Jadi semua tipe di bawah
+           ini aman dari foto. Glow untuk bentuk ber-clip-path ditaruh di
+           wrapper (filter), karena clip-path memotong glow di elemennya. */
+        .sb-sig {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-sg {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--sg-rot, 0deg));
+        }
+        .sb-sg::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 50%;
+          opacity: 0;
+          animation-duration: var(--sg-dur, 3s);
+          animation-delay: var(--sg-delay, 0s);
+          animation-iteration-count: infinite;
+          animation-timing-function: ease-out;
+        }
+
+        /* ember — bara api naik meliuk lalu padam */
+        .sb-sig-ember .sb-sg::before {
+          width: 4px;
+          height: 4px;
+          margin-left: -2px;
+          border-radius: 9999px;
+          background: radial-gradient(circle, #ffffff 0 30%, var(--accent, #fb923c) 75%);
+          box-shadow: 0 0 6px 2px var(--accent, #fb923c);
+          animation-name: sb-sg-ember;
+        }
+        @keyframes sb-sg-ember {
+          0% { transform: translate(0, 0) scale(1); opacity: 0; }
+          12% { opacity: 1; }
+          40% { transform: translate(4px, -10px) scale(0.9); }
+          70% { transform: translate(-3px, -19px) scale(0.6); opacity: 0.8; }
+          100% { transform: translate(2px, -28px) scale(0.15); opacity: 0; }
+        }
+
+        /* frost — kristal salju 8 lengan melayang sambil berputar */
+        .sb-sig-frost {
+          filter: drop-shadow(0 0 3px var(--accent, #bae6fd));
+        }
+        .sb-sig-frost .sb-sg::before {
+          top: -2px;
+          width: 9px;
+          height: 9px;
+          margin-left: -4.5px;
+          background:
+            linear-gradient(#ffffff, #ffffff) 50% 50% / 1.3px 100% no-repeat,
+            linear-gradient(#ffffff, #ffffff) 50% 50% / 100% 1.3px no-repeat,
+            linear-gradient(45deg, transparent 44%, var(--accent, #bae6fd) 44% 56%, transparent 56%),
+            linear-gradient(-45deg, transparent 44%, var(--accent, #bae6fd) 44% 56%, transparent 56%);
+          animation-name: sb-sg-frost;
+        }
+        @keyframes sb-sg-frost {
+          0% { transform: translate(0, 0) rotate(0deg) scale(0.3); opacity: 0; }
+          20% { transform: translate(1px, -5px) rotate(30deg) scale(1); opacity: 0.95; }
+          100% { transform: translate(3px, -24px) rotate(160deg) scale(0.7); opacity: 0; }
+        }
+
+        /* bolt — petir kecil yang menyambar di tepi ring (berkedip 3x) */
+        .sb-sig-bolt {
+          filter: drop-shadow(0 0 4px var(--accent, #fde047));
+        }
+        .sb-sig-bolt .sb-sg::before {
+          top: -14px;
+          width: 7px;
+          height: 15px;
+          margin-left: -3.5px;
+          background: linear-gradient(to bottom, #ffffff, var(--accent, #fde047));
+          clip-path: polygon(55% 0%, 20% 55%, 48% 55%, 35% 100%, 85% 40%, 55% 40%, 75% 0%);
+          animation-name: sb-sg-bolt;
+          animation-timing-function: linear;
+        }
+        @keyframes sb-sg-bolt {
+          0%, 62%, 100% { opacity: 0; transform: scaleY(0.6); }
+          64% { opacity: 1; transform: scaleY(1); }
+          67% { opacity: 0.15; }
+          70% { opacity: 1; transform: scaleY(1.1); }
+          76% { opacity: 0; }
+        }
+
+        /* bubble — gelembung naik, goyang, lalu pecah */
+        .sb-sig-bubble .sb-sg::before {
+          top: -2px;
+          width: 7px;
+          height: 7px;
+          margin-left: -3.5px;
+          border-radius: 9999px;
+          border: 1px solid rgba(255, 255, 255, 0.85);
+          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.95) 0 1.2px, rgba(103, 232, 249, 0.2) 2px, transparent 70%);
+          box-shadow: 0 0 4px var(--accent, #67e8f9), inset 0 0 3px rgba(255, 255, 255, 0.5);
+          animation-name: sb-bubble-rise;
+          animation-timing-function: ease-in;
+        }
+
+        /* star — bintang 4 sudut membesar sambil berputar */
+        .sb-sig-star {
+          filter: drop-shadow(0 0 4px var(--accent, #fff));
+        }
+        .sb-sig-star .sb-sg::before {
+          top: -9px;
+          width: 7px;
+          height: 7px;
+          margin-left: -3.5px;
+          background: #ffffff;
+          clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+          animation-name: sb-twinkle-pop;
+          animation-timing-function: ease-in-out;
+        }
+
+        /* gem — permata berkilau (belah ketupat) yang berdenyut pelan */
+        .sb-sig-gem {
+          filter: drop-shadow(0 0 4px var(--accent, #fff));
+        }
+        .sb-sig-gem .sb-sg::before {
+          top: -12px;
+          width: 9px;
+          height: 11px;
+          margin-left: -4.5px;
+          background: linear-gradient(135deg, #ffffff 10%, var(--accent, #fff) 90%);
+          clip-path: polygon(50% 0, 100% 38%, 50% 100%, 0 38%);
+          animation-name: sb-sg-gem;
+          animation-timing-function: ease-in-out;
+        }
+        @keyframes sb-sg-gem {
+          0%, 100% { transform: scale(0) rotate(0deg); opacity: 0; }
+          45% { transform: scale(1.15) rotate(20deg); opacity: 1; }
+          60% { transform: scale(0.95) rotate(20deg); opacity: 0.9; }
+        }
+
+        /* leaf — daun / kelopak kecil melayang keluar sambil berputar */
+        .sb-sig-leaf .sb-sg::before {
+          top: -2px;
+          width: 5px;
+          height: 9px;
+          margin-left: -2.5px;
+          background: linear-gradient(135deg, #ffffff -20%, var(--accent, #86efac));
+          border-radius: 0 100% 0 100%;
+          box-shadow: 0 0 4px var(--accent, #86efac);
+          animation-name: sb-sg-leaf;
+          animation-timing-function: ease-in-out;
+        }
+        @keyframes sb-sg-leaf {
+          0% { transform: translate(0, 0) rotate(0deg) scale(0.5); opacity: 0; }
+          15% { opacity: 1; }
+          50% { transform: translate(6px, -12px) rotate(100deg) scale(1); }
+          100% { transform: translate(-4px, -26px) rotate(260deg) scale(0.7); opacity: 0; }
+        }
+
+        /* mist — kepulan asap / kabut berwarna aksen yang memuai & memudar */
+        .sb-sig-mist .sb-sg::before {
+          top: -4px;
+          width: 12px;
+          height: 12px;
+          margin-left: -6px;
+          border-radius: 9999px;
+          background: radial-gradient(circle, var(--accent, #c4b5fd) 0%, transparent 70%);
+          animation-name: sb-sg-mist;
+        }
+        @keyframes sb-sg-mist {
+          0% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+          30% { opacity: 0.7; }
+          100% { transform: translate(0, -16px) scale(2); opacity: 0; }
+        }
+
+        /* meteor — goresan bintang jatuh yang meluncur keluar sesekali */
+        .sb-sig-meteor {
+          filter: drop-shadow(0 0 4px var(--accent, #fff));
+        }
+        .sb-sig-meteor .sb-sg::before {
+          top: -12px;
+          width: 2px;
+          height: 14px;
+          margin-left: -1px;
+          border-radius: 2px;
+          background: linear-gradient(to top, transparent, #ffffff 70%, var(--accent, #fff));
+          animation-name: sb-sg-meteor;
+          animation-timing-function: ease-out;
+        }
+        @keyframes sb-sg-meteor {
+          0%, 55%, 100% { opacity: 0; transform: translate(-6px, 10px) rotate(20deg); }
+          60% { opacity: 1; }
+          90% { opacity: 0; transform: translate(10px, -16px) rotate(20deg); }
+        }
+
+        /* ── Holo foil — kilau pelangi tipis (legendary & limited) ───────── */
+        .sb-holo {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 1;
+          pointer-events: none;
+          mix-blend-mode: overlay;
+          opacity: 0.32;
+          background: conic-gradient(from 0deg, #ff7eb3, #ffd86f, #8ff0a4, #6ee7f9, #a78bfa, #ff7eb3);
+          animation: sb-spin-rev 7s linear infinite;
+        }
+
+        /* ── Lip — garis tipis terang di tepi luar + alur gelap di tepi
+           dalam, bikin semua border kelihatan seperti pita logam yang
+           ditatah dan fotonya "duduk" di dalamnya. Statis (murah), jadi
+           ikut tampil juga di mode lite. ───────────────────────────────── */
+        .sb-lip {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 3;
+          pointer-events: none;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38);
+        }
+        .sb-lip::after {
+          content: "";
+          position: absolute;
+          inset: var(--sb-t, 3px);
+          border-radius: 9999px;
+          box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+        }
+
+        /* ── Hover — glow & flare menyala penuh saat kursor di atas avatar ─ */
+        .sb-ring > .sb-rimglow {
+          transition: box-shadow 0.35s ease;
+        }
+        .sb-ring:hover > .sb-rimglow {
+          box-shadow: 0 0 16px 4px var(--accent, #fff);
+        }
+        .sb-flare {
+          transition: opacity 0.3s ease;
+        }
+        .sb-ring:hover > .sb-flare {
+          opacity: 1;
+        }
+
+        /* ══ RAYS — sinar berputar di belakang ring (semua tier) ═════════════
+           Elemen ini z-index negatif, jadi selalu DI BELAKANG ring & foto.
+           Mask radial memotong bagian tengah, sehingga sinar hanya tampak
+           di halo luar lalu memudar. Intensitas lewat --rays-op (per tier). */
+        .sb-rays {
+          position: absolute;
+          inset: -28%;
+          border-radius: 9999px;
+          z-index: -3;
+          pointer-events: none;
+          opacity: var(--rays-op, 0.3);
+          background: repeating-conic-gradient(
+            from 0deg,
+            transparent 0deg 8deg,
+            var(--accent, #fff) 12deg,
+            transparent 16deg 30deg
+          );
+          -webkit-mask: radial-gradient(circle, transparent 0 43%, #000 52%, transparent 70%);
+          mask: radial-gradient(circle, transparent 0 43%, #000 52%, transparent 70%);
+          animation: sb-spin var(--rays-dur, 30s) linear infinite, sb-rays-breathe 4.2s ease-in-out infinite;
+        }
+        @keyframes sb-rays-breathe {
+          0%, 100% { opacity: calc(var(--rays-op, 0.3) * 0.55); }
+          50% { opacity: var(--rays-op, 0.3); }
+        }
+        /* Royal — sinar lebih lebar, lebih rapat & lebih terang (Golden Crown) */
+        .sb-rays-royal {
+          inset: -40%;
+          background: repeating-conic-gradient(
+            from 0deg,
+            transparent 0deg 5deg,
+            var(--accent, #fde68a) 9deg,
+            transparent 13deg 22.5deg
+          );
+          -webkit-mask: radial-gradient(circle, transparent 0 37%, #000 46%, transparent 70%);
+          mask: radial-gradient(circle, transparent 0 37%, #000 46%, transparent 70%);
+          animation: sb-spin 20s linear infinite, sb-rays-breathe 3.2s ease-in-out infinite;
+        }
+
+        /* ══ ORN GLINT — bintang kecil yang berkilat di ornamen (semua) ═════ */
+        .sb-orn-glint {
+          position: absolute;
+          top: -6%;
+          right: -8%;
+          pointer-events: none;
+          background: #ffffff;
+          clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+          opacity: 0;
+          animation: sb-orn-glint 3.6s ease-in-out infinite;
+        }
+        @keyframes sb-orn-glint {
+          0%, 62%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+          72% { opacity: 1; transform: scale(1) rotate(45deg); }
+          86% { opacity: 0; transform: scale(0.2) rotate(90deg); }
+        }
+
+        /* ══ ROYAL ORNAMENT — mahkota Golden Crown: melayang pelan, glow emas
+           berdenyut, dan kilatan di permata puncak. ═════════════════════════ */
+        .sb-ring > .sb-orn.sb-orn-royal {
+          animation: sb-orn-royal 3.4s ease-in-out infinite;
+        }
+        @keyframes sb-orn-royal {
+          0%, 100% {
+            transform: translate(-50%, -54%) rotate(-3deg) scale(1);
+            filter: drop-shadow(0 0 5px var(--accent, #fde68a)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          50% {
+            transform: translate(-50%, -64%) rotate(3deg) scale(1.08);
+            filter: drop-shadow(0 0 13px var(--accent, #fde68a)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.25);
+          }
+        }
+        .sb-orn-royal .sb-orn-glint {
+          left: 50%;
+          right: auto;
+          top: 0;
+          animation-name: sb-glint-royal;
+          animation-duration: 2.8s;
+        }
+        @keyframes sb-glint-royal {
+          0%, 55%, 100% { opacity: 0; transform: translateX(-50%) scale(0) rotate(0deg); }
+          66% { opacity: 1; transform: translateX(-50%) scale(1.15) rotate(45deg); }
+          82% { opacity: 0; transform: translateX(-50%) scale(0.2) rotate(90deg); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
+          .sb-rays,
+          .sb-orn-glint,
+          .sb-orn-royal,
+          .sb-sg::before,
+          .sb-holo,
+          .sb-heart::before,
+          .sb-bubble::before,
+          .sb-moon,
+          .sb-twinkle::before,
+          .sb-halo,
+          .sb-feather::before,
+          .sb-orn-heartbeat,
+          .sb-orn-sway,
           .sb-bg-wrap,
           .sb-bg-wrap > .sb-bg,
           .sb-bg-counter,

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const TABLE = "sales_online_reports";
 // FB/OLX/CAROUSEL pakai username (bukan nomor telepon), MITRA/RESELLER pakai nama mitra.
 // Keduanya sama-sama disimpan di kolom `partner_name` — tidak perlu migrasi tabel.
-const USERNAME_CHANNELS = ["FB", "IG", "TIKTOK", "OLX", "CAROUSEL", "ECOMMERCE", "TOKOPEDIA", "SHOPEE", "SOSMED"];
+const USERNAME_CHANNELS = ["FB", "IG", "TIKTOK", "OLX", "CAROUSEL", "ECOMMERCE", "TOKOPEDIA", "SHOPEE", "SOSMED", "THREADS"];
 const PARTNER_CHANNELS = ["MITRA", "RESELLER"];
 const NO_PHONE_CHANNELS = [...USERNAME_CHANNELS, ...PARTNER_CHANNELS];
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta = UTC+7
@@ -107,15 +107,15 @@ async function getHandler(req: NextRequest) {
     const startUtc = getPeriodStartUtc(period);
 
     const { data, error } = await fetchAllRows((from, to) =>
-  supabaseAdmin
-    .from(TABLE)
-    .select("*")
-    .is("deleted_at", null)
-    .gte("created_at", startUtc)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .range(from, to)
-);
+      supabaseAdmin
+        .from(TABLE)
+        .select("*")
+        .is("deleted_at", null)
+        .gte("created_at", startUtc)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to)
+    );
 
     if (error) throw new Error(error.message);
 

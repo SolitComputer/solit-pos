@@ -265,6 +265,7 @@ const AUDIT_LEADS_MENU: MenuGroup = {
     { name: "Carousell", href: "/dashboard/audit-leads/carousell", icon: Icons.salesReport },
     { name: "Tokopedia", href: "/dashboard/audit-leads/tokopedia", icon: Icons.salesReport },
     { name: "Shopee", href: "/dashboard/audit-leads/shopee", icon: Icons.salesReport },
+    { name: "Threads", href: "/dashboard/audit-leads/threads", icon: Icons.salesReport },
     { name: "Mitra", href: "/dashboard/audit-leads/mitra", icon: Icons.salesReport },
     { name: "Reseller", href: "/dashboard/audit-leads/reseller", icon: Icons.salesReport },
   ],
