@@ -618,6 +618,10 @@ function OutflowFormModal({
             });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan");
+            // FIX: buang cache Data Barang supaya stok aksesoris yang baru KELUAR
+            // langsung ter-refresh saat pindah ke tab Data Barang (tidak lagi
+            // kebaca dari cache lama 5 menit yang masih menampilkan unit itu).
+            try { sessionStorage.removeItem("unified-barang-cache-v1"); } catch { /* storage diblokir — abaikan */ }
             toast.success("Kebutuhan dicatat — modal aksesoris pindah ke laptop");
             onSuccess();
         } catch (e) {

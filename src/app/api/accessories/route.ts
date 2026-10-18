@@ -50,7 +50,10 @@ export const GET = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthUs
         // Aksesori yang BELUM pakai SN tetap pakai kolom stock manual seperti
         // biasa — backward compatible, tidak mengubah aksesori yang sudah ada.
         const derivedStock = units.length > 0
-            ? units.filter((u: any) => u.status !== "TERJUAL").length
+            // FIX: unit yang sudah KELUAR (diambil utk kebutuhan/service) dan
+            // unit yang sudah masuk Kelompok MSJ TIDAK dihitung stok — biar
+            // konsisten dgn normalizeAccessory() di UnifiedBarangContent.
+            ? units.filter((u: any) => u.status !== "TERJUAL" && u.status !== "KELUAR" && !u.msj_group_id).length
             : Number(acc.stock) || 0;
         const base: Record<string, any> = {
             ...acc,

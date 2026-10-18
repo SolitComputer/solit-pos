@@ -270,22 +270,7 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             return NextResponse.json({ success: false, message: "Unit laptop tujuan (SN) wajib dipilih" }, { status: 400 });
         }
 
-        // ── Validasi unit aksesoris + ambil modal (buy_price per-SN, fallback induk) ──
-        const { data: accUnit } = await supabaseAdmin
-            .from("accessory_units")
-            .select("id, status, buy_price")
-            .eq("id", accessory_unit_id)
-            .single();
-        if (!accUnit || accUnit.status !== "TERSEDIA") {
-            return NextResponse.json({ success: false, message: "Unit aksesoris sudah tidak tersedia" }, { status: 400 });
-        }
-        let modal = Math.round(Number(accUnit.buy_price ?? 0));
-        if (modal <= 0) {
-            const { data: accParent } = await supabaseAdmin.from("accessories").select("buy_price").eq("id", accessory_id).single();
-            modal = Math.round(Number(accParent?.buy_price ?? 0));
-        }
-
-        // ── Validasi unit laptop tujuan (harus aktif) ──
+        // ── Validasi unit laptop tujuan (harus aktif) — cek dulu sebelum klaim ──
         const { data: lapUnit } = await supabaseAdmin
             .from("laptop_units")
             .select("id, status, purchase_price")
@@ -293,6 +278,35 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             .single();
         if (!lapUnit || lapUnit.status === "SOLD" || lapUnit.status === "KELUAR") {
             return NextResponse.json({ success: false, message: "Unit laptop tujuan tidak valid / sudah keluar" }, { status: 400 });
+        }
+
+        // ── KLAIM unit aksesoris SECARA ATOMIK & PALING AWAL (anti double-give) ──
+        // Update status=KELUAR dengan guard status=TERSEDIA sekaligus, lalu CEK
+        // apakah ada baris yang ter-update. Kalau `claimed` null → unit sudah
+        // KELUAR/terpakai → berhenti SEBELUM insert outflow & SEBELUM modal
+        // ditambah. Ini akar fix bug double RAM-407: dulu insert & modal jalan
+        // lebih dulu tanpa mengecek klaim, jadi unit yang salah "TERSEDIA" bisa
+        // diambil dua kali.
+        const { data: claimed } = await supabaseAdmin
+            .from("accessory_units")
+            .update({ status: "KELUAR" })
+            .eq("id", accessory_unit_id)
+            .eq("status", "TERSEDIA")
+            .select("id, buy_price")
+            .maybeSingle();
+        if (!claimed) {
+            return NextResponse.json(
+                { success: false, message: "Unit aksesoris sudah tidak tersedia / sudah diambil" },
+                { status: 400 }
+            );
+        }
+        await recalcAccessoryParentStock(supabaseAdmin, accessory_id);
+
+        // Modal diambil dari unit yang BARU di-claim (fallback ke induk kalau 0)
+        let modal = Math.round(Number(claimed.buy_price ?? 0));
+        if (modal <= 0) {
+            const { data: accParent } = await supabaseAdmin.from("accessories").select("buy_price").eq("id", accessory_id).single();
+            modal = Math.round(Number(accParent?.buy_price ?? 0));
         }
 
         const purpose = `${accessory_name || "Aksesoris"} - ${accessory_sn ?? "—"} · Pindah ke ${laptop_name || "Laptop"} - ${laptop_sn ?? "—"}`;
@@ -322,16 +336,17 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             .single();
 
         if (error) {
+            // Insert gagal SETELAH unit di-claim → balikin unit ke TERSEDIA
+            // supaya tidak "hilang" tanpa catatan (kompensasi karena Supabase
+            // REST tidak punya transaksi lintas tabel).
+            await supabaseAdmin
+                .from("accessory_units")
+                .update({ status: "TERSEDIA" })
+                .eq("id", accessory_unit_id)
+                .eq("status", "KELUAR");
+            await recalcAccessoryParentStock(supabaseAdmin, accessory_id);
             return NextResponse.json({ success: false, message: error.message }, { status: 400 });
         }
-
-        // ── Aksesoris KELUAR + hitung ulang stok induk ──
-        await supabaseAdmin
-            .from("accessory_units")
-            .update({ status: "KELUAR" })
-            .eq("id", accessory_unit_id)
-            .eq("status", "TERSEDIA");
-        await recalcAccessoryParentStock(supabaseAdmin, accessory_id);
 
         // ── Modal aksesoris PINDAH ke modal laptop tujuan (purchase_price += modal) ──
         const newPurchase = Math.round(Number(lapUnit.purchase_price ?? 0)) + modal;
