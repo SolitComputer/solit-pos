@@ -1,0 +1,202 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { CircleDollarSign, Volume2, VolumeX, ChevronUp, ChevronDown } from "lucide-react";
+import { usePengajuanDanaNotify } from "@/hooks/usePengajuanDanaNotify";
+
+function formatRupiah(n: number): string {
+  return "Rp " + n.toLocaleString("id-ID");
+}
+
+const VISIBLE_LIMIT = 4;
+
+// ── Preferensi "sembunyikan card" — per-browser, disimpan di localStorage
+// supaya pilihan collapse/expand tidak ke-reset saat pindah halaman (komponen
+// ini remount tiap navigasi). TIDAK mempengaruhi suara alarm sama sekali —
+// suara tetap diatur mute/volume. Ini murni visibilitas kumpulan card.
+const COLLAPSED_STORAGE_KEY = "pengajuan_dana_notif_collapsed";
+
+function loadCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(COLLAPSED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveCollapsed(value: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(COLLAPSED_STORAGE_KEY, value ? "1" : "0");
+  } catch {
+    // localStorage diblokir — abaikan, bukan fitur kritikal
+  }
+}
+
+// ── Filter PENERIMA notifikasi: HANYA user ID di bawah ini yang boleh
+// dapat notifikasi Pengajuan Dana (card + suara), walaupun rolenya ADMIN.
+// Beda dengan NOTIFY_SOURCE_IDS di usePengajuanDanaNotify.ts (itu filter
+// berdasarkan SIAPA YANG MENGAJUKAN dana / requester_id; yang ini filter
+// berdasarkan SIAPA YANG SEDANG LOGIN / melihat notifikasi ini).
+const ALLOWED_NOTIFY_LISTENER_IDS: string[] = [
+  "7b56de81-244e-42af-b2f6-0e29631c4114", // Yoga Adi Prakoso
+  "236c08b5-0dd2-4f2f-95d6-286c5b6dd75e", // Reinaldy Olyvierd Sendouw
+];
+
+interface PengajuanDanaNotifierProps {
+  /** Role user saat ini — dikirim dari DashboardLayout (sumber: useAuthUser,
+   *  supaya tidak fetch /api/auth/me dua kali). Komponen ini SENGAJA tidak
+   *  di-gate oleh isSilentAdmin di DashboardLayout, karena target
+   *  notifikasinya justru ADMIN — kebalikan dari notifier lain. */
+  userRoles: string[];
+  /** ID user yang sedang login — dipakai untuk membatasi notifikasi ini
+   *  supaya HANYA muncul untuk ID yang ada di ALLOWED_NOTIFY_LISTENER_IDS,
+   *  meskipun rolenya ADMIN. Bisa null selagi auth user masih loading —
+   *  konsisten dengan pola MissionSoundNotifier/SellerReminderNotifier. */
+  userId: string | null;
+}
+
+export default function PengajuanDanaNotifier({ userRoles, userId }: PengajuanDanaNotifierProps) {
+  const router = useRouter();
+  const isAdmin = userRoles.includes("ADMIN");
+  const isAllowedListener = !!userId && ALLOWED_NOTIFY_LISTENER_IDS.includes(userId);
+  // enabled = false kalau bukan ADMIN ATAU ID user tidak ada di daftar
+  // penerima -> hook tidak polling sama sekali untuk user selain itu
+  const canReceiveNotif = isAdmin && isAllowedListener;
+  const { alerts, muted, volume, toggleMute, setVolume } = usePengajuanDanaNotify(canReceiveNotif);
+
+  // State collapse/expand untuk SEKUMPULAN card (bukan per-card). Nilai awal
+  // dibaca dari localStorage sekali saat mount.
+  const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed());
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      saveCollapsed(next);
+      return next;
+    });
+  };
+
+  if (!canReceiveNotif || alerts.length === 0) return null;
+
+  const visible = alerts.slice(0, VISIBLE_LIMIT);
+  const hiddenCount = alerts.length - visible.length;
+  const totalAmount = alerts.reduce((sum, a) => sum + a.amount, 0);
+  const compactLabel =
+    alerts.length === 1
+      ? `${alerts[0].requester_name} · ${alerts[0].purpose}`
+      : `${alerts.length} pengajuan menunggu`;
+
+  return (
+    <div className="fixed top-3 sm:top-4 inset-x-0 z-[100] flex flex-col items-center gap-2 px-16 sm:px-4 pointer-events-none">
+      {/* Versi RINGKAS untuk HP: 1 baris kecil, tidak menutupi konten.
+          Di sm ke atas disembunyikan — diganti kontrol + card penuh di bawah. */}
+      <div className="sm:hidden pointer-events-auto flex items-center gap-1.5 max-w-full">
+        <button
+          type="button"
+          onClick={toggleMute}
+          aria-label={muted ? "Bunyikan lagi" : "Bisukan sementara"}
+          className="w-8 h-8 rounded-full bg-white/95 shadow-md border border-slate-200 flex items-center justify-center flex-shrink-0"
+        >
+          {muted ? <VolumeX className="w-4 h-4 text-slate-400" /> : <Volume2 className="w-4 h-4 text-indigo-600" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/pengajuan-dana")}
+          className="min-w-0 flex items-center gap-1.5 bg-white/95 backdrop-blur-sm shadow-md border border-indigo-100 rounded-full pl-1.5 pr-3 py-1"
+        >
+          <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+            <CircleDollarSign className="w-3.5 h-3.5" />
+          </span>
+          <span className="truncate text-[11px] font-bold text-slate-800">{compactLabel}</span>
+          <span className="text-[11px] font-extrabold text-indigo-600 whitespace-nowrap">
+            {formatRupiah(totalAmount)}
+          </span>
+        </button>
+      </div>
+
+      {/* Kontrol mute & volume — mengatur SUARA saja, card tetap tampil
+          apapun statusnya, supaya admin tetap ingat ada yang menunggu. */}
+      <div className="hidden sm:flex pointer-events-auto items-center gap-2 bg-white/95 backdrop-blur-sm shadow-md border border-slate-200 rounded-full px-3 py-1.5">
+        <button
+          type="button"
+          onClick={toggleMute}
+          title={muted ? "Bunyikan lagi" : "Bisukan sementara"}
+          className="w-6 h-6 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition flex-shrink-0"
+        >
+          {muted ? <VolumeX className="w-4 h-4 text-slate-400" /> : <Volume2 className="w-4 h-4 text-indigo-600" />}
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={volume}
+          disabled={muted}
+          onChange={(e) => setVolume(Number(e.target.value))}
+          aria-label="Volume notifikasi Pengajuan Dana"
+          className="w-20 accent-indigo-600 disabled:opacity-40"
+        />
+        {muted && <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">Dibisukan</span>}
+
+        {/* Pemisah + tombol sembunyikan/tampilkan card (tidak mempengaruhi suara) */}
+        <span className="w-px h-4 bg-slate-200 flex-shrink-0" />
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-expanded={!collapsed}
+          title={collapsed ? "Tampilkan detail pengajuan" : "Sembunyikan daftar"}
+          className="flex items-center gap-1 h-6 pl-2 pr-1.5 rounded-full text-indigo-600 hover:bg-indigo-50 transition flex-shrink-0"
+        >
+          <span className="text-[11px] font-extrabold tabular-nums">{alerts.length}</span>
+          {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {!collapsed && visible.map((alert) => (
+        <button
+          key={alert.id}
+          type="button"
+          onClick={() => router.push("/dashboard/pengajuan-dana")}
+          title="Klik untuk membuka & menyetujui pengajuan ini"
+          className="hidden sm:block pointer-events-auto w-full max-w-sm text-left overflow-hidden rounded-2xl bg-white shadow-2xl shadow-black/15 border border-indigo-100 hover:-translate-y-0.5 transition-transform"
+          style={{ animation: "pdnDropIn 0.35s cubic-bezier(0.16,1,0.3,1) both" }}
+        >
+          <div className="h-1 bg-gradient-to-r from-indigo-500 to-purple-600" />
+          <div className="p-4 flex items-start gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+              <CircleDollarSign className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
+                Pengajuan Dana Baru · Menunggu Persetujuan
+              </p>
+              <p className="text-sm font-bold text-slate-800 truncate mt-0.5">
+                {alert.requester_name}
+              </p>
+              <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{alert.purpose}</p>
+              <p className="text-sm font-extrabold text-slate-900 mt-1">
+                {formatRupiah(alert.amount)}
+              </p>
+            </div>
+          </div>
+        </button>
+      ))}
+
+      {!collapsed && hiddenCount > 0 && (
+        <p className="hidden sm:block pointer-events-none text-[11px] font-semibold text-slate-500 bg-white/90 backdrop-blur px-2.5 py-1 rounded-full shadow-sm">
+          +{hiddenCount} pengajuan lain menunggu persetujuan
+        </p>
+      )}
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        @keyframes pdnDropIn {
+          from { opacity: 0; transform: translateY(-16px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}} />
+    </div>
+  );
+}

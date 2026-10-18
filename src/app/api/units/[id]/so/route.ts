@@ -86,6 +86,41 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       notes: notes || null,
     });
 
+    // ── ROLLUP ke parent laptops.so_at ──────────────────────────────────
+    // Begitu SEMUA unit aktif (bukan SOLD/KELUAR, bukan anggota Kelompok MSJ)
+    // sudah di-SO HARI INI, baris model di Data Barang otomatis ditandai
+    // "Sudah SO". Kalau ada 1 unit saja yang belum / di-batalkan, tanda di
+    // baris model ikut dicabut. Inilah yang menaikkan status SO per-unit
+    // (dari Kelola Unit) ke level model — tanpa perlu tombol SO di baris luar.
+    try {
+      const { data: siblings } = await supabase
+        .from("laptop_units")
+        .select("status, so_at, msj_group_id")
+        .eq("laptop_id", current.laptop_id);
+
+      const today = toWibDateStr(new Date());
+      const aktif = (siblings ?? []).filter(
+        (u) => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id
+      );
+      const allSo =
+        aktif.length > 0 &&
+        aktif.every(
+          (u) => u.so_at != null && toWibDateStr(new Date(u.so_at)) === today
+        );
+
+      await supabase
+        .from("laptops")
+        .update(
+          allSo
+            ? { so_at: new Date().toISOString(), so_by: user.name }
+            : { so_at: null, so_by: null }
+        )
+        .eq("id", current.laptop_id);
+    } catch {
+      // Rollup gagal TIDAK membatalkan SO unit yang sudah sukses — unit tetap
+      // tersimpan, cuma tanda di baris model yang mungkin telat ter-update.
+    }
+
     return NextResponse.json({ success: true, data });
   } catch {
     return NextResponse.json(

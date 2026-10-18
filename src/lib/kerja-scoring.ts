@@ -17,6 +17,18 @@ const PROGRAMMER_USER_IDS = [
   "a106053f-8168-4574-9586-6049300bb614",
   "a136bb0a-d6de-4439-946c-c17a85b11a67",
 ];
+// HRD — Yoga Adi Prakoso. Role sistemnya ADMIN, disatukan ke Divisi HRD
+// lewat ID. HARUS SAMA PERSIS dengan YOGA_HRD_USER_ID di
+// api/leaderboard-kerja/route.ts & dashboard/missions/leaderboard/page.tsx.
+const YOGA_HRD_USER_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
+
+// Dedup Tes Kondisi: 1x per (user, barang, tanggal WIB) — pola sama dengan
+// SO di /api/laptops/pengelola-points. 0,3 poin/Tes Kondisi (setara SO).
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+const POINTS_PER_CONDITION_CHECK = 0.3;
+function toWibDateStr(d: Date): string {
+  return new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+}
 // Sales Online — role yang dapat poin dari Laporan Harian Sales (chat leads),
 // role-based (bukan per akun). Harus disamakan manual dengan
 // SALES_REPORT_ROLES di src/lib/permissions.ts.
@@ -66,7 +78,10 @@ export async function computeKerjaScores(startDate: Date, endDate: Date): Promis
     { data: todos },
     { data: todoItems },
     { data: missions },
-    { data: salesOnlineReports }
+    { data: salesOnlineReports },
+    { data: manualAttendanceEntries },
+    { data: overtimeAudits },
+    { data: conditionCheckLogs }
   ] = await Promise.all([
     supabaseAdmin
       .from("transactions")
@@ -143,9 +158,37 @@ export async function computeKerjaScores(startDate: Date, endDate: Date): Promis
       .lte("created_at", endIso)
       .eq("status", "DONE"),
 
+    // deleted_at IS NULL → laporan yang di-soft-delete marketing (akun mati /
+    // data invalid) TIDAK dihitung sebagai poin Lencana. HARUS sama dengan
+    // query sales_online_reports di api/leaderboard-kerja/route.ts.
     supabaseAdmin
       .from("sales_online_reports")
       .select("id, filled_by")
+      .is("deleted_at", null)
+      .gte("created_at", startIso)
+      .lte("created_at", endIso),
+
+    supabaseAdmin
+      .from("attendance_manual")
+      .select("id, created_by, created_at")
+      .gte("created_at", startIso)
+      .lte("created_at", endIso),
+
+    supabaseAdmin
+      .from("overtime_requests")
+      .select("id, audited_by, audited_at, audit_status")
+      .not("audited_by", "is", null)
+      .gte("audited_at", startIso)
+      .lte("audited_at", endIso),
+
+    // Pengelola Barang — Tes Kondisi (endpoint condition-checks selalu
+    // nulis label "... — tes kondisi", entity laptop ATAU unit). entity_id
+    // + created_at dipakai buat dedup 1x/barang/hari WIB.
+    supabaseAdmin
+      .from("activity_logs")
+      .select("user_id, entity_id, created_at")
+      .eq("action", "EDIT")
+      .ilike("entity_label", "%tes kondisi%")
       .gte("created_at", startIso)
       .lte("created_at", endIso)
   ]);
@@ -153,6 +196,16 @@ export async function computeKerjaScores(startDate: Date, endDate: Date): Promis
   const itemCountByTodoId = new Map<string, number>();
   (todoItems ?? []).forEach((it: any) => {
     itemCountByTodoId.set(it.todo_id, (itemCountByTodoId.get(it.todo_id) ?? 0) + 1);
+  });
+
+  // Tes Kondisi: dedup 1x per (user, barang, tanggal WIB) → jumlah unik per user.
+  const condCountByUser = new Map<string, number>();
+  const seenCond = new Set<string>();
+  (conditionCheckLogs ?? []).forEach((r: any) => {
+    const key = `${r.user_id}|${r.entity_id}|${toWibDateStr(new Date(r.created_at))}`;
+    if (seenCond.has(key)) return;
+    seenCond.add(key);
+    condCountByUser.set(r.user_id, (condCountByUser.get(r.user_id) ?? 0) + 1);
   });
 
   const leaderboard: KerjaScoreRow[] = usersData.map((u) => {
@@ -260,9 +313,11 @@ export async function computeKerjaScores(startDate: Date, endDate: Date): Promis
     const uInputBarang = uActivities.filter((a: any) => a.action === "CREATE" && a.entity === "unit");
     const uSo = uActivities.filter((a: any) => a.action === "SO");
     const uMinusFixed = uActivities.filter((a: any) => a.action === "MINUS_FIXED");
+    const uCondCount = condCountByUser.get(uid) ?? 0;
     if (hasRole("PENGELOLA")) {
-      score += uInputBarang.length * 1 + uSo.length * 0.3 + uMinusFixed.length * 5;
+      score += uInputBarang.length * 1 + uSo.length * 0.3 + uMinusFixed.length * 5 + uCondCount * POINTS_PER_CONDITION_CHECK;
       metrics.push({ label: "Input Barang", value: uInputBarang.length, unit: "unit" });
+      metrics.push({ label: "Tes Kondisi", value: uCondCount, unit: "tes" });
     }
 
     const uJournalLogs = (journalLogs ?? []).filter((j: any) => j.changed_by === uid);
@@ -293,6 +348,18 @@ export async function computeKerjaScores(startDate: Date, endDate: Date): Promis
     if (hasRole("PROGRAMMER") || PROGRAMMER_USER_IDS.includes(uid)) {
       score += uTodoUnits * 3;
       metrics.push({ label: "Tugas Selesai", value: uTodoUnits, unit: "item" });
+    }
+
+    const uManualAttendance = (manualAttendanceEntries ?? []).filter(
+      (m: any) => m.created_by === uid
+    );
+    const uOvertimeAudits = (overtimeAudits ?? []).filter(
+      (o: any) => o.audited_by === uid
+    );
+    if (uid === YOGA_HRD_USER_ID) {
+      score += uManualAttendance.length * 1 + uOvertimeAudits.length * 1;
+      metrics.push({ label: "Absen Manual", value: uManualAttendance.length, unit: "absen" });
+      metrics.push({ label: "Audit Lemburan", value: uOvertimeAudits.length, unit: "lembur" });
     }
 
     return {

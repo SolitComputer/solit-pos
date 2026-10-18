@@ -16,7 +16,7 @@ import {
   Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
   Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
   ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
-  Mars, Venus, Plus,
+  Mars, Venus, Plus, UserX, UserCheck, Megaphone,
 } from "lucide-react";
 
 interface User {
@@ -43,6 +43,10 @@ interface User {
   song_artwork_url: string | null;
   contract_status?: string | null;
   contract_valid_until?: string | null;
+  is_active: boolean;
+  deactivated_at?: string | null;
+    deactivated_by?: string | null;
+  deactivated_by_name?: string | null;
 }
 
 interface CustomRoleRow {
@@ -62,7 +66,7 @@ const ALL_ROLES = [
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
-  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_CC",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
@@ -80,7 +84,7 @@ const ROLE_LABEL: Record<string, string> = {
   TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
   MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
-  KONTEN: "Konten", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
+   KONTEN: "Konten", KEPALA_CC: "Kepala CC", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
   KEPALA_SOTECH: "Kepala Sotech",
   PKL: "PKL", PKL_MARKETING: "PKL Marketing", PKL_SALES: "PKL Sales",
   PKL_PENYEDIA_BARANG: "PKL Penyedia Barang", PKL_SOTECH: "PKL Sotech",
@@ -99,7 +103,7 @@ const ROLE_ICON: Record<string, React.ReactNode> = {
   CREW_SALES: <Briefcase className={RI} />, SOTECH: <Wrench className={RI} />, ACCOUNTING: <DollarSign className={RI} />,
   PENGELOLA_BARANG: <Package className={RI} />, KEPALA_PENGELOLA_BARANG: <Package className={RI} />, TEKNISI: <Wrench className={RI} />, PENGANTARAN: <Truck className={RI} />,
   MARKETING: <Smartphone className={RI} />, KEBERSIHAN: <Sparkles className={RI} />,
-  PENYEDIA_BARANG: <Factory className={RI} />, KEPALA_PENYEDIA_BARANG: <Building2 className={RI} />, KONTEN: <FileText className={RI} />,
+     PENYEDIA_BARANG: <Factory className={RI} />, KEPALA_PENYEDIA_BARANG: <Building2 className={RI} />, KONTEN: <FileText className={RI} />, KEPALA_CC: <Megaphone className={RI} />,
   KEPALA_ONPOINT: <Target className={RI} />, ONPOINT: <MapPin className={RI} />, KEPALA_SOTECH: <Settings className={RI} />,
   PKL: <GraduationCap className={RI} />, PKL_MARKETING: <GraduationCap className={RI} />, PKL_SALES: <GraduationCap className={RI} />,
   PKL_PENYEDIA_BARANG: <GraduationCap className={RI} />, PKL_SOTECH: <GraduationCap className={RI} />,
@@ -129,6 +133,7 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   PENYEDIA_BARANG: { bg: "#fefce8", text: "#854d0e", border: "#fef08a" },
   KEPALA_PENYEDIA_BARANG: { bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" },
   KONTEN: { bg: "#fdf4ff", text: "#86198f", border: "#f0abfc" },
+  KEPALA_CC: { bg: "#fdf4ff", text: "#701a75", border: "#f0abfc" },
   KEPALA_ONPOINT: { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
   ONPOINT: { bg: "#ecfdf5", text: "#047857", border: "#a7f3d0" },
   KEPALA_SOTECH: { bg: "#f7fee7", text: "#3f6212", border: "#d9f99d" },
@@ -148,6 +153,9 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"]);
 const ROLE_MANAGER_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 const USER_ACTION_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+
+// Harus SAMA PERSIS dengan DELETE_USER_ALLOWED_ID di src/app/api/users/route.ts
+const DELETE_USER_ALLOWED_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
 
 const KEPALA_ROLES = new Set([
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ZENITH",
@@ -182,7 +190,7 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   PENGANTARAN: "#0d9488", KEPALA_ZENITH: "#7c3aed",
   MARKETING: "#db2777", KEBERSIHAN: "#0891b2",
   PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
-  KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
+  KONTEN: "#a21caf", KEPALA_CC: "#86198f", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
   KEPALA_SOTECH: "#4d7c0f",
   PKL: "#475569", PKL_MARKETING: "#b45309", PKL_SALES: "#b45309", PKL_ZENITH: "#b45309",
   PKL_PENYEDIA_BARANG: "#b45309", PKL_SOTECH: "#b45309",
@@ -205,6 +213,15 @@ function formatBirthDate(birthDate: string | null): string {
   if (!birthDate) return "-";
   const d = new Date(birthDate + "T00:00:00");
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("id-ID", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+  }) + " WIB";
 }
 
 function getAge(birthDate: string | null): number | null {
@@ -469,7 +486,7 @@ function MultiRoleSelect({
           "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"
         ]
       },
-      { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"] },
+      { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_CC"] },
       { label: "Onpoint & Sotech", roles: ["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"] },
       {
         label: "Magang (PKL)", roles: [
@@ -590,7 +607,9 @@ function MultiRoleSelect({
 }
 
 // ── EditUserModal ─────────────────────────────────────────────────────────────
-function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => void; onSaved: () => void }) {
+function EditUserModal({ user, onClose, onSaved, onResetFace }: {
+  user: User; onClose: () => void; onSaved: () => void; onResetFace?: () => void;
+}) {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone_number ?? "");
   const [birthDate, setBirthDate] = useState(user.birth_date ?? "");
@@ -638,6 +657,20 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
           </div>
         )}
+        {user.is_active === false && (
+          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
+            style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", color: "#475569" }}>
+            <UserX className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>
+              Akun ini sedang nonaktif — user tidak bisa login.
+              {user.deactivated_by_name && (
+                <> Dinonaktifkan oleh <b>{user.deactivated_by_name}</b>
+                  {user.deactivated_at && <> pada {formatDateTime(user.deactivated_at)}</>}.
+                </>
+              )}
+            </span>
+          </div>
+        )}
         <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
         <Field label="Tanggal Lahir">
           <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
@@ -659,6 +692,30 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
         <Field label="Role (bisa pilih lebih dari 1)">
           <MultiRoleSelect values={roles} onChange={setRoles} />
         </Field>
+        {onResetFace && (
+          <Field label="Data Wajah (Absensi)">
+            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl"
+              style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold"
+                style={{ color: user.face_embedding ? "#059669" : "#94a3b8" }}>
+                <ScanFace className="w-3.5 h-3.5" />
+                {user.face_embedding ? "Sudah terdaftar" : "Belum scan wajah"}
+              </span>
+              {user.face_embedding && (
+                <button type="button" onClick={onResetFace}
+                  className="h-8 px-3 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 transition-all active:scale-95"
+                  style={{ background: "#fff1f2", color: "#dc2626", border: "1px solid #fecdd3" }}>
+                  <ScanFace className="w-3.5 h-3.5" /> Reset Wajah
+                </button>
+              )}
+            </div>
+            {user.face_embedding && user.face_enrolled_at && (
+              <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>
+                Didaftarkan {formatDateTime(user.face_enrolled_at)}
+              </p>
+            )}
+          </Field>
+        )}
         <Field label="Shift">
           <div className="flex gap-2">
             {(["PAGI", "SORE"] as const).map(s => (
@@ -833,6 +890,65 @@ function ConfirmResetBiometricModal({ user, onClose, onConfirm, loading }: {
   );
 }
 
+// ── ConfirmToggleActiveModal ──────────────────────────────────────────────────
+// Satu modal untuk dua arah aksi (nonaktifkan / aktifkan kembali) — isi teks,
+// warna, dan ikonnya menyesuaikan status akun saat ini.
+function ConfirmToggleActiveModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  const isDeactivating = user.is_active !== false;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={isDeactivating
+            ? { background: "#f8fafc", border: "1px solid #cbd5e1" }
+            : { background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+          {isDeactivating
+            ? <UserX className="w-8 h-8" style={{ color: "#475569" }} />
+            : <UserCheck className="w-8 h-8" style={{ color: "#059669" }} />}
+        </div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">
+          {isDeactivating ? `Nonaktifkan Akun ${user.name}?` : `Aktifkan Kembali ${user.name}?`}
+        </h3>
+        <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
+          {isDeactivating
+            ? "User tidak bisa login lagi dan session aktifnya langsung diakhiri. Data & riwayatnya tetap tersimpan."
+            : "User bisa login kembali seperti biasa dengan password lamanya."}
+        </p>
+        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
+          style={isDeactivating
+            ? { background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }
+            : { background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" }}>
+          <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" />
+          {isDeactivating ? "Bisa diaktifkan lagi kapan saja — bukan hapus akun" : "Status akun kembali normal"}
+        </div>
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
+            style={isDeactivating
+              ? { background: "linear-gradient(135deg, #64748b, #334155)", boxShadow: "0 4px 14px rgba(51,65,85,0.3)" }
+              : { background: "linear-gradient(135deg, #10b981, #059669)", boxShadow: "0 4px 14px rgba(16,185,129,0.3)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+              : isDeactivating
+                ? <><UserX className="w-4 h-4" /> Ya, Nonaktifkan</>
+              : <><UserCheck className="w-4 h-4" /> Ya, Aktifkan</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ActionBtn ─────────────────────────────────────────────────────────────────
 function ActionBtn({ onClick, title, bg, color, children }: {
   onClick: () => void; title: string; bg: string; color: string; children: React.ReactNode;
@@ -887,6 +1003,8 @@ export default function UsersPage() {
   const [togglingBiometric, setTogglingBiometric] = useState<string | null>(null);
   const [confirmResetBiometricUser, setConfirmResetBiometricUser] = useState<User | null>(null);
   const [resettingBiometric, setResettingBiometric] = useState(false);
+  const [confirmToggleActiveUser, setConfirmToggleActiveUser] = useState<User | null>(null);
+  const [togglingActive, setTogglingActive] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRoleManager, setIsRoleManager] = useState(false);
   const [mainTab, setMainTab] = useState<"users" | "roles">("users");
@@ -1060,6 +1178,24 @@ export default function UsersPage() {
     finally { setResettingBiometric(false); setConfirmResetBiometricUser(null); }
   };
 
+  const handleToggleActive = async () => {
+    if (!confirmToggleActiveUser) return;
+    // Target status = kebalikan dari status sekarang
+    const nextActive = confirmToggleActiveUser.is_active === false;
+    setTogglingActive(true);
+    try {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: confirmToggleActiveUser.id, _toggleActive: nextActive }),
+      });
+      const data = await res.json();
+      if (data.success) { showToast(data.message ?? "Status akun diperbarui", "ok"); fetchUsers(); }
+      else showToast(data.message ?? "Gagal memperbarui status akun", "err");
+    } catch { showToast("Terjadi kesalahan", "err"); }
+    finally { setTogglingActive(false); setConfirmToggleActiveUser(null); }
+  };
+
   const filtered = useMemo(() => {
     let result = users.filter(u => {
       const matchSearch = !search
@@ -1089,6 +1225,19 @@ export default function UsersPage() {
     [users, activeTab]
   );
 
+  // Jumlah L / P / belum diisi — dihitung dari semua user di tab aktif
+  // (Karyawan atau PKL), tidak terpengaruh search & filter role.
+  const genderInTab = useMemo(() => {
+    const inTab = users.filter(u =>
+      activeTab === "pkl" ? isPKLRole(u.role) : !isPKLRole(u.role)
+    );
+    return {
+      male: inTab.filter(u => u.gender === "L").length,
+      female: inTab.filter(u => u.gender === "P").length,
+      unknown: inTab.filter(u => u.gender !== "L" && u.gender !== "P").length,
+    };
+  }, [users, activeTab]);
+
   const birthdayUsers = useMemo(
     () => users.filter(u => isBirthdayToday(u.birth_date)),
     [users]
@@ -1096,8 +1245,11 @@ export default function UsersPage() {
   const enrolled = users.filter(u => u.face_embedding).length;
   const pwNotSet = users.filter(u => !u.password_set).length;
   const fullAccess = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
+  const inactiveCount = users.filter(u => u.is_active === false).length;
   const totalKaryawan = users.filter(u => !isPKLRole(u.role)).length;
   const totalPKL = users.filter(u => isPKLRole(u.role)).length;
+  // Hapus akun dikunci khusus 1 ID akun, terpisah dari status isAdmin.
+  const canDeleteUsers = currentUserInfo?.id === DELETE_USER_ALLOWED_ID;
   const showOnlinePanel = isAdmin || isKepala;
 
   return (
@@ -1133,7 +1285,7 @@ export default function UsersPage() {
       {isAdmin && confirmLogoutUser && (
         <ConfirmLogoutModal user={confirmLogoutUser} onClose={() => setConfirmLogoutUser(null)} onConfirm={handleForceLogout} loading={loggingOut} />
       )}
-      {isAdmin && confirmDeleteUser && (
+      {canDeleteUsers && confirmDeleteUser && (
         <ConfirmDeleteModal user={confirmDeleteUser} onClose={() => setConfirmDeleteUser(null)} onConfirm={handleDeleteUser} loading={deleting} />
       )}
       {isAdmin && confirmResetPwUser && (
@@ -1142,11 +1294,24 @@ export default function UsersPage() {
       {isAdmin && confirmResetBiometricUser && (
         <ConfirmResetBiometricModal user={confirmResetBiometricUser} onClose={() => setConfirmResetBiometricUser(null)} onConfirm={handleResetBiometric} loading={resettingBiometric} />
       )}
+      {isAdmin && confirmToggleActiveUser && (
+        <ConfirmToggleActiveModal
+          user={confirmToggleActiveUser}
+          onClose={() => setConfirmToggleActiveUser(null)}
+          onConfirm={handleToggleActive}
+          loading={togglingActive}
+        />
+      )}
       {isAdmin && showCreate && (
         <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />
       )}
       {isAdmin && editUser && (
-        <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }} />
+        <EditUserModal
+          user={editUser}
+          onClose={() => setEditUser(null)}
+          onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }}
+          onResetFace={() => { const u = editUser; setEditUser(null); setConfirmReset(u); }}
+        />
       )}
       {isAdmin && sendContractUser && (
         <SendContractModal
@@ -1205,7 +1370,7 @@ export default function UsersPage() {
           </div>
 
           {/* ── Hero banner: Ringkasan Tim (pola sama seperti "Distribusi Penjualan" di Dashboard) ── */}
-          {isAdmin && (
+           {isAdmin && (
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-100/90 via-indigo-100/80 to-purple-100/90 p-5 sm:p-7 border border-indigo-100/60 shadow-sm">
               <div className="absolute inset-0 pointer-events-none opacity-40 overflow-hidden">
                 <svg className="absolute -right-10 -bottom-10 w-[500px] h-[300px]" viewBox="0 0 500 300" fill="none">
@@ -1243,7 +1408,7 @@ export default function UsersPage() {
                     ))
                   ) : (
                     <>
-                      <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
+                      <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub={inactiveCount > 0 ? `${inactiveCount} nonaktif` : "semua aktif"} accent="linear-gradient(180deg, #94a3b8, #64748b)" />
                       <StatCard icon={<Crown className="w-5 h-5" />} value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
                       <StatCard icon={<ScanFace className="w-5 h-5" />} value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
                       <StatCard icon={<AlertTriangle className="w-5 h-5" />} value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
@@ -1372,13 +1537,36 @@ export default function UsersPage() {
 
                     <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100"
                       style={{ background: "#fafbff" }}>
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
-                        <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
-                          {filtered.length === totalInTab
-                            ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
-                            : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
-                        </p>
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
+                          <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
+                            {filtered.length === totalInTab
+                              ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
+                              : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
+                          </p>
+                        </div>
+
+                        {/* Ringkasan jumlah gender untuk tab aktif */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                            style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" }}
+                            title="Jumlah laki-laki">
+                            <Mars className="w-2.5 h-2.5" /> {genderInTab.male}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                            style={{ background: "#fdf2f8", color: "#db2777", border: "1px solid #fbcfe8" }}
+                            title="Jumlah perempuan">
+                            <Venus className="w-2.5 h-2.5" /> {genderInTab.female}
+                          </span>
+                          {genderInTab.unknown > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                              style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0" }}
+                              title="Belum diisi jenis kelamin">
+                              ? {genderInTab.unknown}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {isAdmin && (
                         <div className="hidden sm:flex items-center gap-3 text-[10px] flex-shrink-0" style={{ color: "#94a3b8" }}>
@@ -1387,6 +1575,9 @@ export default function UsersPage() {
                           </span>
                           <span className="flex items-center gap-1.5">
                             <div className="w-2 h-2 rounded-full bg-violet-400" />Akses penuh
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-slate-300" />Nonaktif
                           </span>
                         </div>
                       )}
@@ -1425,10 +1616,11 @@ export default function UsersPage() {
                           const avatarColor = getAvatarColor(user.role);
                           const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
                           const canChat = currentUserInfo && user.id !== currentUserInfo.id;
+                          const isInactive = user.is_active === false;
 
                           return (
                             <div key={user.id}
-                              className="px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors duration-200 group rounded-2xl">
+                              className={`px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors duration-200 group rounded-2xl ${isInactive ? "opacity-60 grayscale" : ""}`}>
                               <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
 
                                 <div
@@ -1484,6 +1676,12 @@ export default function UsersPage() {
                                         </span>
                                       );
                                     })}
+                                    {isAdmin && isInactive && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                        style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1" }}>
+                                        <UserX className="w-2.5 h-2.5" /> Nonaktif
+                                      </span>
+                                    )}
                                     {isAdmin && !user.password_set && (
                                       <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                         style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
@@ -1521,6 +1719,18 @@ export default function UsersPage() {
                                         {user.song_title} · {user.song_artist}
                                       </p>
                                     </div>
+                                  )}
+                                  {isAdmin && isInactive && (
+                                    <p className="text-[10.5px] mt-0.5 inline-flex items-center gap-1 flex-wrap" style={{ color: "#64748b" }}>
+                                      <UserX className="w-3 h-3 flex-shrink-0" />
+                                                                            {/* 3 kondisi beda: nama ketemu / admin-nya dihapus / memang tidak pernah tercatat */}
+                                      Dinonaktifkan oleh{" "}
+                                      <span className="font-bold">
+                                        {user.deactivated_by_name
+                                          ?? (user.deactivated_by ? "akun yang sudah dihapus" : "— tidak tercatat")}
+                                      </span>
+                                      {user.deactivated_at && <span>· {formatDateTime(user.deactivated_at)}</span>}
+                                    </p>
                                   )}
                                   {user.bio && (
                                     <p className="text-[11px] text-gray-400 mt-0.5 truncate italic">"{user.bio}"</p>
@@ -1564,10 +1774,8 @@ export default function UsersPage() {
                                     </ActionBtn>
                                   )}
                                   {isAdmin && user.face_embedding && (
-                                    <ActionBtn onClick={() => setConfirmReset(user)} title="Reset wajah" bg="#fff1f2" color="#dc2626">
-                                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                      </svg>
+                                    <ActionBtn onClick={() => setConfirmReset(user)} title={`Reset wajah ${user.name}`} bg="#fff1f2" color="#dc2626">
+                                      <ScanFace className="w-3.5 h-3.5" />
                                     </ActionBtn>
                                   )}
                                   {isAdmin && user.biometric_enrolled && (
@@ -1603,6 +1811,17 @@ export default function UsersPage() {
                                     </ActionBtn>
                                   )}
                                   {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                    <ActionBtn
+                                      onClick={() => setConfirmToggleActiveUser(user)}
+                                      title={isInactive ? `Aktifkan kembali ${user.name}` : `Nonaktifkan akun ${user.name}`}
+                                      bg={isInactive ? "#ecfdf5" : "#f8fafc"}
+                                      color={isInactive ? "#059669" : "#64748b"}>
+                                      {isInactive
+                                        ? <UserCheck className="w-3.5 h-3.5" />
+                                        : <UserX className="w-3.5 h-3.5" />}
+                                    </ActionBtn>
+                                  )}
+                                  {canDeleteUsers && currentUserInfo && user.id !== currentUserInfo.id && (
                                     <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -1658,6 +1877,17 @@ export default function UsersPage() {
                                     </ActionBtn>
                                   )}
                                   {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                    <ActionBtn
+                                      onClick={() => setConfirmToggleActiveUser(user)}
+                                      title={isInactive ? `Aktifkan kembali ${user.name}` : `Nonaktifkan akun ${user.name}`}
+                                      bg={isInactive ? "#ecfdf5" : "#f8fafc"}
+                                      color={isInactive ? "#059669" : "#64748b"}>
+                                      {isInactive
+                                        ? <UserCheck className="w-3.5 h-3.5" />
+                                        : <UserX className="w-3.5 h-3.5" />}
+                                    </ActionBtn>
+                                  )}
+                                  {canDeleteUsers && currentUserInfo && user.id !== currentUserInfo.id && (
                                     <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

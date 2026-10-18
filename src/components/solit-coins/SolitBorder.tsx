@@ -544,6 +544,7 @@ export function SolitBorder({
   ornament = true,
   ornamentSize = 18,
   lite = false,
+  lite = false,
   children,
 }: {
   style?: BorderStyle | null;
@@ -553,6 +554,14 @@ export function SolitBorder({
   ornament?: boolean;
   /** Ukuran ornamen (px). */
   ornamentSize?: number;
+  /**
+   * Mode ringan — matiin layer mahal (blur, mix-blend-mode, banyak
+   * elemen partikel/sparkle sekaligus) yang bedanya nyaris gak kelihatan
+   * di ukuran kecil. Pakai di grid katalog (banyak border dirender
+   * bersamaan) biar scroll HP gak patah-patah; JANGAN pakai di preview
+   * besar (cuma 1 border, biaya render-nya kecil).
+   */
+  lite?: boolean;
   /**
    * Mode ringan — matiin layer mahal (blur, mix-blend-mode, banyak
    * elemen partikel/sparkle sekaligus) yang bedanya nyaris gak kelihatan
@@ -1454,12 +1463,45 @@ export function SolitBorder({
           />
         </span>
       )}
+      {!lite && hasParticles && (
+        <span className="sb-particles" aria-hidden="true">
+          <span className="sb-particle sb-particle-1" />
+          {particleCount >= 2 && <span className="sb-particle sb-particle-2" />}
+          {particleCount >= 3 && <span className="sb-particle sb-particle-3" />}
+          {particleCount >= 4 && <span className="sb-particle sb-particle-4" />}
+        </span>
+      )}
+      {!lite && (
+        <span className="sb-glints" aria-hidden="true">
+          <span
+            className="sb-glint"
+            style={{ "--glint-rot": "35deg", "--glint-max": glintOpacity } as React.CSSProperties}
+          />
+          <span
+            className="sb-glint"
+            style={{ "--glint-rot": "215deg", "--glint-max": glintOpacity, animationDelay: "1.4s" } as React.CSSProperties}
+          />
+        </span>
+      )}
       <style jsx global>{`
         .sb-ring {
           position: relative;
           display: inline-flex;
           border-radius: 9999px;
         }
+        .sb-bg-wrap {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 0;
+          transform-origin: center;
+          animation: sb-bg-breathe 3.4s ease-in-out infinite;
+        }
+        @keyframes sb-bg-breathe {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.045); }
+        }
+        .sb-bg-wrap > .sb-bg {
         .sb-bg-wrap {
           position: absolute;
           inset: 0;
@@ -2410,6 +2452,937 @@ export function SolitBorder({
           66% { transform: translate(0.4px, 0.4px); }
           88% { transform: translate(-0.4px, -0.3px); }
         }
+        .sb-facets {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 1;
+          pointer-events: none;
+          mix-blend-mode: overlay;
+          opacity: 0.55;
+          background: repeating-conic-gradient(
+            from 0deg,
+            rgba(255, 255, 255, 0.4) 0deg 3.5deg,
+            rgba(0, 0, 0, 0.3) 3.5deg 7deg
+          );
+          animation: sb-spin-rev 16s linear infinite;
+        }
+        .sb-bevel {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 2;
+          pointer-events: none;
+          box-shadow:
+            inset 0 1.5px 2px rgba(255, 255, 255, 0.6),
+            inset 0 -2px 2.5px rgba(0, 0, 0, 0.45);
+        }
+        /* Specular rim — satu sapuan cahaya TETAP (gak animasi) di sudut
+           kiri-atas, kayak arah lampu studio foto produk. Ini yang bikin
+           SEMUA border (common sampai limited) kerasa "jewel-like"/
+           mengkilat secara instan, tanpa perlu desain ulang 37 gradient
+           satu-satu — murni trik pencahayaan statis, murah banget buat
+           render (gak ada blur, gak ada animasi tambahan). */
+        .sb-specular {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 3;
+          pointer-events: none;
+          background: conic-gradient(
+            from 200deg,
+            transparent 0deg,
+            transparent 18deg,
+            rgba(255, 255, 255, 0.95) 27deg,
+            rgba(255, 255, 255, 0.1) 38deg,
+            transparent 52deg,
+            transparent 360deg
+          );
+          mix-blend-mode: screen;
+          opacity: 0.8;
+        }
+        /* Circuit trace — eksklusif Code Terminal. Beda teknik dari semua
+           efek lain di file ini (yang bentuknya conic-gradient diputer):
+           ini grid garis LURUS (horizontal + vertikal, kayak jalur PCB)
+           yang geser diagonal pelan-pelan. */
+        .sb-circuit {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 1;
+          pointer-events: none;
+          opacity: 0.5;
+          mix-blend-mode: screen;
+          background:
+            repeating-linear-gradient(0deg, rgba(74, 222, 128, 0.35) 0px 1px, transparent 1px 9px),
+            repeating-linear-gradient(90deg, rgba(74, 222, 128, 0.35) 0px 1px, transparent 1px 9px);
+          background-size: 200% 200%;
+          animation: sb-circuit-shift 12s linear infinite;
+        }
+        @keyframes sb-circuit-shift {
+          0% { background-position: 0% 0%, 0% 0%; }
+          100% { background-position: 200% 0%, 0% 200%; }
+        }
+        /* Rim glow — cahaya tipis warna aksen tepat di luar tepi ring.
+           Box-shadow-nya STATIS (murah), yang dianimasiin cuma opacity
+           elemennya. Mode lite (grid) dapet versi statis tanpa animasi,
+           jadi semua border di toko tetep kelihatan lebih "nyala". Intensitas
+           naik per rarity lewat --rim-max. */
+        .sb-rimglow {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: -1;
+          pointer-events: none;
+          box-shadow: 0 0 7px 1px var(--accent, #fff);
+          opacity: var(--rim-max, 0.5);
+          animation: sb-rim-pulse 2.8s ease-in-out infinite;
+        }
+        .sb-rimglow-static {
+          animation: none;
+          opacity: calc(var(--rim-max, 0.5) * 0.7);
+        }
+        @keyframes sb-rim-pulse {
+          0%, 100% { opacity: calc(var(--rim-max, 0.5) * 0.45); }
+          50% { opacity: var(--rim-max, 0.5); }
+        }
+        /* Double ring — cincin tipis kedua di LUAR ring utama (epic ke
+           atas), pakai gradient preset yang sama tapi muter berlawanan
+           arah. Bentuk cincin dari mask-exclude (hanya pita 1.5px yang
+           kelihatan), jadi gak pernah masuk ke area foto. !important di
+           animation buat matiin animasi glow bawaan kelas preset (cukup
+           muter doang, biar ringan). */
+        .sb-outer-ring {
+          position: absolute;
+          inset: -5px;
+          border-radius: 9999px;
+          padding: 1.5px;
+          z-index: -1;
+          pointer-events: none;
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          animation: sb-spin-rev 9s linear infinite !important;
+        }
+        /* Flare — busur cahaya (kepala putih + ekor warna aksen) yang
+           ngejar keliling pita ring. Bentuknya cuma pita tipis hasil
+           mask-exclude, jadi TIDAK PERNAH nutup foto. Element-nya yang
+           diputer (ring itu simetris, jadi mask ikut muter dengan aman). */
+        .sb-flare {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          padding: var(--sb-t, 3px);
+          z-index: 2;
+          pointer-events: none;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 235deg,
+            var(--accent, #fff) 325deg,
+            #ffffff 356deg,
+            transparent 360deg
+          );
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          opacity: var(--flare-op, 0.6);
+          animation: sb-spin var(--flare-dur, 4s) linear infinite;
+        }
+        .sb-flare-2 {
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 270deg,
+            var(--accent, #fff) 340deg,
+            #ffffff 357deg,
+            transparent 360deg
+          );
+          opacity: calc(var(--flare-op, 0.6) * 0.8);
+          animation: sb-spin-rev calc(var(--flare-dur, 4s) * 1.35) linear infinite;
+          animation-delay: -1.1s;
+        }
+        /* Sparks — percikan yang terbang keluar dari tepi ring. Wrapper
+           diputar ke sudut tetap, titiknya geser ke atas (= menjauh dari
+           pusat), jadi selalu bergerak ke luar, gak pernah ke foto. */
+        .sb-sparks {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-spark {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--spark-rot, 0deg));
+        }
+        .sb-spark::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 50%;
+          width: 3px;
+          height: 3px;
+          margin-left: -1.5px;
+          border-radius: 9999px;
+          background: #ffffff;
+          box-shadow: 0 0 5px 1px var(--accent, #fff);
+          opacity: 0;
+          animation: sb-spark-fly var(--spark-dur, 3s) ease-out infinite;
+          animation-delay: var(--spark-delay, 0s);
+        }
+        @keyframes sb-spark-fly {
+          0% { transform: translateY(0) scale(1); opacity: 0; }
+          14% { opacity: 1; }
+          100% { transform: translateY(-17px) scale(0.2); opacity: 0; }
+        }
+        /* Intro — satu gelombang kejut sekali jalan pas border muncul. */
+        .sb-intro {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          border: 2px solid var(--accent, #fff);
+          z-index: -1;
+          pointer-events: none;
+          opacity: 0;
+          animation: sb-intro-wave 1.1s ease-out 1 forwards;
+        }
+        @keyframes sb-intro-wave {
+          0% { transform: scale(1); opacity: 0.9; }
+          100% { transform: scale(1.7); opacity: 0; }
+        }
+        /* Studs — permata kecil di 4 titik mata angin (legendary &
+           limited). Duduk tepat di pita ring (bukan di atas foto),
+           kelip bergantian. */
+        .sb-studs {
+          position: absolute;
+          inset: -2px;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-stud {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--stud-rot, 0deg));
+        }
+        .sb-stud::before {
+          content: "";
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          width: 5px;
+          height: 5px;
+          margin-left: -2.5px;
+          background: linear-gradient(135deg, #ffffff, var(--accent, #fff));
+          transform: rotate(45deg);
+          box-shadow: 0 0 5px 1px var(--accent, #fff);
+          animation: sb-stud-twinkle 2.4s ease-in-out infinite;
+          animation-delay: var(--stud-delay, 0s);
+        }
+        @keyframes sb-stud-twinkle {
+          0%, 100% { opacity: 0.55; transform: rotate(45deg) scale(0.85); }
+          50% { opacity: 1; transform: rotate(45deg) scale(1.2); }
+        }
+        /* Orbit satellite — titik aksen yang ngelilingin ring di zona halo
+           luar (inset negatif, jadi gak pernah lewat di atas foto). Pola:
+           wrapper muter, titik nempel di tepi atas wrapper. */
+        .sb-orbits {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 3;
+        }
+        .sb-orbit {
+          position: absolute;
+          inset: -7px;
+          animation: sb-spin var(--orbit-dur, 5s) linear infinite;
+          animation-delay: var(--orbit-delay, 0s);
+        }
+        .sb-orbit-dot {
+          position: absolute;
+          top: -2px;
+          left: 50%;
+          width: 4px;
+          height: 4px;
+          margin-left: -2px;
+          border-radius: 9999px;
+          background: #fff;
+          box-shadow: 0 0 6px 2px var(--accent, #fff);
+        }
+        .sb-aura-wrap {
+          position: absolute;
+          inset: -16px;
+          border-radius: 9999px;
+          z-index: -4;
+          pointer-events: none;
+          overflow: hidden;
+          filter: blur(9px);
+          opacity: var(--aura-max, 0.4);
+          animation: sb-aura-pulse 3.2s ease-in-out infinite;
+        }
+        @keyframes sb-aura-pulse {
+          0%, 100% { transform: scale(0.94); opacity: calc(var(--aura-max, 0.4) * 0.55); }
+          50% { transform: scale(1.1); opacity: var(--aura-max, 0.4); }
+        }
+        /* Heartbeat — ritme lub-dub (dua detak cepat, lalu jeda panjang),
+           bukan napas sine halus seperti sb-aura-pulse biasa. Khusus
+           Cursed Reaper & Nightmare Eye. */
+        .sb-aura-heartbeat {
+          animation-name: sb-aura-heartbeat;
+          animation-duration: 2.6s;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+        }
+        @keyframes sb-aura-heartbeat {
+          0%, 100% { transform: scale(0.92); opacity: calc(var(--aura-max, 0.4) * 0.5); }
+          12% { transform: scale(1.15); opacity: var(--aura-max, 0.4); }
+          22% { transform: scale(0.98); opacity: calc(var(--aura-max, 0.4) * 0.65); }
+          34% { transform: scale(1.08); opacity: calc(var(--aura-max, 0.4) * 0.9); }
+          46% { transform: scale(0.92); opacity: calc(var(--aura-max, 0.4) * 0.5); }
+        }
+        .sb-aura-bg {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+        }
+        .sb-trace {
+          position: absolute;
+          inset: -9px;
+          border-radius: 9999px;
+          border: 1.5px dashed var(--accent, #fff);
+          opacity: 0.6;
+          z-index: 2;
+          pointer-events: none;
+          animation: sb-spin 3s linear infinite;
+        }
+        .sb-pulse-ring {
+          position: absolute;
+          inset: -6px;
+          border-radius: 9999px;
+          border: 2px solid var(--accent, #fff);
+          opacity: 0;
+          z-index: -1;
+          pointer-events: none;
+          animation: sb-pulse-expand 2.2s ease-out infinite;
+        }
+        .sb-pulse-ring-2 {
+          animation-delay: 1.1s;
+        }
+        .sb-pulse-ring-2.sb-ring-jitter {
+          animation: sb-pulse-expand 2.2s ease-out infinite, sb-jitter 2.6s ease-in-out infinite;
+          animation-delay: 1.1s, 0s;
+        }
+        @keyframes sb-pulse-expand {
+          0% { transform: scale(0.86); opacity: 0.55; }
+          80% { opacity: 0; }
+          100% { transform: scale(1.35); opacity: 0; }
+        }
+        .sb-shimmer {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          overflow: hidden;
+          z-index: 1;
+          pointer-events: none;
+          mix-blend-mode: screen;
+        }
+        .sb-shimmer::after {
+          content: "";
+          position: absolute;
+          inset: -50%;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 82deg,
+            rgba(255, 255, 255, 0.4) 90deg,
+            transparent 98deg,
+            transparent 360deg
+          );
+          animation: sb-spin 5.5s linear infinite;
+        }
+        .sb-shimmer-bold::after {
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 75deg,
+            rgba(255, 255, 255, 0.85) 90deg,
+            transparent 105deg,
+            transparent 360deg
+          );
+          animation: sb-spin 3s linear infinite;
+        }
+        .sb-shimmer-dual::before {
+          content: "";
+          position: absolute;
+          inset: -50%;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 255deg,
+            rgba(255, 255, 255, 0.7) 270deg,
+            transparent 285deg,
+            transparent 360deg
+          );
+          animation: sb-spin 3s linear infinite;
+        }
+        .sb-particles {
+          position: absolute;
+          inset: -9px;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-particle {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          animation: sb-spin 4.4s linear infinite;
+        }
+        .sb-particle::before {
+          content: "";
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          width: 5px;
+          height: 5px;
+          border-radius: 9999px;
+          background: var(--accent, #fff);
+          transform: translate(-50%, -50%);
+          box-shadow: 0 0 6px 2px var(--accent, #fff);
+          animation: sb-particle-twinkle 3.6s ease-in-out infinite;
+        }
+        .sb-particle-2 { animation-delay: -1.5s; }
+        .sb-particle-3 { animation-delay: -3s; }
+        .sb-particle-4 { animation-delay: -0.8s; }
+        .sb-particle-2::before { animation-delay: -1.5s; width: 4px; height: 4px; }
+        .sb-particle-3::before { animation-delay: -3s; }
+        .sb-particle-4::before { animation-delay: -0.8s; width: 4px; height: 4px; }
+        @keyframes sb-particle-twinkle {
+          0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.75); }
+          50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+        }
+        .sb-glints {
+          position: absolute;
+          inset: -7px;
+          z-index: 4;
+          pointer-events: none;
+        }
+        .sb-glint {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          transform: rotate(var(--glint-rot));
+          animation: sb-glint-twinkle 2.8s ease-in-out infinite;
+        }
+        .sb-glint::before,
+        .sb-glint::after {
+          content: "";
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          background: var(--accent, #fff);
+          border-radius: 2px;
+          transform: translate(-50%, -50%);
+          filter: drop-shadow(0 0 4px var(--accent, #fff));
+        }
+        .sb-glint::before { width: 9px; height: 1.6px; }
+        .sb-glint::after { width: 1.6px; height: 9px; }
+        @keyframes sb-glint-twinkle {
+          0%, 100% { opacity: 0; }
+          50% { opacity: var(--glint-max, 0.6); }
+        }
+        .sb-comet {
+          position: absolute;
+          inset: -11px;
+          border-radius: 9999px;
+          z-index: 3;
+          pointer-events: none;
+          animation: sb-spin 2.6s linear infinite;
+        }
+        .sb-comet::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 50%;
+          width: 5px;
+          height: 16px;
+          border-radius: 9999px;
+          background: linear-gradient(to bottom, transparent, var(--accent, #fff));
+          transform: translate(-50%, -85%);
+          filter: drop-shadow(0 0 6px var(--accent, #fff));
+        }
+        .sb-scanline {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          overflow: hidden;
+          z-index: 1;
+          pointer-events: none;
+          mix-blend-mode: screen;
+        }
+        .sb-scanline::after {
+          content: "";
+          position: absolute;
+          left: -20%;
+          right: -20%;
+          height: 14%;
+          background: linear-gradient(to bottom, transparent, rgba(74, 222, 128, 0.9), transparent);
+          animation: sb-scanline-move 2.2s linear infinite;
+        }
+        @keyframes sb-scanline-move {
+          0% { top: -20%; }
+          100% { top: 120%; }
+        }
+        .sb-cursor {
+          position: absolute;
+          left: 50%;
+          bottom: -2px;
+          z-index: 2;
+          width: 6px;
+          height: 12px;
+          background: #4ade80;
+          transform: translateX(-50%);
+          box-shadow: 0 0 6px rgba(74, 222, 128, 0.9);
+          animation: sb-cursor-blink 1s steps(1) infinite;
+          pointer-events: none;
+        }
+        @keyframes sb-cursor-blink {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0; }
+        }
+        .sb-glitch {
+          position: absolute;
+          inset: -3px;
+          border-radius: 9999px;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-glitch::before,
+        .sb-glitch::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          border: 1.5px solid transparent;
+          mix-blend-mode: screen;
+          opacity: 0;
+        }
+        .sb-glitch::before {
+          border-color: rgba(34, 211, 238, 0.9);
+          animation: sb-glitch-cyan 5s steps(1) infinite;
+        }
+        .sb-glitch::after {
+          border-color: rgba(244, 63, 94, 0.9);
+          animation: sb-glitch-red 5s steps(1) infinite;
+        }
+        @keyframes sb-glitch-cyan {
+          0%, 89%, 100% { opacity: 0; transform: translate(0, 0); }
+          90% { opacity: 0.9; transform: translate(-2px, 0); }
+          91.5% { opacity: 0; }
+          93% { opacity: 0.6; transform: translate(-1px, 0.5px); }
+          94% { opacity: 0; }
+        }
+        @keyframes sb-glitch-red {
+          0%, 89%, 100% { opacity: 0; transform: translate(0, 0); }
+          90% { opacity: 0.9; transform: translate(2px, 0); }
+          91.5% { opacity: 0; }
+          93% { opacity: 0.6; transform: translate(1px, -0.5px); }
+          94% { opacity: 0; }
+        }
+        .sb-matrix {
+          position: absolute;
+          inset: -7px;
+          z-index: 4;
+          pointer-events: none;
+        }
+        .sb-matrix-char {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--matrix-rot));
+        }
+        .sb-matrix-glyph {
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          font-family: "Courier New", monospace;
+          font-size: 9px;
+          font-weight: 700;
+          line-height: 1;
+          color: #4ade80;
+          text-shadow: 0 0 4px rgba(74, 222, 128, 0.85), 0 0 8px rgba(74, 222, 128, 0.5);
+          animation: sb-matrix-drift 3.2s ease-out infinite;
+        }
+        @keyframes sb-matrix-drift {
+          0% { opacity: 0; transform: translate(-50%, -50%) translateY(0); }
+          15% { opacity: 1; }
+          70% { opacity: 1; transform: translate(-50%, -50%) translateY(-9px); }
+          100% { opacity: 0; transform: translate(-50%, -50%) translateY(-12px); }
+        }
+        /* Typewriter reveal — selector ditulis lengkap (.sb-ring > .sb-orn.sb-orn-type)
+           biar spesifisitasnya PASTI ngalahin base rule .sb-ring > .sb-orn di atas,
+           dan animasi float-nya digabung di sini (bukan ditimpa) biar ornamen
+           tetap melayang SEKALIGUS "diketik" bareng. */
+        .sb-ring > .sb-orn.sb-orn-type {
+          animation: sb-orn-float 3s ease-in-out infinite, sb-orn-type-reveal 4s steps(6, end) infinite;
+        }
+        @keyframes sb-orn-type-reveal {
+          0%, 8% { clip-path: inset(0 100% 0 0); }
+          45%, 70% { clip-path: inset(0 0 0 0); }
+          92%, 100% { clip-path: inset(0 100% 0 0); }
+        }
+        /* Wing flutter — spesifisitas sama seperti sb-orn-type (2 class
+           di elemen yang sama), tapi ANIMASINYA GANTI TOTAL (bukan
+           ditambah), karena float (translate) dan flutter (scaleX) sama-
+           sama nyentuh property transform — dua animation terpisah yang
+           nyentuh property sama gak digabung otomatis oleh browser, jadi
+           float & flutter-nya sengaja digabung jadi SATU keyframe di sini. */
+        .sb-ring > .sb-orn.sb-orn-flutter {
+          animation: sb-orn-flutter 3s ease-in-out infinite;
+        }
+        @keyframes sb-orn-flutter {
+          0% { transform: translate(-50%, -52%) rotate(-5deg) scaleX(1); }
+          12.5% { transform: translate(-50%, -55.5%) rotate(-2.5deg) scaleX(0.55); }
+          25% { transform: translate(-50%, -59%) rotate(0deg) scaleX(1); }
+          37.5% { transform: translate(-50%, -62.5%) rotate(2.5deg) scaleX(0.55); }
+          50% { transform: translate(-50%, -66%) rotate(5deg) scaleX(1); }
+          62.5% { transform: translate(-50%, -62.5%) rotate(2.5deg) scaleX(0.55); }
+          75% { transform: translate(-50%, -59%) rotate(0deg) scaleX(1); }
+          87.5% { transform: translate(-50%, -55.5%) rotate(-2.5deg) scaleX(0.55); }
+          100% { transform: translate(-50%, -52%) rotate(-5deg) scaleX(1); }
+        }
+        /* Petal fall — posisi horizontal pakai 'left' persen (bukan px),
+           dan gerak jatuhnya pakai 'top' persen juga: karena elemen ini
+           position:absolute di dalam .sb-petals, browser ngitung persen
+           top/left relatif ke TINGGI/LEBAR wrapper-nya — otomatis nyesuain
+           kalau ring-nya kecil (avatar grid 24px) atau gede (preview 96px),
+           gak perlu angka px berbeda per ukuran. */
+        .sb-petals {
+          position: absolute;
+          inset: -10%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-petal {
+          position: absolute;
+          left: 0;
+          width: 6px;
+          height: 7px;
+          background: #f9a8d4;
+          border-radius: 0 100% 0 100%;
+          box-shadow: 0 0 3px rgba(244, 114, 182, 0.7);
+          animation: sb-petal-fall 3.6s linear infinite;
+        }
+        .sb-petal-1 { left: 20%; }
+        .sb-petal-2 { left: 50%; animation-delay: 1.2s; }
+        .sb-petal-3 { left: 78%; animation-delay: 2.4s; }
+        @keyframes sb-petal-fall {
+          0% { top: -6%; opacity: 0; transform: translateX(-50%) rotate(0deg); }
+          10% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { top: 106%; opacity: 0; transform: translateX(-50%) rotate(340deg); }
+        }
+        /* Blood drip — eksklusif Cursed Reaper. Posisi pakai pola yang sama
+           kayak sb-petal (top/left persen, otomatis nyesuain ukuran ring),
+           tapi bentuknya teardrop (border-radius asimetris + rotate 45deg)
+           dan jatuhnya LURUS tanpa muter — kesan cairan menetes, bukan
+           kelopak yang berputar-putar kayak sakura. */
+        .sb-blood {
+          position: absolute;
+          inset: -10%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-drop {
+          position: absolute;
+          left: 0;
+          width: 5px;
+          height: 7px;
+          background: #dc2626;
+          border-radius: 50% 50% 50% 0;
+          transform: translateX(-50%) rotate(45deg);
+          box-shadow: 0 0 3px rgba(220, 38, 38, 0.8);
+          animation: sb-drop-fall 2.8s ease-in infinite;
+        }
+        .sb-drop-1 { left: 22%; }
+        .sb-drop-2 { left: 50%; animation-delay: 0.9s; }
+        .sb-drop-3 { left: 76%; animation-delay: 1.8s; }
+        @keyframes sb-drop-fall {
+          0% { top: -4%; opacity: 0; }
+          15% { opacity: 1; }
+          75% { opacity: 1; }
+          100% { top: 104%; opacity: 0; }
+        }
+        /* Slash flash — garis terang yang nyamber sekali tiap ±5 detik,
+           kesan sabetan sabit/cakar. Dipakai bareng blood drip, bukan
+           gantiin. */
+        .sb-slash {
+          position: absolute;
+          inset: -15%;
+          border-radius: 9999px;
+          background: linear-gradient(
+            115deg,
+            transparent 42%,
+            rgba(248, 113, 113, 0.9) 49%,
+            rgba(255, 255, 255, 0.8) 50%,
+            rgba(248, 113, 113, 0.9) 51%,
+            transparent 58%
+          );
+          opacity: 0;
+          animation: sb-slash-flash 5s ease-in-out infinite;
+        }
+        @keyframes sb-slash-flash {
+          0%, 92%, 100% { opacity: 0; transform: scale(0.9); }
+          94% { opacity: 1; transform: scale(1.05); }
+          96% { opacity: 0.3; transform: scale(1); }
+          98% { opacity: 0.8; transform: scale(1.02); }
+        }
+        /* Soul embers — percikan jiwa naik dari bawah ring, beda arah
+           total dari blood drip yang turun. */
+        .sb-embers {
+          position: absolute;
+          inset: -8%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-ember {
+          position: absolute;
+          bottom: 8%;
+          width: 3px;
+          height: 3px;
+          border-radius: 9999px;
+          background: #fca5a5;
+          box-shadow: 0 0 5px 1px rgba(248, 113, 113, 0.9);
+          animation: sb-ember-rise 3.4s ease-out infinite;
+        }
+        .sb-ember-1 { left: 30%; }
+        .sb-ember-2 { left: 68%; animation-delay: 1.6s; }
+        @keyframes sb-ember-rise {
+          0% { bottom: 6%; opacity: 0; transform: translateX(0) scale(0.6); }
+          20% { opacity: 1; }
+          100% { bottom: 98%; opacity: 0; transform: translateX(6px) scale(0.2); }
+        }
+        /* Shadow tendrils — uratan gelap yang menjangkau keluar dari tepi
+           ring lalu narik balik. Pola sama kayak sb-glint (wrapper rotate
+           via CSS var, pseudo-element tumbuh dari tepi luar) biar dijamin
+           gak pernah numpuk ke foto — tumbuhnya menjauh dari ring, bukan
+           ke arah tengah. */
+        .sb-tendrils {
+          position: absolute;
+          inset: -2px;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-tendril {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--tendril-rot, 0deg));
+        }
+        .sb-tendril::before {
+          content: "";
+          position: absolute;
+          top: -2px;
+          left: 50%;
+          width: 1.5px;
+          height: 14px;
+          background: linear-gradient(to top, rgba(76, 29, 149, 0.9), transparent);
+          transform: translateX(-50%) scaleY(0);
+          transform-origin: bottom center;
+          animation: sb-tendril-reach 4.2s ease-in-out infinite;
+          animation-delay: var(--tendril-delay, 0s);
+        }
+        @keyframes sb-tendril-reach {
+          0%, 60%, 100% { transform: translateX(-50%) scaleY(0); opacity: 0; }
+          75% { transform: translateX(-50%) scaleY(1); opacity: 0.9; }
+          90% { transform: translateX(-50%) scaleY(0.6); opacity: 0.4; }
+        }
+        /* Katana slash — eksklusif Cyber Samurai. Sabetan silang biru-putih-
+           merah yang nyamber sekali tiap beberapa detik (pola sama kayak
+           sb-slash milik Cursed Reaper, tapi warnanya dual-tone biru/merah
+           biar kerasa kayak bentrok dua pedang chi-energy). */
+        .sb-katana {
+          position: absolute;
+          inset: -12%;
+          border-radius: 9999px;
+          pointer-events: none;
+          background: linear-gradient(
+            115deg,
+            transparent 44%,
+            rgba(56, 189, 248, 0.9) 49%,
+            rgba(255, 255, 255, 0.95) 50%,
+            rgba(239, 68, 68, 0.9) 51%,
+            transparent 56%
+          );
+          opacity: 0;
+          animation: sb-katana-flash 4.2s ease-in-out infinite;
+        }
+        @keyframes sb-katana-flash {
+          0%, 88%, 100% { opacity: 0; transform: scale(0.88) rotate(0deg); }
+          90% { opacity: 1; transform: scale(1.06) rotate(-4deg); }
+          92% { opacity: 0.25; transform: scale(1) rotate(0deg); }
+          95% { opacity: 0.85; transform: scale(1.03) rotate(2deg); }
+        }
+        /* Stardust twinkle — eksklusif Stardust Fairy. Beda dari sb-petal
+           (yang jatuh dari atas ke bawah): titik-titik ini DIAM di posisi
+           top/left fix, cuma kedip membesar-mengecil — kesan debu peri
+           yang beterbangan statis di sekitar ring, bukan kelopak gugur. */
+        .sb-stardust {
+          position: absolute;
+          inset: -10%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-star {
+          position: absolute;
+          width: 4px;
+          height: 4px;
+          border-radius: 9999px;
+          background: #ffffff;
+          box-shadow: 0 0 6px 1px rgba(251, 207, 232, 0.9);
+          animation: sb-star-twinkle 2.6s ease-in-out infinite;
+        }
+        .sb-star-1 { top: 8%; left: 18%; }
+        .sb-star-2 { top: 72%; left: 82%; animation-delay: 0.9s; }
+        .sb-star-3 { top: 85%; left: 25%; animation-delay: 1.8s; }
+        @keyframes sb-star-twinkle {
+          0%, 100% { opacity: 0; transform: scale(0.4); }
+          50% { opacity: 1; transform: scale(1.3); }
+        }
+        /* Void wisps — eksklusif Void Stare. Beda teknik dari sb-tendril
+           (yang nyentak lurus/"reach") — ini ngalir lebih lambat & melengkung
+           (rotate berubah seiring scale), kesan asap/kabut ungu yang
+           menjalar dari tepi ring, bukan uratan yang nyodok. Posisi tumbuh
+           dari luar (top:-3px, bukan dari tengah) jadi gak pernah numpuk
+           ke foto walau box wrapper-nya nutupin seluruh ring. */
+        .sb-void-wisps {
+          position: absolute;
+          inset: -2px;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-wisp {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--wisp-rot, 0deg));
+        }
+        .sb-wisp::before {
+          content: "";
+          position: absolute;
+          top: -3px;
+          left: 50%;
+          width: 2px;
+          height: 16px;
+          background: linear-gradient(to top, rgba(217, 70, 239, 0.85), transparent);
+          border-radius: 2px;
+          transform: translateX(-50%) scaleY(0) rotate(0deg);
+          transform-origin: bottom center;
+          animation: sb-wisp-curl 5s ease-in-out infinite;
+          animation-delay: var(--wisp-delay, 0s);
+        }
+        @keyframes sb-wisp-curl {
+          0%, 55%, 100% { transform: translateX(-50%) scaleY(0) rotate(0deg); opacity: 0; }
+          70% { transform: translateX(-50%) scaleY(1) rotate(14deg); opacity: 0.85; }
+          88% { transform: translateX(-50%) scaleY(0.5) rotate(-6deg); opacity: 0.3; }
+        }
+        /* Pupil dilate — eksklusif Nightmare Eye. Selector lengkap
+           (.sb-ring > .sb-orn.sb-orn-dilate) biar GANTI TOTAL animasi
+           float bawaan (pola sama kayak sb-orn-flutter) — bukan nambah,
+           karena sama-sama nyentuh transform. Warna glow var(--accent)
+           sengaja DITULIS ULANG di sini (bukan diwarisi dari class
+           sb-orn-glow), soalnya animasi CSS selalu menang atas property
+           statis untuk property yang sama (filter) — kalau gak ditulis
+           ulang, glow hijau-nya bakal ketimpa jadi putih polos pas
+           animasi jalan. */
+        .sb-ring > .sb-orn.sb-orn-dilate {
+          animation: sb-orn-dilate 4.5s ease-in-out infinite;
+        }
+        @keyframes sb-orn-dilate {
+          0%, 78% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1);
+          }
+          35% {
+            transform: translate(-50%, -52%) scale(1.3, 1.3);
+            filter: drop-shadow(0 0 13px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.4);
+          }
+          80% {
+            transform: translate(-50%, -52%) scale(1.05, 0.08);
+            filter: drop-shadow(0 0 4px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(0.8);
+          }
+          84% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 10px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1.3);
+          }
+          100% {
+            transform: translate(-50%, -52%) scale(1, 1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)) brightness(1);
+          }
+        }
+        /* Orn blink — eksklusif Void Stare. Beda ritme dari sb-orn-dilate
+           (yang membesar dulu baru kedip sekali) — ini DUA kali kedip
+           cepat beruntun di ujung siklus, gerak vertikal doang (scaleY),
+           gak ada pembesaran. Sama-sama nulis ulang var(--accent) di
+           filter karena alasan sama kayak sb-orn-dilate (animasi CSS
+           menang atas property statis). */
+        .sb-ring > .sb-orn.sb-orn-blink {
+          animation: sb-orn-blink 5.5s ease-in-out infinite;
+        }
+        @keyframes sb-orn-blink {
+          0%, 85%, 100% {
+            transform: translate(-50%, -52%) scaleY(1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          88% {
+            transform: translate(-50%, -52%) scaleY(0.05);
+            filter: drop-shadow(0 0 11px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          91% {
+            transform: translate(-50%, -52%) scaleY(1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          93% {
+            transform: translate(-50%, -52%) scaleY(0.05);
+            filter: drop-shadow(0 0 11px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+          96% {
+            transform: translate(-50%, -52%) scaleY(1);
+            filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+        }
+        .sb-orn-glow {
+          filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+        }
+        .sb-bg-counter {
+          animation-direction: reverse !important;
+          opacity: 0.5;
+          mix-blend-mode: color-dodge;
+          transform: scale(1.14);
+          filter: blur(0.5px);
+        }
+        .sb-burst {
+          position: absolute;
+          inset: -35%;
+          border-radius: 9999px;
+          z-index: 8;
+          pointer-events: none;
+          opacity: 0;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 70%);
+          animation: sb-burst-flash 1s ease-out 1 forwards;
+        }
+        @keyframes sb-burst-flash {
+          0% { transform: scale(0.25); opacity: 0; }
+          25% { opacity: 1; }
+          100% { transform: scale(1.7); opacity: 0; }
+        }
+        .sb-ring-jitter {
+          animation: sb-jitter 2.6s ease-in-out infinite;
+        }
+        @keyframes sb-jitter {
+          0%, 100% { transform: translate(0, 0); }
+          22% { transform: translate(0.6px, -0.5px); }
+          44% { transform: translate(-0.5px, 0.5px); }
+          66% { transform: translate(0.4px, 0.4px); }
+          88% { transform: translate(-0.4px, -0.3px); }
+        }
         .sb-ring > .sb-inner {
           position: relative;
           z-index: 1;
@@ -2428,6 +3401,8 @@ export function SolitBorder({
           animation: sb-orn-float 3s ease-in-out infinite;
         }
         @keyframes sb-orn-float {
+          0%, 100% { transform: translate(-50%, -52%) rotate(-5deg) scale(1); }
+          50% { transform: translate(-50%, -66%) rotate(5deg) scale(1.12); }
           0%, 100% { transform: translate(-50%, -52%) rotate(-5deg) scale(1); }
           50% { transform: translate(-50%, -66%) rotate(5deg) scale(1.12); }
         }
@@ -3459,62 +4434,7 @@ export function SolitBorder({
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .sb-sg::before,
-          .sb-holo,
-          .sb-heart::before,
-          .sb-bubble::before,
-          .sb-moon,
-          .sb-twinkle::before,
-          .sb-halo,
-          .sb-feather::before,
-          .sb-orn-heartbeat,
-          .sb-orn-sway,
-          .sb-bg-wrap,
-          .sb-bg-wrap > .sb-bg,
-          .sb-bg-counter,
-          .sb-facets,
-          .sb-aura-wrap,
-          .sb-aura-bg,
-          .sb-trace,
-          .sb-pulse-ring,
-          .sb-shimmer::after,
-          .sb-shimmer-bold::after,
-          .sb-shimmer-dual::before,
-          .sb-particle,
-          .sb-glint,
-          .sb-comet,
-          .sb-scanline::after,
-          .sb-cursor,
-          .sb-glitch::before,
-          .sb-glitch::after,
-          .sb-matrix-glyph,
-          .sb-circuit,
-          .sb-orn-type,
-          .sb-orn-flutter,
-          .sb-orn-dilate,
-          .sb-aura-heartbeat,
-          .sb-petal,
-          .sb-drop,
-          .sb-slash,
-          .sb-katana,
-          .sb-star,
-          .sb-wisp::before,
-          .sb-rimglow,
-          .sb-orbit,
-          .sb-outer-ring,
-          .sb-flare,
-          .sb-spark::before,
-          .sb-intro,
-          .sb-stud::before,
-          .sb-fang::before,
-          .sb-fslash,
-          .sb-orn-bite,
-          .sb-orn-blink,
-          .sb-ember,
-          .sb-tendril::before,
-          .sb-burst,
-          .sb-ring-jitter,
-          .sb-orn {
+          .sb-ring > .sb-bg {
             animation: none !important;
           }
         }

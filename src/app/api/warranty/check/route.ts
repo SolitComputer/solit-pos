@@ -7,6 +7,7 @@ const ALLOWED_ORIGINS = [
     "https://www.solit03.com",
     "http://localhost:5173",
     "http://localhost:3000",
+    "https://www.solit.id"
 ];
 
 // ✅ SECURITY FIX: rate limit in-memory (lihat src/lib/rateLimit.ts) cuma
@@ -25,7 +26,7 @@ function maskCustomerName(name: string): string {
 function getCorsHeaders(origin: string): Record<string, string> {
     const isAllowed = ALLOWED_ORIGINS.includes(origin);
     return {
-        "Access-Control-Allow-Origin": isAllowed ? origin : "https://solit03.com",
+        "Access-Control-Allow-Origin": isAllowed ? origin : "https://solit.id",
         "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Access-Control-Max-Age": "86400",

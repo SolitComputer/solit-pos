@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
@@ -8,12 +8,34 @@ import DateRangeCalendarPicker from "@/components/ui/DateRangeCalendarPicker";
 import { createPortal } from "react-dom";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { supabase } from "@/services/supabase";
+import { compressImage } from "@/lib/imageCompression";
 import {
   ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
   Store, Building2, User, Landmark, Banknote, QrCode, CreditCard,
-  AlertTriangle,
+  AlertTriangle, Wallet, Package, Gift, Plus, Trash2, Search,
   type LucideIcon,
 } from "lucide-react";
+
+export interface TxLaptopItem {
+  id: string;
+  unit_id: string;
+  serial_number: string;
+  laptop_name: string;
+  deal_price: number;
+}
+
+export interface EditModalAccessory {
+  accessory_id: string;
+  name: string;
+  quantity: number;
+  deal_price: number;
+  selling_price: number;
+  is_bonus: boolean;
+  // ✅ NEW: diisi saat aksesoris ditambah lewat Serial Number (bukan ketik nama).
+  // Kalau ada serial_number → 1 baris = 1 unit fisik, qty dikunci 1.
+  serial_number?: string;
+  unit_id?: string;
+}
 
 // ─── SORTING TYPES ───────────────────────────────────────────────────
 export type SortKey =
@@ -154,6 +176,129 @@ const formatDateTime = (date: string) =>
     hour: "2-digit", minute: "2-digit",
   });
 
+// ─── ACTIVITY LOG DIFF (Riwayat perubahan transaksi) ──────────────────
+// Field yang boleh dibandingkan before/after di modal "Lihat Riwayat".
+// `tier` menyamakan gating dengan Margin/Modal yang sudah ada di modal ini:
+// "financial" cuma untuk canSeeFinancials, "modal" cuma untuk canSeeModal
+// (ADMIN & KEPALA_PENGELOLA_BARANG) — supaya log tidak membocorkan harga
+// modal/margin ke role yang memang tidak boleh melihatnya.
+const fmtRupiahDiff = (n: any) => {
+  const num = Number(n);
+  return Number.isFinite(num) ? "Rp" + num.toLocaleString("id-ID") : "—";
+};
+
+const TX_DIFF_FIELD_CONFIG: Record<string, { label: string; tier: "public" | "financial" | "modal"; format?: (v: any) => string }> = {
+  status: { label: "Status", tier: "public", format: (v) => (v ? (STATUS_LABEL[v] ?? v) : "—") },
+  customer_name: { label: "Nama Customer", tier: "public" },
+  customer_phone: { label: "No. Telepon", tier: "public" },
+  customer_type: { label: "Tipe Customer", tier: "public" },
+  company_name: { label: "Toko / Perusahaan", tier: "public" },
+  source_platform: { label: "Sumber Platform", tier: "public" },
+  payment_method: { label: "Metode Bayar", tier: "public" },
+  payment_method_2: { label: "Metode Bayar 2", tier: "public" },
+  amount_method_1: { label: "Nominal Metode 1", tier: "financial", format: fmtRupiahDiff },
+  amount_method_2: { label: "Nominal Metode 2", tier: "financial", format: fmtRupiahDiff },
+  deal_price: { label: "Harga Deal", tier: "financial", format: fmtRupiahDiff },
+  amount: { label: "Nominal (amount)", tier: "financial", format: fmtRupiahDiff },
+  dp_amount: { label: "Nominal DP", tier: "financial", format: fmtRupiahDiff },
+  inventory_price: { label: "Harga Modal", tier: "modal", format: fmtRupiahDiff },
+  other: { label: "Margin", tier: "modal", format: fmtRupiahDiff },
+  // ✅ Ini yang paling relevan buat investigasi SN 0007208 — unit_ids/serial_numbers
+  // di sini adalah snapshot MENTAH kolom transactions, jadi Moreno bisa langsung
+  // cek apakah unit_id 6a6aa189-... hilang di antara before → after edit "ganti unit".
+  unit_ids: {
+    label: "Unit Terhubung (ID)", tier: "public",
+    format: (v) => (Array.isArray(v) ? (v.length ? v.join(", ") : "(kosong)") : String(v ?? "—")),
+  },
+  serial_numbers: {
+    label: "Serial Number", tier: "public",
+    format: (v) => (Array.isArray(v) ? (v.length ? v.join(", ") : "(kosong)") : String(v ?? "—")),
+  },
+  item_kind: { label: "Jenis Barang", tier: "public" },
+};
+
+function getTxDiffEntries(before: any, after: any, canSeeFinancials: boolean, canSeeModal: boolean) {
+  if (!before || !after) return [];
+  const entries: { key: string; label: string; before: string; after: string }[] = [];
+  for (const [key, cfg] of Object.entries(TX_DIFF_FIELD_CONFIG)) {
+    if (cfg.tier === "financial" && !canSeeFinancials) continue;
+    if (cfg.tier === "modal" && !canSeeModal) continue;
+    const rawBefore = before[key];
+    const rawAfter = after[key];
+    const changed = JSON.stringify(rawBefore ?? null) !== JSON.stringify(rawAfter ?? null);
+    if (!changed) continue;
+    entries.push({
+      key,
+      label: cfg.label,
+      before: cfg.format ? cfg.format(rawBefore) : String(rawBefore ?? "—"),
+      after: cfg.format ? cfg.format(rawAfter) : String(rawAfter ?? "—"),
+    });
+  }
+  return entries;
+}
+
+function ActivityLogDiff({ entries }: { entries: { key: string; label: string; before: string; after: string }[] }) {
+  if (entries.length === 0) {
+    return <p className="text-[10px] text-gray-400 italic mt-1">Tidak ada field yang berubah (kemungkinan cuma perubahan internal).</p>;
+  }
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      {entries.map((e) => (
+        <div key={e.key} className="text-[10px]">
+          <p className="font-semibold text-gray-500">{e.label}</p>
+          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+            <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 line-through font-mono break-all">{e.before}</span>
+            <span className="text-gray-300">→</span>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono break-all font-semibold">{e.after}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// RESTORE punya bentuk before_data yang beda dari EDIT (lihat restore/route.ts):
+// restore SEBAGIAN nyimpen { restored_units, deal_price_before }, restore
+// PENUH nyimpen snapshot transaksi utuh sebelum dibatalkan.
+function renderActivityDetail(log: any, canSeeFinancials: boolean, canSeeModal: boolean) {
+  if (log.action === "RESTORE") {
+    const restoredUnits = log.before_data?.restored_units;
+    if (Array.isArray(restoredUnits) && restoredUnits.length > 0) {
+      return (
+        <div className="mt-1.5 space-y-1">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Unit yang direstore</p>
+          {restoredUnits.map((u: any, i: number) => (
+            <div key={i} className="flex items-center justify-between gap-2 bg-red-50/60 border border-red-100 rounded px-2 py-1">
+              <span className="font-mono text-[10px] text-gray-700">{u.serial_number || u.unit_id || "—"}</span>
+              <span className="text-[10px] text-gray-500 truncate">{u.laptop_name}</span>
+              {canSeeFinancials && (
+                <span className="text-[10px] font-semibold text-gray-600 flex-shrink-0">
+                  {fmtRupiahDiff(u.deal_price)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    if (log.before_data?.status) {
+      return (
+        <p className="text-[11px] text-gray-500 mt-1">
+          Seluruh transaksi di-restore dari status{" "}
+          <span className="font-semibold">{STATUS_LABEL[log.before_data.status] ?? log.before_data.status}</span>.
+        </p>
+      );
+    }
+    return null;
+  }
+
+  if (log.action === "EDIT" && log.before_data && log.after_data) {
+    return <ActivityLogDiff entries={getTxDiffEntries(log.before_data, log.after_data, canSeeFinancials, canSeeModal)} />;
+  }
+
+  return null;
+}
+
 function getPaymentStyle(method: string): { text: string; icon: React.ReactNode; bg: string } {
   const m = (method ?? "").toUpperCase();
   const hasCash = m.includes("TUNAI") || m.includes("CASH");
@@ -208,8 +353,7 @@ function getCompanyBadge(company: string): { label: string; color: string } {
   if (cn.includes("sotech")) return { label: "Sotech", color: "bg-orange-50 text-orange-700 ring-1 ring-orange-200" };
   if (cn.includes("solit")) return { label: "Solit 03", color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" };
   if (cn.includes("on point") || cn.includes("onpoint")) return { label: "On Point", color: "bg-purple-50 text-purple-700 ring-1 ring-purple-200" };
-  if (cn.includes("zenit.id")) return { label: "Zenit.id", color: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200" };
-  if (cn.includes("zenit")) return { label: "Zenit", color: "bg-teal-50 text-teal-700 ring-1 ring-teal-200" };
+  if (cn.includes("sultop")) return { label: "Sultop", color: "bg-rose-50 text-rose-700 ring-1 ring-rose-200" };
   if (!company || company.trim() === "") return { label: "—", color: "bg-gray-50 text-gray-300" };
   return { label: company.trim(), color: "bg-gray-50 text-gray-600 ring-1 ring-gray-200" };
 }
@@ -244,11 +388,43 @@ function getPrimaryPriceDisplay(item: any) {
 
 // ─── RESTORE MODAL ────────────────────────────────────────────────────
 function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
-  item: any; isPending: boolean; restoring: boolean; onConfirm: (reason: string) => void; onClose: () => void;
+  item: any; isPending: boolean; restoring: boolean; onConfirm: (reason: string, selectedUnitIds: string[]) => void; onClose: () => void;
 }) {
   const statusLabelMap: Record<string, string> = { RESERVED: "DP", HELD: "Ambil Dulu", PACKING: "Packing", PENDING: "Pending", PAID: "Lunas" };
   const currentLabel = statusLabelMap[item.status] ?? item.status;
   const [reason, setReason] = useState("");
+
+  // ── State baru: daftar unit & seleksi untuk restore sebagian ──────────
+  const [items, setItems] = useState<TxLaptopItem[]>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingItems(true);
+    fetch(`/api/transaction/${item.invoice_number}/items`)
+      .then((res) => res.json())
+      .then((r) => {
+        if (!active) return;
+        const list: TxLaptopItem[] = r.success ? (r.data || []) : [];
+        setItems(list);
+        setSelectedIds(list.map((it) => it.unit_id)); // default: semua terpilih = restore penuh
+      })
+      .catch(() => { if (active) setItems([]); })
+      .finally(() => { if (active) setLoadingItems(false); });
+    return () => { active = false; };
+  }, [item.invoice_number]);
+
+  const isMultiItem = !loadingItems && items.length > 1;
+  const isPartial = isMultiItem && selectedIds.length > 0 && selectedIds.length < items.length;
+
+  const toggleUnit = (unitId: string) => {
+    setSelectedIds((prev) => prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId]);
+  };
+  const selectAllUnits = () => setSelectedIds(items.map((it) => it.unit_id));
+  const clearAllUnits = () => setSelectedIds([]);
+
+  const confirmDisabled = restoring || !reason.trim() || (isMultiItem && selectedIds.length === 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -266,16 +442,94 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
               {isPending ? `Batalkan pesanan untuk ${item.customer_name}?` : `Restore transaksi ${item.customer_name}?`}
             </p>
           </div>
+
+          {/* ── Checklist unit — hanya tampil untuk transaksi multi-laptop ── */}
+          {loadingItems ? (
+            <div className="flex items-center justify-center py-4 text-gray-400 text-xs gap-2">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-red-600 rounded-full animate-spin" />
+              Memuat daftar unit...
+            </div>
+          ) : isMultiItem ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                  Pilih Unit yang Direstore ({selectedIds.length}/{items.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={selectedIds.length === items.length ? clearAllUnits : selectAllUnits}
+                  className="text-[11px] font-bold text-blue-600 hover:text-blue-700"
+                >
+                  {selectedIds.length === items.length ? "Kosongkan" : "Pilih Semua"}
+                </button>
+              </div>
+              {/* ── Note klarifikasi arah checklist, biar tidak salah paham ── */}
+              <div className="flex items-center gap-1.5 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
+                <svg className="w-3 h-3 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                <p className="text-[10.5px] text-red-700 font-medium leading-snug">
+                  Unit yang <span className="font-bold">dicentang</span> = akan direstore (balik ke stok). Unit tidak dicentang tetap ada di transaksi ini.
+                </p>
+              </div>
+              <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-white max-h-52 overflow-y-auto">
+                {items.map((it) => {
+                  const isChecked = selectedIds.includes(it.unit_id);
+                  return (
+                    <label
+                      key={it.unit_id}
+                      className={`flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer transition ${isChecked ? "bg-red-50/40" : "hover:bg-gray-50 opacity-60"
+                        }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleUnit(it.unit_id)}
+                        className="w-4 h-4 accent-red-600 rounded shrink-0 cursor-pointer"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-gray-800 truncate">{it.laptop_name}</p>
+                        <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number || "—"}</p>
+                      </div>
+                      <span className="text-xs font-bold text-gray-700 font-mono shrink-0">
+                        Rp{Number(it.deal_price || 0).toLocaleString("id-ID")}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-gray-500">
+                {isPartial
+                  ? `${selectedIds.length} dari ${items.length} unit akan direstore ke stok. ${items.length - selectedIds.length} unit sisanya tetap ada di transaksi ini.`
+                  : selectedIds.length === items.length
+                    ? "Semua unit dipilih — seluruh transaksi akan di-restore (status → BATAL)."
+                    : "Pilih minimal 1 unit untuk direstore."}
+              </p>
+            </div>
+          ) : null}
+
           <div className="space-y-1.5 text-xs text-gray-600 bg-gray-50 rounded-xl p-3.5 border border-gray-200">
             <p className="font-semibold text-gray-700 mb-2">Yang akan terjadi:</p>
-            <p>• Status → <span className="font-bold text-red-600">BATAL</span></p>
-            <p>• Unit kembali ke stok <span className="font-bold text-emerald-700">SIAP JUAL</span></p>
-            {item.status === "PAID" && <p>• Garansi (jika ada) → <span className="font-bold text-orange-600">VOID</span></p>}
-            {item.status === "RESERVED" && <p className="text-amber-700 font-semibold"> DP yang sudah dibayar diurus manual</p>}
+            {isPartial ? (
+              <>
+                <p>• {selectedIds.length} unit terpilih → kembali ke stok <span className="font-bold text-emerald-700">SIAP JUAL</span></p>
+                <p>• Transaksi <span className="font-bold text-blue-700">TETAP BERJALAN</span> dengan sisa unit yang tidak dipilih</p>
+                <p>• Total harga deal transaksi otomatis dikurangi sesuai unit yang direstore</p>
+                <p>• Tercatat di log sebagai <span className="font-bold text-orange-600">restore sebagian</span></p>
+              </>
+            ) : (
+              <>
+                <p>• Status → <span className="font-bold text-red-600">BATAL</span></p>
+                <p>• Unit kembali ke stok <span className="font-bold text-emerald-700">SIAP JUAL</span></p>
+                {item.status === "PAID" && <p>• Garansi (jika ada) → <span className="font-bold text-orange-600">VOID</span></p>}
+                {item.status === "RESERVED" && <p className="text-amber-700 font-semibold"> DP yang sudah dibayar diurus manual</p>}
+              </>
+            )}
           </div>
+
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Alasan {isPending ? "Batalkan" : "Restore"} <span className="text-red-500">*</span>
+              Alasan {isPending ? "Batalkan" : isPartial ? "Restore Sebagian" : "Restore"} <span className="text-red-500">*</span>
             </label>
             <textarea
               value={reason}
@@ -288,8 +542,12 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
         </div>
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50 flex-shrink-0">
           <button onClick={onClose} className="flex-1 h-11 sm:h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-          <button onClick={() => onConfirm(reason.trim())} disabled={restoring || !reason.trim()} className="flex-1 h-11 sm:h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60">
-            {restoring ? "Memproses..." : isPending ? "Ya, Batalkan" : "Ya, Restore"}
+          <button
+            onClick={() => onConfirm(reason.trim(), selectedIds)}
+            disabled={confirmDisabled}
+            className="flex-1 h-11 sm:h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60"
+          >
+            {restoring ? "Memproses..." : isPending ? "Ya, Batalkan" : isPartial ? "Ya, Restore Sebagian" : "Ya, Restore"}
           </button>
         </div>
       </div>
@@ -298,57 +556,290 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
 }
 
 // ─── CONFIRM PAYMENT MODAL ────────────────────────────────────────────
-function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setConfirmError, confirming, payMode, setPayMode, cicilanAmount, setCicilanAmount, confirmPhoto, setConfirmPhoto, onConfirm, onClose }: {
-  item: any; confirmSN: string; setConfirmSN: (v: string) => void; confirmError: string;
-  setConfirmError: (v: string) => void; confirming: boolean;
-  payMode: "LUNAS" | "CICILAN"; setPayMode: (v: "LUNAS" | "CICILAN") => void;
-  cicilanAmount: string; setCicilanAmount: (v: string) => void;
-  confirmPhoto: File | null; setConfirmPhoto: (v: File | null) => void;
-  onConfirm: () => void; onClose: () => void;
+function ConfirmPaymentModal({
+  item,
+  onClose,
+  onSuccess,
+}: {
+  item: any;
+  onClose: () => void;
+  onSuccess: () => void;
 }) {
-  const fmt = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
+  const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
+  const [cicilanAmount, setCicilanAmount] = useState("");
+  const [confirmSN, setConfirmSN] = useState(item.serial_number || "");
+  const [paymentPhoto, setPaymentPhoto] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [items, setItems] = useState<TxLaptopItem[]>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   const dealTotal = Number(item.deal_price || item.amount || 0);
   const paidSoFar = Number(item.dp_amount || 0);
   const remaining = Math.max(0, dealTotal - paidSoFar);
   const isReserved = item.status === "RESERVED";
   const showCicilanForm = isReserved && payMode === "CICILAN";
-  const showSNForm = isReserved && payMode === "LUNAS";
+
+  const [lunasAmount, setLunasAmount] = useState<string>(() => {
+    return remaining > 0 ? String(remaining) : (dealTotal > 0 ? String(dealTotal) : "");
+  });
+
+  const fmt = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  // ── Ambil rincian unit laptop dalam transaksi dari API ──
+  useEffect(() => {
+    let active = true;
+    setLoadingItems(true);
+    fetch(`/api/transaction/${item.invoice_number}/items`)
+      .then((res) => res.json())
+      .then((r) => {
+        if (!active) return;
+        const list: TxLaptopItem[] = r.success ? (r.data || []) : [];
+        setItems(list);
+        const allIds = list.map((it) => it.unit_id);
+        setSelectedIds(allIds);
+      })
+      .catch(() => { if (active) setItems([]); })
+      .finally(() => { if (active) setLoadingItems(false); });
+    return () => { active = false; };
+  }, [item.invoice_number]);
+
+  const isMultiItem = !loadingItems && items.length > 1;
+  const showSNForm = isReserved && payMode === "LUNAS" && !isMultiItem;
+
+  const toggleUnit = (unitId: string) => {
+    setSelectedIds((prev) => {
+      const next = prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId];
+      const sumDeal = items.filter((it) => next.includes(it.unit_id)).reduce((acc, it) => acc + (Number(it.deal_price) || 0), 0);
+      if (payMode === "LUNAS") {
+        setLunasAmount(sumDeal > 0 ? String(sumDeal) : "");
+      }
+      return next;
+    });
+  };
+
+  const selectAllUnits = () => {
+    const allIds = items.map((it) => it.unit_id);
+    setSelectedIds(allIds);
+    const sumDeal = items.reduce((acc, it) => acc + (Number(it.deal_price) || 0), 0);
+    if (payMode === "LUNAS") {
+      setLunasAmount(sumDeal > 0 ? String(sumDeal) : "");
+    }
+  };
+
+  const clearAllUnits = () => {
+    setSelectedIds([]);
+    if (payMode === "LUNAS") {
+      setLunasAmount("");
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
+    setUploadingPhoto(true);
+    setError("");
+    try {
+      // ✅ NEW — target diperkecil, disamakan dengan kompresi bukti lembur
+      // (dulu 1MB/1600px → sekarang 0.3MB/1280px, jauh lebih hemat storage)
+      const file = await compressImage(rawFile, { maxSizeMB: 0.3, maxWidthOrHeight: 1280 });
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("invoice", item.invoice_number);
+      const res = await fetch("/api/receipt/upload-image", { method: "POST", body: fd });
+      const r = await res.json();
+      if (res.ok && r.url) {
+        setPaymentPhoto(r.url);
+      } else {
+        setError(r.error || r.message || "Gagal mengupload foto bukti");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Gagal mengupload foto bukti");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!paymentPhoto) { setError("Foto bukti pembayaran wajib diupload"); return; }
+
+    if (isMultiItem && selectedIds.length === 0) {
+      setError("Pilih minimal 1 unit yang akan dibayar");
+      return;
+    }
+
+    if (showCicilanForm) {
+      const amt = Number(cicilanAmount);
+      if (!amt || amt <= 0) { setError("Nominal cicilan wajib diisi"); return; }
+      setLoading(true); setError("");
+      try {
+        const res = await fetch("/api/units/confirm-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            invoice_number: item.invoice_number,
+            amount: amt,
+            is_partial: true,
+            payment_photo: paymentPhoto,
+          }),
+        });
+        const r = await res.json();
+        if (!r.success) { setError(r.message || "Gagal mencatat cicilan"); return; }
+        onSuccess();
+      } catch {
+        setError("Terjadi kesalahan koneksi");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    const lunasAmt = Number(lunasAmount);
+    if (!lunasAmt || lunasAmt <= 0) { setError("Nominal pembayaran wajib diisi"); return; }
+    if (showSNForm && !confirmSN.trim()) { setError("Serial number wajib diisi"); return; }
+
+    setLoading(true); setError("");
+    try {
+      const res = await fetch("/api/units/confirm-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoice_number: item.invoice_number,
+          serial_number: confirmSN.trim() || item.serial_number || undefined,
+          payment_photo: paymentPhoto,
+          amount: lunasAmt,
+          selected_unit_ids: isMultiItem ? selectedIds : undefined,
+        }),
+      });
+      const r = await res.json();
+      if (!r.success) { setError(r.message || "Gagal konfirmasi"); return; }
+      onSuccess();
+    } catch {
+      setError("Terjadi kesalahan koneksi");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 anim-fade">
       <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden ring-1 ring-black/5">
-        <div className="bg-emerald-700 px-5 py-4">
-          <p className="font-semibold text-white text-sm">Pembayaran</p>
-          <p className="text-xs text-white/60 mt-0.5 font-mono">{item.invoice_number}</p>
-        </div>
-        <div className="p-5 space-y-4">
-          {/* ── REVISI: Ringkasan transaksi selalu tampil — sebelumnya modal ini
-               kosong untuk status non-RESERVED (HELD/PACKING/PENDING) karena semua
-               konten di bawah cuma tampil kalau isReserved ── */}
-          <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200 space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-gray-400">Customer</span>
-              <span className="text-xs font-bold text-[#1a1545] text-right truncate max-w-[65%]">{item.customer_name}</span>
+      <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden ring-1 ring-black/5 anim-slide-up">
+        {/* Header */}
+        <div className="bg-[#0f0c29] px-5 py-4 shrink-0 relative">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center ring-1 ring-white/10">
+                <CheckCircle2 size={16} className="text-white" />
+              </div>
+              <div>
+                <h2 className="font-bold text-white text-sm tracking-tight">Pembayaran</h2>
+                <p className="text-xs text-white/40 font-mono mt-0.5">{item.invoice_number}</p>
+              </div>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-gray-400">Barang</span>
-              <span className="text-xs font-semibold text-gray-700 text-right truncate max-w-[65%]">
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-emerald-500/70 via-emerald-500/20 to-transparent" />
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+          {/* Ringkasan */}
+          <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100 overflow-hidden">
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Customer</span>
+              <span className="text-xs font-bold text-[#1a1545]">{item.customer_name}</span>
+            </div>
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Status Saat Ini</span>
+              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${statusDot[item.status] ?? "bg-gray-400"}`} />
+                {STATUS_LABEL[item.status] ?? item.status}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Barang</span>
+              <span className="text-xs font-semibold text-gray-700 truncate max-w-[200px]" title={item.laptop_name}>
                 {item.laptop_name || (item.grouped_items?.length > 1 ? `${item.grouped_items.length} laptop` : "—")}
               </span>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-gray-400">Status Saat Ini</span>
-              <span className="text-xs font-bold text-[#1a1545]">{STATUS_LABEL[item.status] ?? item.status}</span>
-            </div>
-            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-gray-200">
-              <span className="text-xs text-gray-500 font-semibold">Total Tagihan</span>
-              <span className="text-sm font-bold text-emerald-700">{fmt(dealTotal)}</span>
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Total Tagihan</span>
+              <span className="text-sm font-bold text-gray-900">{fmt(dealTotal)}</span>
             </div>
           </div>
 
-          {isReserved && (
-            <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200 grid grid-cols-2 gap-3">
+          {/* ── Multi-Unit Checklist & Deal Price Display ── */}
+          {loadingItems ? (
+            <div className="flex items-center justify-center py-4 text-gray-400 text-xs gap-2">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-emerald-600 rounded-full animate-spin" />
+              Memuat daftar unit...
+            </div>
+          ) : isMultiItem ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                  Pilih Unit yang Dibayar ({selectedIds.length}/{items.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={selectedIds.length === items.length ? clearAllUnits : selectAllUnits}
+                  className="text-[11px] font-bold text-blue-600 hover:text-blue-700"
+                >
+                  {selectedIds.length === items.length ? "Kosongkan" : "Pilih Semua"}
+                </button>
+              </div>
+              <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-white">
+                {items.map((it) => {
+                  const isChecked = selectedIds.includes(it.unit_id);
+                  return (
+                    <label
+                      key={it.unit_id}
+                      className={`flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer transition ${isChecked ? "bg-blue-50/40" : "hover:bg-gray-50 opacity-60"
+                        }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleUnit(it.unit_id)}
+                        className="w-4 h-4 accent-emerald-600 rounded shrink-0 cursor-pointer"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-gray-800 truncate">{it.laptop_name}</p>
+                        <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number || "—"}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] text-gray-400 block font-medium">Harga Deal</span>
+                        <span className="text-xs font-bold text-emerald-700 font-mono">{fmt(it.deal_price)}</span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-gray-500">
+                {selectedIds.length === items.length
+                  ? "Semua unit dipilih untuk dilunasi."
+                  : `${selectedIds.length} dari ${items.length} unit dipilih. Unit yang tidak dipilih akan otomatis dipisah jadi invoice baru di Riwayat Pending.`}
+              </p>
+            </div>
+          ) : null}
+
+          {paidSoFar > 0 && (
+            <div className="bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-3 px-4 py-3">
               <div>
                 <p className="text-[10px] text-gray-400 font-semibold uppercase">Sudah Dibayar</p>
                 <p className="text-sm font-bold text-blue-700">{fmt(paidSoFar)}</p>
@@ -362,12 +853,24 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
 
           {isReserved && (
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setPayMode("CICILAN")}
-                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "CICILAN" ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+              <button
+                type="button"
+                onClick={() => setPayMode("CICILAN")}
+                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "CICILAN"
+                  ? "bg-[#0f0c29] text-white border-[#0f0c29]"
+                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  }`}
+              >
                 Cicilan
               </button>
-              <button type="button" onClick={() => setPayMode("LUNAS")}
-                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "LUNAS" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+              <button
+                type="button"
+                onClick={() => setPayMode("LUNAS")}
+                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "LUNAS"
+                  ? "bg-emerald-600 text-white border-emerald-600"
+                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  }`}
+              >
                 Lunas Sekarang
               </button>
             </div>
@@ -377,48 +880,113 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nominal Cicilan</label>
               <input
-                type="number" value={cicilanAmount}
-                onChange={(e) => { setCicilanAmount(e.target.value); setConfirmError(""); }}
+                type="number"
+                value={cicilanAmount}
+                onChange={(e) => { setCicilanAmount(e.target.value); setError(""); }}
                 placeholder={`Kurang dari ${fmt(remaining)}`}
-                className="w-full h-11 sm:h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                className="w-full h-11 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
                 autoFocus
               />
               <p className="text-[11px] text-gray-400">Sisa setelah cicilan ini: {fmt(Math.max(0, remaining - (Number(cicilanAmount) || 0)))}</p>
             </div>
           )}
 
-          {showSNForm && (
+          {!showCicilanForm && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Serial Number</label>
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                Nominal Pembayaran <span className="text-red-500">*</span>
+              </label>
               <input
-                type="text" value={confirmSN}
-                onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }}
-                placeholder="Masukkan SN..."
-                className="w-full h-11 sm:h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                type="number"
+                value={lunasAmount}
+                onChange={(e) => { setLunasAmount(e.target.value); setError(""); }}
+                placeholder="Masukkan nominal pembayaran"
+                className="w-full h-11 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
               />
             </div>
           )}
 
-          {/* ── REVISI: Foto bukti pembayaran wajib diisi setiap konfirmasi lewat
-               tombol centang di Riwayat Transaksi ── */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Foto Bukti Pembayaran <span className="text-red-500">*</span>
+          {showSNForm && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Serial Number <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={confirmSN}
+                onChange={(e) => { setConfirmSN(e.target.value); setError(""); }}
+                placeholder="Masukkan SN..."
+                className="w-full h-11 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+              />
+            </div>
+          )}
+
+          {/* Bukti Transfer */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+              Bukti Transfer <span className="text-red-500">*</span>
             </label>
-            <input
-              type="file" accept="image/*" capture="environment"
-              onChange={(e) => { setConfirmPhoto(e.target.files?.[0] ?? null); setConfirmError(""); }}
-              className="w-full border border-gray-200 rounded-xl p-2.5 text-xs bg-gray-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-[#0f0c29] file:text-white hover:file:bg-[#1a1545] transition"
-            />
-            {confirmPhoto && <p className="text-[11px] text-emerald-600 font-medium">✓ {confirmPhoto.name}</p>}
+            {paymentPhoto ? (
+              <div className="relative rounded-xl overflow-hidden border border-gray-200">
+                <img src={paymentPhoto} alt="Bukti bayar" className="w-full max-h-40 object-cover" />
+                <button
+                  onClick={() => { setPaymentPhoto(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                  className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-lg flex items-center justify-center hover:bg-red-600 transition shadow"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <div className="bg-gray-50 border-t border-gray-100 px-3 py-1.5">
+                  <p className="inline-flex items-center gap-1 text-xs font-medium text-gray-600">
+                    <CheckCircle2 size={12} className="text-emerald-600" /> Foto berhasil diupload
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:border-gray-300 hover:bg-gray-50 transition"
+              >
+                {uploadingPhoto ? (
+                  <><div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" /><span className="text-xs">Mengupload...</span></>
+                ) : (
+                  <><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg><span className="text-xs font-medium">Upload Foto Bukti</span></>
+                )}
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
           </div>
 
-          {confirmError && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-700 font-medium">{confirmError}</div>}
+          {!showCicilanForm && (
+            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
+              <svg className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <p className="text-xs text-amber-700">
+                {isMultiItem && selectedIds.length < items.length
+                  ? `Konfirmasi akan mengubah ${selectedIds.length} unit terpilih menjadi PAID/SOLD. Unit sisanya tetap pending.`
+                  : "Konfirmasi akan mengubah status transaksi menjadi PAID dan unit menjadi SOLD."}
+              </p>
+            </div>
+          )}
+
+          {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-700 anim-shake">{error}</div>}
         </div>
-        <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50">
-          <button onClick={() => { onClose(); setConfirmError(""); }} className="flex-1 h-11 sm:h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-          <button onClick={onConfirm} disabled={confirming} className={`flex-1 h-11 sm:h-10 text-white rounded-xl text-sm font-semibold transition disabled:opacity-60 ${showCicilanForm ? "bg-[#0f0c29] hover:bg-[#1a1545]" : "bg-emerald-600 hover:bg-emerald-700"}`}>
-            {confirming ? "Memproses..." : showCicilanForm ? "Simpan Cicilan" : "Konfirmasi Lunas"}
+
+        {/* Footer */}
+        <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50 shrink-0">
+          <button onClick={onClose} disabled={loading} className="flex-1 h-11 sm:h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
+          <button
+            onClick={handleConfirm}
+            disabled={loading || uploadingPhoto || !paymentPhoto || (showCicilanForm ? !cicilanAmount : !lunasAmount)}
+            className="flex-1 h-11 sm:h-10 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+          >
+            {loading ? (
+              <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
+            ) : showCicilanForm ? (
+              "Simpan Cicilan"
+            ) : (
+              <><CheckCircle2 size={16} /> Konfirmasi Lunas</>
+            )}
           </button>
         </div>
       </div>
@@ -579,21 +1147,33 @@ function DesktopSkeletonTable({ canSeeModal }: { canSeeModal: boolean }) {
   );
 }
 
-function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm", emptyDash = true }: {
-  serials: string[]; maxVisible?: number; align?: "start" | "end"; size?: "sm" | "md"; emptyDash?: boolean;
+function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm", emptyDash = true, restoredSerials = [] }: {
+  serials: string[]; maxVisible?: number; align?: "start" | "end"; size?: "sm" | "md"; emptyDash?: boolean; restoredSerials?: string[];
 }) {
   const [expanded, setExpanded] = useState(false);
   if (serials.length === 0) return emptyDash ? <span className="text-[10px] text-gray-300">—</span> : null;
 
   const visible = expanded ? serials : serials.slice(0, maxVisible);
   const hidden = serials.length - maxVisible;
+  const restoredSet = new Set(restoredSerials);
   const badge = size === "md"
-    ? "text-[10px] text-gray-700 font-mono font-bold bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap"
-    : "text-[9px] text-gray-700 font-mono font-bold tracking-wider bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap";
+    ? "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
+    : "text-[9px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded whitespace-nowrap";
 
   return (
     <div className={`flex flex-row flex-wrap gap-1 ${align === "end" ? "justify-end" : ""}`}>
-      {visible.map((sn, i) => <span key={i} className={badge}>{sn}</span>)}
+      {visible.map((sn, i) => {
+        const isRestored = restoredSet.has(sn);
+        return (
+          <span
+            key={i}
+            title={isRestored ? "Unit ini sudah direstore ke stok" : undefined}
+            className={`${badge} ${isRestored ? "bg-red-50 text-red-400 line-through decoration-red-300" : "bg-gray-100 text-gray-700"}`}
+          >
+            {sn}
+          </span>
+        );
+      })}
       {!expanded && hidden > 0 && (
         <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(true); }}
           className="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded hover:bg-blue-100 transition whitespace-nowrap">
@@ -611,72 +1191,23 @@ function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm
 }
 
 // ─── TRANSACTION CARD (Mobile) ────────────────────────────────────────
-function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
+function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick, onEdit }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmSN, setConfirmSN] = useState("");
-  const [confirming, setConfirming] = useState(false);
-  const [confirmError, setConfirmError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
-  const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
-  const [cicilanAmount, setCicilanAmount] = useState("");
-  const [confirmPhoto, setConfirmPhoto] = useState<File | null>(null);
 
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING" || item.status === "PENDING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
-  const handleConfirmPayment = async () => {
-    if (!confirmPhoto) { setConfirmError("Foto bukti pembayaran wajib diupload"); return; }
-
-    const isCicilan = item.status === "RESERVED" && payMode === "CICILAN";
-    if (isCicilan) {
-      const amt = Number(cicilanAmount);
-      if (!amt || amt <= 0) { setConfirmError("Nominal cicilan wajib diisi"); return; }
-    } else if (item.status === "RESERVED" && !confirmSN.trim()) {
-      setConfirmError("Serial number wajib diisi"); return;
-    }
-
-    setConfirming(true); setConfirmError("");
-
-    // Upload foto bukti pembayaran dulu, baru konfirmasi ke API
-    let photoUrl = "";
-    try {
-      const fileName = `${Date.now()}-${confirmPhoto.name}`;
-      const { error: uploadError } = await supabase.storage.from("payment-proof").upload(fileName, confirmPhoto);
-      if (uploadError) { setConfirmError("Upload foto gagal: " + uploadError.message); setConfirming(false); return; }
-      const { data: imageData } = supabase.storage.from("payment-proof").getPublicUrl(fileName);
-      photoUrl = imageData.publicUrl;
-    } catch {
-      setConfirmError("Upload foto gagal"); setConfirming(false); return;
-    }
-
-    if (isCicilan) {
-      try {
-        const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, amount: Number(cicilanAmount), is_partial: true, payment_photo: photoUrl }) });
-        const result = await res.json();
-        if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
-        setShowConfirmModal(false); onRestored(item.invoice_number);
-      } catch { setConfirmError("Terjadi kesalahan koneksi"); } finally { setConfirming(false); }
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, serial_number: confirmSN.trim() || item.serial_number, payment_photo: photoUrl }) });
-      const result = await res.json();
-      if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
-      setShowConfirmModal(false); onRestored(item.invoice_number);
-    } catch { setConfirmError("Terjadi kesalahan koneksi"); } finally { setConfirming(false); }
-  };
-
-  const handleRestore = async (reason: string) => {
+  const handleRestore = async (reason: string, selectedUnitIds: string[]) => {
     setRestoring(true);
     try {
       const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason, unit_ids: selectedUnitIds }),
       });
       const result = await res.json();
       if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
@@ -749,42 +1280,50 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           if (grouped.length > 1) {
             return (
               <div className="space-y-1.5">
-                {grouped.map((g: any, idx: number) => (
-                  <div key={idx} className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
-                    <div className="flex items-start gap-1.5 mb-1.5">
-                      <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5">{g.unit_count}x</span>
-                      <p className="text-xs font-bold text-[#0f0c29] leading-snug min-w-0">{g.laptop_name}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.cpu}</span>}
-                      {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.ram}</span>}
-                      {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-semibold">{g.storage}</span>}
-                    </div>
-                    {g.serial_numbers?.length > 0 && <div className="mt-1.5"><SerialNumberList serials={g.serial_numbers} maxVisible={3} size="md" emptyDash={false} /></div>}
-                    {(() => {
-                      const unitCount = Number(g.unit_count ?? 1);
-                      const groupTotal = Number(g.allocated_deal_price ?? 0);
-                      const perUnit = unitCount > 0 ? Math.round(groupTotal / unitCount) : groupTotal;
-                      return (
-                        <div className="mt-2 border-t border-gray-100 pt-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] text-blue-500 font-semibold uppercase tracking-wide">Harga Satuan</span>
-                            <span className="text-sm font-bold text-blue-900 font-mono tabular-nums">
-                              Rp{perUnit.toLocaleString("id-ID")}
-                              <span className="text-[9px] text-blue-400 font-sans font-semibold ml-0.5">/unit</span>
-                            </span>
-                          </div>
-                          {unitCount > 1 && (
-                            <div className="flex items-center justify-between mt-0.5">
-                              <span className="text-[9px] text-gray-400">{unitCount} unit · subtotal</span>
-                              <span className="text-[11px] font-semibold text-gray-500 font-mono tabular-nums">Rp{groupTotal.toLocaleString("id-ID")}</span>
+                {grouped.map((g: any, idx: number) => {
+                  const isGroupFullyRestored = g.unit_count === 0 && (g.restored_serial_numbers?.length ?? 0) > 0;
+                  return (
+                    <div key={idx} className={`bg-gray-50 rounded-xl p-2.5 border ${isGroupFullyRestored ? "border-red-100 opacity-70" : "border-gray-100"}`}>
+                      <div className="flex items-start gap-1.5 mb-1.5">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5 ${isGroupFullyRestored ? "text-red-500 bg-red-50" : "text-purple-700 bg-purple-100"}`}>
+                          {isGroupFullyRestored ? (g.restored_serial_numbers?.length ?? 1) : g.unit_count}x
+                        </span>
+                        <p className={`text-xs font-bold leading-snug min-w-0 ${isGroupFullyRestored ? "text-red-400 line-through decoration-red-300" : "text-[#0f0c29]"}`}>
+                          {g.laptop_name}
+                          {isGroupFullyRestored && <span className="ml-1.5 text-[9px] font-semibold text-red-500 no-underline">(direstore)</span>}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.cpu}</span>}
+                        {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.ram}</span>}
+                        {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-semibold">{g.storage}</span>}
+                      </div>
+                      {g.serial_numbers?.length > 0 && <div className="mt-1.5"><SerialNumberList serials={g.serial_numbers} restoredSerials={g.restored_serial_numbers} maxVisible={3} size="md" emptyDash={false} /></div>}
+                      {(() => {
+                        const unitCount = Number(g.unit_count ?? 1);
+                        const groupTotal = Number(g.allocated_deal_price ?? 0);
+                        const perUnit = unitCount > 0 ? Math.round(groupTotal / unitCount) : groupTotal;
+                        return (
+                          <div className="mt-2 border-t border-gray-100 pt-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] text-blue-500 font-semibold uppercase tracking-wide">Harga Satuan</span>
+                              <span className="text-sm font-bold text-blue-900 font-mono tabular-nums">
+                                Rp{perUnit.toLocaleString("id-ID")}
+                                <span className="text-[9px] text-blue-400 font-sans font-semibold ml-0.5">/unit</span>
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ))}
+                            {unitCount > 1 && (
+                              <div className="flex items-center justify-between mt-0.5">
+                                <span className="text-[9px] text-gray-400">{unitCount} unit · subtotal</span>
+                                <span className="text-[11px] font-semibold text-gray-500 font-mono tabular-nums">Rp{groupTotal.toLocaleString("id-ID")}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })}
               </div>
             );
           }
@@ -825,7 +1364,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
 
                   return (
                     <div key={idx} className="flex items-center justify-between text-xs text-[#1a1545]">
-                      <span className="truncate pr-2">• {name} <strong className="text-emerald-700">({qty}x)</strong></span>
+                      <span className="truncate pr-2">• {name}{a.serial_number ? ` · ${a.serial_number}` : ""} <strong className="text-emerald-700">({qty}x)</strong></span>
                       <span className="font-mono font-bold text-[11px] flex-shrink-0">
                         {isBonus ? <span className="text-amber-700 font-bold">BONUS</span> : `Rp${deal.toLocaleString("id-ID")}`}
                       </span>
@@ -916,28 +1455,32 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           </button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {item.payment_photo && (
-            <button onClick={() => onPhotoClick(item.payment_photo)} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition text-[10px] font-semibold">
+            <button onClick={() => onPhotoClick(item.payment_photo)} className="flex flex-col items-center gap-0.5 py-2.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-95 transition text-[10px] font-semibold">
               <ImageIcon className="w-3.5 h-3.5" />Bukti
             </button>
           )}
           {canEditTransaction && (
-            <a href={`/payment/${item.invoice_number}`} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition text-[10px] font-semibold">
+            <button
+              type="button"
+              onClick={() => onEdit?.(item)}
+              className="flex flex-col items-center gap-0.5 py-2.5 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 active:scale-95 transition text-[10px] font-semibold"
+            >
               <Pencil className="w-3.5 h-3.5" />Edit
-            </a>
+            </button>
           )}
           {isPending && canEditTransaction && (
-            <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setConfirmPhoto(null); setShowConfirmModal(true); }} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-[10px] font-semibold">
+            <button onClick={() => setShowConfirmModal(true)} className="flex flex-col items-center gap-0.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:scale-95 transition text-[10px] font-semibold">
               <CheckCircle2 className="w-3.5 h-3.5" />Bayar
             </button>
           )}
           {canRestore && (
-            <button onClick={() => setShowRestoreModal(true)} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 transition text-[10px] font-semibold">
+            <button onClick={() => setShowRestoreModal(true)} className="flex flex-col items-center gap-0.5 py-2.5 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 active:scale-95 transition text-[10px] font-semibold">
               <span>↩</span>{isPending ? "Batal" : "Restore"}
             </button>
           )}
-          <a href={`/receipt/${item.invoice_number}`} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition text-[10px] font-semibold">
+          <a href={`/receipt/${item.invoice_number}`} className="flex flex-col items-center gap-0.5 py-2.5 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 active:scale-95 transition text-[10px] font-semibold">
             <Receipt className="w-3.5 h-3.5" />Receipt
           </a>
         </div>
@@ -945,7 +1488,16 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
       {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
-      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} confirmPhoto={confirmPhoto} setConfirmPhoto={setConfirmPhoto} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
+      {showConfirmModal && (
+        <ConfirmPaymentModal
+          item={item}
+          onSuccess={() => {
+            setShowConfirmModal(false);
+            onRestored(item.invoice_number);
+          }}
+          onClose={() => setShowConfirmModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1034,7 +1586,7 @@ function SortableTh({ label, sortKey, sortBy, sortDir, onSort, className = "", a
 }
 
 // ─── TRANSACTION TABLE (Desktop) ─────────────────────────────────────
-function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortDir, onSort, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onPhotoClick, onRestored, onRowClick }: any) {
+function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortDir, onSort, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onPhotoClick, onRestored, onRowClick, onEdit }: any) {
   const HEAD = "px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap sticky top-0 bg-gray-50/95 backdrop-blur-sm z-10 border-b border-gray-100";
 
   return (
@@ -1076,6 +1628,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
                 canSeeModal={canSeeModal}
                 onRestored={onRestored}
                 onRowClick={onRowClick}
+                onEdit={onEdit}
               />
             ))}
           </tbody>
@@ -1089,71 +1642,22 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
 }
 
 // ─── TRANSACTION TABLE ROW (Desktop) ─────────────────────────────────
-function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
+function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick, onEdit }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmSN, setConfirmSN] = useState("");
-  const [confirming, setConfirming] = useState(false);
-  const [confirmError, setConfirmError] = useState("");
-  const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
-  const [cicilanAmount, setCicilanAmount] = useState("");
-  const [confirmPhoto, setConfirmPhoto] = useState<File | null>(null);
 
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING" || item.status === "PENDING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
-  const handleConfirmPayment = async () => {
-    if (!confirmPhoto) { setConfirmError("Foto bukti pembayaran wajib diupload"); return; }
-
-    const isCicilan = item.status === "RESERVED" && payMode === "CICILAN";
-    if (isCicilan) {
-      const amt = Number(cicilanAmount);
-      if (!amt || amt <= 0) { setConfirmError("Nominal cicilan wajib diisi"); return; }
-    } else if (item.status === "RESERVED" && !confirmSN.trim()) {
-      setConfirmError("Serial number wajib diisi"); return;
-    }
-
-    setConfirming(true); setConfirmError("");
-
-    // Upload foto bukti pembayaran dulu, baru konfirmasi ke API
-    let photoUrl = "";
-    try {
-      const fileName = `${Date.now()}-${confirmPhoto.name}`;
-      const { error: uploadError } = await supabase.storage.from("payment-proof").upload(fileName, confirmPhoto);
-      if (uploadError) { setConfirmError("Upload foto gagal: " + uploadError.message); setConfirming(false); return; }
-      const { data: imageData } = supabase.storage.from("payment-proof").getPublicUrl(fileName);
-      photoUrl = imageData.publicUrl;
-    } catch {
-      setConfirmError("Upload foto gagal"); setConfirming(false); return;
-    }
-
-    if (isCicilan) {
-      try {
-        const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, amount: Number(cicilanAmount), is_partial: true, payment_photo: photoUrl }) });
-        const result = await res.json();
-        if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
-        setShowConfirmModal(false); onRestored(item.invoice_number);
-      } catch { setConfirmError("Terjadi kesalahan koneksi"); } finally { setConfirming(false); }
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, serial_number: confirmSN.trim() || item.serial_number, payment_photo: photoUrl }) });
-      const result = await res.json();
-      if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
-      setShowConfirmModal(false); onRestored(item.invoice_number);
-    } catch { setConfirmError("Terjadi kesalahan koneksi"); } finally { setConfirming(false); }
-  };
-
-  const handleRestore = async (reason: string) => {
+  const handleRestore = async (reason: string, selectedUnitIds: string[]) => {
     setRestoring(true);
     try {
       const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason, unit_ids: selectedUnitIds }),
       });
       const result = await res.json();
       if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
@@ -1184,18 +1688,29 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
     if (grouped.length > 1) {
       return (
         <div className="space-y-2">
-          {grouped.map((g: any, idx: number) => (
-            <div key={idx} className="flex items-start gap-1.5">
-              <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5">{g.unit_count}x</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-[#0f0c29] leading-snug">{g.laptop_name}</div>
-                <div className="flex gap-0.5 flex-wrap mt-0.5">
-                  {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
-                  {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
+          {grouped.map((g: any, idx: number) => {
+            // ✅ Group ini isinya cuma unit yang sudah direstore semua (unit aktif = 0)
+            const isGroupFullyRestored = g.unit_count === 0 && (g.restored_serial_numbers?.length ?? 0) > 0;
+            return (
+              <div key={idx} className={`flex items-start gap-1.5 ${isGroupFullyRestored ? "opacity-60" : ""}`}>
+                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5 ${isGroupFullyRestored ? "text-red-500 bg-red-50 border border-red-100" : "text-purple-600 bg-purple-50 border border-purple-100"}`}>
+                  {isGroupFullyRestored ? (g.restored_serial_numbers?.length ?? 1) : g.unit_count}x
+                </span>
+                <div className="min-w-0">
+                  <div className={`text-xs font-bold leading-snug ${isGroupFullyRestored ? "text-red-400 line-through decoration-red-300" : "text-[#0f0c29]"}`}>
+                    {g.laptop_name}
+                  </div>
+                  {isGroupFullyRestored && (
+                    <span className="text-[8px] font-semibold text-red-500">✓ Direstore</span>
+                  )}
+                  <div className="flex gap-0.5 flex-wrap mt-0.5">
+                    {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
+                    {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {accessoryList}
         </div>
       );
@@ -1291,7 +1806,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
                 <div className="space-y-1.5">
                   {grouped.map((g: any, idx: number) => (
                     <div key={idx}>
-                      {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}
+                      {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} restoredSerials={g.restored_serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}
                     </div>
                   ))}
                 </div>
@@ -1328,6 +1843,18 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
                   const unitCount = Number(g.unit_count ?? 1);
                   const groupTotal = Number(g.allocated_deal_price ?? 0);
                   const perUnit = unitCount > 0 ? Math.round(groupTotal / unitCount) : groupTotal;
+                  // ✅ Group yang isinya cuma unit direstore — tampilkan dicoret, bukan "Rp0/unit"
+                  const isGroupFullyRestored = g.unit_count === 0 && (g.restored_serial_numbers?.length ?? 0) > 0;
+                  if (isGroupFullyRestored) {
+                    return (
+                      <div key={idx} className="rounded-lg border border-red-100 bg-red-50/40 px-2 py-1.5 text-right opacity-70">
+                        <p className="text-[9px] font-semibold text-red-400 leading-tight truncate text-left mb-0.5 line-through decoration-red-300" title={g.laptop_name}>
+                          {g.laptop_name || "—"}
+                        </p>
+                        <p className="text-[10px] font-bold text-red-400">Sudah direstore</p>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={idx} className="rounded-lg border border-gray-100 bg-gray-50/60 px-2 py-1.5 text-right">
                       <p className="text-[9px] font-semibold text-gray-500 leading-tight truncate text-left mb-0.5" title={g.laptop_name}>
@@ -1412,12 +1939,17 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
               </button>
             )}
             {canEditTransaction && (
-              <a href={`/payment/${item.invoice_number}`} className="p-1.5 text-gray-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition group-hover:text-gray-400" title="Edit">
+              <button
+                type="button"
+                onClick={() => onEdit?.(item)}
+                className="p-1.5 text-gray-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition group-hover:text-gray-400"
+                title="Edit Harga Deal"
+              >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-              </a>
+              </button>
             )}
             {isPending && canEditTransaction && (
-              <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setConfirmPhoto(null); setShowConfirmModal(true); }} className="p-1.5 text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition group-hover:text-gray-400" title="Bayar">
+              <button onClick={() => setShowConfirmModal(true)} className="p-1.5 text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition group-hover:text-gray-400" title="Bayar">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </button>
             )}
@@ -1435,7 +1967,16 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
       {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
-      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} confirmPhoto={confirmPhoto} setConfirmPhoto={setConfirmPhoto} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
+      {showConfirmModal && (
+        <ConfirmPaymentModal
+          item={item}
+          onSuccess={() => {
+            setShowConfirmModal(false);
+            onRestored(item.invoice_number);
+          }}
+          onClose={() => setShowConfirmModal(false)}
+        />
+      )}
     </>
   );
 }
@@ -1448,11 +1989,28 @@ const MODAL_VISIBLE_ROLES = [
   "KEPALA_PENGELOLA_BARANG",
 ];
 
-function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, canViewActivityLog }: { item: any; onClose: () => void; canSeeFinancials: boolean; canSeeModal: boolean; canViewActivityLog: boolean }) {
+function TransactionDetailModal({
+  item,
+  onClose,
+  canSeeFinancials,
+  canSeeModal,
+  canViewActivityLog,
+  canEditTransaction,
+  onEdit,
+}: {
+  item: any;
+  onClose: () => void;
+  canSeeFinancials: boolean;
+  canSeeModal: boolean;
+  canViewActivityLog: boolean;
+  canEditTransaction?: boolean;
+  onEdit?: (item: any) => void;
+}) {
   const [fullItem, setFullItem] = useState<any>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -1552,23 +2110,43 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
             </div>
 
             {showHistory && (
-              <div className="max-h-48 overflow-y-auto space-y-1.5 pt-1">
+              <div className="max-h-72 overflow-y-auto space-y-1.5 pt-1">
                 {loadingLogs ? (
                   <p className="text-[11px] text-gray-400">Memuat riwayat...</p>
                 ) : activityLogs.length === 0 ? (
                   <p className="text-[11px] text-gray-400">Belum ada riwayat perubahan.</p>
                 ) : (
-                  activityLogs.map((log: any) => (
-                    <div key={log.id} className="bg-white border border-gray-100 rounded-lg px-3 py-2 text-[11px]">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-gray-700">
-                          {log.action === "EDIT" ? "Edit" : log.action === "RESTORE" ? "Restore" : log.action} — {log.user_name}
-                        </span>
-                        <span className="text-gray-400 flex-shrink-0">{formatDateShort(log.created_at)}</span>
+                  activityLogs.map((log: any) => {
+                    const isLogExpanded = expandedLogIds.has(log.id);
+                    const hasDetail = !!(log.before_data || log.after_data);
+                    return (
+                      <div key={log.id} className="bg-white border border-gray-100 rounded-lg px-3 py-2 text-[11px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-gray-700">
+                            {log.action === "EDIT" ? "Edit" : log.action === "RESTORE" ? "Restore" : log.action} — {log.user_name}
+                          </span>
+                          <span className="text-gray-400 flex-shrink-0">{formatDateShort(log.created_at)}</span>
+                        </div>
+                        {log.reason && <p className="text-gray-500 mt-0.5">"{log.reason}"</p>}
+                        {hasDetail && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedLogIds((prev) => {
+                                const next = new Set(prev);
+                                next.has(log.id) ? next.delete(log.id) : next.add(log.id);
+                                return next;
+                              })
+                            }
+                            className="mt-1 text-[10px] font-bold text-blue-600 hover:text-blue-700"
+                          >
+                            {isLogExpanded ? "Sembunyikan rincian" : "Lihat rincian perubahan"}
+                          </button>
+                        )}
+                        {isLogExpanded && renderActivityDetail(log, canSeeFinancials, canSeeModal)}
                       </div>
-                      {log.reason && <p className="text-gray-500 mt-0.5">"{log.reason}"</p>}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -1621,9 +2199,18 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
                     <div className="px-3.5 py-2.5 border-b border-gray-100">
                       <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">Serial Number</p>
                       <div className="flex flex-wrap gap-1">
-                        {g.serial_numbers.map((sn: string, i: number) => (
-                          <span key={i} className="font-mono text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md">{sn}</span>
-                        ))}
+                        {g.serial_numbers.map((sn: string, i: number) => {
+                          const isRestored = (g.restored_serial_numbers ?? []).includes(sn);
+                          return (
+                            <span
+                              key={i}
+                              title={isRestored ? "Unit ini sudah direstore ke stok" : undefined}
+                              className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-md ${isRestored ? "bg-red-50 text-red-400 line-through decoration-red-300" : "bg-gray-100 text-gray-700"}`}
+                            >
+                              {sn}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1692,6 +2279,9 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
                             </span>
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-[#1a1545] truncate">{name}</p>
+                              {a.serial_number && (
+                                <p className="text-[9px] font-mono text-gray-400">SN: {a.serial_number}</p>
+                              )}
                               {isBonus ? (
                                 <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 inline-block mt-0.5">
                                   BONUS
@@ -1806,7 +2396,766 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
         {/* Footer */}
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-2.5 flex-shrink-0">
           <a href={`/receipt/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"> Receipt</a>
-          <a href={`/payment/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0f0c29] text-white rounded-xl hover:bg-[#1a1545] transition"> Edit</a>
+          {canEditTransaction && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onEdit?.(activeItem);
+              }}
+              className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition shadow-sm"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit Harga Deal
+            </button>
+          )}
+          <a href={`/payment/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0f0c29] text-white rounded-xl hover:bg-[#1a1545] transition"> Halaman Pembayaran</a>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(modalContent, document.body);
+}
+
+// ─── EDIT TRANSACTION MODAL ───────────────────────────────────────────
+function EditTransactionModal({
+  item,
+  onClose,
+  onSuccess,
+}: {
+  item: any;
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+}) {
+  const [items, setItems] = useState<TxLaptopItem[]>([]);
+  const [accessories, setAccessories] = useState<EditModalAccessory[]>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
+  const [singleDealPrice, setSingleDealPrice] = useState<string>("");
+  const [unitDealPrices, setUnitDealPrices] = useState<Record<string, string>>({});
+  const [dpAmount, setDpAmount] = useState<string>(() => String(item.dp_amount || 0));
+  const [customerName, setCustomerName] = useState(item.customer_name || "");
+  const [customerPhone, setCustomerPhone] = useState(item.customer_phone || "");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  // Search & add accessory
+  const [showAddAcc, setShowAddAcc] = useState(false);
+  const [accSearch, setAccSearch] = useState("");
+  const [accResults, setAccResults] = useState<any[]>([]);
+  const [searchingAcc, setSearchingAcc] = useState(false);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", h);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", h);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingItems(true);
+    fetch(`/api/transaction/${item.invoice_number}`)
+      .then((res) => res.json())
+      .then((r) => {
+        if (!active) return;
+        if (r.success && r.data) {
+          const tx = r.data;
+          const txItems: any[] = tx.transaction_items || [];
+
+          // 1. Laptop items
+          // ✅ FIX: unit yang sudah direstore (restored: true) TIDAK boleh
+          // ikut jadi baris "Harga Deal Per Unit" yang editable — unit itu
+          // sudah keluar dari transaksi aktif (balik ke stok SIAP_JUAL).
+          // Kalau ikut ke-hitung di computedLaptopDeal, total deal transaksi
+          // bisa ke-inflate lagi saat disimpan.
+          const laptopItemsList: TxLaptopItem[] = txItems
+            .filter((it: any) => (it.item_type === "laptop" || (!it.item_type && it.unit_id)) && !it.restored)
+            .map((it: any) => ({
+              id: it.id,
+              unit_id: it.unit_id,
+              serial_number: it.serial_number,
+              laptop_name: it.laptop_name || it.item_name || "Laptop",
+              deal_price: Number(it.deal_price ?? 0),
+            }));
+          setItems(laptopItemsList);
+
+          // 2. Accessories
+          const accs: EditModalAccessory[] = (tx.accessory_items || []).map((a: any) => ({
+            accessory_id: a.accessory_id,
+            name: a.name || a.item_name || "Aksesori",
+            quantity: Number(a.quantity) || 1,
+            deal_price: Number(a.deal_price ?? 0),
+            selling_price: Number(a.selling_price ?? 0),
+            is_bonus: Boolean(a.is_bonus || Number(a.deal_price) === 0),
+            serial_number: a.serial_number ?? undefined,
+          }));
+          setAccessories(accs);
+
+          // Inisialisasi harga deal laptop
+          if (laptopItemsList.length > 1) {
+            const map: Record<string, string> = {};
+            for (const it of laptopItemsList) {
+              map[it.unit_id] = String(it.deal_price || "");
+            }
+            setUnitDealPrices(map);
+          } else if (laptopItemsList.length === 1) {
+            setSingleDealPrice(String(laptopItemsList[0].deal_price ?? item.deal_price ?? ""));
+          } else {
+            setSingleDealPrice("0");
+          }
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setItems([]);
+          setAccessories([]);
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingItems(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [item.invoice_number, item.deal_price]);
+
+  const hasLaptops = items.length > 0;
+  const isMultiItem = !loadingItems && items.length > 1;
+
+  // ✅ FIX: item.laptop_name = kolom legacy transactions.laptop_name, di-set
+  // sekali saat create dan TIDAK PERNAH di-sync ulang saat unit ditambah/
+  // diganti/direstore (persis kasus invoice ini — awalnya "Dell Latitude
+  // 5310", sekarang isinya 12 unit Lenovo Thinkpad L13). Label "Barang" di
+  // summary modal ini dihitung dari `items` (sudah fresh, sudah difilter
+  // !restored di atas) supaya selalu menampilkan kondisi terkini.
+  const displayBarangLabel = loadingItems
+    ? "Memuat..."
+    : items.length === 0
+      ? (accessories.length > 0 ? "Aksesoris / Non-Laptop" : (item.laptop_name || "—"))
+      : items.length === 1
+        ? items[0].laptop_name
+        : `${items.length} unit — ${Array.from(new Set(items.map((it) => it.laptop_name))).join(", ")}`;
+
+  const computedLaptopDeal = isMultiItem
+    ? items.reduce((sum, it) => sum + (Number(unitDealPrices[it.unit_id]) || 0), 0)
+    : hasLaptops
+      ? (Number(singleDealPrice) || 0)
+      : 0;
+
+  const computedAccDeal = accessories.reduce(
+    (sum, a) => sum + (a.is_bonus ? 0 : (Number(a.deal_price) || 0) * (Number(a.quantity) || 1)),
+    0
+  );
+
+  const computedTotalDeal = computedLaptopDeal + computedAccDeal;
+  const originalTotalDeal = Number(item.deal_price ?? item.amount ?? 0);
+  const diffDeal = computedTotalDeal - originalTotalDeal;
+
+  const isDP = item.status === "RESERVED" || Number(item.dp_amount || 0) > 0;
+  const currentDP = Number(dpAmount) || 0;
+  const remainingAfterDP = Math.max(0, computedTotalDeal - currentDP);
+
+  const fmtRupiah = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
+
+  const handleToggleBonus = (idx: number, isBonus: boolean) => {
+    setAccessories((prev) =>
+      prev.map((a, i) =>
+        i === idx
+          ? {
+            ...a,
+            is_bonus: isBonus,
+            deal_price: isBonus ? 0 : (a.deal_price > 0 ? a.deal_price : (a.selling_price || 0)),
+          }
+          : a
+      )
+    );
+  };
+
+  const handleUpdateAccPrice = (idx: number, val: string) => {
+    const num = Number(val) || 0;
+    setAccessories((prev) =>
+      prev.map((a, i) =>
+        i === idx
+          ? {
+            ...a,
+            deal_price: num,
+            is_bonus: num === 0 ? a.is_bonus : false,
+          }
+          : a
+      )
+    );
+  };
+
+  const handleUpdateAccQty = (idx: number, val: number) => {
+    const qty = Math.max(1, val);
+    setAccessories((prev) =>
+      prev.map((a, i) => (i === idx ? { ...a, quantity: qty } : a))
+    );
+  };
+
+  const handleRemoveAcc = (idx: number) => {
+    setAccessories((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAccSearch = async (q: string) => {
+    setAccSearch(q);
+    if (q.trim().length < 2) {
+      setAccResults([]);
+      return;
+    }
+    setSearchingAcc(true);
+    try {
+      // ✅ Cari by SERIAL NUMBER (param ?sn=). Endpoint balikin 1 baris per unit
+      // fisik: { accessory_id, name, deal_price, selling_price, serial_number, unit_id }.
+      const res = await fetch(`/api/accessories/search?sn=${encodeURIComponent(q.trim())}`);
+      const json = await res.json();
+      if (json.success) {
+        // Dedup pakai serial_number / unit_id — BUKAN accessory_id — karena 1
+        // model aksesoris bisa punya banyak unit SN berbeda.
+        const usedSN = new Set(accessories.map((a) => (a.serial_number ?? "").toUpperCase()).filter(Boolean));
+        const usedUnitIds = new Set(accessories.map((a) => a.unit_id).filter(Boolean));
+        setAccResults(
+          (json.data || []).filter(
+            (a: any) =>
+              !usedUnitIds.has(a.unit_id) &&
+              !usedSN.has(String(a.serial_number ?? "").toUpperCase())
+          )
+        );
+      }
+    } catch {
+      setAccResults([]);
+    } finally {
+      setSearchingAcc(false);
+    }
+  };
+
+  const handleAddAccessory = (a: any) => {
+    setAccessories((prev) => [
+      ...prev,
+      {
+        accessory_id: a.accessory_id,              // ← endpoint SN balikin accessory_id, bukan id
+        name: a.name,
+        quantity: 1,                               // ← 1 SN = 1 unit fisik, dikunci
+        deal_price: Number(a.deal_price ?? 0),     // harga jual
+        selling_price: Number(a.selling_price ?? 0), // harga modal
+        is_bonus: false,
+        serial_number: a.serial_number,            // ✅ SN unit terpilih
+        unit_id: a.unit_id,                        // ✅ id unit di accessory_units
+      },
+    ]);
+    // Panel dibiarkan TERBUKA + search dikosongkan → bisa langsung scan SN
+    // berikutnya tanpa klik "Tambah Aksesori" lagi.
+    setAccSearch("");
+    setAccResults([]);
+  };
+
+  const handleSave = async () => {
+    if (!reason.trim()) {
+      setError("Alasan edit wajib diisi untuk catatan audit");
+      return;
+    }
+    if (computedTotalDeal <= 0) {
+      setError("Harga deal harus lebih besar dari Rp 0");
+      return;
+    }
+    if (isDP && currentDP > computedTotalDeal) {
+      setError("Nominal DP tidak boleh melebihi total harga deal");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      // NOTE: Status pembayaran / status transaksi TIDAK dikirim di payload,
+      // sehingga status transaksi (PAID, HELD, RESERVED, dll.) tetap terjaga dan tidak berubah.
+      const payload: any = {
+        deal_price: computedTotalDeal,
+        amount: computedTotalDeal,
+        customer_name: customerName.trim() || item.customer_name,
+        customer_phone: customerPhone.trim() || null,
+        edit_reason: reason.trim(),
+        accessories: accessories.map((a) => ({
+          accessory_id: a.accessory_id,
+          name: a.name,
+          quantity: a.serial_number ? 1 : (Number(a.quantity) || 1), // SN → selalu 1
+          selling_price: Number(a.selling_price ?? 0),
+          deal_price: a.is_bonus ? 0 : Number(a.deal_price ?? 0),
+          is_bonus: Boolean(a.is_bonus),
+          serial_number: a.serial_number ?? null, // ✅ dikirim ke PUT: unit ditandai SOLD + SN tersimpan
+          unit_id: a.unit_id ?? null,
+        })),
+      };
+
+      if (isDP) {
+        payload.dp_amount = currentDP;
+      }
+
+      if (items.length > 1) {
+        payload.deal_prices_per_unit = items.map((it) => ({
+          unit_id: it.unit_id,
+          serial_number: it.serial_number,
+          deal_price: Number(unitDealPrices[it.unit_id]) || 0,
+        }));
+      } else if (items.length === 1) {
+        payload.deal_prices_per_unit = [
+          {
+            unit_id: items[0].unit_id,
+            serial_number: items[0].serial_number,
+            deal_price: Number(singleDealPrice) || 0,
+          },
+        ];
+      }
+
+      const res = await fetch(`/api/transaction/${item.invoice_number}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      if (!result.success) {
+        setError(result.message || "Gagal memperbarui transaksi");
+        return;
+      }
+
+      onSuccess(`Transaksi invoice ${item.invoice_number} berhasil diperbarui menjadi ${fmtRupiah(computedTotalDeal)}!`);
+      onClose();
+    } catch {
+      setError("Terjadi kesalahan jaringan saat menyimpan perubahan");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 anim-fade">
+      <div className="absolute inset-0 bg-[#0f0c29]/60 backdrop-blur-md" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden ring-1 ring-black/5">
+        {/* Header */}
+        <div className="bg-[#0f0c29] px-5 py-4 shrink-0 relative">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-amber-500/20 rounded-xl flex items-center justify-center ring-1 ring-amber-500/30">
+                <Pencil size={16} className="text-amber-400" />
+              </div>
+              <div>
+                <h2 className="font-bold text-white text-sm tracking-tight">Edit Transaksi & Aksesoris</h2>
+                <p className="text-xs text-white/40 font-mono mt-0.5">{item.invoice_number}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-amber-500/60 via-amber-400/20 to-transparent" />
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+          {/* Ringkasan Singkat */}
+          <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100 overflow-hidden">
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Customer</span>
+              <span className="text-xs font-bold text-gray-800">{item.customer_name}</span>
+            </div>
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Status Pembayaran</span>
+              <div className="flex items-center gap-1.5">
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${statusDot[item.status] ?? "bg-gray-400"}`} />
+                  {STATUS_LABEL[item.status] ?? item.status}
+                </span>
+                <span className="text-[9.5px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-medium">
+                  ✓ Tetap (tidak berubah)
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Barang</span>
+              <span className="text-xs font-semibold text-gray-800 truncate max-w-[220px] text-right" title={displayBarangLabel}>
+                {displayBarangLabel}
+              </span>
+            </div>
+            {item.sales_name && (
+              <div className="flex items-center justify-between px-3.5 py-2">
+                <span className="text-[11px] text-gray-400 font-semibold uppercase">Sales</span>
+                <span className="text-xs text-gray-600 font-medium">{item.sales_name}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Section 1: Harga Deal Laptop */}
+          {hasLaptops && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
+                  <Wallet size={14} className="text-amber-600" />
+                  Harga Deal Laptop {isMultiItem ? "Per Unit" : ""} <span className="text-red-500">*</span>
+                </label>
+                <span className="text-xs font-mono font-bold text-gray-700">{fmtRupiah(computedLaptopDeal)}</span>
+              </div>
+
+              {loadingItems ? (
+                <div className="flex items-center justify-center py-6 text-gray-400 text-xs gap-2">
+                  <div className="w-4 h-4 border-2 border-gray-300 border-t-amber-600 rounded-full animate-spin" />
+                  Memuat rincian transaksi...
+                </div>
+              ) : isMultiItem ? (
+                <div className="space-y-2.5">
+                  <p className="text-[11px] text-gray-500">
+                    Transaksi ini memiliki <strong>{items.length} unit laptop</strong>. Masukkan harga deal untuk tiap unit:
+                  </p>
+                  <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-gray-50/50">
+                    {items.map((it, i) => (
+                      <div key={it.unit_id} className="p-3 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-gray-800 truncate">{it.laptop_name}</p>
+                            <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number}</p>
+                          </div>
+                          <span className="text-[10px] text-gray-400 font-semibold uppercase">Unit {i + 1}</span>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                          <input
+                            type="number"
+                            value={unitDealPrices[it.unit_id] ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setUnitDealPrices((prev) => ({ ...prev, [it.unit_id]: val }));
+                              setError("");
+                            }}
+                            placeholder="0"
+                            className="w-full h-10 border border-gray-300 rounded-lg pl-9 pr-3 text-xs font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">Rp</span>
+                    <input
+                      type="number"
+                      value={singleDealPrice}
+                      onChange={(e) => {
+                        setSingleDealPrice(e.target.value);
+                        setError("");
+                      }}
+                      placeholder="0"
+                      className="w-full h-11 border border-gray-300 rounded-xl pl-10 pr-4 text-sm font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Section 2: Aksesoris & Bonus */}
+          <div className="space-y-2 bg-purple-50/40 border border-purple-100 rounded-xl p-3.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
+                <Package size={14} className="text-purple-600" />
+                Aksesoris & Bonus {accessories.length > 0 && `(${accessories.length})`}
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowAddAcc((prev) => !prev)}
+                className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 flex items-center gap-1 bg-purple-100/80 hover:bg-purple-200/80 px-2 py-0.5 rounded-lg transition"
+              >
+                <Plus size={12} /> {showAddAcc ? "Tutup" : "Tambah Aksesori"}
+              </button>
+            </div>
+
+            {/* Quick search input */}
+            {showAddAcc && (
+              <div className="space-y-1.5 pt-1">
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={accSearch}
+                    onChange={(e) => handleAccSearch(e.target.value)}
+                    placeholder="Scan / ketik Serial Number aksesoris..."
+                    className="w-full h-8 pl-8 pr-3 text-xs font-mono border border-purple-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400"
+                  />
+                  {searchingAcc && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  )}
+                </div>
+                {accResults.length > 0 && (
+                  <div className="border border-purple-200 rounded-lg bg-white divide-y divide-gray-100 max-h-36 overflow-y-auto shadow-md">
+                    {accResults.map((res) => (
+                      <button
+                        key={res.unit_id ?? res.serial_number}
+                        type="button"
+                        onClick={() => handleAddAccessory(res)}
+                        className="w-full px-3 py-1.5 text-left text-xs hover:bg-purple-50 flex items-center justify-between gap-2 transition"
+                      >
+                        <span className="min-w-0">
+                          <span className="font-medium text-gray-800 truncate block">{res.name}</span>
+                          <span className="font-mono text-[10px] text-gray-400">SN: {res.serial_number}</span>
+                        </span>
+                        <span className="font-mono text-purple-700 font-bold shrink-0">{fmtRupiah(res.deal_price)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!searchingAcc && accSearch.trim().length >= 2 && accResults.length === 0 && (
+                  <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">
+                    SN "<span className="font-mono font-bold">{accSearch.trim()}</span>" tidak ketemu / stok sudah terjual.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* List Aksesoris */}
+            {accessories.length === 0 ? (
+              <p className="text-[11px] text-gray-400 italic py-1">
+                Tidak ada aksesoris pada transaksi ini. Klik "+ Tambah Aksesori" jika ingin menambahkan charger/aksesoris.
+              </p>
+            ) : (
+              <div className="border border-purple-200/70 rounded-xl divide-y divide-purple-100/80 overflow-hidden bg-white">
+                {accessories.map((acc, idx) => (
+                  <div key={acc.accessory_id || idx} className="p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs font-bold text-gray-800 truncate">{acc.name}</p>
+                          {acc.is_bonus && (
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-0.5">
+                              <Gift size={10} /> Bonus (Gratis)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {acc.serial_number ? (
+                            // ✅ Via SN → 1 unit fisik, qty dikunci, tampilkan SN-nya.
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5">
+                              SN: {acc.serial_number}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-[10px] text-gray-400">Qty:</span>
+                              <input
+                                type="number"
+                                min={1}
+                                value={acc.quantity}
+                                onChange={(e) => handleUpdateAccQty(idx, Number(e.target.value))}
+                                className="w-12 h-6 text-center border border-gray-200 rounded text-[11px] font-bold"
+                              />
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAcc(idx)}
+                        className="text-gray-400 hover:text-red-600 p-1 rounded transition"
+                        title="Hapus aksesori dari transaksi"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 pt-2 border-t border-gray-100">
+                      {/* Checkbox / Toggle Bonus */}
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={acc.is_bonus}
+                          onChange={(e) => handleToggleBonus(idx, e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 transition"
+                        />
+                        <span className={`text-xs font-semibold ${acc.is_bonus ? "text-emerald-700 font-bold" : "text-gray-600"}`}>
+                          Gratiskan (Bonus / Rp 0)
+                        </span>
+                      </label>
+
+                      {/* Input deal price jika bukan bonus */}
+                      {!acc.is_bonus ? (
+                        <div className="relative w-full sm:w-36">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                          <input
+                            type="number"
+                            value={acc.deal_price || ""}
+                            onChange={(e) => handleUpdateAccPrice(idx, e.target.value)}
+                            placeholder="0"
+                            className="w-full h-8 border border-gray-300 rounded-lg pl-8 pr-2 text-xs font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs font-mono font-bold text-emerald-600">Rp 0 (Bonus)</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Ringkasan Total Deal Akhir */}
+          <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-3.5 space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-amber-900">
+              <span>Total Laptop:</span>
+              <span className="font-mono font-semibold">{fmtRupiah(computedLaptopDeal)}</span>
+            </div>
+            {accessories.length > 0 && (
+              <div className="flex items-center justify-between text-xs text-amber-900">
+                <span>Total Aksesoris:</span>
+                <span className="font-mono font-semibold">
+                  {computedAccDeal > 0 ? fmtRupiah(computedAccDeal) : "Rp 0 (Semua Bonus)"}
+                </span>
+              </div>
+            )}
+            <div className="pt-1.5 border-t border-amber-200 flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-950 uppercase tracking-wide">Total Harga Deal</span>
+              <div className="text-right">
+                <span className="text-base font-black text-amber-950 font-mono">{fmtRupiah(computedTotalDeal)}</span>
+                {diffDeal !== 0 && (
+                  <div className="text-[10px] font-semibold mt-0.5">
+                    {diffDeal > 0 ? (
+                      <span className="text-emerald-700">+{fmtRupiah(diffDeal)} dari awal</span>
+                    ) : (
+                      <span className="text-red-600">-{fmtRupiah(Math.abs(diffDeal))} dari awal</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Section DP (jika ada DP atau status RESERVED) */}
+          {isDP && (
+            <div className="space-y-2 bg-blue-50/50 border border-blue-100 rounded-xl p-3.5">
+              <label className="text-xs font-bold text-blue-900 uppercase tracking-wide flex items-center gap-1.5">
+                <CreditCard size={14} className="text-blue-600" />
+                Nominal DP (Uang Muka)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                <input
+                  type="number"
+                  value={dpAmount}
+                  onChange={(e) => {
+                    setDpAmount(e.target.value);
+                    setError("");
+                  }}
+                  placeholder="0"
+                  className="w-full h-10 border border-blue-200 rounded-lg pl-9 pr-3 text-xs font-mono font-bold text-blue-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs pt-1 text-blue-800">
+                <span>Sisa Tagihan:</span>
+                <span className="font-bold text-sm text-red-600 font-mono">{fmtRupiah(remainingAfterDP)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Form Customer */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                Nama Customer
+              </label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="w-full h-9 border border-gray-300 rounded-xl px-3 text-xs text-gray-800 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                Nomor Telepon
+              </label>
+              <input
+                type="text"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="08..."
+                className="w-full h-9 border border-gray-300 rounded-xl px-3 text-xs text-gray-800 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition"
+              />
+            </div>
+          </div>
+
+          {/* Alasan Edit (Wajib untuk audit log) */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+              Alasan Edit <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                setError("");
+              }}
+              placeholder="Contoh: Koreksi aksesoris charger digratiskan (bonus), diskon disetujui, dll..."
+              rows={2}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 focus:bg-white transition resize-none"
+            />
+          </div>
+
+          {/* Link ke halaman edit lengkap */}
+          <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 text-xs">
+            <span className="text-amber-800 text-[11px] leading-snug">
+              Ingin ubah metode bayar, garansi, atau tukar tambah?
+            </span>
+            <a
+              href={`/payment/${item.invoice_number}`}
+              className="self-start sm:self-auto font-bold text-amber-700 hover:text-amber-900 underline whitespace-nowrap text-[11px]"
+            >
+              Halaman Lengkap →
+            </a>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5 text-xs text-red-700 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-gray-100 flex gap-2.5 shrink-0 bg-gray-50/50">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || loadingItems || computedTotalDeal <= 0 || !reason.trim()}
+            className="flex-1 h-10 bg-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:bg-[#1a1545] transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-sm"
+          >
+            {saving ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Menyimpan...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={16} />
+                <span>Simpan Perubahan</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
@@ -1853,8 +3202,16 @@ export default function Page() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [detailItem, setDetailItem] = useState<any | null>(null);
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>([]);
   const [sourcePlatformOptions, setSourcePlatformOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!successToast) return;
+    const timer = setTimeout(() => setSuccessToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [successToast]);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1879,7 +3236,20 @@ export default function Page() {
     }).catch(() => { setUserRole(null); setUserRoles([]); });
   }, []);
 
-  const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
+  const canEditTransaction =
+    hasAnyRole(userRoles, PERMISSIONS.EDIT_TRANSACTION) ||
+    userRoles.some((r) =>
+      [
+        "ADMIN",
+        "PROGRAMMER",
+        "ASISTEN_CEO",
+        "KEPALA_SALES",
+        "KEPALA_ZENITH",
+        "KEPALA_ONPOINT",
+        "KEPALA_SOTECH",
+      ].includes(r)
+    ) ||
+    (userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false);
   const canSeeFinancials = hasAnyRole(userRoles, PERMISSIONS.VIEW_FINANCIALS);
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
   // ── Hanya ADMIN dan KEPALA_PENGELOLA_BARANG yang bisa lihat Margin ──
@@ -2197,25 +3567,52 @@ export default function Page() {
         }
       `}</style>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
-      {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} canViewActivityLog={canViewActivityLog} />}
+      {detailItem && (
+        <TransactionDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          canSeeFinancials={canSeeFinancials}
+          canSeeModal={canSeeModal}
+          canViewActivityLog={canViewActivityLog}
+          canEditTransaction={canEditTransaction}
+          onEdit={setEditItem}
+        />
+      )}
+      {editItem && (
+        <EditTransactionModal
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onSuccess={(msg) => {
+            fetchTransactions();
+            setSuccessToast(msg);
+          }}
+        />
+      )}
       {isExporting && <ExportProgressModal progress={exportProgress} label={exportLabel} />}
+      {successToast && (
+        <div className="fixed bottom-5 right-5 z-[9999] bg-emerald-700 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 anim-slide-up border border-emerald-600">
+          <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+          <span>{successToast}</span>
+          <button onClick={() => setSuccessToast(null)} className="ml-2 text-white/60 hover:text-white text-sm leading-none">&times;</button>
+        </div>
+      )}
 
       <div className={`${isMobile ? "px-4 py-4" : "max-w-[1920px] mx-auto px-6 py-4"} space-y-3`}>
 
         {/* ── Header ── */}
         <div>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 bg-[#0f0c29] rounded-xl flex items-center justify-center shadow-lg shadow-[#0f0c29]/25 flex-shrink-0">
                 <Receipt className="w-4.5 h-4.5 text-white" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-black text-[#0f0c29] leading-none tracking-tight">Riwayat Transaksi</h1>
+                <h1 className="text-lg sm:text-xl font-black text-[#0f0c29] leading-none tracking-tight truncate">Riwayat Transaksi</h1>
                 <p className="text-xs text-gray-400 mt-1">Kelola dan pantau semua transaksi</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
               {!isLoading && (
                 <div className="flex items-center gap-1.5 bg-gray-100 px-3 h-9 rounded-xl">
                   <span className="text-xs font-bold text-[#0f0c29] tabular-nums">{totalCount}</span>
@@ -2225,11 +3622,20 @@ export default function Page() {
               {!isLoading && totalCount > 0 && (
                 <button
                   onClick={() => handleExportExcel()} disabled={isExporting}
-                  className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                  title="Export Excel"
+                  className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   {isExporting ? (
-                    <><svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Export... {exportProgress}%</>) : (
-                    <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><polyline points="8 13 12 17 16 13" /><line x1="12" y1="17" x2="12" y2="11" /></svg>Export Excel</>
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                      <span className="hidden sm:inline">Export... {exportProgress}%</span>
+                      <span className="sm:hidden">{exportProgress}%</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><polyline points="8 13 12 17 16 13" /><line x1="12" y1="17" x2="12" y2="11" /></svg>
+                      <span className="hidden sm:inline">Export Excel</span>
+                    </>
                   )}
                 </button>
               )}
@@ -2239,16 +3645,17 @@ export default function Page() {
                   <button
                     onClick={() => setShowMonthExport((v) => !v)}
                     disabled={isExporting}
-                    className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-blue-200 rounded-xl text-xs font-semibold text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Export per Bulan"
+                    className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-blue-200 rounded-xl text-xs font-semibold text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                       <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
-                    Export per Bulan
+                    <span className="hidden sm:inline">Export per Bulan</span>
                   </button>
 
                   {showMonthExport && (
-                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl border border-gray-200 shadow-xl p-3.5 z-20">
+                    <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-gray-200 shadow-xl p-3.5 z-20">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Pilih Bulan</label>
                       <input
                         type="month"
@@ -2272,7 +3679,7 @@ export default function Page() {
         {/* ── Deep-link banner ── */}
         {focusInvoice && (
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
-            <p className="text-xs text-amber-800">
+            <p className="text-xs text-amber-800 min-w-0 flex-1 truncate">
               Dari Cashflow · <span className="font-mono text-amber-600">{focusInvoice}</span>
               {allTransactions[0]?.customer_name && <> · <b>{allTransactions[0].customer_name}</b></>}
               {allTransactions.length === 0 && !isLoading && <span className="text-amber-500"> — tidak ditemukan</span>}
@@ -2284,8 +3691,8 @@ export default function Page() {
 
         {/* ── Search + Filter bar ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-3">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative w-full sm:flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
@@ -2304,43 +3711,45 @@ export default function Page() {
               )}
             </div>
 
-            <button
-              onClick={() => handleSort("date")}
-              title="Urutkan berdasarkan waktu transaksi"
-              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${sortBy === "date" ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                {sortOrder === "newest"
-                  ? <><line x1="12" y1="20" x2="12" y2="4" /><polyline points="6 10 12 4 18 10" /></>
-                  : <><line x1="12" y1="4" x2="12" y2="20" /><polyline points="18 14 12 20 6 14" /></>}
-              </svg>
-              <span className="hidden sm:inline">{sortOrder === "newest" ? "Terbaru" : "Terlama"}</span>
-            </button>
+            <div className="flex items-center gap-2 overflow-x-auto sm:overflow-visible -mx-1 px-1 sm:mx-0 sm:px-0">
+              <button
+                onClick={() => handleSort("date")}
+                title="Urutkan berdasarkan waktu transaksi"
+                className={`flex flex-shrink-0 items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${sortBy === "date" ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  {sortOrder === "newest"
+                    ? <><line x1="12" y1="20" x2="12" y2="4" /><polyline points="6 10 12 4 18 10" /></>
+                    : <><line x1="12" y1="4" x2="12" y2="20" /><polyline points="18 14 12 20 6 14" /></>}
+                </svg>
+                <span className="hidden sm:inline">{sortOrder === "newest" ? "Terbaru" : "Terlama"}</span>
+              </button>
 
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${hasActiveFilter ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
-              <span>Filter</span>
-              {hasActiveFilter && (
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] font-bold">{activeFilterCount}</span>
-              )}
-            </button>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex flex-shrink-0 items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${hasActiveFilter ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+                <span>Filter</span>
+                {hasActiveFilter && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] font-bold">{activeFilterCount}</span>
+                )}
+              </button>
 
-            <button
-              onClick={() => setShowBulkSN(!showBulkSN)}
-              title="Cari banyak Serial Number sekaligus"
-              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${showBulkSN || bulkSNInput ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" />
-              </svg>
-              <span className="hidden sm:inline">Cari Banyak SN</span>
-              {bulkSNInput && <span className="inline-flex w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-            </button>
+              <button
+                onClick={() => setShowBulkSN(!showBulkSN)}
+                title="Cari banyak Serial Number sekaligus"
+                className={`flex flex-shrink-0 items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${showBulkSN || bulkSNInput ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" />
+                </svg>
+                <span className="hidden sm:inline">Cari Banyak SN</span>
+                {bulkSNInput && <span className="inline-flex w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+              </button>
+            </div>
           </div>
 
           {/* ── Panel Cari Banyak SN ── */}
@@ -2434,8 +3843,7 @@ export default function Page() {
                     { value: "solit", label: "Solit 03" },
                     { value: "sotech", label: "Sotech" },
                     { value: "onpoint", label: "On Point" },
-                    { value: "zenit", label: "Zenit" },
-                    { value: "zenit.id", label: "Zenit.id" },
+                    { value: "sultop", label: "Sultop" },
                   ].map((c) => (
                     <button key={c.value} onClick={() => setCompanyName(c.value)}
                       className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${companyName === c.value ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
@@ -2491,6 +3899,7 @@ export default function Page() {
                 canSeeModal={canSeeModal}
                 canRestoreTransaction={canRestoreTransaction}
                 onRestored={() => fetchTransactions()} onRowClick={setDetailItem}
+                onEdit={setEditItem}
               />
             ))}
           </div>
@@ -2502,6 +3911,7 @@ export default function Page() {
             canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction}
             canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} onPhotoClick={setPhotoModal}
             onRestored={() => fetchTransactions()} onRowClick={setDetailItem}
+            onEdit={setEditItem}
           />
         )}
 

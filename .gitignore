@@ -48,3 +48,8 @@ public/sw.js.map
 public/workbox-*.js
 public/workbox-*.js.map
 # public/fallback-*.js
+core
+.playwright-mcp/
+.agent
+.claude.md
+.claude

@@ -52,6 +52,59 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 /**
+ * Deal (harga jual) + modal (harga beli) aksesoris per invoice, dari
+ * transaction_items. Dipakai untuk memisah pendapatan laptop vs aksesoris
+ * (410 vs 420) DAN membukukan HPP aksesoris (D450 Biaya Printilan / K170
+ * Aksesoris) yang sebelumnya tidak pernah dibuat — ini yang bikin aksesoris
+ * tambahan lewat Edit Riwayat Transaksi tidak muncul di Jurnal Umum.
+ *
+ * Konvensi: untuk baris aksesoris, transaction_items.selling_price = MODAL
+ * per unit (bukan harga jual) — sama seperti yang ditampilkan "Modal" di
+ * detail transaksi. Fallback ke accessories.buy_price kalau kosong.
+ */
+async function getAccessoryDealModalByInvoices(
+  supabase: SupabaseClient,
+  invoiceNumbers: string[]
+): Promise<Map<string, { deal: number; modal: number }>> {
+  const map = new Map<string, { deal: number; modal: number }>();
+  if (invoiceNumbers.length === 0) return map;
+
+  const accRows: any[] = [];
+  for (const batch of chunkArray(invoiceNumbers, 150)) {
+    const { data } = await supabase
+      .from("transaction_items")
+      .select("invoice_number, item_type, accessory_id, unit_id, deal_price, selling_price, quantity")
+      .in("invoice_number", batch);
+    for (const it of (data ?? []) as any[]) {
+      const isAccessoryItem = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
+      if (isAccessoryItem) accRows.push(it);
+    }
+  }
+  if (accRows.length === 0) return map;
+
+  // Fallback modal dari accessories.buy_price untuk baris yg selling_price-nya 0.
+  const accIds = [...new Set(accRows.map((it) => it.accessory_id).filter(Boolean))];
+  const buyPriceMap = new Map<string, number>();
+  for (const batch of chunkArray(accIds, 150)) {
+    const { data: accs } = await supabase.from("accessories").select("id, buy_price").in("id", batch);
+    for (const a of accs ?? []) buyPriceMap.set(a.id as string, Math.round(Number(a.buy_price ?? 0)));
+  }
+
+  for (const it of accRows) {
+    const inv = it.invoice_number as string;
+    const qty = Math.max(1, Math.round(Number(it.quantity ?? 1)));
+    const deal = Math.round(Number(it.deal_price ?? 0));
+    const unitModal = Math.round(Number(it.selling_price ?? 0)) || (buyPriceMap.get(it.accessory_id) ?? 0);
+    const cur = map.get(inv) ?? { deal: 0, modal: 0 };
+    cur.deal += deal;
+    cur.modal += unitModal * qty;
+    map.set(inv, cur);
+  }
+
+  return map;
+}
+
+/**
  * Ambil company_name & spek laptop (CPU/RAM/Storage) untuk daftar invoice_number.
  * Dipakai untuk menampilkan badge toko + spek di Jurnal Umum (entry yang SUDAH
  * di-posting/dikonfirmasi) — datanya tidak disimpan di journal_entries, jadi
@@ -201,10 +254,14 @@ export async function getTransactionSyncDraftsByInvoices(
     for (const batch of chunkArray(Array.from(unitIds), 150)) {
       const { data: units } = await supabase
         .from("laptop_units")
-        .select("id, purchase_price, serial_number")
+        .select("id, purchase_price, sparepart_cost, serial_number")
         .in("id", batch);
       for (const u of units ?? []) {
-        purchasePriceMap.set(u.id as string, Math.round(Number(u.purchase_price ?? 0)));
+        // Modal total unit = harga beli + modal sparepart yang tertanam di unit.
+        purchasePriceMap.set(
+          u.id as string,
+          Math.round(Number(u.purchase_price ?? 0)) + Math.round(Number(u.sparepart_cost ?? 0))
+        );
         if (u.serial_number) serialNumberMap.set(u.id as string, u.serial_number as string);
       }
     }
@@ -214,21 +271,8 @@ export async function getTransactionSyncDraftsByInvoices(
     .filter((t) => t.item_kind === "mixed")
     .map((t) => t.invoice_number as string);
 
-  const accessoryDealByInvoice = new Map<string, number>();
-  if (mixedInvoiceNumbers.length > 0) {
-    for (const batch of chunkArray(mixedInvoiceNumbers, 150)) {
-      const { data: itemRows } = await supabase
-        .from("transaction_items")
-        .select("invoice_number, item_type, accessory_id, unit_id, deal_price")
-        .in("invoice_number", batch);
-      for (const it of (itemRows ?? []) as any[]) {
-        const isAccessoryItem = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
-        if (!isAccessoryItem) continue;
-        const cur = accessoryDealByInvoice.get(it.invoice_number as string) ?? 0;
-        accessoryDealByInvoice.set(it.invoice_number as string, cur + Math.round(Number(it.deal_price ?? 0)));
-      }
-    }
-  }
+  // deal (harga jual) + modal (harga beli) aksesoris per invoice.
+  const accMap = await getAccessoryDealModalByInvoices(supabase, mixedInvoiceNumbers);
 
   for (const t of trxs as any[]) {
     if (t.status !== "PAID") continue; // lihat catatan di JSDoc — accrual/cancelled tidak disinkronkan
@@ -276,8 +320,8 @@ export async function getTransactionSyncDraftsByInvoices(
     if (effectiveItemKind === "accessory") {
       lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
     } else if (effectiveItemKind === "mixed") {
-      const accessoryDeal = Math.max(0, Math.min(deal, accessoryDealByInvoice.get(t.invoice_number as string) ?? 0));
-      const laptopDeal = deal - accessoryDeal;
+      const accessoryDeal = Math.max(0, Math.min(deal, accMap.get(t.invoice_number as string)?.deal ?? 0));
+            const laptopDeal = deal - accessoryDeal;
       if (laptopDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: laptopDeal });
       if (accessoryDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: accessoryDeal });
     } else {
@@ -285,8 +329,25 @@ export async function getTransactionSyncDraftsByInvoices(
     }
 
     if (modal > 0) {
-      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
-      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      if (effectiveItemKind === "accessory") {
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal });
+      } else {
+        lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      }
+    }
+
+    // ✅ HPP aksesoris (D450 Biaya Printilan / K170 Aksesoris) untuk transaksi MIXED.
+    // Modal aksesoris yang ditambahkan lewat Edit Riwayat Transaksi — dijual
+    // maupun bonus (deal 0) — sebelumnya TIDAK pernah dibukukan, makanya jurnalnya
+    // "cuma laptop". Modal laptop tetap lewat 440/130 di atas (tidak dobel).
+    if (effectiveItemKind === "mixed") {
+      const accessoryModal = Math.round(accMap.get(t.invoice_number as string)?.modal ?? 0);
+      if (accessoryModal > 0) {
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: accessoryModal });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: accessoryModal });
+      }
     }
 
     const merged = mergeLines(lines);
@@ -302,6 +363,138 @@ export async function getTransactionSyncDraftsByInvoices(
   return result;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Gabung entry cashflow "multi kategori" (1 submit form → banyak baris) jadi 1 jurnal
+// ─────────────────────────────────────────────────────────────────────────────
+type CashflowRow = {
+  id: string;
+  direction: "IN" | "OUT";
+  category: string;
+  nama: string | null;
+  nominal: number | string;
+  keterangan: string | null;
+  tanggal: string;
+  payment_method: string | null;
+  source_type: string;
+  created_at: string | null;
+};
+
+const CASHFLOW_ROW_SELECT =
+  "id, direction, category, nama, nominal, keterangan, tanggal, payment_method, source_type, created_at";
+
+// Jeda maksimal antar-baris (ms) supaya dianggap 1 submit form yang sama.
+const CASHFLOW_GROUP_WINDOW_MS = 10_000;
+
+function cashflowGroupSignature(e: CashflowRow): string {
+  return [
+    e.source_type,
+    e.tanggal,
+    e.payment_method ?? "",
+    (e.nama ?? "").trim().toLowerCase(),
+    (e.keterangan ?? "").trim().toLowerCase(),
+  ].join("|");
+}
+
+/**
+ * Kelompokkan baris cashflow. Hasil: array of group.
+ * - Group berisi >1 baris = digabung jadi 1 jurnal. Urutan: nominal kecil → besar,
+ *   baris TERAKHIR (nominal terbesar) jadi "utama" (dipakai untuk judul & source_id).
+ * - Hanya uang KELUAR (OUT) yang digabung.
+ * - Kalau ada anggota NON-utama yang sudah terlanjur diposting sendiri-sendiri
+ *   (data lama), group dipecah lagi supaya tidak double-post.
+ */
+async function groupCashflowRows(
+  supabase: SupabaseClient,
+  rows: CashflowRow[]
+): Promise<CashflowRow[][]> {
+  const result: CashflowRow[][] = [];
+  const bySignature = new Map<string, CashflowRow[]>();
+
+  for (const r of rows) {
+    if (r.direction !== "OUT") {
+      result.push([r]);
+      continue;
+    }
+    const sig = cashflowGroupSignature(r);
+    const list = bySignature.get(sig) ?? [];
+    list.push(r);
+    bySignature.set(sig, list);
+  }
+
+  // Pecah per signature berdasarkan jeda waktu created_at
+  const candidateGroups: CashflowRow[][] = [];
+  for (const list of bySignature.values()) {
+    list.sort(
+      (a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.id.localeCompare(b.id)
+    );
+    let cur: CashflowRow[] = [];
+    let lastTs = 0;
+    for (const r of list) {
+      const ts = new Date(r.created_at ?? 0).getTime();
+      if (cur.length > 0 && ts - lastTs > CASHFLOW_GROUP_WINDOW_MS) {
+        candidateGroups.push(cur);
+        cur = [];
+      }
+      cur.push(r);
+      lastTs = ts;
+    }
+    if (cur.length > 0) candidateGroups.push(cur);
+  }
+
+  // Cek anggota group yang sudah punya jurnal sendiri (data lama)
+  const multiIds = candidateGroups.filter((g) => g.length > 1).flatMap((g) => g.map((r) => r.id));
+  const postedIds = new Set<string>();
+  let postedCheckFailed = false;
+  for (const batch of chunkArray(multiIds, 150)) {
+    const { data, error } = await supabase
+      .from("journal_entries")
+      .select("source_id")
+      .eq("source_type", "CASHFLOW")
+      .in("source_id", batch);
+    if (error) {
+      console.error("[akuntansi] cek cashflow terposting (group):", error.message);
+      postedCheckFailed = true;
+      break;
+    }
+    for (const e of data ?? []) postedIds.add(String((e as any).source_id));
+  }
+
+  for (const g of candidateGroups) {
+    const sorted = [...g].sort(
+      (a, b) => Number(a.nominal) - Number(b.nominal) || a.id.localeCompare(b.id)
+    );
+    const primary = sorted[sorted.length - 1];
+    const othersPostedSeparately = sorted.some((r) => r.id !== primary.id && postedIds.has(r.id));
+
+    if (sorted.length === 1 || postedCheckFailed || othersPostedSeparately) {
+      for (const r of sorted) result.push([r]); // perilaku lama: 1 baris = 1 jurnal
+    } else {
+      result.push(sorted);
+    }
+  }
+
+  return result;
+}
+
+/** Baris jurnal untuk 1 group cashflow (1 baris = persis logic lama). */
+function cashflowGroupLines(group: CashflowRow[]): DraftLine[] {
+  const lines: DraftLine[] = [];
+  for (const e of group) {
+    const nominal = Math.round(Number(e.nominal ?? 0));
+    if (nominal <= 0) continue;
+
+    const kasAccount = kasAccountFromCashflow(e.payment_method);
+    if (e.direction === "OUT") {
+      lines.push({ account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal });
+      lines.push({ account_code: kasAccount, side: "KREDIT", nominal });
+    } else {
+      lines.push({ account_code: kasAccount, side: "DEBIT", nominal });
+      lines.push({ account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal });
+    }
+  }
+  return mergeLines(lines); // Kas ikut digabung jadi 1 baris (mis. Kas Saldo Rp102.500)
+}
+
 export interface JournalSyncDraft {
   lines: DraftLine[];
   total: number;
@@ -315,6 +508,9 @@ export interface JournalSyncDraft {
  * cashflow_entries dengan source_type "MANUAL" yang pernah diposting ke
  * Jurnal Umum (lihat buildCashflowDrafts di atas) — jadi cuma itu yang
  * dicek di sini.
+ *
+ * Entry multi kategori (beberapa baris cashflow dari 1 submit) dihitung sebagai
+ * 1 jurnal gabungan — lihat groupCashflowRows().
  */
 export async function getCashflowSyncDraftsByIds(
   supabase: SupabaseClient,
@@ -323,38 +519,56 @@ export async function getCashflowSyncDraftsByIds(
   const result = new Map<string, JournalSyncDraft>();
   if (ids.length === 0) return result;
 
-  const rows: any[] = [];
+  const rows: CashflowRow[] = [];
   for (const batch of chunkArray(ids, 150)) {
     const { data, error } = await supabase
       .from("cashflow_entries")
-      .select("id, direction, category, nominal, payment_method, source_type, nama, keterangan")
-      .eq("source_type", "MANUAL")
+      .select(CASHFLOW_ROW_SELECT)
+      .in("source_type", ["MANUAL", "PENGAJUAN_DANA"])
       .in("id", batch);
     if (error) {
       console.error("[akuntansi] fetch cashflow (sync):", error.message);
       return result;
     }
-    if (data) rows.push(...data);
+    if (data) rows.push(...(data as unknown as CashflowRow[]));
   }
 
-  for (const e of rows as any[]) {
-    const nominal = Math.round(Number(e.nominal ?? 0));
-    if (nominal <= 0) continue;
+  // Ambil "saudara" (baris lain di tanggal yang sama) supaya gabungan multi kategori terdeteksi
+  const knownIds = new Set(rows.map((r) => r.id));
+  const outDates = [...new Set(rows.filter((r) => r.direction === "OUT").map((r) => r.tanggal))];
+  const siblings: CashflowRow[] = [];
+  for (const batch of chunkArray(outDates, 50)) {
+    const { data, error } = await supabase
+      .from("cashflow_entries")
+      .select(CASHFLOW_ROW_SELECT)
+      .in("source_type", ["MANUAL", "PENGAJUAN_DANA"])
+      .eq("direction", "OUT")
+      .in("tanggal", batch);
+    if (error) {
+      console.error("[akuntansi] fetch cashflow siblings (sync):", error.message);
+      continue;
+    }
+    for (const r of (data ?? []) as unknown as CashflowRow[]) {
+      if (!knownIds.has(r.id)) siblings.push(r);
+    }
+  }
 
-    const kasAccount = kasAccountFromCashflow(e.payment_method);
-    const lines: DraftLine[] =
-      e.direction === "OUT"
-        ? [
-          { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
-          { account_code: kasAccount, side: "KREDIT", nominal },
-        ]
-        : [
-          { account_code: kasAccount, side: "DEBIT", nominal },
-          { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
-        ];
+  const requested = new Set(ids);
+  const groups = await groupCashflowRows(
+    supabase,
+    [...rows, ...siblings].filter((r) => Math.round(Number(r.nominal ?? 0)) > 0)
+  );
 
-       const merged = mergeLines(lines);
-    result.set(String(e.id), { lines: merged, total: totalOf(merged), keterangan: cashflowKeterangan(e) });
+  for (const group of groups) {
+    const primary = group[group.length - 1];
+    if (!requested.has(primary.id)) continue; // hanya entry jurnal yang memang diminta
+
+    const merged = cashflowGroupLines(group);
+    result.set(String(primary.id), {
+      lines: merged,
+      total: totalOf(merged),
+      keterangan: cashflowKeterangan(primary),
+    });
   }
 
   return result;
@@ -362,16 +576,13 @@ export async function getCashflowSyncDraftsByIds(
 
 export interface CashflowMeta {
   nama: string | null;
+  source_type?: string | null;
 }
 
 /**
- * Ambil nama pengisi (kolom `nama` di cashflow_entries) untuk entry CASHFLOW
- * yang sudah diposting ke Jurnal Umum — dipakai untuk badge "Diinput oleh ..."
- * di UI. Tidak perlu filter source_type=MANUAL lagi di sini karena SEMUA entry
- * jurnal dengan source_type CASHFLOW memang berasal dari cashflow_entries yang
- * source_type-nya MANUAL (lihat buildCashflowDrafts) — entry cashflow AUTO
- * (dari Transaksi/Service) tidak pernah membentuk journal_entries.source_type
- * "CASHFLOW", jadi tidak pernah masuk ke sini.
+ * Ambil nama pengisi (kolom `nama`) dan source_type untuk entry CASHFLOW
+ * yang sudah diposting ke Jurnal Umum — dipakai untuk badge nama dan
+ * penanda apakah dari penginputan manual atau pengajuan dana kepala divisi.
  */
 export async function getCashflowMetaByIds(
   supabase: SupabaseClient,
@@ -383,14 +594,17 @@ export async function getCashflowMetaByIds(
   for (const batch of chunkArray(ids, 150)) {
     const { data, error } = await supabase
       .from("cashflow_entries")
-      .select("id, nama")
+      .select("id, nama, source_type")
       .in("id", batch);
     if (error) {
       console.error("[akuntansi] fetch cashflow meta:", error.message);
       return map;
     }
     for (const e of (data ?? []) as any[]) {
-      map.set(String(e.id), { nama: (e.nama as string) ?? null });
+      map.set(String(e.id), {
+        nama: (e.nama as string) ?? null,
+        source_type: (e.source_type as string) ?? null,
+      });
     }
   }
 
@@ -560,11 +774,13 @@ async function buildTransactionDrafts(
     for (const batch of chunkArray(Array.from(unitIds), 150)) {
       const { data: units } = await supabase
         .from("laptop_units")
-        .select("id, purchase_price, serial_number, laptop_id")
+        .select("id, purchase_price, sparepart_cost, serial_number, laptop_id")
         .in("id", batch);
       for (const u of units ?? []) {
+        // purchase_price di map ini = modal TOTAL (harga beli + sparepart_cost),
+        // supaya `modal += u.purchase_price` di bawah otomatis sudah gabungan.
         unitMap.set(u.id as string, {
-          purchase_price: Math.round(Number(u.purchase_price ?? 0)),
+          purchase_price: Math.round(Number(u.purchase_price ?? 0)) + Math.round(Number(u.sparepart_cost ?? 0)),
           serial_number: (u.serial_number as string) ?? undefined,
           laptop_id: (u.laptop_id as string) ?? undefined,
         });
@@ -677,8 +893,13 @@ async function buildTransactionDrafts(
     }
 
     if (modal > 0) {
-      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
-      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      if (effectiveItemKind === "accessory") {
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal });
+      } else {
+        lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      }
     }
 
     const merged = mergeLines(lines);
@@ -767,11 +988,13 @@ async function buildTransactionAccrualDrafts(
     for (const batch of chunkArray(Array.from(unitIds), 150)) {
       const { data: units } = await supabase
         .from("laptop_units")
-        .select("id, purchase_price, serial_number, laptop_id")
+        .select("id, purchase_price, sparepart_cost, serial_number, laptop_id")
         .in("id", batch);
       for (const u of units ?? []) {
+        // purchase_price di map ini = modal TOTAL (harga beli + sparepart_cost),
+        // supaya `modal += u.purchase_price` di bawah otomatis sudah gabungan.
         unitMap.set(u.id as string, {
-          purchase_price: Math.round(Number(u.purchase_price ?? 0)),
+          purchase_price: Math.round(Number(u.purchase_price ?? 0)) + Math.round(Number(u.sparepart_cost ?? 0)),
           serial_number: (u.serial_number as string) ?? undefined,
           laptop_id: (u.laptop_id as string) ?? undefined,
         });
@@ -849,8 +1072,13 @@ async function buildTransactionAccrualDrafts(
     }
 
     if (modal > 0) {
-      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
-      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      if (effectiveItemKind === "accessory") {
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal });
+      } else {
+        lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      }
     }
 
     const merged = mergeLines(lines);
@@ -921,11 +1149,23 @@ async function buildTransactionPaymentDrafts(
     }
   }
 
-  const trxMap = new Map<string, { customer_name: string; laptop_name: string; payment_method: string; company_name: string | null; status: string }>();
+  const trxMap = new Map<
+    string,
+    {
+      customer_name: string;
+      laptop_name: string;
+      payment_method: string;
+      company_name: string | null;
+      status: string;
+      serial_number: string | null;
+      unit_id: string | null;
+      unit_ids: string[] | null;
+    }
+  >();
   for (const batch of chunkArray(invoiceNumbers, 150)) {
     const { data: trxs } = await supabase
       .from("transactions")
-      .select("invoice_number, customer_name, laptop_name, payment_method, company_name, status")
+      .select("invoice_number, customer_name, laptop_name, payment_method, company_name, status, serial_number, unit_id, unit_ids")
       .in("invoice_number", batch);
     for (const t of trxs ?? []) {
       trxMap.set(t.invoice_number as string, {
@@ -934,8 +1174,45 @@ async function buildTransactionPaymentDrafts(
         payment_method: (t.payment_method as string) ?? "CASH",
         company_name: (t.company_name as string) ?? null,
         status: (t.status as string) ?? "",
+        serial_number: (t.serial_number as string) ?? null,
+        unit_id: (t.unit_id as string) ?? null,
+        unit_ids: Array.isArray(t.unit_ids) ? t.unit_ids : null,
       });
     }
+  }
+
+  // Resolve SN laptop per invoice (unit_ids → laptop_units.serial_number) supaya
+  // keterangan pembayaran DP/Cicilan/Pelunasan ikut menampilkan SN — sama persis
+  // seperti draft transaksi utama. Fallback ke transactions.serial_number (data lama).
+  const paymentUnitIds = new Set<string>();
+  for (const trx of trxMap.values()) {
+    if (trx.unit_id) paymentUnitIds.add(trx.unit_id);
+    if (Array.isArray(trx.unit_ids)) for (const u of trx.unit_ids) if (u) paymentUnitIds.add(u);
+  }
+
+  const snByUnitId = new Map<string, string>();
+  if (paymentUnitIds.size > 0) {
+    for (const batch of chunkArray(Array.from(paymentUnitIds), 150)) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, serial_number")
+        .in("id", batch);
+      for (const u of units ?? []) {
+        if (u.serial_number) snByUnitId.set(u.id as string, u.serial_number as string);
+      }
+    }
+  }
+
+  const snTextByInvoice = new Map<string, string>();
+  for (const [invoice, trx] of trxMap.entries()) {
+    const ids: string[] =
+      Array.isArray(trx.unit_ids) && trx.unit_ids.length > 0 ? trx.unit_ids : trx.unit_id ? [trx.unit_id] : [];
+    const sns: string[] = [];
+    for (const id of ids) {
+      const sn = snByUnitId.get(id);
+      if (sn) sns.push(sn);
+    }
+    snTextByInvoice.set(invoice, sns.length > 0 ? sns.join(", ") : trx.serial_number || "—");
   }
 
   const directInvoices = new Set<string>();
@@ -969,7 +1246,7 @@ async function buildTransactionPaymentDrafts(
       source_category: "PEMBAYARAN_PIUTANG",
       tanggal: jakartaDate(p.created_at as string),
       sort_ts: p.created_at as string,
-      keterangan: `Pembayaran ${TYPE_LABEL[p.payment_type as string] ?? p.payment_type} · ${trx?.laptop_name ?? "—"} - ${trx?.customer_name ?? "—"}`,
+      keterangan: `Pembayaran ${TYPE_LABEL[p.payment_type as string] ?? p.payment_type} · ${trx?.laptop_name ?? "—"} - ${snTextByInvoice.get(p.invoice_number as string) ?? "—"} - ${trx?.customer_name ?? "—"}`,
       ref: p.invoice_number as string,
       lines,
       total: totalOf(lines),
@@ -985,6 +1262,13 @@ async function buildTransactionPaymentDrafts(
 
   return drafts;
 }
+
+// Sparepart service yang dicatat SEJAK waktu ini modalnya dijurnal INSTAN
+// (manual) saat klik Simpan Sparepart (api/service/[id]/route.ts case
+// "sparepart") — jadi TIDAK dibukukan lagi di draft. Sparepart LAMA (sebelum
+// waktu ini) tetap dibukukan di sini seperti dulu.
+// ⚠️ Set ke jam DEPLOY sebenarnya.
+const SPAREPART_INSTANT_CUTOFF_ISO = "2026-10-10T17:00:00+07:00";
 
 async function buildServiceDrafts(
   supabase: SupabaseClient,
@@ -1066,12 +1350,22 @@ async function buildServiceDrafts(
     for (const e of (existingEntries ?? []) as any[]) {
       const rawSourceId = e.source_id as string;
       const baseId = rawSourceId.split("__")[0];
-      const jasaLine = (e.lines ?? []).find(
-        (l: any) => l.account_code === AKUN.JASA_SERVICE && l.side === "KREDIT"
-      );
-      if (jasaLine) {
+      // (fix) Ukur "sudah dibayar berapa" dari sisi DEBIT Kas (uang masuk), BUKAN
+      // dari kredit Jasa Service. Kalau diukur dari Jasa Service, begitu jurnal
+      // diedit & sebagian pendapatan dipindah ke akun lain (mis. Penjualan Laptop),
+      // nilai Jasa Service mengecil → selisihnya salah dianggap "belum dibukukan"
+      // → draft muncul lagi sebagai pending. Sisi Kas tidak ikut berubah saat
+      // sumber pendapatan dipecah, jadi ukuran ini stabil.
+      const kasDebit = (e.lines ?? [])
+        .filter(
+          (l: any) =>
+            (l.account_code === AKUN.KAS_CASH || l.account_code === AKUN.KAS_SALDO) &&
+            l.side === "DEBIT"
+        )
+        .reduce((s: number, l: any) => s + Math.round(Number(l.nominal ?? 0)), 0);
+      if (kasDebit > 0) {
         const cur = alreadyPostedByService.get(baseId) ?? 0;
-        alreadyPostedByService.set(baseId, cur + Math.round(Number(jasaLine.nominal)));
+        alreadyPostedByService.set(baseId, cur + kasDebit);
       }
       if (rawSourceId.includes("__DP")) {
         dpCountByService.set(baseId, (dpCountByService.get(baseId) ?? 0) + 1);
@@ -1079,12 +1373,15 @@ async function buildServiceDrafts(
     }
   }
 
-  // ── Modal sparepart SESUNGGUHNYA per service (tidak berubah dari sebelumnya) ──
+  // Modal sparepart LAMA (dicatat SEBELUM cutoff) tetap dihitung di sini.
+  // Sparepart SEJAK cutoff modalnya sudah dijurnal instan saat Simpan Sparepart
+  // → di-skip (.lt created_at) biar tidak DOBEL.
   const { data: outflows, error: outflowErr } = await supabase
     .from("accessory_outflows")
-    .select("service_id, accessory_id, qty")
+    .select("service_id, accessory_id, qty, created_at")
     .eq("source_type", "service")
     .eq("status", "active")
+    .lt("created_at", SPAREPART_INSTANT_CUTOFF_ISO) // ⬅️ hanya sparepart LAMA
     .in("service_id", serviceIds);
 
   if (outflowErr) {
@@ -1129,8 +1426,6 @@ async function buildServiceDrafts(
     if (delta <= 0) continue;
 
     const isDpOnly = s.payment_status === "DP";
-    // "Completion" = servis benar-benar sudah DONE/SUDAH_DIAMBIL DAN lunas
-    // penuh — cuma di titik inilah modal sparepart ikut dibukukan (sekali saja).
     const isCompletion = !isDpOnly && (s.status === "DONE" || s.status === "SUDAH_DIAMBIL");
 
     const refDate = (s.payment_confirmed_at || s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
@@ -1141,6 +1436,8 @@ async function buildServiceDrafts(
       { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: delta },
     ];
 
+    // modalByService sudah di-filter < cutoff → yang masuk sini HANYA modal
+    // sparepart lama. Sparepart baru sudah dijurnal instan, jadi tidak dobel.
     let sparepart = 0;
     if (isCompletion) {
       sparepart = modalByService.get(idStr) ?? 0;
@@ -1188,13 +1485,16 @@ async function buildServiceDrafts(
   return drafts;
 }
 
-// ── CASHFLOW (uang KELUAR manual + uang MASUK manual) ────────────────────────
-// FIX: sebelumnya cuma tarik direction "OUT" — sekarang tarik SEMUA entry
-// dengan source_type "MANUAL" (mencakup Uang Keluar Manual DAN Uang Masuk
-// Manual: kategori Piutang/Aksesoris/Biaya Lain-lain). Entry otomatis lain
-// (TRANSACTION, TRANSACTION_PAYMENT, TRANSACTION_DP, SERVICE, MODAL_AWAL)
-// TETAP TIDAK ikut ke sini — sudah/akan dibukukan lewat jalurnya sendiri,
-// atau memang di luar cakupan Jurnal Umum otomatis (MODAL_AWAL).
+// ── CASHFLOW (uang KELUAR manual + uang MASUK manual + PENGAJUAN DANA) ──────
+// Tarik SEMUA entry dengan source_type "MANUAL" (mencakup Uang Keluar Manual
+// DAN Uang Masuk Manual: kategori Piutang/Aksesoris/Biaya Lain-lain) serta
+// "PENGAJUAN_DANA" (realisasi dana keluar dari pengajuan kepala divisi).
+// Entry otomatis lain (TRANSACTION, TRANSACTION_PAYMENT, TRANSACTION_DP,
+// SERVICE, MODAL_AWAL) TETAP TIDAK ikut ke sini — sudah/akan dibukukan lewat
+// jalurnya sendiri, atau memang di luar cakupan Jurnal Umum otomatis (MODAL_AWAL).
+//
+// Baris uang KELUAR multi kategori dari 1 submit (mis. "Penjualan Laptop" +
+// "Biaya Lain-lain" · Balikin DP customer) digabung jadi 1 draft jurnal.
 async function buildCashflowDrafts(
   supabase: SupabaseClient,
   startDate: string,
@@ -1202,8 +1502,8 @@ async function buildCashflowDrafts(
 ): Promise<JournalDraft[]> {
   const { data: rows, error } = await supabase
     .from("cashflow_entries")
-    .select("id, direction, category, nama, nominal, keterangan, tanggal, payment_method, source_type, created_at")
-    .eq("source_type", "MANUAL")
+    .select(CASHFLOW_ROW_SELECT)
+    .in("source_type", ["MANUAL", "PENGAJUAN_DANA"])
     .gte("tanggal", startDate)
     .lt("tanggal", endDateExclusive);
 
@@ -1214,40 +1514,307 @@ async function buildCashflowDrafts(
 
   const drafts: JournalDraft[] = [];
 
-  for (const e of (rows ?? []) as any[]) {
-    const nominal = Math.round(Number(e.nominal ?? 0));
-    if (nominal <= 0) continue;
+  const validRows = ((rows ?? []) as unknown as CashflowRow[]).filter(
+    (e) => Math.round(Number(e.nominal ?? 0)) > 0
+  );
 
-    const kasAccount = kasAccountFromCashflow(e.payment_method);
+  const groups = await groupCashflowRows(supabase, validRows);
 
-    // OUT: Debit akun beban/aset sesuai kategori, Kredit Kas (uang keluar dari kas).
-    // IN : Debit Kas (uang masuk ke kas), Kredit akun sesuai kategori.
-    const lines: DraftLine[] =
-      e.direction === "OUT"
-        ? [
-          { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
-          { account_code: kasAccount, side: "KREDIT", nominal },
-        ]
-        : [
-          { account_code: kasAccount, side: "DEBIT", nominal },
-          { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
-        ];
-
-    const merged = mergeLines(lines);
-
-    const sortTs = (e.created_at as string) || `${e.tanggal}T00:00:00+07:00`;
+  for (const group of groups) {
+    const primary = group[group.length - 1]; // nominal terbesar = judul & source_id
+    const merged = cashflowGroupLines(group);
+    const totalNominal = group.reduce((s, r) => s + Math.round(Number(r.nominal ?? 0)), 0);
+    const sortTs = primary.created_at || `${primary.tanggal}T00:00:00+07:00`;
 
     drafts.push({
       source_type: "CASHFLOW",
-      source_id: String(e.id),
-      source_category: e.category as string,
-      tanggal: e.tanggal as string,
+      source_id: String(primary.id),
+      source_category: primary.category,
+      tanggal: primary.tanggal,
       sort_ts: sortTs,
-      keterangan: cashflowKeterangan(e),
+      keterangan: cashflowKeterangan(primary),
       ref: null,
       lines: merged,
       total: totalOf(merged),
-      meta: { category: e.category, payment_method: e.payment_method, nominal, direction: e.direction },
+      meta: {
+        category: primary.category,
+        payment_method: primary.payment_method,
+        nominal: totalNominal,
+        direction: primary.direction,
+        source_type: primary.source_type,
+        merged_ids: group.map((r) => r.id),
+        merged_count: group.length,
+      },
+    });
+  }
+
+  return drafts;
+}
+
+// Fitur jurnal balik (reversal) transaksi batal mulai berlaku 29 Sep 2026
+// (tanggal fitur ini dipasang). Transaksi yang dibatalkan SEBELUM tanggal ini
+// sengaja TIDAK dibuatkan jurnal balik — biar data akuntansi lama tidak ikut
+// berubah belakangan. Kalau mau geser ke waktu deploy yang lebih tepat,
+// ganti saja nilai jam-nya (mis. "2026-09-29T15:30:00+07:00").
+const REVERSAL_FEATURE_CUTOFF_ISO = "2026-09-29T00:00:00+07:00";
+
+// ── REVERSAL: transaksi yang DIBATALKAN (restore penuh → CANCELLED) ──────────// Membalik SEMUA jurnal yang sudah terlanjur diposting untuk invoice itu
+// (penjualan, modal/HPP, piutang, pembayaran) di TANGGAL PEMBATALAN
+// (restored_at). Jadi penjualan lama tetap di tanggal aslinya, pembatalannya
+// jadi jurnal balik di tanggal cancel — sinkron dengan refund di Cashflow.
+// Muncul sebagai draft PENDING untuk dikonfirmasi, sama seperti draft lainnya.
+async function buildTransactionReversalDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: trxs, error } = await supabase
+    .from("transactions")
+    .select("invoice_number, customer_name, laptop_name, serial_number, serial_numbers, unit_id, unit_ids, restored_at")
+    .eq("status", "CANCELLED")
+    .not("restored_at", "is", null)
+    .gte("restored_at", startISO)
+    .gte("restored_at", REVERSAL_FEATURE_CUTOFF_ISO) // ⬅️ cuma cancel sejak fitur ini ada
+    .lt("restored_at", endISO)
+    .order("restored_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch transactions (reversal):", error.message);
+    return [];
+  }
+  if (!trxs || trxs.length === 0) return [];
+
+  const invoices = (trxs as any[]).map((t) => t.invoice_number as string);
+  const trxByInvoice = new Map<string, any>((trxs as any[]).map((t) => [t.invoice_number as string, t]));
+
+  // Ambil semua entry jurnal ASLI yang sudah diposting untuk invoice ini,
+  // KECUALI entry reversal itu sendiri (biar tidak balik-membalik).
+  const entryMap = new Map<string, { lines: any[] }[]>();
+  for (const batch of chunkArray(invoices, 75)) {
+    const orFilter = batch.map((inv) => `source_id.eq.${inv},source_id.like.${inv}__*`).join(",");
+    const { data: existing } = await supabase
+      .from("journal_entries")
+      .select("source_id, lines:journal_lines(account_code, side, nominal)")
+      .eq("source_type", "TRANSACTION")
+      .or(orFilter);
+
+    for (const e of (existing ?? []) as any[]) {
+      const rawSourceId = e.source_id as string;
+      if (rawSourceId.includes("__REVERSAL")) continue;
+      const baseInvoice = rawSourceId.split("__")[0];
+      if (!trxByInvoice.has(baseInvoice)) continue;
+      const list = entryMap.get(baseInvoice) ?? [];
+      list.push({ lines: e.lines ?? [] });
+      entryMap.set(baseInvoice, list);
+    }
+  }
+
+  // Resolve SN laptop per invoice (dari unit_ids → laptop_units), supaya
+  // keterangan ikut menampilkan serial number seperti draft transaksi normal.
+  const reversalUnitIds = new Set<string>();
+  for (const t of trxs as any[]) {
+    if (t.unit_id) reversalUnitIds.add(t.unit_id as string);
+    if (Array.isArray(t.unit_ids)) for (const u of t.unit_ids) if (u) reversalUnitIds.add(u as string);
+  }
+  const snByUnitId = new Map<string, string>();
+  if (reversalUnitIds.size > 0) {
+    for (const batch of chunkArray(Array.from(reversalUnitIds), 150)) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, serial_number")
+        .in("id", batch);
+      for (const u of units ?? []) {
+        if (u.serial_number) snByUnitId.set(u.id as string, u.serial_number as string);
+      }
+    }
+  }
+  const snTextByInvoice = new Map<string, string>();
+  for (const t of trxs as any[]) {
+    const ids: string[] =
+      Array.isArray(t.unit_ids) && t.unit_ids.length > 0 ? t.unit_ids : t.unit_id ? [t.unit_id] : [];
+    const sns: string[] = [];
+    for (const id of ids) {
+      const sn = snByUnitId.get(id);
+      if (sn) sns.push(sn);
+    }
+    let snText = sns.join(", ");
+    if (!snText) {
+      // fallback ke kolom transactions kalau unit tidak ketemu (data lama)
+      snText = Array.isArray(t.serial_numbers) && t.serial_numbers.length > 0
+        ? t.serial_numbers.filter(Boolean).join(", ")
+        : (t.serial_number as string) || "";
+    }
+    snTextByInvoice.set(t.invoice_number as string, snText || "—");
+  }
+
+  const drafts: JournalDraft[] = [];
+  for (const [invoice, entries] of entryMap.entries()) {
+    const t = trxByInvoice.get(invoice);
+    const tanggal = jakartaDate(t.restored_at as string);
+
+    const flipped: DraftLine[] = [];
+    for (const en of entries) {
+      for (const l of en.lines) {
+        const nominal = Math.round(Number(l.nominal));
+        if (nominal <= 0) continue;
+        flipped.push({
+          account_code: l.account_code as string,
+          side: l.side === "DEBIT" ? "KREDIT" : "DEBIT", // ← balik sisi
+          nominal,
+        });
+      }
+    }
+    if (flipped.length === 0) continue;
+
+    const merged = mergeLines(flipped);
+    drafts.push({
+      source_type: "TRANSACTION",
+      source_id: `${invoice}__REVERSAL`,
+      source_category: "PEMBATALAN_TRANSAKSI",
+      tanggal,
+      sort_ts: (t.restored_at as string) || `${tanggal}T00:00:00+07:00`,
+      keterangan: `Pembatalan/Refund · ${t.laptop_name ?? "Laptop"} - ${snTextByInvoice.get(invoice) ?? "—"} - ${t.customer_name ?? "—"}`,
+      ref: invoice,
+      lines: merged,
+      total: totalOf(merged),
+      meta: { invoice, is_reversal: true, modal_missing: false, company_name: null },
+    });
+  }
+
+  return drafts;
+}
+
+// ── KEBUTUHAN: aksesoris keluar → modal pindah ke laptop (Pengambilan Barang) ──
+// Sumbernya tabel item_outflows (outflow_type KEBUTUHAN + dest_laptop_id terisi).
+// Jurnal: Dr 130 (HPP/Modal Laptop) / Cr 170 (Aksesoris). Muncul sebagai draft
+// PENDING — baru masuk jurnal umum setelah dikonfirmasi, sama seperti draft lain.
+async function buildItemOutflowKebutuhanDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: rows, error } = await supabase
+    .from("item_outflows")
+    .select("id, outflow_type, nominal, purpose, serial_number, dest_serial_number, dest_laptop_id, created_at")
+    .eq("outflow_type", "KEBUTUHAN")
+    .not("dest_laptop_id", "is", null)
+    .not("is_restored", "is", true) // sudah di-restore → tidak dibukukan lagi
+    .gte("created_at", startISO)
+    .lt("created_at", endISO)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch item_outflows (kebutuhan):", error.message);
+    return [];
+  }
+  if (!rows || rows.length === 0) return [];
+
+  const drafts: JournalDraft[] = [];
+  for (const r of rows as any[]) {
+    const modal = Math.round(Number(r.nominal ?? 0));
+    if (modal <= 0) continue;
+
+    const tanggal = jakartaDate(r.created_at as string);
+    const lines = mergeLines([
+      { account_code: AKUN.HPP, side: "DEBIT", nominal: modal },        // 130
+      { account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal }, // 170
+    ]);
+
+    drafts.push({
+      source_type: "KEBUTUHAN",
+      source_id: String(r.id),
+      source_category: "KEBUTUHAN_TRANSFER",
+      tanggal,
+      sort_ts: (r.created_at as string) || `${tanggal}T00:00:00+07:00`,
+      keterangan: (r.purpose as string) || "Kebutuhan · modal aksesoris pindah ke laptop",
+      ref: (r.dest_serial_number as string) || null,
+      lines,
+      total: totalOf(lines),
+      meta: {
+        nominal: modal,
+        serial_number: r.serial_number ?? null,
+        dest_serial_number: r.dest_serial_number ?? null,
+        modal_missing: false,
+      },
+    });
+  }
+
+  return drafts;
+}
+
+// ── KEBUTUHAN REVERSAL: Kebutuhan yang di-restore → balik jurnal D170/K130 ──
+// Membalik jurnal forward (D130/K170) yang SUDAH diposting untuk baris Kebutuhan
+// itu, di TANGGAL restore (restored_at). Kalau forward-nya belum pernah diposting
+// (masih pending saat di-restore), tidak ada yang dibalik — Edit 2a sudah bikin
+// draft forward-nya hilang, jadi net-nya tetap nol. Muncul sebagai draft PENDING.
+async function buildItemOutflowKebutuhanReversalDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: rows, error } = await supabase
+    .from("item_outflows")
+    .select("id, nominal, purpose, dest_serial_number, dest_laptop_id, restored_at")
+    .eq("outflow_type", "KEBUTUHAN")
+    .eq("is_restored", true)
+    .not("dest_laptop_id", "is", null)
+    .not("restored_at", "is", null)
+    .gte("restored_at", startISO)
+    .lt("restored_at", endISO)
+    .order("restored_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch item_outflows (kebutuhan reversal):", error.message);
+    return [];
+  }
+  if (!rows || rows.length === 0) return [];
+
+  // Ambil baris jurnal forward yang sudah diposting (source_id polos = forward;
+  // entry __REVERSAL tidak ikut karena .in() cuma match id polos).
+  const ids = rows.map((r) => String(r.id));
+  const postedLinesById = new Map<string, any[]>();
+  for (const batch of chunkArray(ids, 150)) {
+    const { data: existing } = await supabase
+      .from("journal_entries")
+      .select("source_id, lines:journal_lines(account_code, side, nominal)")
+      .eq("source_type", "KEBUTUHAN")
+      .in("source_id", batch);
+    for (const e of (existing ?? []) as any[]) {
+      postedLinesById.set(String(e.source_id), e.lines ?? []);
+    }
+  }
+
+  const drafts: JournalDraft[] = [];
+  for (const r of rows as any[]) {
+    const idStr = String(r.id);
+    const postedLines = postedLinesById.get(idStr);
+    if (!postedLines || postedLines.length === 0) continue; // forward belum diposting → tak ada yang dibalik
+
+    const flipped: DraftLine[] = [];
+    for (const l of postedLines) {
+      const nominal = Math.round(Number(l.nominal));
+      if (nominal <= 0) continue;
+      flipped.push({
+        account_code: l.account_code as string,
+        side: l.side === "DEBIT" ? "KREDIT" : "DEBIT", // ← balik sisi
+        nominal,
+      });
+    }
+    if (flipped.length === 0) continue;
+
+    const merged = mergeLines(flipped);
+    const tanggal = jakartaDate(r.restored_at as string);
+    drafts.push({
+      source_type: "KEBUTUHAN",
+      source_id: `${idStr}__REVERSAL`,
+      source_category: "KEBUTUHAN_REVERSAL",
+      tanggal,
+      sort_ts: (r.restored_at as string) || `${tanggal}T00:00:00+07:00`,
+      keterangan: `Pembatalan Kebutuhan · ${(r.purpose as string) || "modal aksesoris balik ke stok"}`,
+      ref: (r.dest_serial_number as string) || null,
+      lines: merged,
+      total: totalOf(merged),
+      meta: { nominal: Math.round(Number(r.nominal) || 0), is_reversal: true, modal_missing: false },
     });
   }
 
@@ -1261,15 +1828,18 @@ export async function buildDraftsForPeriod(
 ): Promise<JournalDraft[]> {
   const { startISO, endISO, startDate, endDateExclusive } = periodRange(period);
 
-  const [tx, accrual, pay, svc, cf] = await Promise.all([
+   const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal] = await Promise.all([
     buildTransactionDrafts(supabase, startISO, endISO),
     buildTransactionAccrualDrafts(supabase, startISO, endISO),
     buildTransactionPaymentDrafts(supabase, startISO, endISO),
     buildServiceDrafts(supabase, period),
     buildCashflowDrafts(supabase, startDate, endDateExclusive),
+    buildTransactionReversalDrafts(supabase, startISO, endISO),
+    buildItemOutflowKebutuhanDrafts(supabase, startISO, endISO),
+    buildItemOutflowKebutuhanReversalDrafts(supabase, startISO, endISO),
   ]);
 
-  return [...tx, ...accrual, ...pay, ...svc, ...cf].sort((a, b) => {
+  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan, ...kebutuhanReversal].sort((a, b) => {
     if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
     return a.sort_ts.localeCompare(b.sort_ts);
   });

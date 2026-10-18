@@ -5,6 +5,7 @@ import { NotificationBanner } from "@/components/ui/NotificationBanner";
 import ChatBarBackground from "@/components/ui/ChatBarBackground";
 import MissionQuestTracker from "@/components/layout/MissionQuestTracker";
 import BottomNavBar from "@/components/navigation/BottomNavBar";
+import { BirthdayBanner } from "@/components/ui/BirthdayBanner";
 
 export default function Layout({
   children,
@@ -22,6 +23,7 @@ export default function Layout({
 
       <MissionQuestTracker />
       <NotificationBanner />
+      <BirthdayBanner />
 
       {/* Floating chat button pojok kanan bawah — desktop/laptop saja,
           di HP fungsinya digantikan icon "Chat" di BottomNavBar */}

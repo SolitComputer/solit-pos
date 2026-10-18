@@ -3,7 +3,7 @@ import { categoryLabel } from "@/lib/cashflow";
 
 export type AccountType = "ASET" | "HUTANG" | "MODAL" | "PEMASUKAN" | "BEBAN";
 export type JournalSide = "DEBIT" | "KREDIT";
-export type JournalSourceType = "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL";
+export type JournalSourceType = "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN";
 export type DerivedSourceType = Exclude<JournalSourceType, "MANUAL">;
 
 export interface Account {
@@ -18,6 +18,8 @@ export const AKUN = {
   KAS_CASH: "120",
   HPP: "130",
   PIUTANG: "140",
+  KASBON: "141",   // ⬅️ BARU
+  CICILAN: "142",  // ⬅️ BARU
   INVEST: "150",
   ASET_TETAP: "160",
   AKSESORIS: "170",
@@ -45,6 +47,7 @@ export const AKUN = {
   OPS_BULANAN: "520",
   BIAYA_LAIN: "530",
   KEUNTUNGAN_MITRA: "540",
+  PENGELUARAN_TAHUNAN: "550",
 } as const;
 
 export const ACCOUNTS: Account[] = [
@@ -53,6 +56,8 @@ export const ACCOUNTS: Account[] = [
   { code: AKUN.KAS_CASH, name: "Kas Cash", type: "ASET", normal: "DEBIT" },
   { code: AKUN.HPP, name: "HPP (Modal)", type: "ASET", normal: "DEBIT" },
   { code: AKUN.PIUTANG, name: "Piutang", type: "ASET", normal: "DEBIT" },
+  { code: AKUN.KASBON, name: "Kasbon", type: "ASET", normal: "DEBIT" },
+  { code: AKUN.CICILAN, name: "Cicilan", type: "ASET", normal: "DEBIT" },
   { code: AKUN.INVEST, name: "Invest", type: "ASET", normal: "DEBIT" },
   { code: AKUN.ASET_TETAP, name: "Aset Tetap", type: "ASET", normal: "DEBIT" },
   { code: AKUN.AKSESORIS, name: "Aksesoris", type: "ASET", normal: "DEBIT" },
@@ -92,6 +97,7 @@ export const ACCOUNTS: Account[] = [
   { code: AKUN.OPS_BULANAN, name: "Operasional Bulanan", type: "BEBAN", normal: "DEBIT" },
   { code: AKUN.BIAYA_LAIN, name: "Biaya Lain-lain", type: "BEBAN", normal: "DEBIT" },
   { code: AKUN.KEUNTUNGAN_MITRA, name: "Keuntungan Mitra / Reseller", type: "BEBAN", normal: "DEBIT" },
+  { code: AKUN.PENGELUARAN_TAHUNAN, name: "Pengeluaran Tahunan", type: "BEBAN", normal: "DEBIT" },
 ];
 
 export const ACCOUNT_MAP: Record<string, Account> = Object.fromEntries(
@@ -178,36 +184,72 @@ export function kasAccountFromCashflow(pm?: string | null): string {
   return pm === "CASH" ? AKUN.KAS_CASH : AKUN.KAS_SALDO;
 }
 
-export const CASHFLOW_OUT_ACCOUNT: Record<string, string> = {
-  OPERASIONAL_HARIAN: AKUN.OPS_MINGGUAN,
-  OPERASIONAL_BULANAN: AKUN.OPS_BULANAN,
-  OPERASIONAL_MARKETING: AKUN.DOMPET_MARKETING,
+// ─── Mapping Kategori Cashflow → Akun ────────────────────────────────────────
+// SATU peta akun dipakai bareng untuk Uang Keluar & Uang Masuk (permintaan
+// divisi accounting: kategori & akun harus sama persis di kedua arah).
+// Key lama (OPERASIONAL_SOTECH, UTANG, MODAL_SERVICE, dst) sengaja tetap
+// dipertahankan sebagai alias — supaya cashflow_entries LAMA di database yang
+// category-nya masih pakai nama lama tetap ke-resolve ke akun yang benar.
+// Dropdown baru cuma menawarkan 16 key utama (lihat CASHFLOW_CATEGORIES di
+// lib/cashflow.ts).
+export const CASHFLOW_ACCOUNT: Record<string, string> = {
+  // ── 16 kategori baru sesuai daftar divisi accounting ──
+  BELANJA_LAPTOP: AKUN.HPP,                        // 130
+  PIUTANG: AKUN.PIUTANG,                           // 140
+  KASBON: AKUN.KASBON,                             // 141 — ⬅️ BARU
+  CICILAN: AKUN.CICILAN,                           // 142 — ⬅️ BARU
+  INVEST: AKUN.INVEST,                             // 150
+  ASET_TETAP: AKUN.ASET_TETAP,                     // 160
+  AKSESORIS: AKUN.AKSESORIS,                       // 170
+  SPAREPART_SERVICE: AKUN.AKSESORIS_SERVICE,       // 171
+  DANA_MARKETING: AKUN.DOMPET_MARKETING,           // 181
+  DOMPET_LAIN_LAIN: AKUN.DOMPET_LAIN,              // 190
+  HUTANG: AKUN.HUTANG_SUPPLIER,                    // 210
+  MODAL_LAPTOP_KELUAR: AKUN.MODAL_KELUAR,          // 440
+  BIAYA_PRINTILAN: AKUN.BIAYA_PRINTILAN,           // 450
+  MODAL_SERVICE_KELUAR: AKUN.MODAL_SERVICE_KELUAR, // 460
+  OPERASIONAL_HARIAN: AKUN.OPS_MINGGUAN,           // 510
+  OPERASIONAL_BULANAN: AKUN.OPS_BULANAN,           // 520
+  BIAYA_LAIN: AKUN.BIAYA_LAIN,                     // 530
+  KEUNTUNGAN_MITRA: AKUN.KEUNTUNGAN_MITRA,         // 540
+  PENGELUARAN_TAHUNAN: AKUN.PENGELUARAN_TAHUNAN,   // 550
+
+  // ── 3 kategori Uang Masuk manual (Penjualan Laptop/Aksesoris/Service) ──
+  PENJUALAN_LAPTOP_MANUAL: AKUN.PENJUALAN_LAPTOP,  // 410
+  PENJUALAN_AKSESORIS: AKUN.PENJUALAN_AKSESORIS,   // 420
+  SERVICE_MANUAL: AKUN.JASA_SERVICE,               // 430
+
+  // ⬅️ BARU — 3 kategori Uang KELUAR (cashflow.ts: MANUAL_EXPENSE_ONLY_CATEGORIES),
+  // sengaja diarahkan ke akun PENDAPATAN yang SAMA (410/420/430) — bukan ke akun
+  // Beban. Ini dipakai untuk retur/koreksi yang perlu mengurangi pendapatan
+  // (mis. pembatalan penjualan yang sudah lewat siklus normal), makanya sisi
+  // jurnalnya nanti DEBIT ke 410/420/430 (mengurangi saldo Kredit pendapatan),
+  // bukan bikin baris Beban baru.
+  PENJUALAN_LAPTOP_OUT: AKUN.PENJUALAN_LAPTOP,     // 410
+  PENJUALAN_AKSESORIS_OUT: AKUN.PENJUALAN_AKSESORIS, // 420
+  JASA_SERVICE_OUT: AKUN.JASA_SERVICE,             // 430
+
+  // ── Alias key LAMA — JANGAN dihapus, cuma tidak ditawarkan lagi di dropdown ──
   OPERASIONAL_SOTECH: AKUN.OPS_MINGGUAN,
   OPERASIONAL_ONPOINT: AKUN.OPS_MINGGUAN,
   OPERASIONAL_DAVID: AKUN.OPS_MINGGUAN,
   OPERASIONAL_KONTEN_KREATOR: AKUN.OPS_MINGGUAN,
-  BELANJA_LAPTOP: AKUN.HPP,
-  AKSESORIS: AKUN.AKSESORIS,
+  OPERASIONAL_MARKETING: AKUN.DOMPET_MARKETING,
   MODAL_SERVICE: AKUN.AKSESORIS_SERVICE,
   UTANG: AKUN.HUTANG_SUPPLIER,
-  PIUTANG: AKUN.PIUTANG,
-  KEUNTUNGAN_MITRA: AKUN.KEUNTUNGAN_MITRA,
-  BIAYA_PRINTILAN: AKUN.BIAYA_PRINTILAN,
-  BIAYA_LAIN: AKUN.BIAYA_LAIN,
 };
+
+/** @deprecated pakai CASHFLOW_ACCOUNT — nama lama dipertahankan biar import lain tidak pecah */
+export const CASHFLOW_OUT_ACCOUNT = CASHFLOW_ACCOUNT;
+/** @deprecated pakai CASHFLOW_ACCOUNT — nama lama dipertahankan biar import lain tidak pecah */
+export const CASHFLOW_IN_ACCOUNT = CASHFLOW_ACCOUNT;
 
 export function expenseAccountForCashflow(category: string): string {
-  return CASHFLOW_OUT_ACCOUNT[category] ?? AKUN.BIAYA_LAIN;
+  return CASHFLOW_ACCOUNT[category] ?? AKUN.BIAYA_LAIN;
 }
 
-export const CASHFLOW_IN_ACCOUNT: Record<string, string> = {
-  PIUTANG: AKUN.PIUTANG,
-  AKSESORIS: AKUN.PENJUALAN_AKSESORIS,
-  BIAYA_LAIN: AKUN.BIAYA_LAIN,
-};
-
 export function incomeAccountForCashflow(category: string): string {
-  return CASHFLOW_IN_ACCOUNT[category] ?? AKUN.PEMASUKAN_LAIN;
+  return CASHFLOW_ACCOUNT[category] ?? AKUN.PEMASUKAN_LAIN;
 }
 
 export function cashflowKeterangan(e: {
@@ -219,6 +261,31 @@ export function cashflowKeterangan(e: {
   const label = categoryLabel(e.direction ?? "OUT", e.category);
   const detail = e.keterangan?.trim() || e.nama?.trim() || "—";
   return `${label} · ${detail}`;
+}
+
+/**
+ * Akun modal (HPP dan lawan modal keluar) berdasarkan jenis penjualan:
+ * - Penjualan Aksesoris (420 murni, tanpa laptop): Beban = 450 (Biaya Printilan Barang), Kredit = 170 (Aksesoris)
+ * - Penjualan Laptop / Lainnya: Beban = 440 (Modal Keluar Sold), Kredit = 130 (HPP Modal)
+ */
+export function getModalAccountsForEntry(lines: { account_code: string }[]): {
+  debitAccount: string;
+  kreditAccount: string;
+} {
+  const hasAccessoryRevenue = lines.some((l) => l.account_code === AKUN.PENJUALAN_AKSESORIS);
+  const hasLaptopRevenue = lines.some((l) => l.account_code === AKUN.PENJUALAN_LAPTOP);
+
+  if (hasAccessoryRevenue && !hasLaptopRevenue) {
+    return {
+      debitAccount: AKUN.BIAYA_PRINTILAN, // 450
+      kreditAccount: AKUN.AKSESORIS,        // 170
+    };
+  }
+
+  return {
+    debitAccount: AKUN.MODAL_KELUAR,       // 440
+    kreditAccount: AKUN.HPP,                // 130
+  };
 }
 
 export interface DraftLine {

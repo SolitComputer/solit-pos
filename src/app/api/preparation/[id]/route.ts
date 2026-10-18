@@ -79,6 +79,43 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
       });
     }
 
+    // ── Enrich item aksesoris dgn nama dari tabel accessories ──
+    const accItems = (data.preparation_items ?? []).filter((it: any) => it.item_type === "accessory");
+    if (accItems.length > 0) {
+      const accMissingSns = [
+        ...new Set(accItems.filter((it: any) => !it.accessory_id && it.serial_number).map((it: any) => it.serial_number)),
+      ] as string[];
+      let snToAcc = new Map<string, string>();
+      if (accMissingSns.length > 0) {
+        const { data: accUnits } = await supabase
+          .from("accessory_units")
+          .select("serial_number, accessory_id")
+          .in("serial_number", accMissingSns);
+        snToAcc = new Map((accUnits ?? []).filter((u: any) => u.accessory_id).map((u: any) => [u.serial_number, u.accessory_id]));
+      }
+      const accIds = [
+        ...new Set(accItems.map((it: any) => it.accessory_id ?? snToAcc.get(it.serial_number)).filter(Boolean)),
+      ] as string[];
+      let accMap = new Map<string, any>();
+      if (accIds.length > 0) {
+        const { data: accRows } = await supabase
+          .from("accessories")
+          .select("id, name, brand, spec, category")
+          .in("id", accIds);
+        accMap = new Map((accRows ?? []).map((a: any) => [a.id, a]));
+      }
+      data.preparation_items = (data.preparation_items ?? []).map((it: any) => {
+        if (it.item_type !== "accessory") return it;
+        const resolvedAccId = it.accessory_id ?? snToAcc.get(it.serial_number) ?? null;
+        const acc = resolvedAccId ? accMap.get(resolvedAccId) : null;
+        return {
+          ...it,
+          laptop_name: it.laptop_name ?? acc?.name ?? null,
+          accessory_spec: acc ? { brand: acc.brand, spec: acc.spec, category: acc.category } : null,
+        };
+      });
+    }
+
     // ── Deteksi unit yang sudah SOLD lewat transaksi di pesanan LAIN ──────────
     // Business rule: SN yang sama boleh dipakai di lebih dari 1 penyiapan
     // sekaligus (lihat units/search-sn — sekarang tidak lagi cuma SIAP_JUAL).

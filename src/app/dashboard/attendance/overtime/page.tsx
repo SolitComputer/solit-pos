@@ -12,7 +12,7 @@ import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { OvertimePendingPopup } from "@/components/attendance/OvertimePendingPopup";
 import { OvertimeRecapTable } from "@/components/attendance/OvertimeRecapTable"; // ✅ NEW — rekap bulanan
 import { CameraCapture } from "@/components/attendance/CameraCapture"; // ✅ NEW — kamera realtime, tanpa galeri
-import { isPKLRole } from "@/lib/permissions";
+import { isPKLRole, isHolidayOvertimeCustomPayRole } from "@/lib/permissions";
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -35,11 +35,12 @@ const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
 const PAYABLE_OVERTIME_STATUSES = ["COMPLETED", "NEED_PROOF"] as const;
 const DIVISION_HEAD_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] as const;
-const PAY_VIEW_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG", "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] as const;
+const PAY_VIEW_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG", "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG", "KEPALA_CC"] as const;
 
 const DIVISION_HEAD_MAP: Record<string, string[]> = {
   KEPALA_SALES: ["CREW_SALES", "SOTECH", "PENGANTARAN", "KEPALA_SALES", "PKL_SALES", "PKL", "PKL_PENGANTARAN"],
-  KEPALA_MARKETING: ["MARKETING", "KONTEN", "KEPALA_MARKETING", "PKL_MARKETING", "PKL_KONTEN", "PKL"],
+  KEPALA_MARKETING: ["MARKETING", "KEPALA_MARKETING", "PKL_MARKETING", "PKL"],
+  KEPALA_CC: ["KONTEN", "KEPALA_CC", "PKL_KONTEN", "PKL"],
   KEPALA_TEKNISI: ["TEKNISI", "PENGELOLA_BARANG", "CUSTOMER_SERVICE", "KEPALA_TEKNISI", "PKL_TEKNISI", "PKL_CUSTOMER_SERVICE", "PKL"],
   KEPALA_ONPOINT: ["ONPOINT", "KEPALA_ONPOINT", "PKL_ONPOINT", "PKL"],
   KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PENGELOLA_BARANG", "KEPALA_PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG", "PKL"],
@@ -117,9 +118,8 @@ function calcDuration(start: string | null, end: string | null): string {
   return m > 0 ? `${h}j ${m}m` : `${h} jam`;
 }
 
-function detectLateFromTime(timeStr: string | null | undefined): boolean {
+function detectLateFromTime(timeStr: string | null | undefined, lateThresholdMinutes: number = 8 * 60): boolean {
   if (!timeStr) return false;
-  const LATE_THRESHOLD = 8 * 60;
   let totalMin: number;
   if (timeStr.includes("T")) {
     const w = new Date(new Date(timeStr).getTime() + 7 * 60 * 60 * 1000);
@@ -129,7 +129,7 @@ function detectLateFromTime(timeStr: string | null | undefined): boolean {
     if (Number.isNaN(h)) return false;
     totalMin = h * 60 + (m || 0);
   }
-  return totalMin >= LATE_THRESHOLD;
+  return totalMin >= lateThresholdMinutes;
 }
 
 
@@ -765,35 +765,50 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
 }
 
 function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
- const start = o.actual_start ?? o.scheduled_start, end = o.actual_end ?? o.scheduled_end;
-  // ✅ FIX: simpan durasi dalam menit (durationMinutes) buat hitung bayaran
-  // proporsional, "hours" tetap dipakai cuma buat tampilan "X jam".
+  const start = o.actual_start ?? o.scheduled_start, end = o.actual_end ?? o.scheduled_end;
   const durationMinutes = (!start || !end) ? 0 : Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
   const hours = Math.floor(durationMinutes / 60);
 
-  // ✅ NEW — aturan KETAT lembur hari libur:
-  // Karyawan: Tepat waktu = Rp100.000, Terlambat = Rp50.000 (setengah).
-  // PKL: Tepat waktu = Rp50.000, Terlambat = Rp25.000 (setengah).
-  // Nominal ini TIDAK bisa diedit manual sama sekali kalau overtime ini ditandai is_holiday.
   const isTargetPkl = isPKLRole(o.users?.role);
   const isHoliday = o.is_holiday === true;
-  const holidayLate = isHoliday && (o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start)));
+  // ✅ NEW — Pengantaran & PKL Pengantaran: nominal lembur hari libur boleh di-custom
+  const isCustomHolidayRole = isHolidayOvertimeCustomPayRole(o.users?.role);
+  const holidayEditable = isHoliday && isCustomHolidayRole;
+
+  const [lateThreshold, setLateThreshold] = useState<{ h: number; m: number }>({ h: 8, m: 0 });
+  useEffect(() => {
+    if (o.is_late != null || !isHoliday) return;
+    let cancelled = false;
+    fetch(`/api/attendance/shift-config?user_id=${o.user_id}`)
+      .then(r => r.json())
+      .then(d => { if (!cancelled && d.success && d.data) setLateThreshold({ h: d.data.late_hour ?? 8, m: d.data.late_minute ?? 0 }); })
+      .catch(() => { });
+    return () => { cancelled = true; };
+  }, [o.user_id, o.is_late, isHoliday]);
+
+  const holidayLate = isHoliday && (o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start, lateThreshold.h * 60 + lateThreshold.m)));
   const holidayAutoPay = isHoliday ? (isTargetPkl ? (holidayLate ? 25000 : 50000) : (holidayLate ? 50000 : 100000)) : null;
 
   const isFlatPay = o.is_holiday === true || (!o.rate_per_hour && (o.total_pay ?? 0) > 0);
   const [payMode, setPayMode] = useState<"PER_JAM" | "TETAP">(isFlatPay ? "TETAP" : "PER_JAM");
   const [rate, setRate] = useState(o.rate_per_hour || 100000);
   const [fixedPay, setFixedPay] = useState(holidayAutoPay ?? (o.total_pay ?? 0));
+  // ✅ NEW — nilai custom lembur hari libur (khusus role yang dikecualikan)
+  const [customHolidayPay, setCustomHolidayPay] = useState<number>(o.total_pay ?? holidayAutoPay ?? 0);
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
 
- // ✅ FIX: mode Per Jam sekarang proporsional per menit, bukan dibulatkan
+  // ✅ FIX: mode Per Jam sekarang proporsional per menit, bukan dibulatkan
   // ke bawah per jam penuh (mis. 6j30m bukan cuma dibayar 6 jam).
-  const totalPay = isHoliday ? (holidayAutoPay as number) : (payMode === "PER_JAM" ? Math.round((durationMinutes / 60) * rate) : fixedPay);
-
+  // ✅ CHANGED — kalau role-nya boleh custom, total pakai nilai custom; selain itu tetap terkunci aturan
+  const totalPay = isHoliday
+    ? (holidayEditable ? Math.round(Number(customHolidayPay) || 0) : (holidayAutoPay as number))
+    : (payMode === "PER_JAM" ? Math.round((durationMinutes / 60) * rate) : fixedPay);
   const save = async () => {
     if (!isHoliday) {
       if (payMode === "PER_JAM" && rate < 0) { setError("Tarif harus >= 0"); return; }
       if (payMode === "TETAP" && fixedPay < 0) { setError("Nominal harus >= 0"); return; }
+    } else if (holidayEditable) {
+      if (Number(customHolidayPay) < 0) { setError("Nominal harus >= 0"); return; }
     }
     setSaving(true); setError("");
     try {
@@ -804,8 +819,8 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
           id: o.id,
           action: "AUDIT",
           decision: "APPROVE",
-          total_pay: isHoliday ? holidayAutoPay : totalPay,
-          rate_per_hour: isHoliday ? null : (payMode === "PER_JAM" ? rate : null),
+          // ✅ CHANGED — kirim nominal custom untuk role yang dikecualikan
+          total_pay: isHoliday ? (holidayEditable ? Math.round(Number(customHolidayPay) || 0) : holidayAutoPay) : totalPay, rate_per_hour: isHoliday ? null : (payMode === "PER_JAM" ? rate : null),
         }),
       });
       const d = await res.json();
@@ -821,15 +836,27 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
         {error && <ErrorBanner msg={error} />}
         {/* ✅ NEW — lembur hari libur: tidak ada pilihan mode, langsung kunci ke aturan */}
         {isHoliday ? (
-          <div className={`rounded-xl p-3.5 border ${holidayLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
-            <p className={`text-xs font-bold ${holidayLate ? "text-amber-800" : "text-emerald-800"}`}>
-              Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"} {isTargetPkl ? "(PKL)" : ""}
-            </p>
-            <p className="text-[10px] text-gray-500 mt-1">
-              Aturan tetap sistem ({isTargetPkl ? "PKL" : "Karyawan"}): Tepat waktu = {formatRupiah(isTargetPkl ? 50000 : 100000)} · Terlambat = {formatRupiah(isTargetPkl ? 25000 : 50000)}.
-              Nominal ini terkunci dan tidak bisa diubah manual.
-            </p>
-          </div>
+          holidayEditable ? (
+            // ✅ NEW — role dikecualikan: nominal hari libur BISA di-custom
+            <div className="rounded-xl p-3.5 border bg-indigo-50 border-indigo-200">
+              <p className="text-xs font-bold text-indigo-800">
+                Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"} {isTargetPkl ? "(PKL)" : ""} · Nominal bisa di-custom
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Role {(o.users?.role ?? "").replace(/_/g, " ")} dikecualikan dari nominal tetap — kamu bisa isi bayaran lembur hari libur ini secara bebas di bawah.
+              </p>
+            </div>
+          ) : (
+            <div className={`rounded-xl p-3.5 border ${holidayLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
+              <p className={`text-xs font-bold ${holidayLate ? "text-amber-800" : "text-emerald-800"}`}>
+                Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"} {isTargetPkl ? "(PKL)" : ""}
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Aturan tetap sistem ({isTargetPkl ? "PKL" : "Karyawan"}): Tepat waktu = {formatRupiah(isTargetPkl ? 50000 : 100000)} · Terlambat = {formatRupiah(isTargetPkl ? 25000 : 50000)}.
+                Nominal ini terkunci dan tidak bisa diubah manual.
+              </p>
+            </div>
+          )
         ) : (
           <div className="grid grid-cols-2 gap-2">
             {(["PER_JAM", "TETAP"] as const).map(m => (
@@ -861,14 +888,24 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
                 : <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap · tidak dikali jam</p>}
           </div>
         </div>
-        {!isHoliday && (payMode === "PER_JAM" ? (
+        {/* ✅ NEW — input nominal custom untuk lembur hari libur role dikecualikan */}
+        {holidayEditable && (
           <div>
-            <label className={lbl}>Tarif Per Jam (Rp)</label>
+            <label className={lbl}>Nominal Lembur Hari Libur (Rp)</label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
-              <input type="number" min={0} value={rate} onChange={e => setRate(parseFloat(e.target.value) || 0)} className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all" />
+              <input type="number" min={0} value={customHolidayPay} onChange={e => setCustomHolidayPay(parseFloat(e.target.value) || 0)} placeholder={`Default aturan: ${formatRupiah(holidayAutoPay ?? 0)}`} className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all" />
             </div>
+            <p className="text-[9px] text-gray-400 mt-1">Bebas isi berapa saja. Status {holidayLate ? "Terlambat" : "Tepat waktu"} cuma catatan, tidak mengunci nominal.</p>
           </div>
+        )}
+        {!isHoliday && (payMode === "PER_JAM" ? (<div>
+          <label className={lbl}>Tarif Per Jam (Rp)</label>
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
+            <input type="number" min={0} value={rate} onChange={e => setRate(parseFloat(e.target.value) || 0)} className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all" />
+          </div>
+        </div>
         ) : (
           <div>
             <label className={lbl}>Nominal Tetap (Rp)</label>
@@ -975,6 +1012,23 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
   const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
   const [manualPay, setManualPay] = useState<string>("");
+  // ✅ NEW (poin 1) — jam telat buat preview lembur hari libur ikut
+  // shift-config karyawan yang dipilih, bukan jam 08:00 tetap.
+  const [targetLateThreshold, setTargetLateThreshold] = useState<{ h: number; m: number }>({ h: 8, m: 0 });
+
+  useEffect(() => {
+    if (!targetUserId) return;
+    let cancelled = false;
+    fetch(`/api/attendance/shift-config?user_id=${targetUserId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!cancelled && d.success && d.data) {
+          setTargetLateThreshold({ h: d.data.late_hour ?? 8, m: d.data.late_minute ?? 0 });
+        }
+      })
+      .catch(() => { /* biarkan default 08:00 kalau gagal fetch */ });
+    return () => { cancelled = true; };
+  }, [targetUserId]);
 
   const userRoles = useMemo<string[]>(
     () => Array.isArray(currentUser?.roles) && currentUser.roles.length > 0
@@ -1015,10 +1069,14 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const selectedUser = useMemo(() => allUsers.find(u => u.id === targetUserId), [allUsers, targetUserId]);
   const isTargetPkl = isPKLRole(selectedUser?.role);
 
-  const holidayIsLate = useMemo(
-    () => isHolidayOvertime && detectLateFromTime(startTime),
-    [isHolidayOvertime, startTime]
-  );
+  const holidayIsLate = useMemo(() => {
+    if (!isHolidayOvertime || !startTime) return false;
+    const [sh, sm] = startTime.split(":").map(Number);
+    if (Number.isNaN(sh)) return false;
+    const startMinutes = sh * 60 + (sm || 0);
+    const thresholdMinutes = targetLateThreshold.h * 60 + targetLateThreshold.m;
+    return startMinutes >= thresholdMinutes;
+  }, [isHolidayOvertime, startTime, targetLateThreshold]);
 
   const holidayAutoPay = useMemo(
     () => (isHolidayOvertime ? (isTargetPkl ? (holidayIsLate ? 25000 : 50000) : (holidayIsLate ? 50000 : 100000)) : null),
@@ -1635,7 +1693,11 @@ export default function OvertimePage() {
   const [overtimes, setOvertimes] = useState<OvertimeRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [filterStatus, setFilterStatus] = useState("Semua");
+  type UnifiedFilter = "ALL" | "PENDING_ACC" | "UNAUDITED" | "AUDITED" | "REJECTED";
+  type SortOption = "PRIORITY" | "DATE_DESC" | "DATE_ASC" | "NAME_ASC";
+
+  const [unifiedFilter, setUnifiedFilter] = useState<UnifiedFilter>("ALL");
+  const [sortBy, setSortBy] = useState<SortOption>("PRIORITY");
   const [searchQuery, setSearchQuery] = useState("");
   const [calendarMonth, setCalendarMonth] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -1786,16 +1848,15 @@ export default function OvertimePage() {
 
   const filtered = useMemo(() => {
     let list = overtimes;
-    if (filterStatus !== "Semua") list = list.filter(o => o.status === filterStatus);
     if (selectedDate) list = list.filter(o => o.request_date === selectedDate);
     return list;
-  }, [overtimes, filterStatus, selectedDate]);
+  }, [overtimes, selectedDate]);
 
   const groupedByUser = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const map = new Map<string, { user: { id: string; name: string; role: string }; items: OvertimeRequest[] }>();
 
-    if (!selectedDate && filterStatus === "Semua") {
+    if (!selectedDate && unifiedFilter === "ALL") {
       allUsers.forEach(u => { if (!q || u.name.toLowerCase().includes(q)) map.set(u.id, { user: u, items: [] }); });
     }
     filtered.forEach(o => {
@@ -1804,20 +1865,85 @@ export default function OvertimePage() {
       if (map.has(uid)) { map.get(uid)!.items.push(o); }
       else if (!q || o.users.name.toLowerCase().includes(q)) { map.set(uid, { user: o.users, items: [o] }); }
     });
-    const hasFilter = filterStatus !== "Semua" || !!selectedDate;
+    const hasFilter = unifiedFilter !== "ALL" || !!selectedDate;
     const result = Array.from(map.values()).filter(g => !hasFilter || g.items.length > 0);
     return result.sort((a, b) => a.user.name.localeCompare(b.user.name, "id-ID"));
-  }, [filtered, allUsers, filterStatus, searchQuery, selectedDate]);
+  }, [filtered, allUsers, unifiedFilter, searchQuery, selectedDate]);
+
+  const FILTER_TABS: { key: UnifiedFilter; label: string; dot?: string }[] = [
+    { key: "ALL", label: "Semua" },
+    { key: "PENDING_ACC", label: "Belum di-ACC", dot: "bg-amber-400" },
+    { key: "UNAUDITED", label: "Belum Diaudit", dot: "bg-blue-400" },
+    { key: "AUDITED", label: "Sudah Diaudit", dot: "bg-emerald-400" },
+    { key: "REJECTED", label: "Ditolak", dot: "bg-red-400" },
+  ];
+
+  const baseRows = useMemo(() => {
+    return filtered
+      .filter((o) => o.users)
+      .filter((o) => (activeTab === "KARYAWAN" ? !isUserPKL(o.users!.role) : isUserPKL(o.users!.role)));
+  }, [filtered, activeTab]);
+
+  const tabCounts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const list = q ? baseRows.filter(o => o.users?.name.toLowerCase().includes(q)) : baseRows;
+    return {
+      ALL: list.length,
+      PENDING_ACC: list.filter(o => o.status === "PENDING").length,
+      UNAUDITED: list.filter(o => o.status !== "PENDING" && o.status !== "REJECTED" && o.status !== "CANCELLED" && (o as any).audit_status !== "AUDITED").length,
+      AUDITED: list.filter(o => (o as any).audit_status === "AUDITED").length,
+      REJECTED: list.filter(o => o.status === "REJECTED").length,
+    };
+  }, [baseRows, searchQuery]);
 
   const tableRows: OvertimeTableRow[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return filtered
-      .filter((o) => o.users)
-      .filter((o) => (activeTab === "KARYAWAN" ? !isUserPKL(o.users!.role) : isUserPKL(o.users!.role)))
-      .filter((o) => filterStatus === "REJECTED" || o.status !== "REJECTED")
-      .filter((o) => !q || o.users!.name.toLowerCase().includes(q))
-      .sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime()) as unknown as OvertimeTableRow[];
-  }, [filtered, searchQuery, activeTab, filterStatus]);
+    let list = baseRows;
+    if (q) {
+      list = list.filter(o => o.users!.name.toLowerCase().includes(q));
+    }
+
+    if (unifiedFilter === "PENDING_ACC") {
+      list = list.filter(o => o.status === "PENDING");
+    } else if (unifiedFilter === "UNAUDITED") {
+      list = list.filter(o => o.status !== "PENDING" && o.status !== "REJECTED" && o.status !== "CANCELLED" && (o as any).audit_status !== "AUDITED");
+    } else if (unifiedFilter === "AUDITED") {
+      list = list.filter(o => (o as any).audit_status === "AUDITED");
+    } else if (unifiedFilter === "REJECTED") {
+      list = list.filter(o => o.status === "REJECTED");
+    }
+
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      if (sortBy === "DATE_DESC") {
+        return new Date(b.request_date).getTime() - new Date(a.request_date).getTime();
+      }
+      if (sortBy === "DATE_ASC") {
+        return new Date(a.request_date).getTime() - new Date(b.request_date).getTime();
+      }
+      if (sortBy === "NAME_ASC") {
+        return (a.users?.name || "").localeCompare(b.users?.name || "", "id-ID");
+      }
+      // Default: "PRIORITY" -> Prioritas Belum di-ACC di atas
+      const getPriority = (o: OvertimeRequest) => {
+        if (o.status === "PENDING") return 1;
+        if (o.status === "NEED_PROOF" || o.status === "ONGOING") return 2;
+        if (o.status === "COMPLETED" && (o as any).audit_status !== "AUDITED") return 3;
+        if ((o as any).audit_status === "AUDITED") return 4;
+        return 5;
+      };
+
+      const pA = getPriority(a);
+      const pB = getPriority(b);
+      if (pA !== pB) return pA - pB;
+
+      const dateDiff = new Date(b.request_date).getTime() - new Date(a.request_date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return sorted as unknown as OvertimeTableRow[];
+  }, [baseRows, searchQuery, unifiedFilter, sortBy]);
 
   const groupedKaryawan = useMemo(
     () => groupedByUser.filter(g => !isUserPKL(g.user.role)),
@@ -1856,7 +1982,7 @@ export default function OvertimePage() {
 
   const handleDateSelect = (dk: string) => {
     if (selectedDate === dk) { setSelectedDate(null); return; }
-    setSelectedDate(dk); setSelectedUserId(null); setFilterStatus("Semua"); setSearchQuery("");
+    setSelectedDate(dk); setSelectedUserId(null); setUnifiedFilter("ALL"); setSearchQuery("");
   };
 
   const statCards = [
@@ -1994,7 +2120,7 @@ export default function OvertimePage() {
                 return (
                   <button
                     key={tab}
-                    onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); setSelectedUserId(null); setRecapUserId("ALL"); }}
+                    onClick={() => { setActiveTab(tab); setSearchQuery(""); setUnifiedFilter("ALL"); setSelectedUserId(null); setRecapUserId("ALL"); }}
                     className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${active
                       ? "bg-[#0f0c29] text-white shadow-md"
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
@@ -2063,32 +2189,67 @@ export default function OvertimePage() {
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-              <input
-                type="text"
-                placeholder="Cari nama karyawan..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full h-9 pl-9 pr-3.5 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300"
-              />
-            </div>
-            {statuses.length > 0 && (
-              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-                {["Semua", ...statuses].map(s => {
-                  const c = s !== "Semua" ? STATUS_CONFIG[s] : null;
-                  const active = filterStatus === s;
-                  const Icon = c?.icon;
-                  return (
-                    <button key={s} onClick={() => setFilterStatus(s)}
-                      className={`flex-shrink-0 h-9 px-3 rounded-xl text-[10px] font-semibold transition-all border ${active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"}`}>
-                      {c && Icon ? <span className="inline-flex items-center gap-1"><Icon size={12} />{c.label}</span> : "Semua"}
-                    </button>
-                  );
-                })}
+          {/* ── UNIFIED FILTER BAR & CONTROLS ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+              <div className="relative flex-1">
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Cari nama karyawan..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full h-10 pl-10 pr-9 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                    <X size={14} />
+                  </button>
+                )}
               </div>
-            )}
+
+              {/* Urutan / Sort Dropdown */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-[11px] text-gray-400 font-semibold whitespace-nowrap hidden sm:inline">Urutan:</span>
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as SortOption)}
+                  className="h-10 px-3 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-gray-50/50 hover:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all cursor-pointer w-full sm:w-auto"
+                >
+                  <option value="PRIORITY"> Prioritas Belum di-ACC</option>
+                  <option value="DATE_DESC"> Tanggal Terbaru</option>
+                  <option value="DATE_ASC"> Tanggal Terlama</option>
+                  <option value="NAME_ASC"> Nama Karyawan (A–Z)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pt-0.5 pb-0.5">
+              {FILTER_TABS.map(tab => {
+                const active = unifiedFilter === tab.key;
+                const count = tabCounts[tab.key];
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setUnifiedFilter(tab.key)}
+                    className={`flex-shrink-0 h-9 px-3.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 active:scale-95 ${active
+                        ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                  >
+                    {tab.dot && <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tab.dot}`} />}
+                    <span>{tab.label}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black tabular-nums transition-colors ${active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                      }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <OvertimeTable

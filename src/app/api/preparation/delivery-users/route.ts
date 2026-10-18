@@ -17,12 +17,26 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   try {
     const { data, error } = await admin
       .from("users")
-      .select("id, name, role")
-      .in("role", PREPARATION_DELIVERY_PERSON_ROLES)
+      .select("id, name, role, roles, is_active")
+      .or("role.in.(PENGANTARAN,PKL_PENGANTARAN),roles.ov.{PENGANTARAN,PKL_PENGANTARAN}")
       .order("name", { ascending: true });
 
     if (error) throw error;
-    return NextResponse.json({ success: true, data: data ?? [] });
+
+    const mapped = (data ?? [])
+      .filter((u: any) => u.is_active !== false)
+      .map((u: any) => {
+        const userRoles: string[] = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles : [u.role];
+        const deliveryRole = userRoles.find((r: string) => PREPARATION_DELIVERY_PERSON_ROLES.includes(r as any)) || u.role;
+        return {
+          id: u.id,
+          name: u.name,
+          role: deliveryRole,
+          roles: userRoles,
+        };
+      });
+
+    return NextResponse.json({ success: true, data: mapped });
   } catch (err) {
     console.error("[GET /api/preparation/delivery-users]", err);
     return NextResponse.json({ success: false, message: "Gagal mengambil daftar pengantar" }, { status: 500 });

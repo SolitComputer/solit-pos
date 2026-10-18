@@ -70,47 +70,20 @@ export function useIncomingChat() {
     const openConvRef = useRef(openConversation);
     useEffect(() => { openConvRef.current = openConversation; }, [openConversation]);
 
-    // ── 1) Realtime: DM masuk → auto-open ─────────────────────────────────────
+    // ── 1) Preload daftar user (TANPA auto-open) ──────────────────────────────
+    // DULU: DM masuk lewat realtime → panel chat kebuka sendiri (mengganggu).
+    // SEKARANG: pesan masuk cukup tampil sebagai push notification (dari service
+    // worker). Panel chat baru kebuka kalau NOTIFNYA DIKLIK — lihat efek deep-link
+    // ?dm= dan listener NOTIFICATION_CLICK di bawah, yang sudah ada.
+    // User di-preload di sini supaya begitu notif diklik, panel langsung kebuka instan.
     useEffect(() => {
         let cancelled = false;
-        let channel: ReturnType<typeof supabase.channel> | null = null;
-
         (async () => {
             const me = await getCurrentUserClient();
             if (!me || cancelled) return;
-
-            await loadUsers(); // preload supaya buka pertama instan (tanpa delay)
-            if (cancelled) return;
-
-            channel = supabase
-                .channel(`inbox-global:${me.id}`) // nama unik, tidak bentrok channel DM
-                .on(
-                    "postgres_changes",
-                    {
-                        event: "INSERT",
-                        schema: "public",
-                        table: "messages",
-                        filter: `receiver_id=eq.${me.id}`,
-                    },
-                    (payload) => {
-                        const msg = payload.new as { sender_id?: string };
-                        if (!msg?.sender_id || msg.sender_id === me.id) return;
-                        openConvRef.current(msg.sender_id);
-                    }
-                )
-                .subscribe();
-
-            // kalau unmount super cepat sebelum subscribe kelar → bersihkan
-            if (cancelled) {
-                supabase.removeChannel(channel);
-                channel = null;
-            }
+            await loadUsers();
         })();
-
-        return () => {
-            cancelled = true;
-            if (channel) supabase.removeChannel(channel);
-        };
+        return () => { cancelled = true; };
     }, [loadUsers]);
 
     // ── 2) Deep-link dari klik push notif: /dashboard?dm=<senderId> ───────────

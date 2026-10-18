@@ -25,6 +25,16 @@ const PROGRAMMER_USER_IDS = [
   "a106053f-8168-4574-9586-6049300bb614",
   "a136bb0a-d6de-4439-946c-c17a85b11a67",
 ];
+// HRD — Yoga Adi Prakoso. Role sistemnya ADMIN, disatukan ke Divisi HRD
+// lewat ID (pola sama dengan Rayhan Accounting & Programmer di atas).
+const YOGA_HRD_USER_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
+
+// Dedup Tes Kondisi: 1x per (user, barang, tanggal WIB). 0,3 poin (setara SO).
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+const POINTS_PER_CONDITION_CHECK = 0.3;
+function toWibDateStr(d: Date): string {
+  return new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+}
 // Sales Online — role yang dapat poin dari Laporan Harian Sales (chat leads),
 // role-based (bukan per akun). Harus disamakan manual dengan
 // SALES_REPORT_ROLES di src/lib/permissions.ts.
@@ -60,8 +70,14 @@ export const GET = withAuth(async (req, _ctx, user) => {
       endDate.setUTCHours(23, 59, 59, 999);
     }
 
-    const startIso = startDate.toISOString();
-    const endIso = endDate.toISOString();
+    // ✅ FIX: startDate/endDate di atas disimpan dalam representasi "WIB
+    // dipalsukan sebagai UTC" (trik +7 jam). toISOString() polos di sini
+    // membaca angka itu sebagai UTC ASLI (bukan WIB), jadi query ke
+    // Supabase jadi telat 7 jam dari batas WIB yang seharusnya — bikin
+    // aktivitas jam 00:00–06:59 WIB di awal periode "hilang" dari hitungan.
+    // Perlu dikurangi 7 jam lagi di sini biar balik jadi UTC yang benar.
+    const startIso = new Date(startDate.getTime() - 7 * 60 * 60 * 1000).toISOString();
+    const endIso = new Date(endDate.getTime() - 7 * 60 * 60 * 1000).toISOString();
 
     // 1. Fetch all non-admin users
     const { data: rawUsers, error } = await supabaseAdmin
@@ -89,7 +105,10 @@ export const GET = withAuth(async (req, _ctx, user) => {
       { data: todos },
       { data: todoItems },
       { data: missions },
-      { data: salesOnlineReports }
+      { data: salesOnlineReports },
+      { data: manualAttendanceEntries },
+      { data: overtimeAudits },
+      { data: conditionCheckLogs }
     ] = await Promise.all([
       // Sales Offline: transactions — kolom SEBELUMNYA salah nama
       // (created_by/invoice/total_amount TIDAK ADA di tabel ini; nama
@@ -191,9 +210,44 @@ export const GET = withAuth(async (req, _ctx, user) => {
 
       // Sales Online: laporan harian sales (chat leads) — 1 baris = 1 chat
       // yang diisi manual lewat halaman Laporan Harian Sales.
+      // deleted_at IS NULL → laporan yang di-soft-delete marketing (akun mati /
+      // data invalid) TIDAK dihitung lagi sebagai poin. Lihat fitur Riwayat
+      // Hapus di Audit Marketing.
       supabaseAdmin
         .from("sales_online_reports")
         .select("id, filled_by")
+        .is("deleted_at", null)
+        .gte("created_at", startIso)
+        .lte("created_at", endIso),
+
+      // HRD: absen manual yang diinput (PKL maupun karyawan tetap, tidak
+      // dibedakan) — 1 baris attendance_manual = 1 kali "Absenin manual",
+      // dihitung dari created_by (siapa yang input), BUKAN attendance_date
+      // (tanggal absen yang diinput bisa tanggal lampau).
+      supabaseAdmin
+        .from("attendance_manual")
+        .select("id, created_by, created_at")
+        .gte("created_at", startIso)
+        .lte("created_at", endIso),
+
+      // HRD: lemburan yang sudah diaudit (action AUDIT di PATCH
+      // /api/attendance/overtime) — dihitung dari audited_by & audited_at,
+      // mencakup keputusan APPROVE maupun REJECT (dua-duanya tetap kerja
+      // audit yang sama).
+      supabaseAdmin
+        .from("overtime_requests")
+        .select("id, audited_by, audited_at, audit_status")
+        .not("audited_by", "is", null)
+        .gte("audited_at", startIso)
+        .lte("audited_at", endIso),
+
+      // Pengelola Barang — Tes Kondisi (label "... — tes kondisi", EDIT).
+      // entity_id + created_at dipakai buat dedup 1x/barang/hari WIB.
+      supabaseAdmin
+        .from("activity_logs")
+        .select("user_id, entity_id, created_at")
+        .eq("action", "EDIT")
+        .ilike("entity_label", "%tes kondisi%")
         .gte("created_at", startIso)
         .lte("created_at", endIso)
     ]);
@@ -205,6 +259,16 @@ export const GET = withAuth(async (req, _ctx, user) => {
     const itemCountByTodoId = new Map<string, number>();
     (todoItems ?? []).forEach((it: any) => {
       itemCountByTodoId.set(it.todo_id, (itemCountByTodoId.get(it.todo_id) ?? 0) + 1);
+    });
+
+    // Tes Kondisi: dedup 1x per (user, barang, tanggal WIB) → jumlah unik per user.
+    const condCountByUser = new Map<string, number>();
+    const seenCond = new Set<string>();
+    (conditionCheckLogs ?? []).forEach((r: any) => {
+      const key = `${r.user_id}|${r.entity_id}|${toWibDateStr(new Date(r.created_at))}`;
+      if (seenCond.has(key)) return;
+      seenCond.add(key);
+      condCountByUser.set(r.user_id, (condCountByUser.get(r.user_id) ?? 0) + 1);
     });
 
     // Calculate score per user
@@ -357,9 +421,11 @@ export const GET = withAuth(async (req, _ctx, user) => {
       const uInputBarang = uActivities.filter((a: any) => a.action === "CREATE" && a.entity === "unit");
       const uSo = uActivities.filter((a: any) => a.action === "SO");
       const uMinusFixed = uActivities.filter((a: any) => a.action === "MINUS_FIXED");
+      const uCondCount = condCountByUser.get(uid) ?? 0;
       if (hasRole("PENGELOLA")) {
-        score += uInputBarang.length * 1 + uSo.length * 0.3 + uMinusFixed.length * 5;
+        score += uInputBarang.length * 1 + uSo.length * 0.3 + uMinusFixed.length * 5 + uCondCount * POINTS_PER_CONDITION_CHECK;
         metrics.push({ label: "Input Barang", value: uInputBarang.length, unit: "unit" });
+        metrics.push({ label: "Tes Kondisi", value: uCondCount, unit: "tes" });
       }
 
       // ACCOUNTING — Pembukuan Manual (bikin jurnal lewat "+ Jurnal Manual",
@@ -408,6 +474,21 @@ export const GET = withAuth(async (req, _ctx, user) => {
       if (hasRole("PROGRAMMER") || PROGRAMMER_USER_IDS.includes(uid)) {
         score += uTodoUnits * 3;
         metrics.push({ label: "Tugas Selesai", value: uTodoUnits, unit: "item" });
+      }
+
+      // HRD — Yoga Adi Prakoso. Absen Manual = 1 poin per absen yang
+      // diinput (PKL/karyawan tetap tidak dibedakan). Audit Lemburan = 1
+      // poin per lemburan yang diaudit (approve/reject dihitung sama).
+      const uManualAttendance = (manualAttendanceEntries ?? []).filter(
+        (m: any) => m.created_by === uid
+      );
+      const uOvertimeAudits = (overtimeAudits ?? []).filter(
+        (o: any) => o.audited_by === uid
+      );
+      if (uid === YOGA_HRD_USER_ID) {
+        score += uManualAttendance.length * 1 + uOvertimeAudits.length * 1;
+        metrics.push({ label: "Absen Manual", value: uManualAttendance.length, unit: "absen" });
+        metrics.push({ label: "Audit Lemburan", value: uOvertimeAudits.length, unit: "lembur" });
       }
 
       // MISSIONS — DINONAKTIFKAN SEMENTARA (biar leaderboard "Pekerjaan" fokus Purchasing dulu).

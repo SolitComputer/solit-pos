@@ -5,11 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { useVehiclePendingBadge } from "@/hooks/useVehiclePendingBadge";
+import { usePengajuanDanaBadge } from "@/hooks/usePengajuanDanaBadge";
+import { useExpiringContractsBadge } from "@/hooks/useExpiringContractsBadge";
 import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES, CONTRACT_EXPIRING_VIEW_ROLES } from "@/lib/permissions";
+import { hasSopAccess } from "@/lib/sop";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
@@ -25,6 +28,7 @@ const RAIL_KEY = "solit_sidebar_rail";
 const WIDTH_KEY = "solit_sidebar_width";
 const GROUPS_KEY = "solit_sidebar_groups_open";
 const PINNED_KEY = "solit_sidebar_pinned";
+const CONTRACT_BANNER_DISMISS_KEY = "solit_contract_banner_dismiss_date";
 const MIN_W = 208;
 const MAX_W = 360;
 const DEFAULT_W = 240;
@@ -46,6 +50,9 @@ function isItemActive(href: string, pathname: string): boolean {
 
   if (href === "/dashboard/laptops/ready") {
     return pathname === "/dashboard/laptops/ready";
+  }
+  if (href === "/dashboard/laptops/minus-siap-jual") {
+    return pathname === "/dashboard/laptops/minus-siap-jual";
   }
   if (href === "/dashboard/laptops/minus") {
     return pathname === "/dashboard/laptops/minus";
@@ -180,9 +187,11 @@ const Icons = {
   fingerprint: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 015 5v2" /><path d="M7 9V7a5 5 0 019.8-1.5" /><path d="M4.5 10.5V9a7.5 7.5 0 011-3.8" /><path d="M12 9v3.5a5.5 5.5 0 01-1.2 3.4" /><path d="M16 9v2.5c0 3-1 5.5-3 7" /><path d="M8.5 9v3c0 3.5-1 6-3 8" /><path d="M19.5 9v1.5c0 4.5-1.5 8-4 10.5" /></svg>),
   auditOutflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12l2 2 4-4" /></svg>),
   fixedAsset: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01" /></svg>),
-  assetMatot: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v8" /><path d="M18.36 6.64a9 9 0 11-12.73 0" /></svg>),
+    assetMatot: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v8" /><path d="M18.36 6.64a9 9 0 11-12.73 0" /></svg>),
+  sopDivisi: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6" /><path d="M9 16h6" /></svg>),
   kendaraan: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 11l1.5-4.5A2 2 0 018.4 5h7.2a2 2 0 011.9 1.5L19 11" /><path d="M3 11h18v5a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1z" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></svg>),
   salesReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" /><path d="M9 12l2 2 4-4" /></svg>),
+  pelanggaran: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -203,14 +212,29 @@ const ITEM_PATCH_NOTES: MenuItem = { name: "Patch Notes", href: "/dashboard/admi
 const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon: Icons.aiCeo };
 const ITEM_TANYA_CEO: MenuItem = { name: "Tanya CEO", href: "/dashboard/tanya-ceo", icon: Icons.tanyaCeo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
-const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
+const ITEM_PENGAJUAN_DANA: MenuItem = {
+  name: "Pengajuan Dana",
+  href: "/dashboard/pengajuan-dana",
+  icon: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M12 14v4" />
+      <path d="M10 16h4" />
+    </svg>
+  ),
+}; const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 const ITEM_LENCANA: MenuItem = { name: "Lencana", href: "/dashboard/lencana", icon: Icons.lencana };
+const ITEM_PELANGGARAN: MenuItem = { name: "Pelanggaran", href: "/dashboard/pelanggaran", icon: Icons.pelanggaran };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
 const ITEM_CONTRACT_SIGN: MenuItem = { name: "Tanda Tangan Kontrak", href: "/contract/pending-signature", icon: Icons.pklReport };
+const ITEM_CONTRACT_EXPIRING: MenuItem = { name: "Daftar Kontrak", href: "/dashboard/contract-expiring", icon: Icons.serviceHistory };
 const ITEM_KENDARAAN: MenuItem = { name: "Management Kendaraan", href: "/dashboard/kendaraan", icon: Icons.kendaraan };
 const ITEM_KENDARAAN_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard/kendaraan/dashboard", icon: Icons.reports };
+
+const ITEM_SOP_DIVISI: MenuItem = { name: "SOP", href: "/dashboard/sop-divisi", icon: Icons.sopDivisi };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -218,6 +242,33 @@ const ITEM_LAPORAN_KEUANGAN: MenuItem = { name: "Laporan Keuangan", href: "/dash
 const ITEM_MONITOR_CHAT: MenuItem = { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat };
 const ITEM_LEADS_CHAT: MenuItem = { name: "Leads Chat Masuk", href: "/dashboard/leads-chat", icon: Icons.leadsChat };
 const ITEM_LAPORAN_SALES_HARIAN: MenuItem = { name: "Laporan Harian Sales", href: "/dashboard/laporan-harian-sales", icon: Icons.salesReport };
+// Sub-menu per channel leads (WA/FB/OLX/Carousell/Mitra/Reseller) — link ke
+// halaman yang sama dengan query ?channel=... supaya tab channel di halaman
+// Laporan Harian Sales otomatis ke-preselect saat diklik dari sidebar.
+const LAPORAN_SALES_MENU: MenuGroup = {
+  label: "Laporan Sales",
+  items: [
+    ITEM_LAPORAN_SALES_HARIAN,
+  ],
+};
+
+// BARU: fitur "Audit Marketing" — beda dari LAPORAN_SALES_MENU di atas, tiap
+// channel di sini adalah HALAMAN SENDIRI (route [channel]), bukan 1 halaman + tab.
+const AUDIT_LEADS_MENU: MenuGroup = {
+  label: "Audit Marketing",
+  items: [
+    { name: "WhatsApp", href: "/dashboard/audit-leads/wa", icon: Icons.salesReport },
+    { name: "Facebook", href: "/dashboard/audit-leads/fb", icon: Icons.salesReport },
+    { name: "Instagram", href: "/dashboard/audit-leads/ig", icon: Icons.salesReport },
+    { name: "TikTok", href: "/dashboard/audit-leads/tiktok", icon: Icons.salesReport },
+    { name: "OLX", href: "/dashboard/audit-leads/olx", icon: Icons.salesReport },
+    { name: "Carousell", href: "/dashboard/audit-leads/carousell", icon: Icons.salesReport },
+    { name: "Tokopedia", href: "/dashboard/audit-leads/tokopedia", icon: Icons.salesReport },
+    { name: "Shopee", href: "/dashboard/audit-leads/shopee", icon: Icons.salesReport },
+    { name: "Mitra", href: "/dashboard/audit-leads/mitra", icon: Icons.salesReport },
+    { name: "Reseller", href: "/dashboard/audit-leads/reseller", icon: Icons.salesReport },
+  ],
+};
 const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashboard/hasil-penjualan", icon: Icons.salesResult };
 const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
@@ -226,9 +277,10 @@ const ITEM_BUAT_PENGANTARAN: MenuItem = { name: "Buat Pengantaran", href: "/dash
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang", icon: Icons.barang };
 const ITEM_AUDIT_OUTFLOW: MenuItem = { name: "Audit Barang Keluar", href: "/dashboard/audit-barang-keluar", icon: Icons.auditOutflow };
-const ITEM_FIXED_ASSETS: MenuItem = { name: "Data Aset Tetap", href: "/dashboard/fixed-assets", icon: Icons.fixedAsset };
+const ITEM_FIXED_ASSETS: MenuItem = { name: "Aset", href: "/dashboard/fixed-assets", icon: Icons.fixedAsset };
 const ITEM_ASET_MATOT: MenuItem = { name: "Aset Matot", href: "/dashboard/fixed-assets/aset-matot", icon: Icons.assetMatot };
 const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
+const ITEM_LAPTOP_MINUS_SIAP_JUAL: MenuItem = { name: "Minus Siap Jual", href: "/dashboard/laptops/minus-siap-jual", icon: Icons.laptopMinus };
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LAPTOP_MONITORING: MenuItem = { name: "Monitoring Stok", href: "/dashboard/laptops/monitoring", icon: Icons.laptopMonitoring };
 // Pakai icon yang sama dengan "Riwayat Servis" (Icons.serviceHistory) — secara
@@ -385,18 +437,17 @@ const ADMIN_TRANSAKSI: MenuGroup = {
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
-    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
 
 const SERVICE_MENU: MenuGroup = {
-  label: "Servis",
+  label: "Service",
   items: [
-    { name: "Dashboard Servis", href: "/dashboard/service/statistik", icon: Icons.dashboard },
+    { name: "Dashboard Service", href: "/dashboard/service/statistik", icon: Icons.dashboard },
     { name: "Antrian", href: "/dashboard/service/antrian", icon: Icons.serviceQueue },
     { name: "Selesai (Done)", href: "/dashboard/service/done", icon: Icons.serviceDone },
-    { name: "Riwayat Servis", href: "/dashboard/service/history", icon: Icons.serviceHistory },
+    { name: "Riwayat Service", href: "/dashboard/service/history", icon: Icons.serviceHistory },
   ],
 };
 
@@ -423,7 +474,6 @@ const SALES_TRANSAKSI: MenuGroup = {
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     ITEM_MANAGEMENT_SELLER,
-    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -611,7 +661,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     GROUP_ABSENSI,
     { label: "Management", items: [ITEM_USERS] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_LAPTOP_MONITORING, ITEM_ALL_UNITS] },
-    { label: "Transaksi", items: [{ name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }] },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+      ],
+    },
+    ADMIN_PENYEDIA_MENU,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
@@ -626,7 +683,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
-    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+      ],
+    },
+    ADMIN_PENYEDIA_MENU,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
@@ -692,6 +756,20 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
+  // Hak akses KEPALA_CC SENGAJA dibuat identik dengan KONTEN (requirement:
+  // "hak akses sama dengan KONTEN") — satu-satunya tambahan untuk role ini
+  // adalah grup "Keuangan" berisi Pengajuan Dana, yang disuntik otomatis oleh
+  // blok FUND_REQUEST_VIEW_ROLES di bawah karena KEPALA_CC ada di
+  // KEPALA_DIVISI_ROLES (lib/permissions.ts). Jangan tambah item lain di sini
+  // tanpa mengubah juga blok KONTEN di atas, biar keduanya tetap sinkron.
+  KEPALA_CC: [
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
+    { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT] },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
+    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
+  ],
+
   CUSTOMER_SERVICE: [
     { label: "Utama", items: [ITEM_DASHBOARD] },
     GROUP_ABSENSI,
@@ -721,6 +799,35 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
   PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
 };
+
+// ── Laporan Sales: grup sidebar tersendiri (WA/FB/OLX/Carousell/Mitra/
+// Reseller), BUKAN flat item lagi di dalam "Transaksi". Ditambahkan di sini —
+// SEBELUM loop PKL_MENU_INHERIT & sortGroupsByCanonicalOrder di bawah —
+// supaya PKL_SALES/PKL_ZENITH/PKL_MARKETING otomatis ikut mewarisi grup ini
+// dari role induknya (CREW_SALES/MARKETING), dan grupnya ke-sort ke posisi
+// yang benar (tepat di bawah "Transaksi") oleh GROUP_ORDER di bawah.
+const LAPORAN_SALES_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING", "MARKETING",
+];
+LAPORAN_SALES_ROLES.forEach((role) => {
+  ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: LAPORAN_SALES_MENU.label, items: [...LAPORAN_SALES_MENU.items] }];
+});
+
+// Sama polanya kayak LAPORAN_SALES_ROLES di atas — role list yang sama persis,
+// jadi PKL_SALES/PKL_ZENITH/PKL_MARKETING otomatis ikut mewarisi grup ini juga
+// lewat PKL_MENU_INHERIT di bawah.
+const AUDIT_LEADS_MENU_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING", "MARKETING",
+];
+AUDIT_LEADS_MENU_ROLES.forEach((role) => {
+  ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: AUDIT_LEADS_MENU.label, items: [...AUDIT_LEADS_MENU.items] }];
+});
 
 const MISSION_HREFS = new Set([...MISSIONS_MENU.items.map((i) => i.href), ITEM_MISSION_ALL.href]);
 
@@ -798,6 +905,8 @@ const GROUP_ORDER: string[] = [
   "Keuangan",
   "Inventaris",
   "Transaksi",
+  "Laporan Sales",
+  "Audit Marketing",
   "Penyedia Barang",
   "Penyiapan Barang",
   "Pengantaran",
@@ -806,8 +915,9 @@ const GROUP_ORDER: string[] = [
   "Marketing",
   "Absensi",
   "Log",
-  "Ultah",
+   "Ultah",
   "Management",
+  "SOP Pekerjaan",
 ];
 
 function sortGroupsByCanonicalOrder(groups: MenuGroup[]): MenuGroup[] {
@@ -827,6 +937,7 @@ function sortGroupsByCanonicalOrder(groups: MenuGroup[]): MenuGroup[] {
 const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   "ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH",
   "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING", "MARKETING", "KEPALA_PENYEDIA_BARANG",
 ]);
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
@@ -901,8 +1012,25 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   }
 });
 
+// ── Pengajuan Dana: inject ke grup "Keuangan" ────────────────────────────────
+// Untuk role yang sudah punya grup "Keuangan", item disisipkan di akhir.
+// Untuk Kepala Divisi yang belum punya, grup baru dibuat otomatis.
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(FUND_REQUEST_VIEW_ROLES as string[]).includes(role)) return;
+  let hasKeuangan = false;
+  ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
+    if (g.label !== "Keuangan") return g;
+    hasKeuangan = true;
+    if (g.items.some((it) => it.href === ITEM_PENGAJUAN_DANA.href)) return g;
+    return { label: g.label, items: [...g.items, ITEM_PENGAJUAN_DANA] };
+  });
+  if (!hasKeuangan) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Keuangan", items: [ITEM_PENGAJUAN_DANA] }];
+  }
+});
+
 // Riwayat SO: HANYA untuk SO_HISTORY_VIEW_ROLES. Sengaja tidak ditaruh
-// langsung di const ADMIN_INVENTARIS — grup itu dipakai bareng oleh
+// // langsung di const ADMIN_INVENTARIS — grup itu dipakai bareng oleh
 // ASISTEN_CEO juga (lihat `ASISTEN_CEO: [..., ADMIN_INVENTARIS, ...]`), yang
 // sengaja TIDAK boleh lihat menu ini. Item disisipkan TEPAT SETELAH
 // "Monitoring Stok" via findIndex, jadi tidak tergantung urutan array.
@@ -927,6 +1055,33 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   }
 });
 
+// ── Minus Siap Jual: hanya untuk LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES ───────────
+// Daftar role SENGAJA lebih sempit dari yang bisa lihat Barang Siap Jual
+// (mis. Marketing/Accounting boleh lihat Siap Jual tapi TIDAK Minus Siap Jual),
+// jadi TIDAK bisa auto-ikut Barang Siap Jual — harus whitelist eksplisit.
+// Item disisipkan TEPAT di bawah "Barang Siap Jual" via findIndex; kalau role
+// itu belum punya "Barang Siap Jual" di grup Inventaris, item ditaruh di akhir.
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES as string[]).includes(role)) return;
+  let hasInventaris = false;
+  ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
+    if (g.label !== "Inventaris") return g;
+    hasInventaris = true;
+    if (g.items.some((it) => it.href === ITEM_LAPTOP_MINUS_SIAP_JUAL.href)) return g;
+    const readyIdx = g.items.findIndex((it) => it.href === ITEM_LAPTOP_SIAP_JUAL.href);
+    const items = [...g.items];
+    if (readyIdx >= 0) {
+      items.splice(readyIdx + 1, 0, ITEM_LAPTOP_MINUS_SIAP_JUAL);
+    } else {
+      items.push(ITEM_LAPTOP_MINUS_SIAP_JUAL);
+    }
+    return { ...g, items };
+  });
+  if (!hasInventaris) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Inventaris", items: [ITEM_LAPTOP_MINUS_SIAP_JUAL] }];
+  }
+});
+
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   const utama = ROLE_MENUS[role].find((g) => g.label === "Utama");
   if (utama) {
@@ -939,8 +1094,11 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
     if (!utama.items.some((it) => it.href === ITEM_LENCANA.href)) {
       utama.items.push(ITEM_LENCANA);
     }
+    if (!utama.items.some((it) => it.href === ITEM_PELANGGARAN.href)) {
+      utama.items.push(ITEM_PELANGGARAN);
+    }
   } else {
-    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE, ITEM_LENCANA] }, ...ROLE_MENUS[role]];
+    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE, ITEM_LENCANA, ITEM_PELANGGARAN] }, ...ROLE_MENUS[role]];
   }
 });
 // Kendaraan: grup sendiri (collapsible) berisi Dashboard + Management Kendaraan.
@@ -957,6 +1115,22 @@ function withKendaraanGroup(groups: MenuGroup[]): MenuGroup[] {
   const utamaIdx = rest.findIndex((g) => g.label === "Utama");
   const at = utamaIdx >= 0 ? utamaIdx + 1 : 0;
   return [...rest.slice(0, at), KENDARAAN_GROUP, ...rest.slice(at)];
+}
+
+// SOP Pekerjaan: grup sidebar berisi "SOP Divisi".
+// Ditambahkan kondisional — hanya muncul kalau user punya mapping divisi
+// SOP atau merupakan admin (lihat hasSopAccess di lib/sop.ts).
+const SOP_GROUP: MenuGroup = {
+  label: "SOP Pekerjaan",
+  items: [ITEM_SOP_DIVISI],
+};
+
+function withSopGroup(groups: MenuGroup[], userEffectiveRoles: string[]): MenuGroup[] {
+  if (!hasSopAccess(userEffectiveRoles)) return groups;
+  const rest = groups.filter((g) => g.label !== "SOP Pekerjaan");
+  const utamaIdx = rest.findIndex((g) => g.label === "Utama");
+  const at = utamaIdx >= 0 ? utamaIdx + 1 : 0;
+  return [...rest.slice(0, at), SOP_GROUP, ...rest.slice(at)];
 }
 
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
@@ -996,7 +1170,8 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_CUSTOMER_SERVICE: { label: "PKL Customer Service", className: "bg-amber-50 text-amber-700" },
   PKL_PENGELOLA_BARANG: { label: "PKL Pengelola Barang", className: "bg-amber-50 text-amber-700" },
   PKL_ACCOUNTING: { label: "PKL Accounting", className: "bg-amber-50 text-amber-700" },
-  KEPALA_ZENITH: { label: "Kepala Zenith", className: "bg-purple-50 text-purple-700" },
+   KEPALA_ZENITH: { label: "Kepala Zenith", className: "bg-purple-50 text-purple-700" },
+  KEPALA_CC: { label: "Kepala CC", className: "bg-fuchsia-50 text-fuchsia-800" },
 };
 
 function getInitials(name: string): string {
@@ -1011,7 +1186,7 @@ function RoleBadges({ user }: { user: any }) {
       {roles.map((role) => {
         const meta = ROLE_META[role as UserRole];
         return (
-          <span key={role} className={`inline-block text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-slate-50 text-slate-700"}`}>
+          <span key={role} className={`inline-block max-w-full truncate text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-slate-50 text-slate-700"}`}>
             {meta?.label ?? role}
           </span>
         );
@@ -1039,12 +1214,23 @@ function NavItem({ item, isActive, onClick, badge, rail, isPinned, onTogglePin }
       </span>
       {!rail && <span className="flex-1 truncate">{item.name}</span>}
       {badge && badge > 0 ? (
-        <span
-          style={{ animation: "solitBadgePop 0.3s ease-out both" }}
-          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${rail ? "absolute top-0.5 right-1" : "ml-auto mr-1"} ${isActive ? "bg-white text-indigo-600" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
-        >
-          {badge > 99 ? "99+" : badge}
-        </span>
+        // Badge "Pengajuan Dana" sengaja dibuat lebih besar & berdenyut —
+        // ini notif approval dana, harus jauh lebih mencolok dari badge menu lain.
+        item.href === "/dashboard/pengajuan-dana" ? (
+          <span
+            style={{ animation: "solitBadgePop 0.3s ease-out both" }}
+            className={`inline-flex items-center justify-center min-w-[26px] h-[26px] px-1.5 rounded-full text-sm font-black tabular-nums animate-pulse ${rail ? "absolute -top-1 -right-1" : "ml-auto mr-1"} ${isActive ? "bg-white text-indigo-600" : "bg-red-500 text-white shadow-md shadow-red-500/50 ring-2 ring-red-200"}`}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        ) : (
+          <span
+            style={{ animation: "solitBadgePop 0.3s ease-out both" }}
+            className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${rail ? "absolute top-0.5 right-1" : "ml-auto mr-1"} ${isActive ? "bg-white text-indigo-600" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )
       ) : null}
 
       {/* Tombol Sematkan / Pin */}
@@ -1123,7 +1309,7 @@ function SidebarContent({
             <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-indigo-600">
               <img src="/assets/solit03.jpeg" alt="Solit" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
-                       {!rail && <span className="text-sm font-extrabold text-[#1a1a2e] tracking-[-0.01em]">Solit POS</span>}
+            {!rail && <span className="text-sm font-extrabold text-[#1a1a2e] tracking-[-0.01em]">Solit POS</span>}
           </div>
           <div className="flex items-center gap-1">
             {onToggleRail && (
@@ -1171,7 +1357,7 @@ function SidebarContent({
             })()}
           </Link>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Link href="/dashboard/profile" className="flex items-center gap-3 group/profile min-w-0 flex-1" title="Profil saya">
               {(() => {
                 const avatar = (
@@ -1190,9 +1376,10 @@ function SidebarContent({
                 <RoleBadges user={user} />
               </div>
             </Link>
-            <CoinBalanceChip className="flex-shrink-0" />
+            <CoinBalanceChip className="flex-shrink-0 ml-auto" />
           </div>
-        )}      </div>
+        )}      
+      </div>
 
       <div className={`h-px bg-slate-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
       {!rail && (
@@ -1450,7 +1637,15 @@ export default function Sidebar() {
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const [reminderDismissed, setReminderDismissed] = useState(false);
-  const [contractDismissed, setContractDismissed] = useState(false);
+  const [contractDismissed, setContractDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const todayWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      return localStorage.getItem(CONTRACT_BANNER_DISMISS_KEY) === todayWIB;
+    } catch {
+      return false;
+    }
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([]);
 
@@ -1546,11 +1741,13 @@ export default function Sidebar() {
       : [];
 
   const isContractSigner = user?.id === YOGA_ADMIN_ID || user?.id === REINALDY_ADMIN_ID;
+  const isContractExpiringAdmin = userRoles.some((r) => (CONTRACT_EXPIRING_VIEW_ROLES as string[]).includes(r));
 
-  const groups: MenuGroup[] = withKendaraanGroup(
+  const groups: MenuGroup[] = withSopGroup(withKendaraanGroup(
     dedupeGroups([
       ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
       ...(isContractSigner ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT_SIGN] }] : []),
+      ...(isContractExpiringAdmin ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT_EXPIRING] }] : []),
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
       ...dynamicGroups.map((g) => ({
@@ -1558,7 +1755,7 @@ export default function Sidebar() {
         items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
       })),
     ])
-  );
+  ), effectiveRoles);
 
   const groupsSig = groups.map((g) => g.label).join("|");
 
@@ -1629,6 +1826,10 @@ export default function Sidebar() {
   const overtimeNotify = useOvertimeNotify(effectiveRoles, user?.id);
   // Badge senyap (tanpa bunyi) untuk admin: pengajuan pinjam kendaraan yang PENDING
   const vehiclePending = useVehiclePendingBadge(userRoles, user?.id);
+  // Badge senyap (tanpa bunyi) untuk admin: jumlah pengajuan dana yang belum di-approve
+  const pengajuanDanaBadge = usePengajuanDanaBadge(userRoles, user?.id);
+  // Badge senyap (tanpa bunyi): jumlah karyawan yang kontraknya akan habis dalam H-7
+  const expiringContracts = useExpiringContractsBadge(userRoles, user?.id);
   const leadsChat = useLeadsChatNotify(effectiveRoles, user?.id);
   const { sound_key: notifSoundKey, custom_sound_url: notifCustomUrl } = useNotificationSettings(user?.id ?? null);
 
@@ -1642,6 +1843,7 @@ export default function Sidebar() {
   const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
   const onOvertimePage = pathname.startsWith("/dashboard/attendance/overtime");
   const onKendaraanPage = pathname.startsWith("/dashboard/kendaraan");
+  const onPengajuanDanaPage = pathname.startsWith("/dashboard/pengajuan-dana");
 
   const isSilentAdmin = isPrepSilent(null, effectiveRoles);
 
@@ -1649,7 +1851,7 @@ export default function Sidebar() {
   usePrepAlarm(onSiapKirim || isSilentAdmin ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
   usePrepAlarm(isSilentAdmin ? [] : leadsChat.unreadUnacked.map((id) => ({ id })), ALARM_KEYS.LEADS_CHAT, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
 
-  const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
+  const deliveryBadge = useDeliveryBadge(user?.id, user?.role, userRoles);
   // isSilentAdmin → pass null agar hook tidak fetch & tidak bunyi playReminderBeep()
   const reminderUnread = useReminderBadge(isSilentAdmin ? null : user?.id);
   const onTanyaCeoPage = pathname.startsWith("/dashboard/tanya-ceo");
@@ -1660,11 +1862,12 @@ export default function Sidebar() {
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
     "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count,
     "/dashboard/kendaraan": onKendaraanPage ? 0 : vehiclePending.count,
+    "/dashboard/pengajuan-dana": onPengajuanDanaPage ? 0 : pengajuanDanaBadge.count,
     "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
     "/dashboard/ai-ceo": aiCeoEscalationCount,
 
     "/dashboard/leads-chat": leadsChat.unreadCount,
-
+    "/dashboard/contract-expiring": expiringContracts.count,
   };
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
   const displayGroups: MenuGroup[] = groups.map((g) => ({
@@ -1843,6 +2046,10 @@ export default function Sidebar() {
               onClick={(e) => {
                 e.stopPropagation();
                 setContractDismissed(true);
+                try {
+                  const todayWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+                  localStorage.setItem(CONTRACT_BANNER_DISMISS_KEY, todayWIB);
+                } catch { }
               }}
               className="w-7 h-7 rounded-full bg-black/20 hover:bg-black/35 active:scale-90 flex items-center justify-center text-white flex-shrink-0 transition"
               title="Tutup notifikasi"

@@ -44,6 +44,7 @@ export const GET = withAuth(async (req) => {
       transaction: pending.filter((d) => d.source_type === "TRANSACTION").length,
       service: pending.filter((d) => d.source_type === "SERVICE").length,
       cashflow: pending.filter((d) => d.source_type === "CASHFLOW").length,
+      kebutuhan: pending.filter((d) => d.source_type === "KEBUTUHAN").length,
     },
   });
 }, AKUNTANSI_ROLES);

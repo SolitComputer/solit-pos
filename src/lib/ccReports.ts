@@ -3,7 +3,7 @@ import type { SyncStatus } from "./ccMetrics";
 
 /* ── Brand / Divisi ──────────────────────────────────────────────────────── */
 
-export const CC_BRANDS = ["Solit", "OnPoint", "Sotech", "Zenit"] as const;
+export const CC_BRANDS = ["Solit", "OnPoint", "Sotech", "Zenit", "Sultop"] as const;
 export type CCBrand = (typeof CC_BRANDS)[number];
 export type BrandFilter = "ALL" | CCBrand;
 
@@ -14,6 +14,7 @@ export const BRAND_META: Record<CCBrand, { label: string; color: string; classNa
   OnPoint: { label: "OnPoint", color: "#0ea5e9", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-200" },
   Sotech: { label: "Sotech", color: "#10b981", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
   Zenit: { label: "Zenit", color: "#f59e0b", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  Sultop: { label: "Sultop", color: "#f59e0b", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
 };
 
 export const BRAND_TABS: { key: BrandFilter; label: string; color: string }[] = [

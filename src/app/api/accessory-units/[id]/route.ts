@@ -50,8 +50,12 @@ export const PATCH = withAuth(async (
     }
 
     if (typeof condition === "string" && ["BARU", "BEKAS"].includes(condition)) updates.condition = condition;
-    if (typeof status === "string" && ["TERSEDIA", "TERJUAL", "RESERVED"].includes(status)) updates.status = status;
-    if (typeof buy_price === "number") updates.buy_price = Math.max(0, buy_price);
+    // ✅ NEW: MINUS_SIAP_JUAL ditambahkan — tanpa ini, status dari dropdown
+    // modal akan DIBUANG diam-diam di server (tidak masuk updates) walau UI
+    // sudah benar. Unit tetap kehitung stok (status !== TERJUAL), jadi tetap
+    // tampil di Data Barang sampai dimasukkan ke Kelompok MSJ.
+    if (typeof status === "string" && ["TERSEDIA", "BELUM_SIAP", "MINUS_SIAP_JUAL", "TERJUAL", "RESERVED"].includes(status)) updates.status = status;
+        if (typeof buy_price === "number") updates.buy_price = Math.max(0, buy_price);
     if (typeof selling_price === "number") updates.selling_price = Math.max(0, selling_price);
     if (typeof notes === "string") updates.notes = notes.trim() || null;
 

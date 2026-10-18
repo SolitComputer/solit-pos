@@ -1,21 +1,25 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useDeferredValue, useRef } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Filter, RotateCcw, SlidersHorizontal, ArrowUpDown, Search, X, ChevronDown, ChevronUp, Tag } from "lucide-react";
+import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Filter, RotateCcw, SlidersHorizontal, ArrowUpDown, Search, X, ChevronDown, ChevronUp, Tag, Maximize2, Minimize2 } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import AddUnitModalAccessory from "@/components/inventory/AddUnitModalAccessory";
 import AccessoryUnitDetailModal, { AccessoryUnitDetailData } from "@/components/inventory/AccessoryUnitDetailModal";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, isConditionCheckCategory, sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { usePagePermission } from "@/hooks/usePagePermission";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import {
     UserRole, hasAnyRole, PERMISSIONS,
     LAPTOP_DELETE_ROLES, ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES, ACCESSORY_DELETE_ROLES,
+    ACCESSORY_AUDIT_ROLES,
     BARANG_PRIVATE_VIEW_ROLES, BARANG_FULL_ACCESS_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop,
+    canEditConditionChecks, isBarangBasicViewOnly,
 } from "@/lib/permissions";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -27,11 +31,16 @@ interface LaptopUnitLite {
     id: string; serial_number: string; status: string;
     purchase_price?: number; sparepart_cost?: number;
     source?: string | null; created_at?: string;
+    is_pedagang_listed?: boolean;
+    msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
+    so_at?: string | null; so_by?: string | null;       // SO per-unit (progress X/Y)
+    audited_at?: string | null; audited_by?: string | null; // Audit per-unit (progress X/Y)
 }
 interface LaptopRaw {
     id: string; laptop_name: string; category_id?: string | null; category_name?: string | null;
     brand: string; cpu: string; ram: string; storage: string; gpu: string; display: string;
     condition_note: string; selling_price: number; notes: string; created_at: string;
+    condition_checks?: ConditionChecks | null;
     audited_at?: string | null; audited_by?: string | null;
     so_at?: string | null; so_by?: string | null;
     laptop_units?: LaptopUnitLite[];
@@ -39,6 +48,9 @@ interface LaptopRaw {
 interface AccessoryUnitLite {
     id: string; serial_number: string; condition: string; status: string;
     buy_price?: number; selling_price?: number; created_at?: string;
+    msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
+    so_at?: string | null; so_by?: string | null; // SO per-unit (progress X/Y)
+    audited_at?: string | null; audited_by?: string | null; // Audit per-unit (progress X/Y)
 }
 interface AccessoryRaw {
     id: string; name: string; category: string; brand: string | null; spec: string | null;
@@ -56,11 +68,16 @@ interface UnifiedRow {
     harga_jual: number; total_jual: number | null; gross_profit: number | null;
     sumber: string | null; tanggal_masuk: string | null;
     sn: string | null; sn_note?: string;
-    stok_tersedia: number | null; siap_jual: number | null; minus: number | null; // laptop (ST/SJ/M)
+    stok_tersedia: number | null; siap_jual: number | null; minus: number | null; minus_siap_jual: number | null; // laptop (ST/SJ/M/MSJ)
     stok: number | null; // aksesoris
     so_at: string | null; so_by: string | null;
     audited_at: string | null; audited_by: string | null;
+    // Progress per-unit "X/Y" — X = unit aktif yang sudah SO/Audit, Y = total
+    // unit aktif. Dihitung di normalizeLaptop/normalizeAccessory dari status
+    // per-unit, bukan dari flag model-level so_at/audited_at di atas.
+    so_done: number; audit_done: number;
     unit_id?: string; unit_count: number;
+    is_pedagang_listed?: boolean; // laptop: true kalau ADA unit aktif yang masuk Pricelist Pedagang
     raw: LaptopRaw | AccessoryRaw;
 }
 
@@ -71,6 +88,21 @@ interface HistoryEntry { id: string; action: string; by: string; at: string; not
 // ═══════════════════════════════════════════════════════════════════════════
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 const Dash = () => <span className="text-zinc-300">-</span>;
+
+// Sistem cuma kenal 2 "keluarga" kategori sekarang: LAPTOP & bukan-LAPTOP
+// (Aksesoris). Perbandingan di-trim & case-insensitive supaya kategori lama
+// yang field `type`-nya kepencet beda kapital/ada spasi nyempil (mis. hasil
+// insert sebelum form Tambah Kategori disederhanakan) TETAP kehitung Aksesoris,
+// bukan malah "hilang" dari kedua filter sekaligus.
+function isLaptopCategoryType(type?: string | null, name?: string | null): boolean {
+    const t = (type ?? "").trim().toUpperCase();
+    if (t === "LAPTOP" || t === "PC") return true;
+    // Kategori "PC" dibuat lewat modal Tambah Kategori yang TIDAK punya input
+    // Tipe — kolom `type` di database untuk kategori ini hampir pasti kosong.
+    // Fallback: cek NAMA kategori juga, supaya kategori bernama persis "PC"
+    // tetap dianggap Laptop.
+    return (name ?? "").trim().toUpperCase() === "PC";
+}
 
 // TTL audit BEDA antara laptop (2 hari) & aksesoris (3 hari) — ini business
 // rule yang SUDAH ADA masing-masing di komponen asli, disatukan di sini biar
@@ -86,6 +118,24 @@ function isAuditActive(row: Pick<UnifiedRow, "tipe" | "audited_at">): boolean {
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
+
+// ── Helper per-unit untuk progress X/Y ─────────────────────────────────────
+// Logika reset DISAMAKAN dengan halaman Kelola Unit:
+//  • Audit unit laptop  → TTL 2 hari sejak audited_at.
+//  • SO unit (laptop & aksesoris) → aktif kalau di-SO pada TANGGAL WIB yang
+//    sama dengan hari ini (reset tiap 00:00 WIB), bukan rolling 24 jam.
+function isUnitAuditActiveLaptop(u: LaptopUnitLite): boolean {
+    return !!u.audited_at && Date.now() - new Date(u.audited_at).getTime() < LAPTOP_AUDIT_TTL_MS;
+}
+function isUnitSoActive(soAt?: string | null): boolean {
+    return !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
+}
+
+// Arsip MANUAL hanya boleh muncul saat stok BENAR-BENAR habis (0 semua).
+function isStockEmpty(row: UnifiedRow): boolean {
+    const stok = row.tipe === "LAPTOP" ? (row.stok_tersedia ?? 0) : (row.stok ?? 0);
+    return stok === 0;
+}
 
 //  Aksesoris: tentukan aksi Unit berdasarkan STOK EFEKTIF (row.stok — sudah
 //  fallback ke kolom stock manual kalau belum ada SN sama sekali), BUKAN
@@ -105,23 +155,33 @@ function getAccessoryUnitAction(row: UnifiedRow): "units" | "add" | "detail" | n
 
 function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const units = l.laptop_units ?? [];
-    const aktif = units.filter(u => u.status !== "SOLD");
+    // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok,
+    // sama seperti SOLD, tapi tetap dibedakan dari penjualan di laporan.
+    // msj_group_id terisi = unit sudah masuk Kelompok Minus Siap Jual → disembunyikan
+    // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
+    const aktif = units.filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id);
     const siapJual = aktif.filter(u => u.status === "SIAP_JUAL").length;
+    // "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual (bisa dibikin
+    // payment). Dihitung terpisah dari minus biasa (SERVICE/BELUM_SIAP) yang
+    // TIDAK boleh dijual.
+    const minusSiapJual = aktif.filter(u => u.status === "MINUS_SIAP_JUAL").length;
     const stokMinus = aktif.filter(u => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
     const dalamPenyiapan = aktif.filter(u => u.status === "DALAM_PENYIAPAN").length;
-    const stokTersedia = siapJual + stokMinus + dalamPenyiapan;
+    // Progress X/Y: hitung unit aktif yang SO / Audit-nya masih aktif.
+    const soDone = aktif.filter(u => isUnitSoActive(u.so_at)).length;
+    const auditDone = aktif.filter(u => isUnitAuditActiveLaptop(u)).length;
+    const stokTersedia = siapJual + stokMinus + dalamPenyiapan + minusSiapJual;
     const one = aktif.length === 1 ? aktif[0] : null;
     const modals = aktif.map(u => u.purchase_price).filter((n): n is number => n != null && n > 0);
     const min = modals.length ? Math.min(...modals) : 0;
     const max = modals.length ? Math.max(...modals) : 0;
-    const jt = (n: number) => (n / 1_000_000).toFixed(1).replace(".", ",");
 
     return {
         id: l.id, tipe: "LAPTOP", nama: l.laptop_name,
         kategori: l.category_name ?? null, kategori_id: l.category_id ?? null,
         brand: l.brand || null, cpu: l.cpu || null, ram: l.ram || null, storage: l.storage || null, spek: null,
         harga_modal: one ? (one.purchase_price ?? 0) : null,
-        harga_modal_note: one ? undefined : (modals.length ? (min === max ? `Rp ${jt(min)} jt` : `Rp ${jt(min)}–${jt(max)} jt`) : undefined),
+        harga_modal_note: one ? undefined : (modals.length ? (min === max ? fmt(min) : `${fmt(min)} - ${fmt(max)}`) : undefined),
         modal_sparepart: one ? (one.sparepart_cost ?? 0) : null,
         harga_jual: l.selling_price || 0,
         total_jual: (l.selling_price || 0) * stokTersedia,
@@ -130,33 +190,58 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
         tanggal_masuk: one ? (one.created_at ?? null) : null,
         sn: one ? one.serial_number : null,
         sn_note: one ? undefined : (aktif.length > 1 ? `${aktif.length} SN` : undefined),
-        stok_tersedia: stokTersedia, siap_jual: siapJual, minus: stokMinus, stok: null,
+        stok_tersedia: stokTersedia, siap_jual: siapJual, minus: stokMinus, minus_siap_jual: minusSiapJual, stok: null,
         so_at: l.so_at ?? null, so_by: l.so_by ?? null,
         audited_at: l.audited_at ?? null, audited_by: l.audited_by ?? null,
+        so_done: soDone, audit_done: auditDone,
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
+        is_pedagang_listed: aktif.some(u => u.is_pedagang_listed === true),
         raw: l,
     };
 }
 
 function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     const units = a.accessory_units ?? [];
-    const aktif = units.filter(u => u.status !== "TERJUAL");
+    // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok.
+    // msj_group_id terisi = unit sudah masuk Kelompok Minus Siap Jual → disembunyikan
+    // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
+    const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && !u.msj_group_id);
     const one = aktif.length === 1 ? aktif[0] : null;
-    const margin = (a.sell_price || 0) - (a.buy_price || 0);
+    // Progress SO & Audit per-unit aksesoris (audit kolomnya sudah ada — R3 selesai).
+    const soDoneAcc = aktif.filter(u => isUnitSoActive(u.so_at)).length;
+    // Audit aksesoris TTL 3 hari — disamakan dgn ACCESSORY_AUDIT_TTL_MS.
+    const auditDoneAcc = aktif.filter(
+        u => !!u.audited_at && Date.now() - new Date(u.audited_at).getTime() < ACCESSORY_AUDIT_TTL_MS
+    ).length;
+    // Harga modal range aksesoris ber-SN banyak — mirror logika laptop:
+    // kumpulkan buy_price tiap unit aktif yang > 0, lalu ambil min & max.
+    const modals = aktif.map(u => u.buy_price).filter((n): n is number => n != null && n > 0);
+    const minModal = modals.length ? Math.min(...modals) : 0;
+    const maxModal = modals.length ? Math.max(...modals) : 0;
+const margin = (a.sell_price || 0) - (a.buy_price || 0);
     return {
         id: a.id, tipe: "AKSESORIS", nama: a.name, kategori: a.category,
         brand: a.brand || null, cpu: null, ram: null, storage: null, spek: a.spec || null,
-        harga_modal: one ? (one.buy_price ?? 0) : (a.buy_price ?? null), modal_sparepart: null,
+        harga_modal: one
+            ? (one.buy_price ?? 0)
+            : (aktif.length > 1 && modals.length ? null : (a.buy_price ?? null)),
+        harga_modal_note: one
+            ? undefined
+            : (aktif.length > 1 && modals.length
+                ? (minModal === maxModal ? fmt(minModal) : `${fmt(minModal)} - ${fmt(maxModal)}`)
+                : undefined),
+        modal_sparepart: null,
         harga_jual: a.sell_price || 0, total_jual: null,
         gross_profit: a.buy_price != null && a.buy_price > 0 ? margin : null,
         sumber: null,
         tanggal_masuk: one ? (one.created_at ?? null) : null,
         sn: one ? one.serial_number : null,
         sn_note: one ? undefined : (aktif.length > 1 ? `${aktif.length} SN` : undefined),
-        stok_tersedia: null, siap_jual: null, minus: null,
+        stok_tersedia: null, siap_jual: null, minus: null, minus_siap_jual: null,
         stok: units.length > 0 ? aktif.length : (a.stock ?? 0),
         so_at: a.so_at ?? null, so_by: a.so_by ?? null,
         audited_at: a.audited_at ?? null, audited_by: a.audited_by ?? null,
+        so_done: soDoneAcc, audit_done: auditDoneAcc,
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         raw: a,
     };
@@ -276,11 +361,77 @@ function readBarangCache(): BarangCachePayload | null {
 
 function writeBarangCache(rows: UnifiedRow[]) {
     if (typeof window === "undefined") return;
-    try {
-        sessionStorage.setItem(BARANG_CACHE_KEY, JSON.stringify({ rows, savedAt: Date.now() }));
-    } catch {
-        // storage penuh/disabled — tidak fatal, cuma berarti load berikutnya tidak instan
+    // Ditunda ke waktu idle. Versi lama menjalankan JSON.stringify persis
+    // setelah setRows, jadi browser harus menunggu stringify selesai sebelum
+    // boleh menggambar layar — datanya sudah ada tapi tampilan masih kosong.
+    const run = () => {
+        try {
+            sessionStorage.setItem(BARANG_CACHE_KEY, JSON.stringify({ rows, savedAt: Date.now() }));
+        } catch {
+            // storage penuh/disabled — tidak fatal, cuma berarti load berikutnya tidak instan
+        }
+    };
+    if (typeof (window as any).requestIdleCallback === "function") {
+        (window as any).requestIdleCallback(run, { timeout: 2000 });
+    } else {
+        setTimeout(run, 0);
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PERSIST FILTER (sessionStorage) — supaya filter TIDAK hilang saat user
+// pindah ke halaman Kelola Unit untuk SO lalu klik "back". Komponen ini
+// unmount saat pindah route, jadi semua useState ter-reset ke default — itu
+// sebabnya filter balik ke "Semua". Pola sama persis dengan cache data di atas.
+// ═══════════════════════════════════════════════════════════════════════════
+const BARANG_FILTER_KEY = "unified-barang-filter-v1";
+
+interface BarangFilterState {
+    tipeFilter: "ALL" | ItemType;
+    kategoriFilter: string[];
+    brandFilter: string;
+    stokFilter: "ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS" | "MINUS_SIAP_JUAL";
+    minPrice: string;
+    maxPrice: string;
+    statusAuditSoFilter: "ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE";
+    sortBy: "NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST";
+    search: string;
+}
+
+function readBarangFilter(): Partial<BarangFilterState> | null {
+    if (typeof window === "undefined") return null;
+    try {
+        const raw = sessionStorage.getItem(BARANG_FILTER_KEY);
+        return raw ? (JSON.parse(raw) as Partial<BarangFilterState>) : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeBarangFilter(state: BarangFilterState) {
+    if (typeof window === "undefined") return;
+    try {
+        sessionStorage.setItem(BARANG_FILTER_KEY, JSON.stringify(state));
+    } catch {
+        /* storage penuh/diblokir — tidak fatal, filter cuma tidak persist */
+    }
+}
+
+// Pilih SATU mode render: kartu mobile ATAU tabel desktop, bukan dua-duanya.
+// Sebelumnya keduanya masuk DOM dan cuma disembunyikan CSS (lg:hidden /
+// hidden lg:block), jadi browser membangun 2x node untuk data yang sama.
+// Nilai awal false supaya render pertama di server & client identik (tidak
+// ada hydration mismatch); nilai asli baru dipasang setelah mount.
+function useIsDesktop() {
+    const [isDesktop, setIsDesktop] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia("(min-width: 1024px)");
+        const sync = () => setIsDesktop(mq.matches);
+        sync();
+        mq.addEventListener("change", sync);
+        return () => mq.removeEventListener("change", sync);
+    }, []);
+    return isDesktop;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -336,32 +487,345 @@ function SoConfirmModal({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Konfirmasi Audit — kembar dengan SoConfirmModal, tapi konteks Audit.
+// Dipakai laptop & aksesoris; catatan opsional, ikut tercatat ke riwayat.
+// ═══════════════════════════════════════════════════════════════════════════
+function AuditConfirmModal({
+    row, notes, onNotesChange, onConfirm, onCancel, loading,
+}: {
+    row: UnifiedRow; notes: string; onNotesChange: (v: string) => void;
+    onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel, loading]);
+
+    const isActive = isAuditActive(row);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !loading && onCancel()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className={`h-1 w-full bg-gradient-to-r ${isActive ? "from-amber-400 via-amber-600 to-amber-800" : "from-emerald-400 via-emerald-600 to-emerald-800"}`} />
+                <div className={`px-5 py-4 ${isActive ? "bg-amber-600" : "bg-emerald-600"}`}>
+                    <p className="font-bold text-white text-sm">{isActive ? "Batalkan Audit" : "Tandai Sudah Diaudit"}</p>
+                    <p className="text-xs text-white/70 mt-0.5 truncate">{row.nama}</p>
+                </div>
+                <div className="p-5">
+                    <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
+                        Catatan Audit (opsional)
+                    </label>
+                    <textarea
+                        autoFocus
+                        rows={3}
+                        placeholder="Kondisi barang, hasil audit, dll"
+                        value={notes}
+                        onChange={e => onNotesChange(e.target.value)}
+                        className={`w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:bg-white transition resize-none ${isActive ? "focus:ring-amber-500/20 focus:border-amber-400" : "focus:ring-emerald-500/20 focus:border-emerald-400"}`}
+                    />
+                    <div className="flex gap-3 mt-5">
+                        <button onClick={onCancel} disabled={loading} className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 transition disabled:opacity-50">Batal</button>
+                        <button onClick={onConfirm} disabled={loading}
+                            className={`flex-1 h-10 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isActive ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Konfirmasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Perbaiki Tipe — konversi Laptop yang salah tipe jadi Aksesoris
+// ═══════════════════════════════════════════════════════════════════════════
+function ConvertToAccessoryModal({
+    row, categories, onClose, onConfirm, loading,
+}: {
+    row: UnifiedRow;
+    categories: { id: string; name: string; type?: string | null }[];
+    onClose: () => void;
+    onConfirm: (categoryName: string) => void;
+    loading: boolean;
+}) {
+    const [categoryName, setCategoryName] = useState("");
+    const selectedCategory = categories.find(c => c.name === categoryName);
+    const targetIsLaptopFamily = selectedCategory ? isLaptopCategoryType(selectedCategory.type, selectedCategory.name) : false;
+    const laptopPcOptions = categories.filter(c => isLaptopCategoryType(c.type, c.name));
+    const accessoryOnlyOptions = categories.filter(c => !isLaptopCategoryType(c.type, c.name));
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-amber-400 via-amber-600 to-amber-800" />
+                <div className="bg-amber-600 px-5 py-4">
+                    <p className="font-bold text-white text-sm">Perbaiki Tipe Barang</p>
+                    <p className="text-xs text-white/70 mt-0.5 truncate">{row.nama}</p>
+                </div>
+                <div className="p-5">
+                    <p className="text-xs text-zinc-500 mb-3">
+                        {categoryName === ""
+                            ? "Pilih kategori tujuan yang benar untuk barang ini."
+                            : targetIsLaptopFamily
+                                ? "Barang tetap tersimpan sebagai Laptop/PC — hanya kategorinya yang diperbarui, data spek (CPU/RAM/dll) tetap aman."
+                                : <>Barang ini akan dipindahkan dari <b>Laptop</b> menjadi <b>Aksesoris</b>. Data spek laptop lama (CPU/RAM/dll) akan dihapus permanen.</>}
+                    </p>
+                    <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
+                        Kategori Tujuan
+                    </label>
+                    <select
+                        autoFocus
+                        value={categoryName}
+                        onChange={e => setCategoryName(e.target.value)}
+                        className="w-full h-10 border border-zinc-200 rounded-xl px-3 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400"
+                    >
+                        <option value="">-- Pilih Kategori --</option>
+                        {laptopPcOptions.length > 0 && (
+                            <optgroup label="Laptop / PC">
+                                {laptopPcOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </optgroup>
+                        )}
+                        {accessoryOnlyOptions.length > 0 && (
+                            <optgroup label="Aksesoris">
+                                {accessoryOnlyOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </optgroup>
+                        )}
+                    </select>
+                    <div className="flex gap-3 mt-5">
+                        <button onClick={onClose} disabled={loading} className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 transition disabled:opacity-50">Batal</button>
+                        <button onClick={() => categoryName && onConfirm(categoryName)} disabled={loading || !categoryName}
+                            className="flex-1 h-10 bg-amber-600 text-white rounded-xl text-sm font-semibold hover:bg-amber-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            {targetIsLaptopFamily ? "Simpan" : "Konversi"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Tes Kondisi — edit checklist kondisi laptop (level model) langsung
+// dari tabel/kartu, tanpa buka form Edit penuh. Read-only kalau role tidak
+// berhak (canEdit=false) — tombol Simpan disembunyikan.
+// ═══════════════════════════════════════════════════════════════════════════
+function ConditionChecksModal({
+    row, value, onChange, canEdit, loading, onClose, onConfirm,
+}: {
+    row: UnifiedRow;
+    value: ConditionChecks;
+    onChange: (v: ConditionChecks) => void;
+    canEdit: boolean;
+    loading: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-sky-400 via-sky-600 to-sky-800 flex-shrink-0" />
+                <div className="px-5 py-4 bg-sky-600 flex-shrink-0">
+                    <p className="font-bold text-white text-sm">Tes Kondisi</p>
+                    <p className="text-xs text-white/70 mt-0.5 truncate">{row.nama}</p>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    <ConditionChecklist value={value} onChange={onChange} readOnly={!canEdit} />
+                    {!canEdit && (
+                        <p className="text-[11px] text-zinc-400 mt-3 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2">
+                            Kamu hanya bisa melihat tes kondisi. Perubahan hanya untuk role yang berhak.
+                        </p>
+                    )}
+                </div>
+                <div className="flex gap-3 px-5 py-4 border-t border-zinc-100 flex-shrink-0">
+                    <button onClick={onClose} disabled={loading}
+                        className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition disabled:opacity-50">
+                        {canEdit ? "Batal" : "Tutup"}
+                    </button>
+                    {canEdit && (
+                        <button onClick={onConfirm} disabled={loading}
+                            className="flex-1 h-10 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Simpan
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DROPDOWN: Filter Kategori bergaya Excel — checklist multi-select + search.
+// kategoriFilter kosong ([]) berarti SEMUA kategori dianggap tercentang.
+// Begitu satu item di-uncheck, baru materialisasi jadi array eksplisit
+// (semua ID kecuali yang di-uncheck itu) — meniru AutoFilter Excel: klik
+// checkbox satu-satu, baris yang kategorinya di-uncheck langsung hilang
+// dari tabel, sisanya tetap tampil.
+// ═══════════════════════════════════════════════════════════════════════════
+function CategoryChecklistDropdown({
+    categories, selected, onChange,
+}: {
+    categories: { id: string; name: string }[];
+    selected: string[];
+    onChange: (ids: string[]) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const wrapRef = useRef<HTMLDivElement>(null);
+
+    // Klik di luar dropdown → tutup otomatis.
+    useEffect(() => {
+        if (!open) return;
+        const onClickOutside = (e: MouseEvent) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener("mousedown", onClickOutside);
+        return () => document.removeEventListener("mousedown", onClickOutside);
+    }, [open]);
+
+    const allIds = useMemo(() => categories.map(c => c.id), [categories]);
+    const isChecked = (id: string) => selected.length === 0 || selected.includes(id);
+    const checkedCount = selected.length === 0 ? categories.length : selected.length;
+    const allChecked = categories.length > 0 && checkedCount === categories.length;
+    const someChecked = checkedCount > 0 && !allChecked;
+
+    const toggleAll = () => onChange(allChecked ? [] : allIds);
+    const toggleOne = (id: string) => {
+        const base = selected.length === 0 ? allIds : selected;
+        const next = base.includes(id) ? base.filter(x => x !== id) : [...base, id];
+        onChange(next.length === categories.length ? [] : next);
+    };
+
+    const filtered = search.trim()
+        ? categories.filter(c => c.name.toLowerCase().includes(search.trim().toLowerCase()))
+        : categories;
+
+    const label = selected.length === 0 ? "Semua Kategori"
+        : selected.length === 1 ? (categories.find(c => c.id === selected[0])?.name || "1 kategori")
+            : `${selected.length} kategori dipilih`;
+
+    return (
+        <div className="relative" ref={wrapRef}>
+            <button
+                type="button"
+                onClick={() => setOpen(v => !v)}
+                className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-zinc-700 font-medium flex items-center justify-between gap-2"
+            >
+                <span className="truncate">{label}</span>
+                <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+
+            {open && (
+                <div className="absolute z-30 mt-1.5 w-64 max-w-[85vw] bg-white border border-zinc-200 rounded-xl shadow-xl overflow-hidden animate-fadeIn">
+                    <div className="p-2 border-b border-zinc-100">
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2 pointer-events-none" />
+                            <input
+                                autoFocus
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Cari kategori..."
+                                className="w-full h-8 pl-8 pr-2 border border-zinc-200 rounded-lg text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                            />
+                        </div>
+                    </div>
+
+                    <label className="flex items-center gap-2 px-3 py-2 border-b border-zinc-100 cursor-pointer hover:bg-zinc-50">
+                        <input
+                            type="checkbox"
+                            checked={allChecked}
+                            ref={el => { if (el) el.indeterminate = someChecked; }}
+                            onChange={toggleAll}
+                            className="w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900/20"
+                        />
+                        <span className="text-xs font-semibold text-zinc-700">Semua Kategori</span>
+                    </label>
+
+                    <div className="max-h-56 overflow-y-auto table-scroll">
+                        {filtered.length === 0 ? (
+                            <p className="text-xs text-zinc-400 text-center py-4">Kategori tidak ditemukan</p>
+                        ) : (
+                            filtered.map(c => (
+                                <label key={c.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-zinc-50">
+                                    <input
+                                        type="checkbox"
+                                        checked={isChecked(c.id)}
+                                        onChange={() => toggleOne(c.id)}
+                                        className="w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900/20"
+                                    />
+                                    <span className="text-xs text-zinc-700 truncate">{c.name}</span>
+                                </label>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="flex gap-2 p-2 border-t border-zinc-100 bg-zinc-50/60">
+                        <button onClick={() => onChange([])} className="flex-1 h-7 rounded-lg text-[11px] font-semibold text-zinc-600 bg-zinc-100 hover:bg-zinc-200 transition">Reset</button>
+                        <button onClick={() => setOpen(false)} className="flex-1 h-7 rounded-lg text-[11px] font-semibold text-white bg-zinc-900 hover:bg-zinc-800 transition">Terapkan</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════════════════
 export default function UnifiedBarangContent() {
-    // Lazy initializer: cache dibaca SEKALI saat komponen pertama kali dibuat.
-    // Kalau ada cache yang masih segar, rows langsung terisi & loading langsung
-    // false — artinya tabel/kartu langsung tampil di render PERTAMA, tanpa
-    // "kedip" loading sama sekali.
-    const [rows, setRows] = useState<UnifiedRow[]>(() => readBarangCache()?.rows ?? []);
-    const [loading, setLoading] = useState(() => readBarangCache() === null);
+    // Cache dibaca SEKALI saat komponen pertama kali dibuat. Kalau masih segar,
+    // rows langsung terisi & loading langsung false — tabel/kartu tampil di
+    // render PERTAMA, tanpa "kedip" loading.
+    const [bootCache] = useState(() => readBarangCache());
+    const [rows, setRows] = useState<UnifiedRow[]>(() => bootCache?.rows ?? []);
+    const [loading, setLoading] = useState(() => bootCache === null);
     const [categories, setCategories] = useState<{ id: string; name: string; type?: string | null }[]>([]);
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
 
-    const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>("ALL");
-    const [kategoriFilter, setKategoriFilter] = useState("");
-    const [brandFilter, setBrandFilter] = useState("");
-    const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS">("ALL");
-    const [minPrice, setMinPrice] = useState("");
-    const [maxPrice, setMaxPrice] = useState("");
-    const [statusAuditSoFilter, setStatusAuditSoFilter] = useState<"ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE">("ALL");
-    const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST">("NAMA_ASC");
-    const [search, setSearch] = useState("");
-    const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+    // Baca filter tersimpan SEKALI saat mount — kalau user baru balik dari
+    // halaman Kelola Unit (habis SO), nilai di bawah langsung terisi filter
+    // terakhir, bukan default.
+    const [bootFilter] = useState(() => readBarangFilter());
+    const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>(() => bootFilter?.tipeFilter ?? "ALL");
+    const [kategoriFilter, setKategoriFilter] = useState<string[]>(() => bootFilter?.kategoriFilter ?? []);
+    const [brandFilter, setBrandFilter] = useState(() => bootFilter?.brandFilter ?? "");
+    const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS" | "MINUS_SIAP_JUAL">(() => bootFilter?.stokFilter ?? "ALL"); const [minPrice, setMinPrice] = useState(() => bootFilter?.minPrice ?? "");
+    const [maxPrice, setMaxPrice] = useState(() => bootFilter?.maxPrice ?? "");
+    const [statusAuditSoFilter, setStatusAuditSoFilter] = useState<"ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE">(() => bootFilter?.statusAuditSoFilter ?? "ALL");
+    const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST">(() => bootFilter?.sortBy ?? "NAMA_ASC");
+    const [search, setSearch] = useState(() => bootFilter?.search ?? "");
+    // Input tetap responsif karena `search` langsung update, tapi proses filter
+    // yang berat memakai nilai yang ditunda — ketikan tidak lagi tersendat.
+    const deferredSearch = useDeferredValue(search);
 
-    const [formModal, setFormModal] = useState<{ mode: "create" | "edit"; tipe: ItemType; row?: UnifiedRow } | null>(null);
+    const isDesktop = useIsDesktop();
+    const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+    const [isMaximized, setIsMaximized] = useState(false);
+
+    // tipe: null HANYA dipakai sementara di mode "create" SEBELUM user pilih
+    // Kategori dari dropdown Master Kategori (baru) — begitu kategori dipilih,
+    // tipe langsung ke-derive otomatis (lihat handleCategoryPick), makanya field
+    // form Laptop/Aksesoris di bawah baru muncul setelah tipe terisi.
+    const [formModal, setFormModal] = useState<{ mode: "create" | "edit"; tipe: ItemType | null; row?: UnifiedRow } | null>(null);
+    // id kategori yang lagi dipilih di form Tambah/Edit — SATU dropdown ini
+    // yang sekarang jadi "Master Kategori" (flat), menggantikan toggle
+    // Laptop/Aksesoris yang lama.
+    const [selectedCategoryId, setSelectedCategoryId] = useState("");
     const [laptopForm, setLaptopForm] = useState(EMPTY_LAPTOP_FORM);
+    // Checklist tes kondisi — khusus kategori Laptop & Monitor.
+    const [conditionChecks, setConditionChecks] = useState<ConditionChecks>({});
     const [accForm, setAccForm] = useState(EMPTY_ACC_FORM);
     const [saving, setSaving] = useState(false);
 
@@ -372,25 +836,28 @@ export default function UnifiedBarangContent() {
     const [soingId, setSoingId] = useState<string | null>(null);
     const [soConfirmTarget, setSoConfirmTarget] = useState<UnifiedRow | null>(null);
     const [soConfirmNotes, setSoConfirmNotes] = useState("");
+    const [auditConfirmTarget, setAuditConfirmTarget] = useState<UnifiedRow | null>(null);
+    const [auditConfirmNotes, setAuditConfirmNotes] = useState("");
     const [pedagangSavingId, setPedagangSavingId] = useState<string | null>(null);
+    // Target row yang mau di-"Perbaiki Tipe"-nya (Laptop → Aksesoris) — lihat
+    // convertToAccessory() & ConvertToAccessoryModal di bawah.
+    const [convertTarget, setConvertTarget] = useState<UnifiedRow | null>(null);
+    const [converting, setConverting] = useState(false);
+    const [archivingId, setArchivingId] = useState<string | null>(null);
+    // Target row untuk modal "Tes Kondisi" — edit checklist kondisi laptop
+    // (level model) TANPA harus buka form Edit penuh.
+    const [conditionChecksTarget, setConditionChecksTarget] = useState<UnifiedRow | null>(null);
+    const [conditionChecksDraft, setConditionChecksDraft] = useState<ConditionChecks>({});
+    const [conditionChecksSaving, setConditionChecksSaving] = useState(false);
 
     const [historyTarget, setHistoryTarget] = useState<{ row: UnifiedRow; kind: "audit" | "so" } | null>(null);
     const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
 
-    const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
-    //  Tambah unit pertama untuk laptop stok 0 — dibuka dari tombol "Tambah Unit"
-    //  di kolom Aksi (mobile & desktop) ATAU dari klik baris/kartu itu sendiri
-    //  (lihat handleRowClick di bawah), saat row.unit_count === 0.
+    const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string; type: ItemType } | null>(null);
     const [addUnitTarget, setAddUnitTarget] = useState<UnifiedRow | null>(null);
-    //  Edit SN + tambah unit untuk laptop stok 1 — dibuka dari klik baris/kartu
-    //  (lihat handleRowClick). Unit LENGKAP diambil dulu lewat fetch, karena
-    //  data di tabel gabungan ini tidak menyertakan condition_note/notes.
     const [unitDetailTarget, setUnitDetailTarget] = useState<{ unit: UnitDetailData; row: UnifiedRow } | null>(null);
     const [unitDetailLoading, setUnitDetailLoading] = useState(false);
-    //  Versi AKSESORIS dari 2 state di atas — struktur data unit beda
-    //  (buy_price/condition, bukan purchase_price/grade), dipisah supaya
-    //  tidak mencampur shape data laptop & aksesori di satu state.
     const [addUnitAccessoryTarget, setAddUnitAccessoryTarget] = useState<UnifiedRow | null>(null);
     const [unitDetailAccessoryTarget, setUnitDetailAccessoryTarget] = useState<{ unit: AccessoryUnitDetailData; row: UnifiedRow } | null>(null);
     const [unitDetailAccessoryLoading, setUnitDetailAccessoryLoading] = useState(false);
@@ -406,28 +873,22 @@ export default function UnifiedBarangContent() {
     const { can: matrixCanBarang } = usePagePermission("data-barang");
     const { can: matrixCanLaptop } = usePagePermission("laptops");
 
-    const isAdmin = userRoles.includes("ADMIN" as UserRole);
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
+    // KEPALA_PENYEDIA_BARANG: mode "lihat kolom dasar saja" (No–Spek).
+    // Semua kolom sensitif + tombol aksi disembunyikan lewat flag ini.
+    const canOnlyViewBasic = isBarangBasicViewOnly(userRoles);
     const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP) || matrixCanLaptop.create;
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP) || matrixCanLaptop.edit;
     const canDeleteLaptop = hasAnyRole(userRoles, LAPTOP_DELETE_ROLES) || matrixCanLaptop.delete;
     const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
-    //  Klik baris/kartu untuk buka pop-up "Tambah Unit" (stok 0) ATAU pop-up
-    //  "Detail Unit" untuk edit SN + tambah unit (stok 1) — lihat handleRowClick.
     const canAddUnit = hasAnyRole(userRoles, PERMISSIONS.CREATE_UNITS);
-    //  Dipakai sebagai prop canEdit UnitDetailModal — menggerbangi tombol
-    //  "+ Tambah Unit" & "Edit Data" di dalam pop-up detail unit (stok 1).
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
+    const canEditChecklist = canEditConditionChecks(userId, userRoles);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
-    // SO untuk AKSESORIS belum punya aturan role khusus seperti canSoLaptop
-    // (yang mempertimbangkan siap_jual) — sementara pakai gate stok > 0.
-    // Sesuaikan di sini kalau nanti ada aturan role spesifik untuk aksesoris.
     const canDoSo = (row: UnifiedRow) => {
         if (!canManageSo) return false;
         if (row.tipe === "LAPTOP") return canSoLaptop(userRoles, userId, row.siap_jual ?? 0);
-        // Aksesoris: SO di tabel utama HANYA untuk stok ≤ 1 (0 atau 1 unit).
-        // Stok > 1 → SO dipindah ke dalam halaman Kelola Unit, per-SN.
         const stok = row.stok ?? 0;
         if (stok > 1) return false;
         return stok > 0;
@@ -436,14 +897,12 @@ export default function UnifiedBarangContent() {
     const canEditAcc = hasAnyRole(userRoles, ACCESSORY_EDIT_ROLES) || matrixCanBarang.edit;
     const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_DELETE_ROLES) || matrixCanBarang.delete;
 
-    // ── Aturan toggle audit: LAPTOP butuh canSeePrivate, AKSESORIS butuh ADMIN.
-    // Ini persis aturan yang sudah ada masing-masing di komponen asli — sengaja
-    // TIDAK diseragamkan biar tidak mengubah behavior lama.
-    const canToggleAudit = (row: UnifiedRow) => row.tipe === "LAPTOP" ? canSeePrivate : isAdmin;
+    const canAuditAccessory = hasAnyRole(userRoles, ACCESSORY_AUDIT_ROLES);
+    const canToggleAudit = (row: UnifiedRow) => row.tipe === "LAPTOP" ? canSeePrivate : canAuditAccessory;
 
-    // opts.silent = true → refresh di belakang layar: TIDAK menyalakan spinner
-    // "Memuat data..." dan TIDAK menampilkan toast kalau gagal (karena data lama
-    // dari cache masih tampil di layar, gangguan toast hanya bikin bingung).
+    const canShowConditionChecks = (row: UnifiedRow) =>
+        row.tipe === "LAPTOP" && isConditionCheckCategory(row.kategori) && canEditChecklist;
+
     const fetchAll = useCallback(async (opts?: { silent?: boolean }) => {
         if (!opts?.silent) setLoading(true);
         try {
@@ -453,8 +912,11 @@ export default function UnifiedBarangContent() {
             ]);
             const lapJson = await lapRes.json();
             const accJson = await accRes.json();
-            const laptopRows = (lapJson.success ? lapJson.data : []).map(normalizeLaptop);
-            const accessoryRows = (accJson.success ? accJson.data : []).map(normalizeAccessory);
+            // Barang terarsip (archived_at terisi) TIDAK muncul di Data Barang —
+            // ditampilkan di tab Arsip. Disaring di sini, bukan di endpoint,
+            // supaya halaman lain yang pakai /api/laptops & /api/accessories aman.
+            const laptopRows = (lapJson.success ? lapJson.data : []).filter((l: any) => !l.archived_at).map(normalizeLaptop);
+            const accessoryRows = (accJson.success ? accJson.data : []).filter((a: any) => !a.archived_at).map(normalizeAccessory);
             const merged = [...laptopRows, ...accessoryRows];
             setRows(merged);
             writeBarangCache(merged);
@@ -466,15 +928,12 @@ export default function UnifiedBarangContent() {
     }, []);
 
     useEffect(() => {
-        // Ada cache segar? → rows sudah terisi dari lazy initializer di atas,
-        // di sini cuma refresh DIAM-DIAM di belakang layar biar tetap akurat.
-        // Tidak ada cache? → fetch normal dengan spinner "Memuat data...".
-        if (readBarangCache()) {
+        if (bootCache) {
             fetchAll({ silent: true });
         } else {
             fetchAll();
         }
-    }, [fetchAll]);
+    }, [fetchAll, bootCache]);
 
     useEffect(() => {
         (async () => {
@@ -498,34 +957,64 @@ export default function UnifiedBarangContent() {
         })();
     }, []);
 
-    // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe)
-    useEffect(() => { setKategoriFilter(""); }, [tipeFilter]);
+    const tipeChangeFirstRun = useRef(true);
+    useEffect(() => {
+        if (tipeChangeFirstRun.current) { tipeChangeFirstRun.current = false; return; }
+        setKategoriFilter([]);
+    }, [tipeFilter]);
 
-    // Deep-link: baca ?tipe= dari URL sekali saat mount — dipakai tombol
-    // breadcrumb "Data Aksesori" di halaman Kelola Unit, supaya begitu balik
-    // ke sini tab langsung terisi Aksesoris, bukan "Semua" default.
+    useEffect(() => {
+        writeBarangFilter({
+            tipeFilter, kategoriFilter, brandFilter, stokFilter,
+            minPrice, maxPrice, statusAuditSoFilter, sortBy, search,
+        });
+    }, [tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, sortBy, search]);
+
     useEffect(() => {
         const t = new URLSearchParams(window.location.search).get("tipe");
         if (t === "LAPTOP" || t === "AKSESORIS") setTipeFilter(t);
     }, []);
 
-    // Kategori dipisah per tipe supaya dropdown laptop tidak menampilkan kategori
-    // aksesoris & sebaliknya. Transition-safe: kategori tanpa `type` (mis. migrasi
-    // belum jalan) tetap ikut muncul di kedua tipe — persis perilaku lama.
+    useEffect(() => {
+        if (!isMaximized) return;
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setIsMaximized(false);
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            document.body.style.overflow = prevOverflow;
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, [isMaximized]);
+
     const laptopCategories = useMemo(
-        () => categories.filter(c => !c.type || c.type === "LAPTOP"),
+        () => categories.filter(c => isLaptopCategoryType(c.type, c.name)),
         [categories],
     );
     const accessoryCategories = useMemo(
-        () => categories.filter(c => !c.type || c.type === "AKSESORIS"),
+        () => categories.filter(c => !isLaptopCategoryType(c.type, c.name)),
         [categories],
     );
-    // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
+    const creatableCategories = useMemo(
+        () => categories.filter(c => (isLaptopCategoryType(c.type, c.name) ? canCreateLaptop : canCreateAcc)),
+        [categories, canCreateLaptop, canCreateAcc],
+    );
+    const selectedCategoryIsPc = useMemo(() => {
+        const cat = categories.find(c => c.id === selectedCategoryId);
+        if (!cat) return false;
+        if ((cat.type ?? "").trim().toUpperCase() === "PC") return true;
+        return (cat.name ?? "").trim().toUpperCase() === "PC";
+    }, [categories, selectedCategoryId]);
+    const selectedCategoryHasChecklist = useMemo(
+        () => isConditionCheckCategory(categories.find(c => c.id === selectedCategoryId)?.name),
+        [categories, selectedCategoryId],
+    );
     const filterCategories = tipeFilter === "LAPTOP" ? laptopCategories
         : tipeFilter === "AKSESORIS" ? accessoryCategories
             : categories;
 
-    // Daftar Brand unik yang ada di data
     const availableBrands = useMemo(() => {
         const set = new Set<string>();
         rows.forEach(r => {
@@ -541,28 +1030,24 @@ export default function UnifiedBarangContent() {
     const filteredRows = useMemo(() => {
         let list = rows;
 
-        // 1. Tipe Barang
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
 
-        // 2. Kategori
-        if (kategoriFilter) {
-            const selectedName = (categories.find(c => c.id === kategoriFilter)?.name || "").toUpperCase();
-            const matchLaptop = (r: UnifiedRow) => r.kategori_id === kategoriFilter;
-            const matchAksesoris = (r: UnifiedRow) => (r.kategori || "").toUpperCase() === selectedName;
+        if (kategoriFilter.length > 0) {
+            const selectedIds = new Set(kategoriFilter);
+            const selectedNames = new Set(
+                kategoriFilter.map(id => (categories.find(c => c.id === id)?.name || "").toUpperCase())
+            );
             list = list.filter(r => {
-                if (tipeFilter === "LAPTOP") return matchLaptop(r);
-                if (tipeFilter === "AKSESORIS") return matchAksesoris(r);
-                return r.tipe === "LAPTOP" ? matchLaptop(r) : matchAksesoris(r);
+                if (r.tipe === "LAPTOP") return r.kategori_id != null && selectedIds.has(r.kategori_id);
+                return selectedNames.has((r.kategori || "").toUpperCase());
             });
         }
 
-        // 3. Brand
         if (brandFilter) {
             const b = brandFilter.toLowerCase();
             list = list.filter(r => (r.brand || "").toLowerCase() === b);
         }
 
-        // 4. Status Stok
         if (stokFilter !== "ALL") {
             list = list.filter(r => {
                 const stokVal = r.tipe === "LAPTOP" ? (r.stok_tersedia ?? 0) : (r.stok ?? 0);
@@ -570,11 +1055,11 @@ export default function UnifiedBarangContent() {
                 if (stokFilter === "EMPTY") return stokVal === 0;
                 if (stokFilter === "SIAP_JUAL") return r.tipe === "LAPTOP" && (r.siap_jual ?? 0) > 0;
                 if (stokFilter === "MINUS") return r.tipe === "LAPTOP" && (r.minus ?? 0) > 0;
+                if (stokFilter === "MINUS_SIAP_JUAL") return r.tipe === "LAPTOP" && (r.minus_siap_jual ?? 0) > 0;
                 return true;
             });
         }
 
-        // 5. Rentang Harga Jual
         const pMin = minPrice.trim() !== "" ? parseFloat(minPrice) : null;
         const pMax = maxPrice.trim() !== "" ? parseFloat(maxPrice) : null;
         if (pMin !== null && !isNaN(pMin)) {
@@ -584,7 +1069,6 @@ export default function UnifiedBarangContent() {
             list = list.filter(r => (r.harga_jual || 0) <= pMax);
         }
 
-        // 6. Status Audit & Stock Opname (SO)
         if (statusAuditSoFilter !== "ALL") {
             list = list.filter(r => {
                 if (statusAuditSoFilter === "SO_TODAY") return isSoActive(r.so_at);
@@ -594,9 +1078,8 @@ export default function UnifiedBarangContent() {
             });
         }
 
-        // 7. Pencarian Teks
-        if (search.trim()) {
-            const t = search.toLowerCase();
+        if (deferredSearch.trim()) {
+            const t = deferredSearch.toLowerCase();
             list = list.filter(r => {
                 const matchString = (
                     r.nama?.toLowerCase().includes(t) ||
@@ -617,14 +1100,23 @@ export default function UnifiedBarangContent() {
                     }
                 }
 
+                // ✅ FIX: SN aksesoris ikut dicari juga. Sebelumnya hanya laptop
+                // yang menelusuri unit-nya, jadi SN aksesoris yang punya >1 unit
+                // ber-SN tidak pernah kebaca lewat kotak pencarian.
+                if (r.tipe === "AKSESORIS" && r.raw && "accessory_units" in r.raw) {
+                    const units = (r.raw as AccessoryRaw).accessory_units;
+                    if (units && units.some(u => u.serial_number?.toLowerCase().includes(t))) {
+                        return true;
+                    }
+                }
+
                 return false;
             });
         }
 
-        // 8. Urutkan Data (Sorting)
         return [...list].sort((a, b) => {
-            if (sortBy === "NAMA_ASC") return a.nama.localeCompare(b.nama, "id-ID");
-            if (sortBy === "NAMA_DESC") return b.nama.localeCompare(a.nama, "id-ID");
+            if (sortBy === "NAMA_ASC") return a.nama.trim().localeCompare(b.nama.trim(), "id-ID", { sensitivity: "base", numeric: true });
+            if (sortBy === "NAMA_DESC") return b.nama.trim().localeCompare(a.nama.trim(), "id-ID", { sensitivity: "base", numeric: true });
             if (sortBy === "HARGA_DESC") return (b.harga_jual || 0) - (a.harga_jual || 0);
             if (sortBy === "HARGA_ASC") return (a.harga_jual || 0) - (b.harga_jual || 0);
             if (sortBy === "STOK_DESC") {
@@ -644,7 +1136,9 @@ export default function UnifiedBarangContent() {
             }
             return 0;
         });
-    }, [rows, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, search, categories, sortBy]);
+    }, [rows, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, deferredSearch, categories, sortBy]);
+
+    const visibleRows = filteredRows;
 
     const counts = useMemo(() => ({
         total: rows.length,
@@ -652,13 +1146,8 @@ export default function UnifiedBarangContent() {
         aksesoris: rows.filter(r => r.tipe === "AKSESORIS").length,
     }), [rows]);
 
-    // ── Export Excel ─────────────────────────────────────────────────────
-    // Laptop: setiap unit/SN aktif (non-SOLD) jadi 1 baris sendiri, supaya
-    // modal, sumber, dan tanggal masuk per-SN kelihatan detail — bukan
-    // digabung per model seperti di tabel. Aksesoris tetap 1 baris per item
-    // (memang tidak punya SN individual). Yang di-export ikut filter/search
-    // yang sedang aktif (pakai filteredRows, bukan rows mentah).
-    const handleExportExcel = useCallback(() => {
+    // ── Export Excel: RINGKAS (1 baris per model) ──────────────────────────
+    const handleExportRingkas = useCallback(() => {
         try {
             const exportRows: Record<string, string | number>[] = [];
             let no = 1;
@@ -668,12 +1157,72 @@ export default function UnifiedBarangContent() {
                 const soLabel = row.tipe === "LAPTOP" ? (isSoActive(row.so_at) ? "Sudah SO" : "Belum SO") : "-";
 
                 if (row.tipe === "LAPTOP") {
-                    const units = ((row.raw as LaptopRaw).laptop_units ?? []).filter(u => u.status !== "SOLD");
+                    // Total Modal = jumlah modal SEMUA unit aktif (bukan SOLD/KELUAR/MSJ)
+                    // supaya konsisten dengan angka Stok Tersedia di tabel layar.
+                    const aktif = ((row.raw as LaptopRaw).laptop_units ?? [])
+                        .filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id);
+                    const totalModal = aktif.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
+                    exportRows.push({
+                        No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
+                        Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                        CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
+                        "Harga Jual": row.harga_jual,
+                        "Total Modal": totalModal,
+                        "Total Jual": row.total_jual ?? (row.harga_jual * (row.stok_tersedia ?? 0)),
+                        Stok: row.stok_tersedia ?? 0,
+                        "Status Audit": auditLabel, "Status SO": soLabel,
+                    });
+                } else {
+                    const acc = row.raw as AccessoryRaw;
+                    const accAktif = (acc.accessory_units ?? [])
+                        .filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR");
+                    // Punya unit ber-SN → jumlahkan modal tiap unit. Belum pakai SN →
+                    // buy_price model × stok manual.
+                    const totalModal = accAktif.length > 0
+                        ? accAktif.reduce((s, u) => s + (u.buy_price ?? acc.buy_price ?? 0), 0)
+                        : (acc.buy_price ?? 0) * (row.stok ?? 0);
+                    exportRows.push({
+                        No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
+                        Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                        CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
+                        "Harga Jual": row.harga_jual,
+                        "Total Modal": totalModal,
+                        "Total Jual": row.harga_jual * (row.stok ?? 0),
+                        Stok: row.stok ?? 0,
+                        "Status Audit": auditLabel, "Status SO": soLabel,
+                    });
+                }
+            });
+
+            const cols = [
+                { wch: 5 }, { wch: 10 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+                { wch: 18 }, { wch: 8 }, { wch: 10 }, { wch: 16 },
+                { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 6 },
+                { wch: 11 }, { wch: 10 },
+            ];
+            writeStyledExcel(exportRows, cols, "Ringkas Barang", "Data-Barang-Ringkas");
+            toast.success(`Export ringkas berhasil — ${exportRows.length} baris`);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal export Excel");
+        }
+    }, [filteredRows]);
+
+    // ── Export Excel: PER-SN (tiap SN 1 baris + modal per-SN) ──────────────
+    const handleExportPerSn = useCallback(() => {
+        try {
+            const exportRows: Record<string, string | number>[] = [];
+            let no = 1;
+
+            filteredRows.forEach((row) => {
+                const auditLabel = isAuditActive(row) ? "Teraudit" : "Belum";
+                const soLabel = row.tipe === "LAPTOP" ? (isSoActive(row.so_at) ? "Sudah SO" : "Belum SO") : "-";
+
+                if (row.tipe === "LAPTOP") {
+                    const units = ((row.raw as LaptopRaw).laptop_units ?? []).filter(u => u.status !== "SOLD" && u.status !== "KELUAR");
 
                     if (units.length === 0) {
-                        // Model belum punya unit sama sekali — tetap 1 baris, SN kosong
                         exportRows.push({
-                            No: no++, Tipe: "Laptop", "Nama Barang": row.nama,
+                            No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
                             Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                             CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
                             SN: "-", "Status Unit": "-",
@@ -686,7 +1235,7 @@ export default function UnifiedBarangContent() {
 
                     units.forEach((u) => {
                         exportRows.push({
-                            No: no++, Tipe: "Laptop", "Nama Barang": row.nama,
+                            No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
                             Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                             CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
                             SN: u.serial_number, "Status Unit": u.status,
@@ -700,50 +1249,75 @@ export default function UnifiedBarangContent() {
                     });
                 } else {
                     const acc = row.raw as AccessoryRaw;
-                    exportRows.push({
-                        No: no++, Tipe: "Aksesoris", "Nama Barang": row.nama,
-                        Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
-                        CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
-                        SN: "-", "Status Unit": "-",
-                        "Harga Modal": acc.buy_price ?? 0, "Modal Sparepart": 0, "Harga Jual": row.harga_jual,
-                        Sumber: "-", "Tgl Masuk": "-", Stok: row.stok ?? 0,
-                        "Status Audit": auditLabel, "Status SO": soLabel,
+                    // Sama seperti laptop: iterasi SEMUA unit aktif aksesoris supaya
+                    // tiap SN + modal per-SN keluar 1 baris sendiri. "TERJUAL"/"KELUAR"
+                    // dibuang biar konsisten dengan normalizeAccessory().
+                    const accUnits = (acc.accessory_units ?? []).filter(
+                        u => u.status !== "TERJUAL" && u.status !== "KELUAR"
+                    );
+
+                    if (accUnits.length === 0) {
+                        // Aksesoris lama tanpa SN (stok manual) → tetap 1 baris ringkas.
+                        exportRows.push({
+                            No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
+                            Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                            CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
+                            SN: "-", "Status Unit": "-",
+                            "Harga Modal": acc.buy_price ?? 0, "Modal Sparepart": 0, "Harga Jual": row.harga_jual,
+                            Sumber: "-", "Tgl Masuk": "-", Stok: row.stok ?? 0,
+                            "Status Audit": auditLabel, "Status SO": soLabel,
+                        });
+                        return;
+                    }
+
+                    // Per unit: SN + modal masing-masing SN (fallback ke acc.buy_price
+                    // kalau unit-nya belum punya buy_price sendiri).
+                    accUnits.forEach((u) => {
+                        exportRows.push({
+                            No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
+                            Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                            CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
+                            SN: u.serial_number, "Status Unit": u.status,
+                            "Harga Modal": u.buy_price ?? acc.buy_price ?? 0, "Modal Sparepart": 0,
+                            "Harga Jual": row.harga_jual,
+                            Sumber: "-",
+                            "Tgl Masuk": u.created_at ? new Date(u.created_at).toLocaleDateString("id-ID") : "-",
+                            Stok: 1,
+                            "Status Audit": auditLabel, "Status SO": soLabel,
+                        });
                     });
                 }
             });
 
-            const ws = XLSX.utils.json_to_sheet(exportRows);
-            ws["!cols"] = [
+            const cols = [
                 { wch: 5 }, { wch: 10 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
                 { wch: 18 }, { wch: 8 }, { wch: 10 }, { wch: 16 }, { wch: 16 },
                 { wch: 12 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 12 },
                 { wch: 12 }, { wch: 6 }, { wch: 11 }, { wch: 10 },
             ];
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Data Barang");
-
-            const stamp = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
-            XLSX.writeFile(wb, `Data-Barang-${stamp}.xlsx`);
-
-            toast.success(`Export berhasil — ${exportRows.length} baris`);
+            writeStyledExcel(exportRows, cols, "Data Barang per-SN", "Data-Barang-perSN");
+            toast.success(`Export per-SN berhasil — ${exportRows.length} baris`);
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal export Excel");
         }
     }, [filteredRows]);
 
     // ── Audit toggle ───────────────────────────────────────────────────────
-    const toggleAudit = async (row: UnifiedRow) => {
+    const toggleAudit = async (row: UnifiedRow, note: string = "") => {
         if (!canToggleAudit(row)) return;
         setAuditingId(row.id);
         try {
             const url = row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/audit` : `/api/accessories/${row.id}/audit`;
-            const res = await fetch(url, { method: "PATCH" });
+            const res = await fetch(url, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ notes: note }),
+            });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal update audit");
             setRows(prev => {
                 const next = prev.map(r => r.id === row.id ? { ...r, audited_at: json.data.audited_at, audited_by: json.data.audited_by } : r);
-                writeBarangCache(next); // cache ikut update, biar load berikutnya tidak "kedip balik" ke status lama
+                writeBarangCache(next);
                 return next;
             });
             toast.success("Status audit diperbarui");
@@ -754,9 +1328,43 @@ export default function UnifiedBarangContent() {
         }
     };
 
+    // ── Tes Kondisi (checklist level model laptop) ──────────────────────────
+    const openConditionChecks = (row: UnifiedRow) => {
+        const l = row.raw as LaptopRaw;
+        setConditionChecksDraft(sanitizeConditionChecks(l.condition_checks));
+        setConditionChecksTarget(row);
+    };
+
+    const saveConditionChecks = async () => {
+        if (!conditionChecksTarget) return;
+        setConditionChecksSaving(true);
+        try {
+            const res = await fetch(`/api/laptops/${conditionChecksTarget.id}/condition-checks`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ condition_checks: conditionChecksDraft }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal menyimpan tes kondisi");
+            setRows(prev => {
+                const next = prev.map(r =>
+                    r.id === conditionChecksTarget.id
+                        ? { ...r, raw: { ...(r.raw as LaptopRaw), condition_checks: conditionChecksDraft } }
+                        : r
+                );
+                writeBarangCache(next);
+                return next;
+            });
+            toast.success("Tes kondisi berhasil diperbarui");
+            setConditionChecksTarget(null);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal menyimpan tes kondisi");
+        } finally {
+            setConditionChecksSaving(false);
+        }
+    };
+
     // ── SO toggle (laptop & aksesoris) ──────────────────────────────────────
-    // Catatan diambil dari SoConfirmModal, bukan window.prompt — Cancel di
-    // modal benar-benar tidak memanggil fungsi ini sama sekali.
     const toggleSo = async (row: UnifiedRow, note: string) => {
         setSoingId(row.id);
         try {
@@ -779,17 +1387,37 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    // ── Pedagang toggle (laptop, stok = 1 saja) ────────────────────────────
-    const togglePedagang = async (row: UnifiedRow, current: boolean) => {
-        if (!row.unit_id) return;
-        setPedagangSavingId(row.unit_id);
+    // ── Pedagang toggle (laptop — SEMUA unit aktif satu model sekaligus) ─────
+    const togglePedagang = async (row: UnifiedRow) => {
+        if (row.tipe !== "LAPTOP") return;
+        const next = !(row.is_pedagang_listed ?? false);
+        setPedagangSavingId(row.id);
         try {
-            const res = await fetch(`/api/units/${row.unit_id}/pedagang`, {
-                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_pedagang_listed: !current }),
+            const res = await fetch(`/api/laptops/${row.id}/pedagang`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_pedagang_listed: next }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal update status pedagang");
-            toast.success("Status pedagang diperbarui");
+            setRows(prev => {
+                const updated = prev.map(r => {
+                    if (r.id !== row.id) return r;
+                    const rawL = r.raw as LaptopRaw;
+                    return {
+                        ...r,
+                        is_pedagang_listed: next,
+                        raw: {
+                            ...rawL,
+                            laptop_units: (rawL.laptop_units ?? []).map(u =>
+                                u.status !== "SOLD" ? { ...u, is_pedagang_listed: next } : u
+                            ),
+                        },
+                    };
+                });
+                writeBarangCache(updated);
+                return updated;
+            });
+            toast.success(next ? "Laptop masuk Pricelist Pedagang" : "Laptop keluar dari Pricelist Pedagang");
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal update status pedagang");
         } finally {
@@ -797,9 +1425,64 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    //  Ambil detail unit LENGKAP (condition_note, notes, dst) untuk laptop
-    //  stok 1 — data di tabel gabungan ini cuma versi ringkas, jadi harus
-    //  fetch ulang lewat endpoint units, sama seperti LaptopsContent.tsx.
+    // Arsip MANUAL — langsung pindah ke Arsip Barang (tanpa konfirmasi, sesuai
+    // requirement). Baris dihapus dari state lokal + cache biar hilang instan.
+    const archiveRow = async (row: UnifiedRow) => {
+        setArchivingId(row.id);
+        try {
+            const url = row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/archive` : `/api/accessories/${row.id}/archive`;
+            const res = await fetch(url, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ archived: true }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal mengarsipkan");
+            setRows(prev => {
+                const next = prev.filter(r => !(r.id === row.id && r.tipe === row.tipe));
+                writeBarangCache(next);
+                return next;
+            });
+            toast.success("Barang dipindahkan ke Arsip");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal mengarsipkan");
+        } finally {
+            setArchivingId(null);
+        }
+    };
+
+    const convertToAccessory = async (categoryName: string) => {
+        if (!convertTarget) return;
+        const targetCategory = categories.find(c => c.name === categoryName);
+        const targetIsLaptopFamily = isLaptopCategoryType(targetCategory?.type, targetCategory?.name);
+        setConverting(true);
+        try {
+            if (targetIsLaptopFamily) {
+                const res = await fetch(`/api/laptops/${convertTarget.id}`, {
+                    method: "PUT", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ category_id: targetCategory?.id ?? null }),
+                });
+                const json = await res.json();
+                if (!json.success) throw new Error(json.message || "Gagal memindahkan kategori");
+                toast.success("Kategori berhasil diperbarui");
+            } else {
+                const res = await fetch(`/api/laptops/${convertTarget.id}/convert-to-accessory`, {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ category: categoryName }),
+                });
+                const json = await res.json();
+                if (!json.success) throw new Error(json.error || "Gagal mengonversi barang");
+                toast.success("Barang berhasil dipindahkan ke Aksesoris");
+            }
+            setConvertTarget(null);
+            fetchAll();
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal memperbarui tipe barang");
+        } finally {
+            setConverting(false);
+        }
+    };
+
     const openUnitDetail = async (row: UnifiedRow) => {
         setUnitDetailLoading(true);
         try {
@@ -820,9 +1503,6 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    //  Versi AKSESORIS dari openUnitDetail — fetch ke endpoint asli
-    //  (GET /api/accessory-units?accessory_id=X), bukan endpoint nested
-    //  yang sudah dihapus karena duplikat & tidak konsisten dengan yang asli.
     const openAccessoryUnitDetail = async (row: UnifiedRow) => {
         setUnitDetailAccessoryLoading(true);
         try {
@@ -844,12 +1524,8 @@ export default function UnifiedBarangContent() {
     };
 
     // ── Klik baris (desktop) / tap kartu (mobile) ───────────────────────────
-    // Stok 0  → buka pop-up "Tambah Unit" (unit pertama belum ada).
-    // Stok 1  → buka pop-up "Detail Unit" untuk edit SN yang sudah ada ATAU
-    //           tambah unit baru (tombol "+ Tambah Unit" di dalam pop-up itu).
-    // Stok >1 → TIDAK diberi aksi klik — edit SN dilakukan di halaman Units
-    //           lewat tombol "Kelola Unit" yang sudah ada.
     const handleRowClick = (row: UnifiedRow) => {
+        if (canOnlyViewBasic) return; // role basic-view: baris tidak bisa diklik
         if (row.tipe === "LAPTOP") {
             if (row.unit_count === 0 && canAddUnit) {
                 setAddUnitTarget(row);
@@ -869,9 +1545,6 @@ export default function UnifiedBarangContent() {
             if (action === "detail" && canViewUnits) {
                 openAccessoryUnitDetail(row);
             }
-            // action === "units" → sengaja TIDAK diapa-apakan di sini, sama
-            // seperti LAPTOP saat unit_count > 1: klik baris tidak ngapa-ngapain,
-            // user wajib klik tombol "Kelola Unit" di kolom Aksi.
         }
     };
 
@@ -905,10 +1578,27 @@ export default function UnifiedBarangContent() {
     }, [historyTarget]);
 
     // ── Create / Edit form ───────────────────────────────────────────────────
-    const openCreate = (tipe: ItemType) => {
+    const openCreate = () => {
         setLaptopForm(EMPTY_LAPTOP_FORM);
+        setConditionChecks({});
         setAccForm(EMPTY_ACC_FORM);
-        setFormModal({ mode: "create", tipe });
+        setSelectedCategoryId("");
+        setFormModal({ mode: "create", tipe: null });
+    };
+
+    const inferTipeFromCategory = (cat?: { type?: string | null; name?: string }): ItemType =>
+        isLaptopCategoryType(cat?.type, cat?.name) ? "LAPTOP" : "AKSESORIS";
+
+    const handleCategoryPick = (categoryId: string) => {
+        setSelectedCategoryId(categoryId);
+        const cat = categories.find(c => c.id === categoryId);
+        const tipe = inferTipeFromCategory(cat);
+        setFormModal(prev => prev ? { ...prev, tipe } : prev);
+        if (tipe === "LAPTOP") {
+            setLaptopForm(p => ({ ...p, category_id: categoryId }));
+        } else {
+            setAccForm(p => ({ ...p, category: cat?.name ?? "" }));
+        }
     };
     const openEdit = (row: UnifiedRow) => {
         if (row.tipe === "LAPTOP") {
@@ -918,24 +1608,35 @@ export default function UnifiedBarangContent() {
                 cpu: l.cpu || "", ram: l.ram || "", storage: l.storage || "", gpu: l.gpu || "", display: l.display || "",
                 selling_price: String(l.selling_price || ""), condition_note: l.condition_note || "", notes: l.notes || "",
             });
+            setConditionChecks(sanitizeConditionChecks(l.condition_checks));
+            setSelectedCategoryId(l.category_id || "");
         } else {
             const a = row.raw as AccessoryRaw;
             setAccForm({
                 name: a.name || "", category: a.category || "", brand: a.brand || "", spec: a.spec || "",
                 buy_price: String(a.buy_price ?? ""), sell_price: String(a.sell_price ?? ""), stock: String(a.stock ?? ""), notes: a.notes || "",
             });
+            setSelectedCategoryId(categories.find(c => c.name.toUpperCase() === (a.category || "").toUpperCase())?.id ?? "");
         }
         setFormModal({ mode: "edit", tipe: row.tipe, row });
     };
-    const closeForm = () => setFormModal(null);
+    const closeForm = () => { setFormModal(null); setSelectedCategoryId(""); };
 
     const submitForm = async () => {
         if (!formModal) return;
+        if (formModal.mode === "create" && !formModal.tipe) {
+            toast.error("Kategori wajib dipilih");
+            return;
+        }
         setSaving(true);
         try {
             if (formModal.tipe === "LAPTOP") {
                 if (!laptopForm.laptop_name.trim()) { toast.error("Nama laptop wajib diisi"); return; }
-                const body = { ...laptopForm, selling_price: Number(laptopForm.selling_price) || 0 };
+                const body = {
+                    ...laptopForm,
+                    selling_price: Number(laptopForm.selling_price) || 0,
+                    ...(canEditChecklist && selectedCategoryHasChecklist && { condition_checks: conditionChecks }),
+                };
                 const url = formModal.mode === "edit" ? `/api/laptops/${formModal.row!.id}` : "/api/laptops/create";
                 const res = await fetch(url, {
                     method: formModal.mode === "edit" ? "PUT" : "POST",
@@ -991,7 +1692,7 @@ export default function UnifiedBarangContent() {
 
     const activeFilterCount = [
         tipeFilter !== "ALL",
-        !!kategoriFilter,
+        kategoriFilter.length > 0,
         !!brandFilter,
         stokFilter !== "ALL",
         !!minPrice.trim(),
@@ -1005,7 +1706,7 @@ export default function UnifiedBarangContent() {
 
     const resetFilter = () => {
         setTipeFilter("ALL");
-        setKategoriFilter("");
+        setKategoriFilter([]);
         setBrandFilter("");
         setStokFilter("ALL");
         setMinPrice("");
@@ -1026,34 +1727,76 @@ export default function UnifiedBarangContent() {
                 .table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
                 .table-scroll::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 99px; }
                 .table-scroll::-webkit-scrollbar-track { background: #fafafa; border-radius: 99px; }
+                /* Baris pill kategori di HP: digeser horizontal, scrollbar disembunyikan
+                   supaya tidak makan tinggi. Di >= sm balik jadi flex-wrap biasa. */
+                .pills-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+                .pills-scroll::-webkit-scrollbar { display: none; }
             `}</style>
 
-            <main className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8">
-                <div className="max-w-full mx-auto space-y-5">
+            <main
+                className={
+                    isMaximized
+                        ? "fixed inset-0 z-[45] bg-zinc-50 p-4 sm:p-6 lg:p-8 overflow-auto"
+                        : "min-h-screen bg-zinc-50 p-3 sm:p-6 lg:p-8"
+                }
+            >
+                <div className="max-w-full mx-auto space-y-4 sm:space-y-5">
 
-                    {/* ── FILTER TIPE BARANG ─────────────────────────────── */}
-                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 flex flex-wrap items-center gap-2">
-                        {([["ALL", `Semua (${counts.total})`], ["LAPTOP", `Laptop (${counts.laptop})`], ["AKSESORIS", `Aksesoris (${counts.aksesoris})`]] as const).map(([key, label]) => (
-                            <button key={key} onClick={() => setTipeFilter(key)}
-                                className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${tipeFilter === key ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
-                                {label}
+                    {/* ── FILTER SUB KATEGORI ── */}
+                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-3 sm:p-4 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                            <h3 className="text-[13px] font-bold text-zinc-700">Kategori</h3>
+                            <div className="flex items-center gap-2 sm:flex-shrink-0">
+                                <button
+                                    onClick={() => setIsMaximized(v => !v)}
+                                    title={isMaximized ? "Kembalikan ukuran normal (Esc)" : "Perbesar layar penuh"}
+                                    className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-xl text-zinc-500 bg-zinc-100 border border-zinc-200 hover:bg-zinc-200 hover:text-zinc-700 transition"
+                                >
+                                    {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                                </button>
+                                {!canOnlyViewBasic && (
+                                    <button onClick={handleExportRingkas} disabled={filteredRows.length === 0}
+                                        className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition whitespace-nowrap">
+                                        Export Ringkas
+                                    </button>
+                                )}
+                                {!canOnlyViewBasic && (
+                                    <button onClick={handleExportPerSn} disabled={filteredRows.length === 0}
+                                        className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 disabled:opacity-40 transition whitespace-nowrap">
+                                        Export per-SN
+                                    </button>
+                                )}
+                                {!canOnlyViewBasic && (canCreateLaptop || canCreateAcc) && (
+                                    <button
+                                        onClick={openCreate}
+                                        className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition whitespace-nowrap"
+                                    >
+                                        + Tambah<span className="hidden sm:inline"> Barang</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pills-scroll -mx-1 px-1 pb-0.5 sm:flex-wrap sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
+                            <button
+                                onClick={() => setKategoriFilter([])}
+                                className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${kategoriFilter.length === 0 ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                Semua Kategori
                             </button>
-                        ))}
-                        <div className="flex-1" />
-                        <button onClick={handleExportExcel} disabled={filteredRows.length === 0}
-                            className="h-9 px-4 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition">
-                            Export Excel
-                        </button>
-                        {canCreateLaptop && <button onClick={() => openCreate("LAPTOP")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition">+ Laptop</button>}
-                        {canCreateAcc && <button onClick={() => openCreate("AKSESORIS")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-600 to-zinc-700 hover:from-zinc-700 hover:to-zinc-800 transition">+ Aksesori</button>}
+                            {filterCategories.map(c => (
+                                <button
+                                    key={c.id}
+                                    onClick={() => setKategoriFilter(prev => (prev.length === 1 && prev[0] === c.id) ? [] : [c.id])}
+                                    className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${kategoriFilter.length === 1 && kategoriFilter[0] === c.id ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                    {c.name}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
-                    {/* ── FILTER UTAMA & LANJUTAN (FULL FILTER) ───────────── */}
-                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 sm:p-5 space-y-3">
-                        {/* Row 1: Search, Kategori, Brand, Toggle Lanjutan, & Reset */}
+                    {/* ── FILTER UTAMA & LANJUTAN ── */}
+                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-3 sm:p-5 space-y-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-center">
-                            {/* Search Input */}
-                            <div className="relative lg:col-span-4">
+                            <div className="relative sm:col-span-2 lg:col-span-4">
                                 <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 pointer-events-none" />
                                 <input
                                     className="w-full h-9 pl-9 pr-8 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition"
@@ -1068,19 +1811,14 @@ export default function UnifiedBarangContent() {
                                 )}
                             </div>
 
-                            {/* Kategori Dropdown */}
                             <div className="lg:col-span-3">
-                                <select
-                                    className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-zinc-700 font-medium"
-                                    value={kategoriFilter}
-                                    onChange={e => setKategoriFilter(e.target.value)}
-                                >
-                                    <option value="">Semua Kategori</option>
-                                    {filterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
+                                <CategoryChecklistDropdown
+                                    categories={filterCategories}
+                                    selected={kategoriFilter}
+                                    onChange={setKategoriFilter}
+                                />
                             </div>
 
-                            {/* Brand Dropdown */}
                             <div className="lg:col-span-2">
                                 <select
                                     className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-zinc-700 font-medium"
@@ -1092,8 +1830,7 @@ export default function UnifiedBarangContent() {
                                 </select>
                             </div>
 
-                            {/* Action Buttons: Toggle Advanced + Reset */}
-                            <div className="lg:col-span-3 flex items-center gap-2">
+                            <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
                                 <button
                                     onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
                                     className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition border ${showAdvancedFilter || activeFilterCount > (tipeFilter !== "ALL" || kategoriFilter || brandFilter || search ? 1 : 0)
@@ -1101,20 +1838,20 @@ export default function UnifiedBarangContent() {
                                         : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
                                         }`}
                                 >
-                                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                                    <span>Filter Lanjutan</span>
+                                    <SlidersHorizontal className="w-3.5 h-3.5 flex-shrink-0" />
+                                    <span className="truncate">Filter Lanjutan</span>
                                     {activeFilterCount > 0 && (
-                                        <span className="w-4 h-4 rounded-full bg-amber-400 text-zinc-900 font-bold text-[10px] flex items-center justify-center ml-0.5">
+                                        <span className="w-4 h-4 flex-shrink-0 rounded-full bg-amber-400 text-zinc-900 font-bold text-[10px] flex items-center justify-center ml-0.5">
                                             {activeFilterCount}
                                         </span>
                                     )}
-                                    {showAdvancedFilter ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                    {showAdvancedFilter ? <ChevronUp className="w-3.5 h-3.5 flex-shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />}
                                 </button>
 
                                 <button
                                     onClick={resetFilter}
                                     disabled={!hasFilter}
-                                    className="h-9 px-3 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-medium hover:bg-zinc-200 disabled:opacity-40 transition flex items-center gap-1.5"
+                                    className="h-9 px-3 flex-shrink-0 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-medium hover:bg-zinc-200 disabled:opacity-40 transition flex items-center gap-1.5"
                                     title="Reset Semua Filter"
                                 >
                                     <RotateCcw className="w-3.5 h-3.5" />
@@ -1123,10 +1860,8 @@ export default function UnifiedBarangContent() {
                             </div>
                         </div>
 
-                        {/* Collapsible Panel: Filter Lanjutan */}
                         {showAdvancedFilter && (
                             <div className="pt-3 border-t border-zinc-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-fadeIn">
-                                {/* Status Stok */}
                                 <div>
                                     <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Status Stok</label>
                                     <select
@@ -1139,10 +1874,10 @@ export default function UnifiedBarangContent() {
                                         <option value="EMPTY">Stok Habis (= 0)</option>
                                         <option value="SIAP_JUAL">Ada Unit Siap Jual</option>
                                         <option value="MINUS">Ada Stock Minus / Service</option>
+                                        <option value="MINUS_SIAP_JUAL">Ada Minus Siap Jual</option>
                                     </select>
                                 </div>
 
-                                {/* Status Audit & Stock Opname */}
                                 <div>
                                     <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Status Audit / SO</label>
                                     <select
@@ -1157,12 +1892,12 @@ export default function UnifiedBarangContent() {
                                     </select>
                                 </div>
 
-                                {/* Rentang Harga Jual (Min & Max) */}
                                 <div>
                                     <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Harga Jual (Rp)</label>
                                     <div className="flex items-center gap-1.5">
                                         <input
                                             type="number"
+                                            inputMode="numeric"
                                             placeholder="Min"
                                             className="w-1/2 h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none"
                                             value={minPrice}
@@ -1171,6 +1906,7 @@ export default function UnifiedBarangContent() {
                                         <span className="text-zinc-300 text-xs">-</span>
                                         <input
                                             type="number"
+                                            inputMode="numeric"
                                             placeholder="Max"
                                             className="w-1/2 h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none"
                                             value={maxPrice}
@@ -1179,7 +1915,6 @@ export default function UnifiedBarangContent() {
                                     </div>
                                 </div>
 
-                                {/* Sorting Dropdown */}
                                 <div>
                                     <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Urutkan Berdasarkan</label>
                                     <select
@@ -1199,7 +1934,6 @@ export default function UnifiedBarangContent() {
                             </div>
                         )}
 
-                        {/* Active Filter Badges & Counter */}
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100/80 text-xs text-zinc-500">
                             <div className="flex flex-wrap items-center gap-1.5">
                                 <span className="text-[11px] font-medium text-zinc-400">Total:</span>
@@ -1207,345 +1941,495 @@ export default function UnifiedBarangContent() {
                                     {filteredRows.length} dari {rows.length} barang
                                 </span>
 
-                                {kategoriFilter && (
-                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
-                                        Kategori: {categories.find(c => c.id === kategoriFilter)?.name || kategoriFilter}
-                                        <button onClick={() => setKategoriFilter("")} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                {kategoriFilter.length > 0 && (
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium max-w-full">
+                                        <span className="truncate">
+                                            Kategori: {kategoriFilter.length === 1
+                                                ? (categories.find(c => c.id === kategoriFilter[0])?.name || kategoriFilter[0])
+                                                : `${kategoriFilter.length} dipilih`}
+                                        </span>
+                                        <button onClick={() => setKategoriFilter([])} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
                                     </span>
                                 )}
                                 {brandFilter && (
-                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
-                                        Brand: {brandFilter}
-                                        <button onClick={() => setBrandFilter("")} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium max-w-full">
+                                        <span className="truncate">Brand: {brandFilter}</span>
+                                        <button onClick={() => setBrandFilter("")} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
                                     </span>
                                 )}
                                 {stokFilter !== "ALL" && (
-                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
-                                        Stok: {stokFilter}
-                                        <button onClick={() => setStokFilter("ALL")} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium max-w-full">
+                                        <span className="truncate">Stok: {stokFilter}</span>
+                                        <button onClick={() => setStokFilter("ALL")} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
                                     </span>
                                 )}
                                 {(minPrice || maxPrice) && (
-                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
-                                        Harga: {minPrice ? fmt(Number(minPrice)) : "0"} - {maxPrice ? fmt(Number(maxPrice)) : "∞"}
-                                        <button onClick={() => { setMinPrice(""); setMaxPrice(""); }} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium max-w-full">
+                                        <span className="truncate">Harga: {minPrice ? fmt(Number(minPrice)) : "0"} - {maxPrice ? fmt(Number(maxPrice)) : "∞"}</span>
+                                        <button onClick={() => { setMinPrice(""); setMaxPrice(""); }} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
                                     </span>
                                 )}
                                 {statusAuditSoFilter !== "ALL" && (
-                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
-                                        Audit/SO: {statusAuditSoFilter}
-                                        <button onClick={() => setStatusAuditSoFilter("ALL")} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium max-w-full">
+                                        <span className="truncate">Audit/SO: {statusAuditSoFilter}</span>
+                                        <button onClick={() => setStatusAuditSoFilter("ALL")} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
                                     </span>
                                 )}
                             </div>
                         </div>
                     </div>
 
-                    {/* ── TABEL / DAFTAR BARANG ────────────────────────────── */}
+                    {/* ── TABEL / DAFTAR BARANG ── */}
                     {loading ? (
                         <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm py-16 text-center text-sm text-zinc-400">Memuat data...</div>
                     ) : filteredRows.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm py-16 text-center">
+                        <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm py-16 text-center px-4">
                             <p className="text-zinc-700 font-bold text-base">Tidak ada barang ditemukan</p>
                             <p className="text-zinc-400 text-sm mt-1">Coba ubah filter atau tambah barang baru</p>
                         </div>
                     ) : (
                         <>
                             {/* ══ MODE HP/TABLET (< lg) — kartu per barang ══════════ */}
-                            <div className="lg:hidden space-y-3">
-                                {filteredRows.map((row) => {
-                                    const rowKey = `${row.tipe}-${row.id}`;
-                                    const auditActive = isAuditActive(row);
-                                    const soActive = isSoActive(row.so_at);
-                                    const expanded = expandedIds.has(rowKey);
-                                    const canEditThis = row.tipe === "LAPTOP" ? canEditLaptop : canEditAcc;
-                                    const canDeleteThis = row.tipe === "LAPTOP" ? canDeleteLaptop : canDeleteAcc;
-                                    const accAction = getAccessoryUnitAction(row);
-                                    const isRowClickable = row.tipe === "LAPTOP"
-                                        ? ((row.unit_count === 0 && canAddUnit) || (row.unit_count === 1 && canViewUnits))
-                                        : row.tipe === "AKSESORIS"
-                                            ? ((accAction === "add" && canAddUnit) || (accAction === "detail" && canViewUnits))
-                                            : false;
-                                    return (
-                                        <div
-                                            key={rowKey}
-                                            onClick={() => handleRowClick(row)}
-                                            className={`bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 space-y-3 ${isRowClickable ? "cursor-pointer" : ""}`}
-                                        >
-                                            {/* Header: tipe + nama + harga jual */}
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0 flex-1">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
-                                                        {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
-                                                        {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
-                                                    </span>
-                                                    <h3 className="font-bold text-zinc-900 text-[13.5px] leading-snug mt-1.5 truncate" title={row.nama}>{row.nama}</h3>
-                                                    <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
-                                                        {row.kategori || "Tanpa kategori"}{row.brand ? ` · ${row.brand}` : ""}
-                                                    </p>
+                            {!isDesktop && (
+                                <div className="lg:hidden space-y-3">
+                                    {visibleRows.map((row) => {
+                                        const rowKey = `${row.tipe}-${row.id}`;
+                                        const auditActive = isAuditActive(row);
+                                        const soActive = isSoActive(row.so_at);
+                                        const expanded = expandedIds.has(rowKey);
+                                        const canEditThis = row.tipe === "LAPTOP" ? canEditLaptop : canEditAcc;
+                                        const canDeleteThis = row.tipe === "LAPTOP" ? canDeleteLaptop : canDeleteAcc;
+                                        const accAction = getAccessoryUnitAction(row);
+                                        const isRowClickable = canOnlyViewBasic ? false : (row.tipe === "LAPTOP"
+                                            ? ((row.unit_count === 0 && canAddUnit) || (row.unit_count === 1 && canViewUnits))
+                                            : row.tipe === "AKSESORIS"
+                                                ? ((accAction === "add" && canAddUnit) || (accAction === "detail" && canViewUnits))
+                                                : false);
+                                        return (
+                                            <div
+                                                key={rowKey}
+                                                onClick={() => handleRowClick(row)}
+                                                className={`bg-white rounded-2xl border border-zinc-100 shadow-sm p-3.5 space-y-3 ${isRowClickable ? "cursor-pointer" : ""}`}
+                                            >
+                                                {/* Header: tipe + nama + harga jual. */}
+                                                <div className="flex items-start justify-between gap-2.5">
+                                                    <div className="min-w-0 flex-1">
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
+                                                            {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
+                                                            {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
+                                                        </span>
+                                                        <h3 className="font-bold text-zinc-900 text-[13.5px] leading-snug mt-1.5 line-clamp-2" title={row.nama}>{row.nama}</h3>
+                                                        <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
+                                                            {row.kategori || "Tanpa kategori"}{row.brand ? ` · ${row.brand}` : ""}
+                                                        </p>
+                                                    </div>
+                                                    {!canOnlyViewBasic && (
+                                                        <div className="text-right flex-shrink-0 max-w-[42%]">
+                                                            <p className="text-[9px] font-semibold text-zinc-400 uppercase tracking-widest">Harga Jual</p>
+                                                            <p className="text-[13px] font-black text-zinc-900 tabular-nums whitespace-nowrap">{fmt(row.harga_jual)}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="text-right flex-shrink-0">
-                                                    <p className="text-[9px] font-semibold text-zinc-400 uppercase tracking-widest">Harga Jual</p>
-                                                    <p className="text-sm font-black text-zinc-900 tabular-nums">{fmt(row.harga_jual)}</p>
-                                                </div>
-                                            </div>
 
-                                            {/* Chip status stok — beda field antara laptop (ST/SJ/M) dan aksesoris (Stok) */}
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {row.tipe === "LAPTOP" ? (
-                                                    <>
-                                                        <StatChip label="ST" value={row.stok_tersedia} tone={(row.stok_tersedia ?? 0) === 0 ? "red" : "gray"} />
-                                                        <StatChip label="SJ" value={row.siap_jual} tone="green" />
-                                                        <StatChip label="M" value={row.minus} tone={(row.minus ?? 0) > 0 ? "red" : "gray"} />
-                                                    </>
-                                                ) : (
-                                                    <StatChip label="Stok" value={row.stok} tone={(row.stok ?? 0) === 0 ? "red" : "emerald"} />
-                                                )}
-                                            </div>
-
-                                            {/* Toggle detail — CPU/RAM/Spek/Sumber/SN/dll disembunyikan di sini,
-                                                BUKAN dihapus, supaya kartu tetap ringkas di layar kecil. */}
-                                            <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(rowKey); }}
-                                                className="text-[11px] font-semibold text-zinc-700 hover:text-zinc-900 flex items-center gap-1">
-                                                {expanded ? "Sembunyikan detail" : "Lihat detail lengkap"}
-                                                <svg className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </button>
-
-                                            {expanded && (
-                                                <div className="grid grid-cols-2 gap-2 pt-1">
-                                                    <DetailItem label="CPU" value={row.cpu} />
-                                                    <DetailItem label="RAM" value={row.ram} />
-                                                    <DetailItem label="Storage" value={row.storage} />
-                                                    <DetailItem label="Spek" value={row.spek} />
-                                                    <DetailItem label="Harga Modal" value={row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note} />
-                                                    <DetailItem label="Modal Sparepart" value={row.modal_sparepart != null ? fmt(row.modal_sparepart) : null} />
-                                                    <DetailItem label="Total Jual" value={row.total_jual != null ? fmt(row.total_jual) : null} />
-                                                    <DetailItem label="Gross Profit" value={row.gross_profit != null ? `${row.gross_profit >= 0 ? "+" : ""}${fmt(row.gross_profit)}` : null} />
-                                                    <DetailItem label="Sumber" value={row.sumber} />
-                                                    <DetailItem label="Tgl Masuk" value={row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : null} />
-                                                    <DetailItem label="SN" value={row.sn || row.sn_note} />
-                                                </div>
-                                            )}
-
-                                            {/* Aksi — persis fungsi yang sama dengan kolom Aksi di tabel desktop.
-                                                stopPropagation supaya tap tombol di sini tidak ikut memicu
-                                                handleRowClick pada wrapper kartu di atas. */}
-                                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-zinc-100" onClick={(e) => e.stopPropagation()}>
-                                                <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
-                                                    title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
-                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
-                                                    {auditActive ? "Teraudit" : "Audit"}
-                                                </button>
-                                                <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit"
-                                                    className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
-                                                    <HistoryIcon size={13} />
-                                                </button>
-                                                {canDoSo(row) && (
-                                                    <>
-                                                        <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
-                                                            className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${soActive ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
-                                                            {soActive ? "Sudah SO" : "SO"}
+                                                {/* Mode basic-view: tombol Tes Kondisi tetap muncul khusus role
+                                                    editor checklist (Penyedia Barang / Kepala Penyedia Barang),
+                                                    walau kolom & aksi lain disembunyikan. stopPropagation supaya
+                                                    tap tombol tidak memicu handleRowClick. */}
+                                                {canOnlyViewBasic && canShowConditionChecks(row) && (
+                                                    <div className="pt-2.5 border-t border-zinc-100" onClick={(e) => e.stopPropagation()}>
+                                                        <button onClick={() => openConditionChecks(row)}
+                                                            title="Isi / lihat tes kondisi barang"
+                                                            className={`${cardActionCls} text-sky-700 bg-sky-50 hover:bg-sky-100`}>
+                                                            Tes Kondisi
                                                         </button>
-                                                        <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO" className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
-                                                            <HistoryIcon size={13} />
-                                                        </button>
-                                                    </>
+                                                    </div>
                                                 )}
-                                                {row.tipe === "LAPTOP" && row.unit_id && (
-                                                    <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
-                                                        className="h-7 px-2 text-[11px] font-semibold text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Pedagang</button>
-                                                )}
-                                                {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
-                                                    <button onClick={() => setAddUnitTarget(row)}
-                                                        className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
-                                                        Tambah Unit
+
+                                                {/* Chip status stok + toggle detail + panel expand — semua
+                                                    disembunyikan untuk role basic-view (KEPALA_PENYEDIA_BARANG). */}
+                                                {!canOnlyViewBasic && (<>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {row.tipe === "LAPTOP" ? (
+                                                            <>
+                                                                <StatChip label="ST" value={row.stok_tersedia} tone={(row.stok_tersedia ?? 0) === 0 ? "red" : "gray"} />
+                                                                <StatChip label="SJ" value={row.siap_jual} tone="green" />
+                                                                <StatChip label="MSJ" value={row.minus_siap_jual} tone={(row.minus_siap_jual ?? 0) > 0 ? "amber" : "gray"} />
+                                                                <StatChip label="M" value={row.minus} tone={(row.minus ?? 0) > 0 ? "red" : "gray"} />
+                                                            </>
+                                                        ) : (
+                                                            <StatChip label="Stok" value={row.stok} tone={(row.stok ?? 0) === 0 ? "red" : "emerald"} />
+                                                        )}
+                                                    </div>
+
+                                                    {/* Toggle detail — CPU/RAM/Spek/Sumber/SN/dll disembunyikan di sini,
+                                                    BUKAN dihapus, supaya kartu tetap ringkas di layar kecil. */}
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(rowKey); }}
+                                                        className="text-[11px] font-semibold text-zinc-700 hover:text-zinc-900 flex items-center gap-1">
+                                                        {expanded ? "Sembunyikan detail" : "Lihat detail lengkap"}
+                                                        <svg className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                        </svg>
                                                     </button>
-                                                )}
-                                                {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
-                                                    <Link href={`/dashboard/laptops/${row.id}/units`}
-                                                        className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                        Kelola Unit ({row.unit_count})
-                                                    </Link>
-                                                )}
-                                                {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
-                                                    <button onClick={() => setAddUnitAccessoryTarget(row)}
-                                                        className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
-                                                        Tambah Unit
-                                                    </button>
-                                                )}
-                                                {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
-                                                    <Link href={`/dashboard/accessories/${row.id}/units`}
-                                                        className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                        Kelola Unit ({row.stok ?? 0})
-                                                    </Link>
-                                                )}
-                                                {row.tipe === "LAPTOP" && canViewBarcode && (
-                                                    <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })}
-                                                        className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
-                                                )}
-                                                {canEditThis && (
-                                                    <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
-                                                )}
-                                                {canDeleteThis && (
-                                                    <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
+
+                                                    {expanded && (
+                                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                                            <DetailItem label="CPU" value={row.cpu} />
+                                                            <DetailItem label="RAM" value={row.ram} />
+                                                            <DetailItem label="Storage" value={row.storage} />
+                                                            <DetailItem label="Spek" value={row.spek} />
+                                                            <DetailItem label="Harga Modal" value={row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note} />
+                                                            <DetailItem label="Modal Sparepart" value={row.modal_sparepart != null ? fmt(row.modal_sparepart) : null} />
+                                                            <DetailItem label="Total Jual" value={row.total_jual != null ? fmt(row.total_jual) : null} />
+                                                            <DetailItem label="Gross Profit" value={row.gross_profit != null ? `${row.gross_profit >= 0 ? "+" : ""}${fmt(row.gross_profit)}` : null} />
+                                                            <DetailItem label="Sumber" value={row.sumber} />
+                                                            <DetailItem label="Tgl Masuk" value={row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : null} />
+                                                            <DetailItem label="SN" value={row.sn || row.sn_note} />
+                                                        </div>
+                                                    )}
+                                                </>)}
+
+                                                {/* Aksi — status Audit/SO + grid tombol. Seluruhnya disembunyikan
+                                                    untuk role basic-view. stopPropagation tetap di wrapper supaya
+                                                    tap tombol tidak memicu handleRowClick pada kartu. */}
+                                                {!canOnlyViewBasic && (
+                                                    <div className="pt-2.5 border-t border-zinc-100 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+
+                                                        {/* (1) BARIS STATUS: Audit + SO.
+                                                            Stok > 1 → badge progress X/Y (read-only, cerminan Kelola Unit).
+                                                            Stok ≤ 1 → tombol lama, TIDAK diubah. */}
+                                                        <div className="flex items-stretch gap-1.5">
+                                                            {/* ── Audit ── */}
+                                                            {row.unit_count > 1 ? (
+                                                                <div className="flex-1 min-w-0 flex items-center justify-center h-8 rounded-lg border border-zinc-100 bg-zinc-50/60 gap-1.5">
+                                                                    <span className="text-[10px] font-semibold text-zinc-400 uppercase">Audit</span>
+                                                                    <ProgressBadge done={row.audit_done} total={row.unit_count} tone="audit" />
+                                                                </div>
+                                                            ) : (
+                                                                <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${auditActive ? "bg-emerald-50 border-emerald-200" : "bg-zinc-50 border-zinc-200"}`}>
+                                                                    <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                                        title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin/Accounting yang bisa mengubah status audit" : "Tidak punya akses") : ""}
+                                                                        className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${auditActive ? "text-emerald-700" : "text-zinc-400"}`}>
+                                                                        {auditActive ? "Teraudit" : "Audit"}
+                                                                    </button>
+                                                                    <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit"
+                                                                        className={`w-8 flex-shrink-0 flex items-center justify-center border-l transition ${auditActive ? "border-emerald-200 text-emerald-600" : "border-zinc-200 text-zinc-400"}`}>
+                                                                        <HistoryIcon size={13} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+
+                                                            {/* ── SO ── */}
+                                                            {row.unit_count > 1 ? (
+                                                                <div className="flex-1 min-w-0 flex items-center justify-center h-8 rounded-lg border border-zinc-100 bg-zinc-50/60 gap-1.5">
+                                                                    <span className="text-[10px] font-semibold text-zinc-400 uppercase">SO</span>
+                                                                    <ProgressBadge done={row.so_done} total={row.unit_count} tone="so" />
+                                                                </div>
+                                                            ) : canDoSo(row) && (
+                                                                <div className={`flex-1 min-w-0 flex items-stretch h-8 rounded-lg border overflow-hidden ${soActive ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+                                                                    <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
+                                                                        className={`flex-1 min-w-0 truncate px-1 text-[11px] font-semibold disabled:opacity-40 ${soActive ? "text-emerald-700" : "text-red-600"}`}>
+                                                                        {soActive ? "Sudah SO" : "SO"}
+                                                                    </button>
+                                                                    <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO"
+                                                                        className={`w-8 flex-shrink-0 flex items-center justify-center border-l transition ${soActive ? "border-emerald-200 text-emerald-600" : "border-red-200 text-red-500"}`}>
+                                                                        <HistoryIcon size={13} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* (2) GRID AKSI — 2 kolom seragam */}
+                                                        <div className="grid grid-cols-2 gap-1.5">
+                                                            {row.tipe === "LAPTOP" && row.unit_count > 0 && canFullAccessBarang && (
+                                                                <button onClick={() => togglePedagang(row)} disabled={pedagangSavingId === row.id}
+                                                                    title={row.is_pedagang_listed ? "Keluarkan dari Pricelist Pedagang" : "Masukkan ke Pricelist Pedagang"}
+                                                                    className={`${cardActionCls} ${row.is_pedagang_listed ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100" : "text-zinc-700 bg-zinc-100 hover:bg-zinc-200"}`}>
+                                                                    {pedagangSavingId === row.id ? "..." : row.is_pedagang_listed ? "✓ Pedagang" : "+ Pedagang"}
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
+                                                                <button onClick={() => setAddUnitTarget(row)}
+                                                                    className={`${cardActionCls} text-white bg-zinc-800 hover:bg-zinc-900`}>
+                                                                    Tambah Unit
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
+                                                                <Link href={`/dashboard/laptops/${row.id}/units`}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Kelola Unit ({row.unit_count})
+                                                                </Link>
+                                                            )}
+                                                            {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
+                                                                <button onClick={() => setAddUnitAccessoryTarget(row)}
+                                                                    className={`${cardActionCls} text-white bg-zinc-800 hover:bg-zinc-900`}>
+                                                                    Tambah Unit
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
+                                                                <Link href={`/dashboard/accessories/${row.id}/units`}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Kelola Unit ({row.stok ?? 0})
+                                                                </Link>
+                                                            )}
+                                                            {row.tipe === "LAPTOP" && canViewBarcode && (
+                                                                <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "LAPTOP" })}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Barcode
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "AKSESORIS" && canViewBarcode && accAction !== "add" && (
+                                                                <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "AKSESORIS" })}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Barcode
+                                                                </button>
+                                                            )}
+                                                            {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count <= 1 && (
+                                                                <button onClick={() => setConvertTarget(row)}
+                                                                    title="Pindahkan ke Aksesoris dengan kategori yang benar"
+                                                                    className={`${cardActionCls} text-amber-700 bg-amber-50 hover:bg-amber-100`}>
+                                                                    Perbaiki Tipe
+                                                                </button>
+                                                            )}
+                                                            {canFullAccessBarang && isStockEmpty(row) && (
+                                                                <button onClick={() => archiveRow(row)} disabled={archivingId === row.id}
+                                                                    title="Pindahkan barang ini ke Arsip"
+                                                                    className={`${cardActionCls} text-orange-700 bg-orange-50 hover:bg-orange-100`}>
+                                                                    {archivingId === row.id ? "..." : "Arsip"}
+                                                                </button>
+                                                            )}
+                                                            {canShowConditionChecks(row) && (
+                                                                <button onClick={() => openConditionChecks(row)}
+                                                                    title="Edit tes kondisi tanpa buka form Edit penuh"
+                                                                    className={`${cardActionCls} text-sky-700 bg-sky-50 hover:bg-sky-100`}>
+                                                                    Tes Kondisi
+                                                                </button>
+                                                            )}
+                                                            {canEditThis && (
+                                                                <button onClick={() => openEdit(row)}
+                                                                    className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
+                                                                    Edit
+                                                                </button>
+                                                            )}
+                                                            {canDeleteThis && (
+                                                                <button onClick={() => setDeleteRow(row)}
+                                                                    className={`${cardActionCls} text-red-500 bg-red-50 hover:bg-red-100`}>
+                                                                    Hapus
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 )}
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                                <p className="text-center text-xs text-zinc-400 pt-1">
-                                    <span className="text-zinc-700 font-bold">{filteredRows.length}</span> barang ditampilkan
-                                </p>
-                            </div>
+                                        );
+                                    })}
 
-                            {/* ══ MODE LAPTOP (≥ lg) — tabel penuh, sticky header + kolom nama ══ */}
-                            <div className="hidden lg:block bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-                                <div className="overflow-auto table-scroll max-h-[70vh]">
-                                    <table className="w-full text-sm border-collapse">
-                                        <thead>
-                                            <tr className="whitespace-nowrap">
-                                                {["No", "Tipe", "Nama Barang", "Kategori", "Merk", "CPU", "RAM", "Storage", "Spek",
-                                                    "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
-                                                    "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "M", "Stok", "SO", "Audit", "Aksi"].map((h, hi) => (
+                                    <p className="text-center text-xs text-zinc-400 pt-1">
+                                        <span className="text-zinc-700 font-bold">{filteredRows.length}</span> barang ditampilkan
+                                    </p>
+
+                                </div>
+                            )}
+
+                            {/* ══ MODE DESKTOP (≥ lg) — tabel penuh, sticky header + kolom nama ══ */}
+                            {isDesktop && (
+                                <div className="hidden lg:block bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+                                    <div className="overflow-auto table-scroll max-h-[70vh]">
+                                        <table className="w-full text-sm border-collapse">
+                                            <thead>
+                                                <tr className="whitespace-nowrap">
+                                                    {(canOnlyViewBasic
+                                                        ? ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek", "Tes Kondisi"]
+                                                        : ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek",
+                                                            "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
+                                                            "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "MSJ", "M", "Stok", "SO", "Audit", "Aksi"]
+                                                    ).map((h, hi) => (
                                                         <th key={h}
                                                             className={`px-3 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-left bg-zinc-50 border-b-2 border-zinc-100 sticky top-0 ${hi === 2 ? "left-0 z-20 min-w-[180px]" : "z-10"}`}>
                                                             {h}
                                                         </th>
                                                     ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredRows.map((row, idx) => {
-                                                const auditActive = isAuditActive(row);
-                                                const soActive = isSoActive(row.so_at);
-                                                const zebra = idx % 2 === 1;
-                                                const rowBg = zebra ? "bg-zinc-50" : "bg-white";
-                                                const accAction = getAccessoryUnitAction(row);
-                                                const isRowClickable = row.tipe === "LAPTOP"
-                                                    ? ((row.unit_count === 0 && canAddUnit) || (row.unit_count === 1 && canViewUnits))
-                                                    : row.tipe === "AKSESORIS"
-                                                        ? ((accAction === "add" && canAddUnit) || (accAction === "detail" && canViewUnits))
-                                                        : false;
-                                                return (
-                                                    <tr
-                                                        key={`${row.tipe}-${row.id}`}
-                                                        onClick={() => handleRowClick(row)}
-                                                        className={`group border-b border-zinc-50 hover:bg-zinc-100 transition-colors ${rowBg} ${isRowClickable ? "cursor-pointer" : ""}`}
-                                                    >
-                                                        <td className="px-3 py-3 text-xs text-zinc-400 tabular-nums">{idx + 1}</td>
-                                                        <td className="px-3 py-3">
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
-                                                                {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
-                                                                {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
-                                                            </span>
-                                                        </td>
-                                                        <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 ${rowBg}`} title={row.nama}>{row.nama}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.kategori || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.brand || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.cpu || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.ram || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.storage || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500 max-w-[140px] truncate">{row.spek || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">
-                                                            {row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note ? <span className="text-zinc-400">{row.harga_modal_note}</span> : <Dash />}
-                                                        </td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.modal_sparepart != null ? fmt(row.modal_sparepart) : <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs font-bold text-zinc-800 whitespace-nowrap">{fmt(row.harga_jual)}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.total_jual != null ? fmt(row.total_jual) : <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs whitespace-nowrap">
-                                                            {row.gross_profit != null ? <span className={row.gross_profit >= 0 ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>{row.gross_profit >= 0 ? "+" : ""}{fmt(row.gross_profit)}</span> : <Dash />}
-                                                        </td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.sumber || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.sn || (row.sn_note ? <span className="text-zinc-400">{row.sn_note}</span> : <Dash />)}</td>
-                                                        <td className="px-3 py-3 text-xs text-center tabular-nums">
-                                                            <span className={(row.stok_tersedia ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok_tersedia ?? <Dash />}</span>
-                                                        </td>
-                                                        <td className="px-3 py-3 text-xs text-center tabular-nums">
-                                                            <span className={(row.siap_jual ?? 0) > 0 ? "text-emerald-600 font-bold" : ""}>{row.siap_jual ?? <Dash />}</span>
-                                                        </td>
-                                                        <td className="px-3 py-3 text-xs text-center tabular-nums">
-                                                            <span className={(row.minus ?? 0) > 0 ? "text-red-500 font-bold" : ""}>{row.minus ?? <Dash />}</span>
-                                                        </td>
-                                                        <td className="px-3 py-3 text-xs text-center tabular-nums">
-                                                            <span className={(row.stok ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok ?? <Dash />}</span>
-                                                        </td>
-                                                        <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                            {canDoSo(row) ? (
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                    <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
-                                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${soActive ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
-                                                                        {soActive ? "Sudah SO" : "SO"}
-                                                                    </button>
-                                                                    <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
-                                                                        <HistoryIcon size={13} />
-                                                                    </button>
-                                                                </div>
-                                                            ) : <Dash />}
-                                                        </td>
-                                                        <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="flex items-center justify-center gap-1">
-                                                                <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
-                                                                    title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
-                                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
-                                                                    {auditActive ? "Teraudit" : "Audit"}
-                                                                </button>
-                                                                <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
-                                                                    <HistoryIcon size={13} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="flex items-center gap-1 flex-nowrap min-w-max">
-                                                                {row.tipe === "LAPTOP" && row.unit_id && (
-                                                                    <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
-                                                                        className="h-7 px-2 text-[11px] font-semibold text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Pedagang</button>
-                                                                )}
-                                                                {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
-                                                                    <button onClick={() => setAddUnitTarget(row)}
-                                                                        className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
-                                                                        Tambah Unit
-                                                                    </button>
-                                                                )}
-                                                                {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
-                                                                    <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                                        Kelola Unit ({row.unit_count})
-                                                                    </Link>
-                                                                )}
-                                                                {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
-                                                                    <button onClick={() => setAddUnitAccessoryTarget(row)}
-                                                                        className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
-                                                                        Tambah Unit
-                                                                    </button>
-                                                                )}
-                                                                {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
-                                                                    <Link href={`/dashboard/accessories/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                                        Kelola Unit ({row.stok ?? 0})
-                                                                    </Link>
-                                                                )}
-                                                                {row.tipe === "LAPTOP" && canViewBarcode && (
-                                                                    <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
-                                                                )}
-                                                                {((row.tipe === "LAPTOP" && canEditLaptop) || (row.tipe === "AKSESORIS" && canEditAcc)) && (
-                                                                    <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
-                                                                )}
-                                                                {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
-                                                                    <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {visibleRows.map((row, idx) => {
+                                                    const auditActive = isAuditActive(row);
+                                                    const soActive = isSoActive(row.so_at);
+                                                    const zebra = idx % 2 === 1;
+                                                    const rowBg = zebra ? "bg-zinc-50" : "bg-white";
+                                                    const accAction = getAccessoryUnitAction(row);
+                                                    const isRowClickable = canOnlyViewBasic ? false : (row.tipe === "LAPTOP"
+                                                        ? ((row.unit_count === 0 && canAddUnit) || (row.unit_count === 1 && canViewUnits))
+                                                        : row.tipe === "AKSESORIS"
+                                                            ? ((accAction === "add" && canAddUnit) || (accAction === "detail" && canViewUnits))
+                                                            : false);
+                                                    return (
+                                                        <tr
+                                                            key={`${row.tipe}-${row.id}`}
+                                                            onClick={() => handleRowClick(row)}
+                                                            className={`group border-b border-zinc-50 hover:bg-zinc-100 transition-colors ${rowBg} ${isRowClickable ? "cursor-pointer" : ""}`}
+                                                        >
+                                                            <td className="px-3 py-3 text-xs text-zinc-400 tabular-nums">{idx + 1}</td>
+                                                            <td className="px-3 py-3">
+                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
+                                                                    {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
+                                                                    {row.kategori || (row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris")}
+                                                                </span>
+                                                            </td>
+                                                            <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 ${rowBg}`} title={row.nama}>{row.nama}</td>
+                                                            <td className="px-3 py-3 text-xs text-zinc-500">{row.brand || <Dash />}</td>
+                                                            <td className="px-3 py-3 text-xs text-zinc-500">{row.cpu || <Dash />}</td>
+                                                            <td className="px-3 py-3 text-xs text-zinc-500">{row.ram || <Dash />}</td>
+                                                            <td className="px-3 py-3 text-xs text-zinc-500">{row.storage || <Dash />}</td>
+                                                            <td className="px-3 py-3 text-xs text-zinc-500 max-w-[140px] truncate">{row.spek || <Dash />}</td>
+                                                            {canOnlyViewBasic && (
+                                                                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                                                                    {canShowConditionChecks(row) ? (
+                                                                        <button onClick={() => openConditionChecks(row)}
+                                                                            title="Isi / lihat tes kondisi barang"
+                                                                            className="h-7 px-2 text-[11px] font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition">
+                                                                            Tes Kondisi
+                                                                        </button>
+                                                                    ) : <Dash />}
+                                                                </td>
+                                                            )}
+                                                            {!canOnlyViewBasic && (<>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">
+                                                                    {row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note ? <span className="text-zinc-400">{row.harga_modal_note}</span> : <Dash />}
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.modal_sparepart != null ? fmt(row.modal_sparepart) : <Dash />}</td>
+                                                                <td className="px-3 py-3 text-xs font-bold text-zinc-800 whitespace-nowrap">{fmt(row.harga_jual)}</td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.total_jual != null ? fmt(row.total_jual) : <Dash />}</td>
+                                                                <td className="px-3 py-3 text-xs whitespace-nowrap">
+                                                                    {row.gross_profit != null ? <span className={row.gross_profit >= 0 ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>{row.gross_profit >= 0 ? "+" : ""}{fmt(row.gross_profit)}</span> : <Dash />}
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500">{row.sumber || <Dash />}</td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : <Dash />}</td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500">{row.sn || (row.sn_note ? <span className="text-zinc-400">{row.sn_note}</span> : <Dash />)}</td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.stok_tersedia ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok_tersedia ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.siap_jual ?? 0) > 0 ? "text-emerald-600 font-bold" : ""}>{row.siap_jual ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.minus_siap_jual ?? 0) > 0 ? "text-amber-600 font-bold" : ""}>{row.minus_siap_jual ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.minus ?? 0) > 0 ? "text-red-500 font-bold" : ""}>{row.minus ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                                    <span className={(row.stok ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                    {row.unit_count > 1 ? (
+                                                                        <ProgressBadge done={row.so_done} total={row.unit_count} tone="so" />
+                                                                    ) : canDoSo(row) ? (
+                                                                        <div className="flex items-center justify-center gap-1">
+                                                                            <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
+                                                                                className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${soActive ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
+                                                                                {soActive ? "Sudah SO" : "SO"}
+                                                                            </button>
+                                                                            <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
+                                                                                <HistoryIcon size={13} />
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : <Dash />}
+                                                                </td>
+                                                                <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                    {row.unit_count > 1 ? (
+                                                                        // Laptop & Aksesoris: badge progress audit X/Y (R3 selesai).
+                                                                        <ProgressBadge done={row.audit_done} total={row.unit_count} tone="audit" />
+                                                                    ) : (
+                                                                        <div className="flex items-center justify-center gap-1">
+                                                                            <button onClick={() => { setAuditConfirmNotes(""); setAuditConfirmTarget(row); }} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                                                title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
+                                                                                className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
+                                                                                {auditActive ? "Teraudit" : "Audit"}
+                                                                            </button>
+                                                                            <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
+                                                                                <HistoryIcon size={13} />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                                                                    <div className="flex items-center gap-1 flex-nowrap min-w-max">
+                                                                        {row.tipe === "LAPTOP" && row.unit_count > 0 && canFullAccessBarang && (
+                                                                            <button onClick={() => togglePedagang(row)} disabled={pedagangSavingId === row.id}
+                                                                                title={row.is_pedagang_listed ? "Keluarkan dari Pricelist Pedagang" : "Masukkan ke Pricelist Pedagang"}
+                                                                                className={`h-7 px-2 text-[11px] font-semibold rounded-lg transition disabled:opacity-40 ${row.is_pedagang_listed ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100" : "text-zinc-700 bg-zinc-100 hover:bg-zinc-200"}`}>
+                                                                                {pedagangSavingId === row.id ? "..." : row.is_pedagang_listed ? "✓ Pedagang" : "+ Pedagang"}
+                                                                            </button>
+                                                                        )}
+                                                                        {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
+                                                                            <button onClick={() => setAddUnitTarget(row)}
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
+                                                                                Tambah Unit
+                                                                            </button>
+                                                                        )}
+                                                                        {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
+                                                                            <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
+                                                                                Kelola Unit ({row.unit_count})
+                                                                            </Link>
+                                                                        )}
+                                                                        {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
+                                                                            <button onClick={() => setAddUnitAccessoryTarget(row)}
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
+                                                                                Tambah Unit
+                                                                            </button>
+                                                                        )}
+                                                                        {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
+                                                                            <Link href={`/dashboard/accessories/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
+                                                                                Kelola Unit ({row.stok ?? 0})
+                                                                            </Link>
+                                                                        )}
+                                                                        {row.tipe === "LAPTOP" && canViewBarcode && (
+                                                                            <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "LAPTOP" })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
+                                                                        )}
+                                                                        {row.tipe === "AKSESORIS" && canViewBarcode && accAction !== "add" && (
+                                                                            <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama, type: "AKSESORIS" })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
+                                                                        )}
+                                                                        {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count <= 1 && (
+                                                                            <button onClick={() => setConvertTarget(row)}
+                                                                                title="Pindahkan ke Aksesoris dengan kategori yang benar"
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition">
+                                                                                Perbaiki Tipe
+                                                                            </button>
+                                                                        )}
+                                                                        {canFullAccessBarang && isStockEmpty(row) && (
+                                                                            <button onClick={() => archiveRow(row)} disabled={archivingId === row.id}
+                                                                                title="Pindahkan barang ini ke Arsip"
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 transition disabled:opacity-40">
+                                                                                {archivingId === row.id ? "..." : "Arsip"}
+                                                                            </button>
+                                                                        )}
+                                                                        {canShowConditionChecks(row) && (
+                                                                            <button onClick={() => openConditionChecks(row)}
+                                                                                title="Edit tes kondisi tanpa buka form Edit penuh"
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition">Tes Kondisi</button>
+                                                                        )}
+                                                                        {((row.tipe === "LAPTOP" && canEditLaptop) || (row.tipe === "AKSESORIS" && canEditAcc)) && (
+                                                                            <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
+                                                                        )}
+                                                                        {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
+                                                                            <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </>)}
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="px-5 py-3 border-t border-zinc-100 bg-zinc-50/60 text-xs text-zinc-400 flex items-center justify-between gap-3">
+                                        <span>
+                                            <span className="text-zinc-700 font-bold">{filteredRows.length}</span> barang ditampilkan
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="px-5 py-3 border-t border-zinc-100 bg-zinc-50/60 text-xs text-zinc-400">
-                                    <span className="text-zinc-700 font-bold">{filteredRows.length}</span> barang ditampilkan
-                                </div>
-                            </div>
+                            )}
                         </>
                     )}
                 </div>
@@ -1553,37 +2437,54 @@ export default function UnifiedBarangContent() {
 
             {/* ── MODAL CREATE / EDIT ─────────────────────────────────── */}
             {formModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={closeForm} />
                     <div className="relative bg-white w-full max-w-lg shadow-2xl rounded-2xl overflow-hidden animate-popIn max-h-[90vh] flex flex-col">
                         <div className="h-0.5 w-full bg-gradient-to-r from-zinc-300 via-zinc-600 to-black" />
-                        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+                        <div className="px-5 sm:px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
                             <h2 className="font-bold text-zinc-900 text-[15px]">
-                                {formModal.mode === "edit" ? "Edit" : "Tambah"} {formModal.tipe === "LAPTOP" ? "Laptop" : "Aksesori"}
+                                {formModal.mode === "edit" ? "Edit" : "Tambah"} {formModal.tipe === "LAPTOP" ? (selectedCategoryIsPc ? "PC" : "Laptop") : formModal.tipe === "AKSESORIS" ? "Aksesori" : "Barang"}
                             </h2>
                             <button onClick={closeForm} className="text-zinc-400 hover:text-zinc-700">✕</button>
                         </div>
 
-                        {formModal.mode === "create" && (
-                            <div className="px-6 pt-4 flex gap-2">
-                                <button onClick={() => setFormModal({ mode: "create", tipe: "LAPTOP" })}
-                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500"}`}>Laptop</button>
-                                <button onClick={() => setFormModal({ mode: "create", tipe: "AKSESORIS" })}
-                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "AKSESORIS" ? "bg-zinc-700 text-white" : "bg-zinc-100 text-zinc-500"}`}>Aksesoris</button>
-                            </div>
-                        )}
+                        <div className="overflow-y-auto flex-1 px-5 sm:px-6 py-5 space-y-3">
+                            <Field label="Kategori" required>
+                                <select
+                                    className={inputCls}
+                                    value={selectedCategoryId}
+                                    onChange={e => {
+                                        if (formModal.mode === "create") {
+                                            handleCategoryPick(e.target.value);
+                                        } else {
+                                            const catId = e.target.value;
+                                            setSelectedCategoryId(catId);
+                                            const cat = categories.find(c => c.id === catId);
+                                            if (formModal.tipe === "LAPTOP") setLaptopForm(p => ({ ...p, category_id: catId }));
+                                            else setAccForm(p => ({ ...p, category: cat?.name ?? "" }));
+                                        }
+                                    }}
+                                >
+                                    {formModal.mode === "create" ? (
+                                        <option value="">-- Pilih Kategori --</option>
+                                    ) : formModal.tipe === "LAPTOP" ? (
+                                        <option value="">Tanpa Kategori</option>
+                                    ) : null}
+                                    {(formModal.mode === "edit"
+                                        ? (formModal.tipe === "LAPTOP" ? laptopCategories : accessoryCategories)
+                                        : creatableCategories
+                                    ).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </Field>
 
-                        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-3">
-                            {formModal.tipe === "LAPTOP" ? (
+                            {formModal.tipe === null ? (
+                                <p className="text-xs text-zinc-400 text-center py-6">
+                                    Pilih kategori dulu untuk menampilkan form barangnya.
+                                </p>
+                            ) : formModal.tipe === "LAPTOP" ? (
                                 <>
-                                    <Field label="Nama Laptop" required>
+                                    <Field label={selectedCategoryIsPc ? "Nama PC" : "Nama Laptop"} required>
                                         <input className={inputCls} value={laptopForm.laptop_name} onChange={e => setLaptopForm(p => ({ ...p, laptop_name: e.target.value }))} />
-                                    </Field>
-                                    <Field label="Kategori">
-                                        <select className={inputCls} value={laptopForm.category_id} onChange={e => setLaptopForm(p => ({ ...p, category_id: e.target.value }))}>
-                                            <option value="">Tanpa Kategori</option>
-                                            {laptopCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
                                     </Field>
                                     <div className="grid grid-cols-2 gap-3">
                                         <Field label="Brand"><input className={inputCls} value={laptopForm.brand} onChange={e => setLaptopForm(p => ({ ...p, brand: e.target.value }))} /></Field>
@@ -1593,38 +2494,32 @@ export default function UnifiedBarangContent() {
                                         <Field label="GPU"><input className={inputCls} value={laptopForm.gpu} onChange={e => setLaptopForm(p => ({ ...p, gpu: e.target.value }))} /></Field>
                                         <Field label="Display"><input className={inputCls} value={laptopForm.display} onChange={e => setLaptopForm(p => ({ ...p, display: e.target.value }))} /></Field>
                                     </div>
-                                    <Field label="Harga Store" required><input type="number" className={inputCls} value={laptopForm.selling_price} onChange={e => setLaptopForm(p => ({ ...p, selling_price: e.target.value }))} /></Field>
+                                    <Field label="Harga Store" required><input type="number" inputMode="numeric" className={inputCls} value={laptopForm.selling_price} onChange={e => setLaptopForm(p => ({ ...p, selling_price: e.target.value }))} /></Field>
                                     <Field label="Kondisi Umum"><input className={inputCls} value={laptopForm.condition_note} onChange={e => setLaptopForm(p => ({ ...p, condition_note: e.target.value }))} /></Field>
+                                    {selectedCategoryHasChecklist && (
+                                        <Field label="Tes Kondisi">
+                                            <ConditionChecklist value={conditionChecks} onChange={setConditionChecks} readOnly={!canEditChecklist} />
+                                        </Field>
+                                    )}
                                     <Field label="Catatan"><textarea rows={2} className={inputCls} value={laptopForm.notes} onChange={e => setLaptopForm(p => ({ ...p, notes: e.target.value }))} /></Field>
                                 </>
                             ) : (
                                 <>
                                     <Field label="Nama Aksesori" required><input className={inputCls} value={accForm.name} onChange={e => setAccForm(p => ({ ...p, name: e.target.value }))} /></Field>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Field label="Kategori" required>
-                                            <select className={inputCls} value={accForm.category} onChange={e => setAccForm(p => ({ ...p, category: e.target.value }))}>
-                                                <option value="">-- Pilih --</option>
-                                                {accessoryCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                                {accForm.category && !accessoryCategories.some(c => c.name.toUpperCase() === accForm.category.toUpperCase()) && (
-                                                    <option value={accForm.category}>{accForm.category}</option>
-                                                )}
-                                            </select>
-                                        </Field>
-                                        <Field label="Merk"><input className={inputCls} value={accForm.brand} onChange={e => setAccForm(p => ({ ...p, brand: e.target.value }))} /></Field>
-                                    </div>
+                                    <Field label="Merk"><input className={inputCls} value={accForm.brand} onChange={e => setAccForm(p => ({ ...p, brand: e.target.value }))} /></Field>
                                     <Field label="Spesifikasi"><input className={inputCls} value={accForm.spec} onChange={e => setAccForm(p => ({ ...p, spec: e.target.value }))} /></Field>
                                     <div className="grid grid-cols-2 gap-3">
-                                        <Field label="Harga Modal"><input type="number" className={inputCls} value={accForm.buy_price} onChange={e => setAccForm(p => ({ ...p, buy_price: e.target.value }))} /></Field>
-                                        <Field label="Harga Jual" required><input type="number" className={inputCls} value={accForm.sell_price} onChange={e => setAccForm(p => ({ ...p, sell_price: e.target.value }))} /></Field>
+                                        <Field label="Harga Modal"><input type="number" inputMode="numeric" className={inputCls} value={accForm.buy_price} onChange={e => setAccForm(p => ({ ...p, buy_price: e.target.value }))} /></Field>
+                                        <Field label="Harga Jual" required><input type="number" inputMode="numeric" className={inputCls} value={accForm.sell_price} onChange={e => setAccForm(p => ({ ...p, sell_price: e.target.value }))} /></Field>
                                     </div>
-                                    <Field label="Stok" required><input type="number" className={inputCls} value={accForm.stock} onChange={e => setAccForm(p => ({ ...p, stock: e.target.value }))} /></Field>
+                                    <Field label="Stok" required><input type="number" inputMode="numeric" className={inputCls} value={accForm.stock} onChange={e => setAccForm(p => ({ ...p, stock: e.target.value }))} /></Field>
                                     <Field label="Keterangan"><textarea rows={2} className={inputCls} value={accForm.notes} onChange={e => setAccForm(p => ({ ...p, notes: e.target.value }))} /></Field>
                                 </>
                             )}
                         </div>
-                        <div className="flex gap-3 px-6 py-4 border-t border-zinc-100">
+                        <div className="flex gap-3 px-5 sm:px-6 py-4 border-t border-zinc-100">
                             <button onClick={closeForm} disabled={saving} className="flex-1 h-11 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition">Batal</button>
-                            <button onClick={submitForm} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-zinc-800 to-zinc-900 text-white rounded-xl text-sm font-semibold hover:from-zinc-900 hover:to-black transition disabled:opacity-50">
+                            <button onClick={submitForm} disabled={saving || (formModal.mode === "create" && !formModal.tipe)} className="flex-1 h-11 bg-gradient-to-r from-zinc-800 to-zinc-900 text-white rounded-xl text-sm font-semibold hover:from-zinc-900 hover:to-black transition disabled:opacity-50">
                                 {saving ? "Menyimpan..." : "Simpan"}
                             </button>
                         </div>
@@ -1645,7 +2540,12 @@ export default function UnifiedBarangContent() {
             )}
 
             {barcodeTarget && (
-                <BarcodeModal laptopId={barcodeTarget.id} laptopName={barcodeTarget.name} onClose={() => setBarcodeTarget(null)} />
+                <BarcodeModal
+                    laptopId={barcodeTarget.id}
+                    laptopName={barcodeTarget.name}
+                    itemType={barcodeTarget.type === "AKSESORIS" ? "ACCESSORY" : "LAPTOP"}
+                    onClose={() => setBarcodeTarget(null)}
+                />
             )}
 
             {soConfirmTarget && (
@@ -1659,6 +2559,42 @@ export default function UnifiedBarangContent() {
                         await toggleSo(soConfirmTarget, soConfirmNotes);
                         setSoConfirmTarget(null);
                     }}
+                />
+            )}
+
+            {auditConfirmTarget && (
+                <AuditConfirmModal
+                    row={auditConfirmTarget}
+                    notes={auditConfirmNotes}
+                    onNotesChange={setAuditConfirmNotes}
+                    loading={auditingId === auditConfirmTarget.id}
+                    onCancel={() => { if (auditingId !== auditConfirmTarget.id) setAuditConfirmTarget(null); }}
+                    onConfirm={async () => {
+                        await toggleAudit(auditConfirmTarget, auditConfirmNotes);
+                        setAuditConfirmTarget(null);
+                    }}
+                />
+            )}
+
+            {convertTarget && (
+                <ConvertToAccessoryModal
+                    row={convertTarget}
+                    categories={categories}
+                    loading={converting}
+                    onClose={() => { if (!converting) setConvertTarget(null); }}
+                    onConfirm={convertToAccessory}
+                />
+            )}
+
+            {conditionChecksTarget && (
+                <ConditionChecksModal
+                    row={conditionChecksTarget}
+                    value={conditionChecksDraft}
+                    onChange={setConditionChecksDraft}
+                    canEdit={canEditChecklist}
+                    loading={conditionChecksSaving}
+                    onClose={() => { if (!conditionChecksSaving) setConditionChecksTarget(null); }}
+                    onConfirm={saveConditionChecks}
                 />
             )}
 
@@ -1676,7 +2612,6 @@ export default function UnifiedBarangContent() {
                 />
             )}
 
-            {/*  Loader singkat saat menarik detail unit lengkap (stok = 1) */}
             {unitDetailLoading && (
                 <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
                     <div className="w-8 h-8 border-2 border-zinc-200 border-t-zinc-900 rounded-full animate-spin" />
@@ -1695,12 +2630,8 @@ export default function UnifiedBarangContent() {
                         { label: "Storage", value: unitDetailTarget.row.storage },
                     ]}
                     canEdit={canFullAccessBarang}
-                    //  Tombol "+ Tambah Unit" & "Edit Data" di dalam pop-up ini digerbangi
-                    //  CREATE_UNITS/EDIT_UNITS (memuat KEPALA_TEKNISI dkk) — bukan full-access.
-                    //  Tanpa prop ini, canManage jatuh ke canEdit=full-access sehingga role
-                    //  yang backend-nya SUDAH izinkan (mis. KEPALA_TEKNISI) tidak bisa nambah/
-                    //  edit unit dari sini, padahal bisa lewat tombol "Tambah Unit" saat stok 0.
                     canManageUnit={canAddUnit}
+                    canEditChecklist={canEditChecklist}
                     canSeePrivate={canSeePrivate}
                     defaultSellingPrice={unitDetailTarget.row.harga_jual}
                     onClose={() => setUnitDetailTarget(null)}
@@ -1717,10 +2648,6 @@ export default function UnifiedBarangContent() {
                 />
             )}
 
-            {/* ✅ FIX: blok render 2 modal AKSESORIS ini sebelumnya HILANG —
-                state & logic-nya (addUnitAccessoryTarget, openAccessoryUnitDetail,
-                handleRowClick) sudah benar, tapi tanpa render ini popup-nya
-                tidak pernah benar-benar muncul di layar. */}
             {addUnitAccessoryTarget && (
                 <AddUnitModalAccessory
                     accessoryId={addUnitAccessoryTarget.id}
@@ -1766,7 +2693,55 @@ export default function UnifiedBarangContent() {
     );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Helper Export Excel — styling tabel dipakai BERSAMA kedua tombol export
+// (Ringkas & per-SN), biar tidak ada duplikasi logika border/header/autofilter.
+// ═══════════════════════════════════════════════════════════════════════════
+function writeStyledExcel(
+    exportRows: Record<string, string | number>[],
+    colWidths: { wch: number }[],
+    sheetName: string,
+    filePrefix: string,
+) {
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    ws["!cols"] = colWidths;
+
+    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+    const borderTipis = { style: "thin", color: { rgb: "D4D4D8" } } as const;
+
+    for (let R = range.s.r; R <= range.e.r; R++) {
+        const isHeader = R === 0;
+        const isBanded = !isHeader && R % 2 === 0;
+        for (let C = range.s.c; C <= range.e.c; C++) {
+            const addr = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws[addr]) continue;
+            ws[addr].s = {
+                font: isHeader
+                    ? { bold: true, sz: 10, color: { rgb: "FFFFFF" } }
+                    : { sz: 10, color: { rgb: "27272A" } },
+                fill: isHeader
+                    ? { fgColor: { rgb: "18181B" } }
+                    : isBanded ? { fgColor: { rgb: "F4F4F5" } } : undefined,
+                alignment: { vertical: "center", horizontal: isHeader ? "center" : "left" },
+                border: { top: borderTipis, bottom: borderTipis, left: borderTipis, right: borderTipis },
+            };
+        }
+    }
+
+    ws["!autofilter"] = {
+        ref: XLSX.utils.encode_range({ s: { r: 0, c: range.s.c }, e: { r: 0, c: range.e.c } }),
+    };
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    const stamp = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
+    XLSX.writeFile(wb, `${filePrefix}-${stamp}.xlsx`);
+}
+
 const inputCls = "w-full h-10 border border-zinc-200 rounded-xl px-3 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400";
+
+const cardActionCls = "h-8 w-full inline-flex items-center justify-center px-2 rounded-lg text-[11px] font-semibold truncate transition disabled:opacity-40";
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
     return (
@@ -1779,17 +2754,34 @@ function Field({ label, children, required }: { label: string; children: React.R
     );
 }
 
-// ── Dipakai di kartu mobile ──────────────────────────────────────────────
-// StatChip: null (bukan 0) berarti field ini memang tidak berlaku untuk tipe
-// barang ini (mis. "Stok" untuk laptop, atau "ST/SJ/M" untuk aksesoris) →
-// chip tidak dirender sama sekali, bukan ditampilkan sebagai "0".
-function StatChip({ label, value, tone = "gray" }: { label: string; value: number | null; tone?: "gray" | "green" | "red" | "emerald" }) {
+// Badge progress X/Y untuk kolom SO & Audit saat stok > 1 unit. Read-only —
+// angka murni cerminan status per-unit dari halaman Kelola Unit. "done" =
+// unit yang sudah SO/Audit aktif, "total" = total unit aktif (= Stok Tersedia).
+function ProgressBadge({ done, total, tone }: { done: number; total: number; tone: "so" | "audit" }) {
+    const complete = total > 0 && done >= total;
+    const started = done > 0;
+    // Penuh (semua unit) → warna solid; sebagian → warna muda; belum sama sekali → abu.
+    const cls = !started
+        ? "bg-zinc-50 text-zinc-400 border-zinc-200"
+        : complete
+            ? (tone === "so" ? "bg-emerald-100 text-emerald-700 border-emerald-300" : "bg-sky-100 text-sky-700 border-sky-300")
+            : (tone === "so" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-sky-50 text-sky-600 border-sky-200");
+    return (
+        <span title={`${done} dari ${total} unit sudah di-${tone === "so" ? "SO" : "audit"} — proses di halaman Kelola Unit`}
+            className={`inline-flex items-center justify-center px-2 py-0.5 rounded-lg text-[11px] font-bold border tabular-nums ${cls}`}>
+            {done}/{total}
+        </span>
+    );
+}
+
+function StatChip({ label, value, tone = "gray" }: { label: string; value: number | null; tone?: "gray" | "green" | "red" | "emerald" | "amber" }) {
     if (value == null) return null;
     const toneCls: Record<string, string> = {
         gray: "bg-zinc-50 text-zinc-500 border-zinc-200",
         green: "bg-emerald-50 text-emerald-700 border-emerald-200",
         red: "bg-red-50 text-red-600 border-red-200",
         emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        amber: "bg-amber-50 text-amber-700 border-amber-200",
     };
     return (
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border tabular-nums ${toneCls[tone]}`}>
@@ -1798,9 +2790,6 @@ function StatChip({ label, value, tone = "gray" }: { label: string; value: numbe
     );
 }
 
-// DetailItem: dipakai di panel "Lihat detail lengkap" pada kartu mobile.
-// Cek eksplisit undefined/null/"" (bukan pakai `||`) supaya nilai 0 yang
-// valid (mis. Gross Profit = 0) tetap tampil, bukan ikut dianggap kosong.
 function DetailItem({ label, value }: { label: string; value?: string | number | null }) {
     const hasValue = value !== undefined && value !== null && value !== "";
     return (

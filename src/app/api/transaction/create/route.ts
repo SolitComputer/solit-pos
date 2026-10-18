@@ -65,6 +65,40 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
 
         // ─────────────────────────────────────────────────────────────────────
+        // 1b. Aksesori BER-SN (serialized, dari accessory_units) — item yang
+        // dipilih lewat "Cari & Tambah Serial Number" dengan unit_type
+        // "accessory". BEDA dari aksesori quantity-based di bawah: yang ini
+        // punya identitas fisik per-unit, jadi TIDAK lewat decrement stok
+        // manual — statusnya di-klaim langsung di accessory_units, sama
+        // seperti laptop_units.
+        // ✅ FIX: sebelumnya item unit_type "accessory" di body.units di-
+        // filter OUT total oleh .filter(unit_type === "laptop") di atas, dan
+        // TIDAK PERNAH ditangkap di manapun — bukan masuk laptopUnits, bukan
+        // masuk accessoriesInput (yang cuma baca body.accessories, field
+        // terpisah). Makanya request SN aksesori doang selalu dianggap
+        // "kosong" → selalu gagal "Minimal 1 unit atau aksesori harus dipilih".
+        type AccUnitInput = {
+            unit_id: string; accessory_id: string; serial_number: string;
+            name: string; cost_price: number; selling_price: number;
+        };
+        let accessoryUnits: AccUnitInput[] = [];
+        if (Array.isArray(body.units) && body.units.length > 0) {
+            accessoryUnits = body.units
+                .filter((u: any) => u.unit_type === "accessory")
+                .map((u: any) => ({
+                    unit_id: u.unit_id,
+                    // Client kirim accessory_id lewat field "laptop_id" (di-
+                    // reuse biar konsisten shape UnitItem) — lihat
+                    // CreatePaymentClient.tsx handleSelectSnResult.
+                    accessory_id: u.laptop_id,
+                    serial_number: u.serial_number,
+                    name: u.laptop_name,
+                    cost_price: toNumber(u.purchase_price || 0),
+                    selling_price: toNumber(u.selling_price || 0),
+                }));
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
         // 2. Aksesori quantity-based (bonus = harga 0)
         // ─────────────────────────────────────────────────────────────────────
         type AccInput = { accessory_id: string; name: string; quantity: number; unit_price: number; is_bonus: boolean };
@@ -96,8 +130,8 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             }, { status: 403 });
         }
 
-        // Minimal 1 item (laptop ATAU aksesori)
-        if (laptopUnits.length === 0 && accessoriesInput.length === 0)
+        // Minimal 1 item (laptop ATAU aksesori quantity-based ATAU aksesori ber-SN)
+        if (laptopUnits.length === 0 && accessoriesInput.length === 0 && accessoryUnits.length === 0)
             return NextResponse.json({ success: false, message: "Minimal 1 unit atau aksesori harus dipilih" }, { status: 400 });
 
         const laptopUnitIds = laptopUnits.map(u => u.unit_id);
@@ -153,8 +187,10 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 }
             }
 
+            // ✅ NEW: MINUS_SIAP_JUAL dianggap "tersedia" juga — unit minus yang
+            // dijual lewat Kelompok MSJ. Statusnya nanti diklaim atomik di 4c.
             const notAvailable = (checks ?? []).filter(
-                u => u.status !== "SIAP_JUAL" && !releasedFromPrep.has(u.id)
+                u => u.status !== "SIAP_JUAL" && u.status !== "MINUS_SIAP_JUAL" && !releasedFromPrep.has(u.id)
             );
             if (notAvailable.length > 0)
                 return NextResponse.json({ success: false, message: `Unit laptop tidak tersedia: ${notAvailable.map(u => u.serial_number).join(", ")}` }, { status: 409 });
@@ -182,6 +218,24 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             }
         }
 
+        // 4b2. Validasi ketersediaan aksesori BER-SN
+        const accUnitMap = new Map<string, { id: string; accessory_id: string; status: string }>();
+        if (accessoryUnits.length > 0) {
+            const accUnitIds = accessoryUnits.map(u => u.unit_id);
+            const { data: accUnitRows, error: accUnitErr } = await supabase
+                .from("accessory_units").select("id, accessory_id, status").in("id", accUnitIds);
+            if (accUnitErr) throw accUnitErr;
+            for (const r of accUnitRows ?? []) accUnitMap.set(r.id, { id: r.id, accessory_id: r.accessory_id, status: r.status });
+
+            // ✅ NEW: MINUS_SIAP_JUAL juga dianggap tersedia (dijual via Kelompok MSJ borongan).
+            const okAccStatus = new Set(["TERSEDIA", "MINUS_SIAP_JUAL"]);
+            const notAvailableAcc = accessoryUnits.filter(u => !okAccStatus.has(accUnitMap.get(u.unit_id)?.status ?? ""));
+            if (notAvailableAcc.length > 0) {
+                const sns = notAvailableAcc.map(u => u.serial_number).join(", ");
+                return NextResponse.json({ success: false, message: `Unit aksesori tidak tersedia: ${sns}` }, { status: 409 });
+            }
+        }
+
         const invoice_number = await generateInvoice();
         const deal_price = Number(body.amount) || 0;
 
@@ -199,10 +253,11 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 if (p?.unit_id) unitPriceMap.set(String(p.unit_id), toNumber(p.deal_price));
         const perUnitFallback = laptopUnits.length > 0 ? Math.round(deal_price / laptopUnits.length) : 0;
 
-        // inventory = modal laptop + modal aksesori
+        // inventory = modal laptop + modal aksesori quantity-based + modal aksesori ber-SN
         const laptopInventory = laptopUnits.reduce((s, u) => s + (u.cost_price ?? 0), 0);
         const accessoryInventory = accessoriesInput.reduce((s, a) => s + (accMap.get(a.accessory_id)?.buy_price ?? 0) * a.quantity, 0);
-        const inventory_price = laptopInventory + accessoryInventory;
+        const accessoryUnitInventory = accessoryUnits.reduce((s, u) => s + (u.cost_price ?? 0), 0);
+        const inventory_price = laptopInventory + accessoryInventory + accessoryUnitInventory;
 
         const payment_method = body.payment_method || "CASH";
         const is_trade_in = Boolean(body.is_trade_in);
@@ -234,23 +289,34 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         // Baru jadi SOLD ketika transaksi benar-benar lunas (dilakukan lewat FU / confirm-payment).
         const laptopUnitStatus = txStatus === "PAID" ? "SOLD" : txStatus; // "PACKING" | "RESERVED" | "HELD"
 
-        // ── Display name & primary unit (handle aksesori-saja) ──
+        // ── Display name & primary unit (handle aksesori-saja, termasuk ber-SN) ──
         const hasLaptops = laptopUnits.length > 0;
         const primaryUnit = hasLaptops ? laptopUnits[0] : null;
-        const totalAccQty = accessoriesInput.reduce((s, a) => s + a.quantity, 0);
+        const totalAccQty = accessoriesInput.reduce((s, a) => s + a.quantity, 0) + accessoryUnits.length;
+
+        const allAccessoryNames = [
+            ...accessoriesInput.map(a => a.quantity > 1 ? `${a.name} x${a.quantity}` : a.name),
+            ...accessoryUnits.map(u => u.name),
+        ];
 
         let displayLaptopName: string;
         if (hasLaptops) {
             displayLaptopName = laptopUnits.length > 1
                 ? `${primaryUnit!.laptop_name} (+${laptopUnits.length - 1} unit)`
                 : primaryUnit!.laptop_name;
-            if (accessoriesInput.length > 0) displayLaptopName += ` + ${totalAccQty} aksesori`;
+            if (totalAccQty > 0) displayLaptopName += ` + ${totalAccQty} aksesori`;
         } else {
-            displayLaptopName = accessoriesInput.length === 1
-                ? `${accessoriesInput[0].name} x${accessoriesInput[0].quantity}`
-                : `${accessoriesInput[0].name} (+${accessoriesInput.length - 1} item)`;
+            // ✅ FIX: sebelumnya selalu baca accessoriesInput[0] — kalau yang
+            // dipilih cuma aksesori BER-SN, accessoriesInput kosong dan ini
+            // CRASH (TypeError). Sekarang pakai gabungan keduanya.
+            displayLaptopName = allAccessoryNames.length === 1
+                ? allAccessoryNames[0]
+                : `${allAccessoryNames[0]} (+${allAccessoryNames.length - 1} item)`;
         }
-        const displaySN = laptopUnits.map(u => u.serial_number).join(", ") || "-";
+        const displaySN = [
+            ...laptopUnits.map(u => u.serial_number),
+            ...accessoryUnits.map(u => u.serial_number),
+        ].join(", ") || "-";
 
         // ─────────────────────────────────────────────────────────────────────
         // 4c. ✅ FIX RACE "jual dobel": KLAIM unit secara ATOMIK sebelum insert.
@@ -286,8 +352,10 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 .in("id", laptopUnitIds)
                 // Hanya klaim unit yang MASIH di status pra-jual (semua id di sini
                 // sudah lolos validasi ketersediaan di atas, jadi pra-statusnya
-                // pasti salah satu dari dua ini).
-                .in("status", ["SIAP_JUAL", "DALAM_PENYIAPAN"])
+                // pasti salah satu dari tiga ini).
+                // ✅ NEW: MINUS_SIAP_JUAL ditambahkan — unit minus-siap-jual (lewat
+                // Kelompok MSJ borongan) juga boleh diklaim jadi SOLD/pending.
+                .in("status", ["SIAP_JUAL", "DALAM_PENYIAPAN", "MINUS_SIAP_JUAL"])
                 .select("id");
             if (claimErr) throw claimErr;
             claimedIds = (claimed ?? []).map((c: any) => c.id);
@@ -298,6 +366,49 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 return NextResponse.json({
                     success: false,
                     message: "Sebagian unit baru saja terjual/dipakai di transaksi lain. Silakan ulangi transaksi.",
+                }, { status: 409 });
+            }
+        }
+
+        // 4c2. Klaim ATOMIK aksesori BER-SN — pola sama persis dengan klaim
+        // laptop_units di atas, supaya 2 kasir tidak bisa jual unit fisik
+        // yang sama 2x. Status "TERJUAL" mengikuti konvensi yang sudah dipakai
+        // di UnifiedBarangContent.tsx untuk accessory_units.
+        // ⚠️ ASUMSI YANG PERLU DIVERIFIKASI: untuk transaksi PENDING (DP/
+        // Ambil Dulu/E-Commerce), baris ini set status accessory_units ke
+        // txStatus yang sama (mis. "PACKING"/"RESERVED"/"HELD") — meniru pola
+        // laptop_units. Kalau kolom status di accessory_units cuma punya CHECK
+        // constraint untuk TERSEDIA/TERJUAL saja, update ini GAGAL (aman,
+        // di-throw & di-revert, bukan korup data) untuk transaksi PENDING —
+        // tolong tes dulu skenario ini kalau kamu pakai DP/Ambil Dulu untuk
+        // aksesori ber-SN.
+        const accessoryUnitStatus = txStatus === "PAID" ? "TERJUAL" : txStatus;
+        const revertAccUnitClaim = async (ids: string[]) => {
+            await Promise.all(ids.map((uid) =>
+                supabase.from("accessory_units").update({ status: "TERSEDIA" }).eq("id", uid)
+            ));
+        };
+        let claimedAccUnitIds: string[] = [];
+        if (accessoryUnits.length > 0) {
+            const accUnitIdsToClaim = accessoryUnits.map(u => u.unit_id);
+            const { data: claimedAcc, error: claimAccErr } = await supabase
+                .from("accessory_units")
+                .update({ status: accessoryUnitStatus })
+                .in("id", accUnitIdsToClaim)
+                // ✅ NEW: terima TERSEDIA & MINUS_SIAP_JUAL — unit MSJ juga bisa diklaim.
+                .in("status", ["TERSEDIA", "MINUS_SIAP_JUAL"])
+                .select("id");
+            if (claimAccErr) {
+                if (claimedIds.length > 0) await revertClaim(claimedIds);
+                throw claimAccErr;
+            }
+            claimedAccUnitIds = (claimedAcc ?? []).map((c: any) => c.id);
+            if (claimedAccUnitIds.length !== accUnitIdsToClaim.length) {
+                if (claimedIds.length > 0) await revertClaim(claimedIds);
+                if (claimedAccUnitIds.length > 0) await revertAccUnitClaim(claimedAccUnitIds);
+                return NextResponse.json({
+                    success: false,
+                    message: "Sebagian unit aksesori baru saja terjual/dipakai di transaksi lain. Silakan ulangi transaksi.",
                 }, { status: 409 });
             }
         }
@@ -344,7 +455,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 customer_birth_date: body.customer_birth_date || null,
                 status: txStatus,
                 paid_at: txStatus === "PAID" ? new Date().toISOString() : null,
-                item_kind: hasLaptops && accessoriesInput.length > 0
+                item_kind: hasLaptops && (accessoriesInput.length > 0 || accessoryUnits.length > 0)
                     ? "mixed"
                     : hasLaptops
                         ? "laptop"
@@ -355,6 +466,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             // Insert gagal setelah unit sudah diklaim → kembalikan status unit
             // supaya tidak nyangkut "terjual" padahal transaksi tidak jadi.
             if (claimedIds.length > 0) await revertClaim(claimedIds);
+            if (claimedAccUnitIds.length > 0) await revertAccUnitClaim(claimedAccUnitIds);
             throw txError;
         }
 
@@ -371,7 +483,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }));
 
         let fallbackLaptopId = laptopUnits[0]?.laptop_id || body.laptop_id || null;
-        if (!fallbackLaptopId && accessoriesInput.length > 0) {
+        if (!fallbackLaptopId && (accessoriesInput.length > 0 || accessoryUnits.length > 0)) {
             const { data: anyLaptop } = await supabase.from("laptops").select("id").limit(1).maybeSingle();
             if (anyLaptop?.id) fallbackLaptopId = anyLaptop.id;
         }
@@ -387,8 +499,24 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             grade: null,
         }));
 
+        // Aksesori BER-SN — 1 baris = 1 unit fisik (quantity selalu 1). unit_id
+        // sengaja dibiarkan null (bukan diisi accessory_units.id) karena belum
+        // pasti kolom itu bebas dari FK constraint yang mengarah ke
+        // laptop_units — serial number aslinya tetap tersimpan lewat kolom
+        // "serial_number" yang memang teks bebas, jadi tetap bisa dilacak.
+        const accessoryUnitTxItems = accessoryUnits.map(u => ({
+            transaction_id: transaction.id, invoice_number,
+            item_type: "accessory",
+            unit_id: null, accessory_id: u.accessory_id, laptop_id: fallbackLaptopId,
+            serial_number: u.serial_number, laptop_name: u.name, item_name: u.name,
+            quantity: 1, is_bonus: false,
+            selling_price: u.cost_price, // modal
+            deal_price: unitPriceMap.get(u.unit_id) || 0,
+            grade: null,
+        }));
+
         const { error: itemsError } = await supabase
-            .from("transaction_items").insert([...laptopItems, ...accessoryItems]);
+            .from("transaction_items").insert([...laptopItems, ...accessoryItems, ...accessoryUnitTxItems]);
         if (itemsError) console.error("[transaction_items]", itemsError.message);
 
         // 6b. Catat DP awal — supaya otomatis ke-pickup sync cashflow (kalau 0 / Ambil Dulu, TIDAK dicatat)
@@ -434,6 +562,94 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                     status: newQty <= 0 ? (isEcommerce ? "BELUM_SIAP" : "SOLD") : "SIAP_JUAL",
                 }).eq("id", lid);
             }));
+        }
+
+        // 8b. AUTO-ARSIP — barang yang stoknya habis KARENA transaksi lunas ini
+        //     otomatis pindah ke Arsip Barang. Non-fatal: kalau gagal, transaksi
+        //     tetap sukses. archived_at di-set HANYA kalau masih NULL → tidak
+        //     menimpa arsip manual & otomatis "berlaku per hari ini".
+        //     Barang yang 0 karena Pengambilan Barang (Service/Kebutuhan) TIDAK
+        //     lewat sini, jadi tetap di Data Barang.
+        try {
+            if (txStatus === "PAID") {
+                const archivedAtISO = new Date().toISOString();
+
+                // ✅ NEW: Tutup Kelompok MSJ yang unitnya ikut terjual di transaksi
+                // ini. Ambil msj_group_id dari unit laptop & aksesoris yang barusan
+                // terjual, lalu set kelompoknya SOLD + catat invoice. Non-fatal.
+                try {
+                    const soldLaptopIds = laptopUnitIds;
+                    const soldAccUnitIds = accessoryUnits.map(u => u.unit_id);
+                    const groupIdSet = new Set<string>();
+
+                    if (soldLaptopIds.length > 0) {
+                        const { data: lg } = await supabase.from("laptop_units")
+                            .select("msj_group_id").in("id", soldLaptopIds).not("msj_group_id", "is", null);
+                        for (const r of lg ?? []) if (r.msj_group_id) groupIdSet.add(r.msj_group_id);
+                    }
+                    if (soldAccUnitIds.length > 0) {
+                        const { data: ag } = await supabase.from("accessory_units")
+                            .select("msj_group_id").in("id", soldAccUnitIds).not("msj_group_id", "is", null);
+                        for (const r of ag ?? []) if (r.msj_group_id) groupIdSet.add(r.msj_group_id);
+                    }
+                    if (groupIdSet.size > 0) {
+                        await supabase.from("msj_groups")
+                            .update({ status: "SOLD", sold_at: archivedAtISO, invoice: invoice_number })
+                            .in("id", [...groupIdSet]);
+                    }
+                } catch (gErr: any) {
+                    console.error("[transaction/create] tutup kelompok MSJ gagal (non-fatal):", gErr?.message ?? gErr);
+                }
+
+                // Laptop: arsip kalau SEMUA unit model ini sudah tidak aktif.
+                // "aktif" = status !== "SOLD" — sama persis dgn stok_tersedia
+                // di UnifiedBarangContent.
+                if (laptopUnitIds.length > 0) {
+                    const archiveLaptopIds = [...new Set(laptopUnits.map(u => u.laptop_id))];
+                    await Promise.all(archiveLaptopIds.map(async (lid) => {
+                        const { count: activeCount } = await supabase
+                            .from("laptop_units")
+                            .select("id", { count: "exact", head: true })
+                            .eq("laptop_id", lid)
+                            .neq("status", "SOLD");
+                        if ((activeCount ?? 0) === 0) {
+                            await supabase.from("laptops")
+                                .update({ archived_at: archivedAtISO, archived_by: user.name, archive_reason: "TRANSAKSI" })
+                                .eq("id", lid)
+                                .is("archived_at", null);
+                        }
+                    }));
+                }
+
+                // Aksesoris: arsip kalau stok efektif habis. Stok efektif =
+                // unit ber-SN yang belum TERJUAL (kalau sudah pakai SN), atau
+                // kolom stock manual (sudah dikurangi di langkah 7b). Sama
+                // persis dgn derivedStock di /api/accessories.
+                const affectedAccIds = new Set<string>([
+                    ...accQtyById.keys(),
+                    ...accessoryUnits.map(u => u.accessory_id),
+                ]);
+                await Promise.all([...affectedAccIds].map(async (accId) => {
+                    const { data: accRow } = await supabase
+                        .from("accessories")
+                        .select("id, stock, archived_at, accessory_units(id, status)")
+                        .eq("id", accId)
+                        .single();
+                    if (!accRow) return;
+                    const accUnits = (accRow as any).accessory_units ?? [];
+                    const effStock = accUnits.length > 0
+                        ? accUnits.filter((u: any) => u.status !== "TERJUAL").length
+                        : Number((accRow as any).stock) || 0;
+                    if (effStock === 0 && (accRow as any).archived_at == null) {
+                        await supabase.from("accessories")
+                            .update({ archived_at: archivedAtISO, archived_by: user.name, archive_reason: "TRANSAKSI" })
+                            .eq("id", accId)
+                            .is("archived_at", null);
+                    }
+                }));
+            }
+        } catch (archErr: any) {
+            console.error("[transaction/create] auto-arsip gagal (non-fatal):", archErr?.message ?? archErr);
         }
 
         // 9. Warranty — hanya laptop, hanya kalau sudah benar-benar PAID (bukan DP/Ambil-Dulu/Ecommerce)
@@ -515,6 +731,16 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                     is_bonus: ai.is_bonus,
                     official_price:
                         (accMap.get(ai.accessory_id)?.sell_price ?? 0) * ai.quantity,
+                })),
+                ...accessoryUnitTxItems.map((au) => ({
+                    item_type: au.item_type,
+                    item_name: au.item_name,
+                    serial_number: au.serial_number,
+                    quantity: au.quantity,
+                    deal_price: au.deal_price,
+                    is_bonus: au.is_bonus,
+                    official_price:
+                        (accessoryUnits.find((u) => u.serial_number === au.serial_number)?.selling_price ?? 0) * au.quantity,
                 })),
             ];
 

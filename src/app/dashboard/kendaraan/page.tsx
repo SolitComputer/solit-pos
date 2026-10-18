@@ -29,6 +29,7 @@ type Vehicle = {
   status: "TERSEDIA" | "DIPAKAI" | "MAINTENANCE";
   battery_level: string | null;
   fuel_level: string | null;
+  plate_number: string | null;
   lastUsage?: LastUsage | null;
 };
 type UserLite = { id: string; name: string; role: string };
@@ -139,7 +140,7 @@ export default function KendaraanPage() {
               </p>
               <div className="flex flex-wrap items-center gap-1.5 mt-3.5">
                 <StatPill label="Tersedia" count={availableCount} tone="emerald" />
-                <StatPill label="Dipakai" count={inUseCount} tone="zinc" />
+                <StatPill label="Dipakai" count={inUseCount} tone="red" />
                 <StatPill label="Maintenance" count={maintenanceCount} tone="amber" />
               </div>
             </div>
@@ -443,21 +444,20 @@ function VehicleCard({
   const TypeIcon = v.type === "MOTOR" ? Bike : Car;
   const accent: Record<string, string> = {
     TERSEDIA: "bg-gradient-to-b from-emerald-400 to-emerald-500",
-    DIPAKAI: "bg-gradient-to-b from-zinc-300 to-zinc-400",
+    DIPAKAI: "bg-gradient-to-b from-red-500 to-red-600",
     MAINTENANCE: "bg-gradient-to-b from-amber-400 to-amber-500",
   };
   // Shadow hover mengikuti warna status — biar "hidup" tapi tetap halus, bukan norak.
   const hoverGlow: Record<string, string> = {
     TERSEDIA: "hover:shadow-[0_18px_36px_-16px_rgba(16,185,129,0.35)]",
-    DIPAKAI: "hover:shadow-[0_18px_36px_-16px_rgba(63,63,70,0.22)]",
+    DIPAKAI: "hover:shadow-[0_18px_36px_-16px_rgba(239,68,68,0.35)]",
     MAINTENANCE: "hover:shadow-[0_18px_36px_-16px_rgba(245,158,11,0.35)]",
   };
 
   return (
     <div
-      className={`group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:-translate-y-0.5 hover:border-gray-200 transition-all duration-200 overflow-hidden flex ${
-        hoverGlow[v.status] ?? "hover:shadow-lg"
-      }`}
+      className={`group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:-translate-y-0.5 hover:border-gray-200 transition-all duration-200 overflow-hidden flex ${hoverGlow[v.status] ?? "hover:shadow-lg"
+        }`}
     >
       <div className={`w-1 shrink-0 ${accent[v.status] ?? "bg-gray-200"}`} />
       <div className="p-4 sm:p-5 flex flex-col gap-3 flex-1 min-w-0">
@@ -466,6 +466,11 @@ function VehicleCard({
             <FuelRing level={v.fuel_level} TypeIcon={TypeIcon} />
             <div className="min-w-0 pt-0.5">
               <p className="text-sm font-black text-gray-900 truncate tracking-tight">{v.name}</p>
+              {v.plate_number && (
+                <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-600 text-[10px] font-mono font-bold tracking-wider">
+                  {v.plate_number}
+                </span>
+              )}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
                 <span className="text-[10px] text-gray-500 flex items-center gap-1">
                   <Fuel size={12} className="text-emerald-500" /> {v.fuel_level || "—"}
@@ -521,8 +526,8 @@ function VehicleCard({
             </>
           )}
           {v.status === "DIPAKAI" && !iAmUsing && (
-            <div className="text-[10.5px] text-zinc-600 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2.5 font-semibold">
-              Sedang dipakai karyawan lain
+            <div className="text-[10.5px] text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 font-semibold flex items-center gap-1.5">
+              <Ban size={12} /> Sedang dipakai karyawan lain
             </div>
           )}
           {v.status === "MAINTENANCE" && (
@@ -704,6 +709,7 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
   const isEdit = !!vehicle;
   const [name, setName] = useState(vehicle?.name ?? "");
   const [type, setType] = useState<"MOTOR" | "MOBIL">(vehicle?.type ?? "MOTOR");
+  const [plate, setPlate] = useState(vehicle?.plate_number ?? "");
   const [fuel, setFuel] = useState(vehicle?.fuel_level ?? "");
   const [status, setStatus] = useState(vehicle?.status ?? "TERSEDIA");
   const [busy, setBusy] = useState(false);
@@ -718,7 +724,7 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
     try {
       const url = isEdit ? `/api/vehicles/${vehicle!.id}` : "/api/vehicles";
       const method = isEdit ? "PUT" : "POST";
-      const payload: any = { name: name.trim(), type, fuel_level: fuel.trim() };
+      const payload: any = { name: name.trim(), type, plate_number: plate.trim(), fuel_level: fuel.trim() };
       if (isEdit) payload.status = status;
       const res = await fetch(url, {
         method,
@@ -744,6 +750,15 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
         <div>
           <label className={lbl}>Nama Kendaraan *</label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="mis. Beat 2023" className={inp} />
+        </div>
+        <div>
+          <label className={lbl}>Nomor Plat</label>
+          <input
+            value={plate}
+            onChange={(e) => setPlate(e.target.value.toUpperCase())}
+            placeholder="mis. B 1234 ABC"
+            className={`${inp} font-mono tracking-wider`}
+          />
         </div>
         <div>
           <label className={lbl}>Tipe *</label>

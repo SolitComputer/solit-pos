@@ -43,7 +43,7 @@ export const POST = withAuth(async (_req, ctx, user: any) => {
 
   const { data: before, error: beforeErr } = await supabase
     .from("journal_entries")
-    .select("*, lines:journal_lines(account_code, account_name, side, nominal, line_order)")
+    .select("*, lines:journal_lines(id, account_code, account_name, side, nominal, line_order)")
     .eq("id", id)
     .single();
 
@@ -119,51 +119,41 @@ export const POST = withAuth(async (_req, ctx, user: any) => {
     );
   }
 
+  const linesChanged = !linesEqual((before.lines ?? []) as any, draft.lines);
   const keteranganChanged = before.keterangan !== draft.keterangan;
 
-  if (linesEqual((before.lines ?? []) as any, draft.lines) && !keteranganChanged) {
+  if (!linesChanged && !keteranganChanged) {
     return NextResponse.json(
       { success: false, message: "Nominal & keterangan jurnal sudah sama dengan data sumber terbaru" },
       { status: 400 }
     );
   }
 
-  // Simpan status "Sudah Dicek" sebelum baris lama dihapus
-  const oldLineIds = ((before.lines ?? []) as any).map((l: any) => l.id);
-  let wasFullyChecked = false;
-  if (oldLineIds.length > 0) {
-    const { data: oldChecks } = await supabase
-      .from("journal_umum_line_checks")
-      .select("line_id")
-      .in("line_id", oldLineIds);
-    // Jika ada salah satu baris (atau semua) yang pernah dicek, anggap entry ini checked
-    wasFullyChecked = (oldChecks?.length ?? 0) > 0;
-  }
+  const oldLineIds = ((before.lines ?? []) as any).map((l: any) => l.id).filter(Boolean);
 
-  // Replace baris lama dengan draft baru
-  if (oldLineIds.length > 0) {
-    await supabase.from("journal_umum_line_checks").delete().in("line_id", oldLineIds);
-  }
-  await supabase.from("journal_lines").delete().eq("entry_id", id);
-  const { data: insertedLines, error: lineErr } = await supabase
-    .from("journal_lines")
-    .insert(draftToLineRows(id, draft.lines))
-    .select("id");
+  if (linesChanged) {
+    // Nominal / baris berubah:
+    // Sesuai aturan: jika selain keterangan yang berubah (nominal/akun),
+    // ceklis di Jurnal Umum dan Buku Besar HARUS HILANG (reset).
+    if (oldLineIds.length > 0) {
+      await supabase.from("journal_umum_line_checks").delete().in("line_id", oldLineIds);
+      await supabase.from("journal_line_checks").delete().in("line_id", oldLineIds);
+    }
+    await supabase.from("journal_lines").delete().eq("entry_id", id);
+    const { error: lineErr } = await supabase
+      .from("journal_lines")
+      .insert(draftToLineRows(id, draft.lines));
 
-  if (lineErr) {
-    // Rollback: kembalikan baris lama supaya jurnal tidak tiba-tiba kosong
-    await supabase.from("journal_lines").insert(draftToLineRows(id, (before as any).lines ?? []));
-    console.error("[akuntansi POST sync lines]", lineErr);
-    return NextResponse.json({ success: false, message: lineErr.message }, { status: 500 });
+    if (lineErr) {
+      // Rollback: kembalikan baris lama supaya jurnal tidak tiba-tiba kosong
+      await supabase.from("journal_lines").insert(draftToLineRows(id, (before as any).lines ?? []));
+      console.error("[akuntansi POST sync lines]", lineErr);
+      return NextResponse.json({ success: false, message: lineErr.message }, { status: 500 });
+    }
   }
-
-  // Pulihkan status "Sudah Dicek" ke baris-baris yang baru di-insert
-  if (wasFullyChecked && insertedLines && insertedLines.length > 0) {
-    const checkedAt = new Date().toISOString();
-    await supabase.from("journal_umum_line_checks").insert(
-      insertedLines.map((l: any) => ({ line_id: l.id, checked_at: checkedAt }))
-    );
-  }
+  // Jika HANYA keterangan yang berubah (!linesChanged && keteranganChanged):
+  // journal_lines tidak dihapus & tidak dibuat ulang, sehingga ceklis di Jurnal Umum
+  // dan Buku Besar tetap utuh (tidak hilang).
 
   const { error: updErr } = await supabase
     .from("journal_entries")

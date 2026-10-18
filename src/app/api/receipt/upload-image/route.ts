@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { withAuth } from "@/lib/auth";
+import sharp from "sharp";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8 MB
-const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"];
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MB
+const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/jpg", "image/heic", "image/heif"];
 
 // ✅ SECURITY FIX: dulu route ini tidak lewat middleware & tanpa auth, dan
 // `invoice` dari body dipakai mentah jadi path storage (`receipts/${invoice}.jpg`)
@@ -31,20 +32,44 @@ export const POST = withAuth(async (req: NextRequest) => {
             return NextResponse.json({ error: "Invoice tidak valid" }, { status: 400 });
         }
 
-        if (!ALLOWED_MIME.includes(file.type)) {
-            return NextResponse.json({ error: "Tipe file tidak didukung (harus JPG/PNG/WebP)" }, { status: 400 });
+        const isAllowedType = file.type.startsWith("image/") || ALLOWED_MIME.includes(file.type);
+        if (!isAllowedType) {
+            return NextResponse.json({ error: "Tipe file tidak didukung (harus format gambar)" }, { status: 400 });
         }
         if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) {
-            return NextResponse.json({ error: "Ukuran file tidak valid (maks 8MB)" }, { status: 400 });
+            return NextResponse.json({ error: "Ukuran file terlalu besar (maksimal 15MB)" }, { status: 400 });
         }
 
+        // ✅ NEW — kompresi server-side sebagai lapisan kedua setelah
+        // compressImage di client. rotate() baca orientasi EXIF dulu (biar
+        // foto dari HP gak kebalik), resize max 1280px sisi terpanjang,
+        // lalu re-encode ke JPEG quality 65 asli (bukan cuma ganti label
+        // contentType kayak sebelumnya). Ini juga otomatis membereskan
+        // kasus file PNG/WEBP/HEIC yang sebelumnya di-upload mentah tapi
+        // dilabeli "image/jpeg" — sekarang beneran jadi JPEG.
         const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        const originalBuffer = Buffer.from(bytes);
+        const compressedBuffer = await sharp(originalBuffer)
+            .rotate()
+            .resize({
+                width: 1280,
+                height: 1280,
+                fit: "inside",
+                withoutEnlargement: true,
+            })
+            .jpeg({ quality: 65 })
+            .toBuffer();
         const fileName = `receipts/${invoice}.jpg`;
+
+        console.log("📤 Uploading payment proof:", {
+            invoice,
+            originalSize: `${(file.size / 1024).toFixed(1)} KB`,
+            compressedSize: `${(compressedBuffer.length / 1024).toFixed(1)} KB`,
+        });
 
         const { error } = await supabase.storage
             .from("payment-proof")
-            .upload(fileName, buffer, {
+            .upload(fileName, compressedBuffer, {
                 contentType: "image/jpeg",
                 upsert: true, 
             });

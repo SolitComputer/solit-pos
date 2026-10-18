@@ -11,8 +11,8 @@ const ALLOWED_ROLES: UserRole[] = [
     "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
     "TEKNISI", "KEPALA_TEKNISI",
     "ACCOUNTING", "PKL",
+    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
 ];
-
 // GET /api/accessory-units/search-sn?q=xxx
 export const GET = withAuth(async (req: NextRequest) => {
     const { searchParams } = new URL(req.url);
@@ -29,6 +29,7 @@ export const GET = withAuth(async (req: NextRequest) => {
       serial_number,
       condition,
       status,
+      buy_price,
       selling_price,
       notes,
      accessories(
@@ -40,7 +41,10 @@ export const GET = withAuth(async (req: NextRequest) => {
       )
     `)
         .ilike("serial_number", `%${q}%`)
-        .eq("status", "TERSEDIA")
+        // Boleh dijual = TERSEDIA (Siap Jual) ATAU MINUS_SIAP_JUAL (minus tapi
+        // sudah diizinkan jual) — konsisten dgn aturan laptop. BELUM_SIAP
+        // sengaja TIDAK masuk: belum boleh dijual, cuma tercatat sebagai stok.
+        .in("status", ["TERSEDIA", "MINUS_SIAP_JUAL"])
         .limit(10);
 
     if (error) {

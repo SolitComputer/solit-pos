@@ -67,8 +67,8 @@ function getWaLink(c: BirthdayCustomer) {
     const normalized = phone.startsWith("0")
         ? "62" + phone.slice(1)
         : phone.startsWith("62")
-        ? phone
-        : "62" + phone;
+            ? phone
+            : "62" + phone;
 
     let text = "";
     if (c.diff_days === 0) {
@@ -80,6 +80,186 @@ function getWaLink(c: BirthdayCustomer) {
     }
 
     return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
+}
+
+// ── Util tanggal singkat "3 Okt" (untuk banner "Berikutnya") ──────────────────
+const MONTH_SHORT_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+function shortBirthDate(birthDateStr: string): string {
+    const [, m, d] = birthDateStr.slice(0, 10).split("-").map(Number);
+    if (!m || !d) return "";
+    return `${d} ${MONTH_SHORT_ID[m - 1]}`;
+}
+
+function formatCountdown(days: number): string {
+    if (days === 0) return "Hari ini";
+    if (days === 1) return "Besok";
+    return `${days} hari lagi`;
+}
+
+// ── Pill hitung mundur (gaya identik halaman karyawan) ────────────────────────
+function CountdownPill({ days }: { days: number }) {
+    const tone =
+        days === 0
+            ? { bg: "#fef3c7", text: "#92400e", border: "#fde68a" }
+            : days <= 7
+                ? { bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" }
+                : { bg: "#f8fafc", text: "#64748b", border: "#e8ecf5" };
+    return (
+        <span
+            className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10.5px] font-black whitespace-nowrap tabular-nums ${days === 0 ? "animate-pulse" : ""}`}
+            style={{ background: tone.bg, color: tone.text, border: `1px solid ${tone.border}` }}
+        >
+            {formatCountdown(days)}
+        </span>
+    );
+}
+
+// ── Banner: ada customer ultah HARI INI (gelap + konfeti) ─────────────────────
+function TodayBanner({ people }: { people: BirthdayCustomer[] }) {
+    return (
+        <section
+            className="relative overflow-hidden rounded-2xl sm:rounded-3xl"
+            style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}
+        >
+            <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                    backgroundImage:
+                        "radial-gradient(ellipse at 88% 15%, rgba(236,72,153,0.30) 0%, transparent 58%), radial-gradient(ellipse at 5% 95%, rgba(99,102,241,0.26) 0%, transparent 58%)",
+                }}
+            />
+            <div className="confetti pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+                {Array.from({ length: 10 }).map((_, i) => (
+                    <span key={i} className={`confetti-bit bit-${i}`} />
+                ))}
+            </div>
+
+            <div className="relative z-10 px-4 sm:px-6 py-5 sm:py-6">
+                <div className="flex items-center gap-2 mb-4">
+                    <PartyPopper className="w-4 h-4 flex-shrink-0" style={{ color: "#fbbf24" }} />
+                    <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: "#fbbf24" }}>
+                        Ulang tahun customer hari ini
+                    </p>
+                </div>
+
+                <ul className="space-y-2.5">
+                    {people.map((p) => {
+                        const wa = getWaLink(p);
+                        return (
+                            <li
+                                key={p.id}
+                                className="flex items-center gap-3 rounded-2xl px-3 py-2.5 sm:px-3.5 sm:py-3"
+                                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
+                            >
+                                <div
+                                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center font-black flex-shrink-0 text-sm sm:text-base"
+                                    style={{ background: "linear-gradient(135deg, #fde68a, #fbbf24)", boxShadow: "0 4px 14px rgba(251,191,36,0.4)", color: "#78350f" }}
+                                >
+                                    {getInitials(p.customer_name)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm sm:text-base font-black text-white truncate leading-tight">{p.customer_name}</p>
+                                    {p.customer_phone && (
+                                        <p className="text-[10.5px] sm:text-[11.5px] mt-1 truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+                                            {p.customer_phone}
+                                        </p>
+                                    )}
+                                    <p className="text-[10.5px] sm:text-[11.5px] font-bold mt-0.5" style={{ color: "#fbbf24" }}>
+                                        Genap {p.age} tahun
+                                    </p>
+                                </div>
+                                {p.customer_phone && (
+                                    <a
+                                        href={wa}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white px-3 py-2 rounded-xl flex-shrink-0 transition-transform hover:scale-[1.03] active:scale-95"
+                                        style={{ background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)", boxShadow: "0 4px 12px rgba(37,211,102,0.35)" }}
+                                    >
+                                        <MessageCircle size={14} /> <span className="hidden sm:inline">Ucapkan</span>
+                                    </a>
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            </div>
+
+            <style jsx>{`
+                .confetti-bit {
+                    position: absolute;
+                    top: -14px;
+                    width: 6px;
+                    height: 10px;
+                    border-radius: 2px;
+                    opacity: 0;
+                    animation: fall 6s linear infinite;
+                }
+                .bit-0 { left: 6%;  background: #fbbf24; animation-delay: 0s;   }
+                .bit-1 { left: 16%; background: #ec4899; animation-delay: 0.7s; }
+                .bit-2 { left: 27%; background: #6366f1; animation-delay: 1.4s; }
+                .bit-3 { left: 38%; background: #34d399; animation-delay: 2.1s; }
+                .bit-4 { left: 49%; background: #fbbf24; animation-delay: 2.8s; }
+                .bit-5 { left: 60%; background: #a78bfa; animation-delay: 0.4s; }
+                .bit-6 { left: 70%; background: #ec4899; animation-delay: 1.1s; }
+                .bit-7 { left: 80%; background: #34d399; animation-delay: 1.8s; }
+                .bit-8 { left: 88%; background: #6366f1; animation-delay: 2.5s; }
+                .bit-9 { left: 95%; background: #fbbf24; animation-delay: 3.2s; }
+
+                @keyframes fall {
+                    0%   { transform: translateY(0) rotate(0deg);       opacity: 0;    }
+                    12%  {                                              opacity: 0.55; }
+                    100% { transform: translateY(260px) rotate(320deg); opacity: 0;    }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .confetti { display: none; }
+                }
+            `}</style>
+        </section>
+    );
+}
+
+// ── Banner: belum ada ultah hari ini → tampilkan yang TERDEKAT ────────────────
+function NextUpBanner({ person }: { person: BirthdayCustomer }) {
+    return (
+        <section
+            className="bg-white rounded-2xl sm:rounded-3xl px-4 sm:px-6 py-4 sm:py-5"
+            style={{ border: "1px solid #ebebf8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+        >
+            <div className="flex items-center gap-2 mb-3.5">
+                <Clock className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#7c3aed" }} />
+                <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: "#7c3aed" }}>
+                    Berikutnya
+                </p>
+            </div>
+
+            <div className="flex items-center gap-3 sm:gap-3.5">
+                <div
+                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-white font-black flex-shrink-0 text-sm sm:text-base"
+                    style={{ background: "linear-gradient(135deg, #a78bfa, #7c3aed)", boxShadow: "0 4px 14px rgba(124,58,237,0.25)" }}
+                >
+                    {getInitials(person.customer_name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm sm:text-base font-black truncate leading-tight" style={{ color: "#0f172a" }}>
+                        {person.customer_name}
+                    </p>
+                    {person.customer_phone && (
+                        <p className="text-[10.5px] sm:text-xs mt-1 truncate" style={{ color: "#94a3b8" }}>
+                            {person.customer_phone}
+                        </p>
+                    )}
+                    <p className="text-[10.5px] sm:text-xs mt-0.5 font-bold" style={{ color: "#64748b" }}>
+                        {shortBirthDate(person.customer_birth_date)} &middot; ke-{person.age}
+                    </p>
+                </div>
+                <div className="flex-shrink-0">
+                    <CountdownPill days={person.diff_days} />
+                </div>
+            </div>
+        </section>
+    );
 }
 
 export default function CustomerBirthdaysPage() {
@@ -94,6 +274,13 @@ export default function CustomerBirthdaysPage() {
                 const res = await fetch("/api/transaction/customer-birthdays");
                 const data = await res.json();
                 if (data.success) setCustomers(data.customers);
+
+                // === DUMMY TES BANNER — HAPUS SETELAH SELESAI CEK ===
+                setCustomers([
+                    { id: "t1", customer_name: "Tes Ultah Hari Ini", customer_phone: "081234567890", customer_birth_date: "2000-10-03", age: 26, diff_days: 0, sales_name: "Sales A", sales_id: "s1", invoice_number: "INV-TEST-1", transaction_date: "2026-10-03" },
+                    { id: "t2", customer_name: "Tes H-2", customer_phone: "081234567891", customer_birth_date: "2000-10-05", age: 26, diff_days: 2, sales_name: "Sales B", sales_id: "s2", invoice_number: "INV-TEST-2", transaction_date: "2026-10-03" },
+                ]);
+                // === END DUMMY ===
             } catch { /* silent */ }
             finally { setLoading(false); }
         };
@@ -117,6 +304,14 @@ export default function CustomerBirthdaysPage() {
         if (filter === "PASSED") return customers.filter(c => c.diff_days < 0);
         return customers;
     }, [customers, filter]);
+
+    // Ultah hari ini (diff_days === 0) → banner gelap.
+    const todayList = useMemo(() => customers.filter(c => c.diff_days === 0), [customers]);
+    // Yang paling dekat & belum lewat (H-1/H-2/H-3) → banner "Berikutnya".
+    const nextUp = useMemo(
+        () => customers.filter(c => c.diff_days > 0).sort((a, b) => a.diff_days - b.diff_days)[0] ?? null,
+        [customers]
+    );
 
     return (
         <DashboardLayout>
@@ -178,6 +373,10 @@ export default function CustomerBirthdaysPage() {
                         </div>
                     </div>
 
+                    {/* ── Sorotan: ultah hari ini / terdekat (gaya halaman karyawan) ── */}f
+                    {!loading && todayList.length > 0 && <TodayBanner people={todayList} />}
+                    {!loading && todayList.length === 0 && nextUp && <NextUpBanner person={nextUp} />}
+
                     {/* ── Summary & Filter Tabs ── */}
                     {!loading && customers.length > 0 && (
                         <div className="space-y-3">
@@ -199,41 +398,37 @@ export default function CustomerBirthdaysPage() {
                             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
                                 <button
                                     onClick={() => setFilter("ALL")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap ${
-                                        filter === "ALL"
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap ${filter === "ALL"
                                             ? "bg-[#1a1535] text-white shadow-sm"
                                             : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                                    }`}
+                                        }`}
                                 >
                                     Semua ({counts.total})
                                 </button>
                                 <button
                                     onClick={() => setFilter("TODAY")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap ${
-                                        filter === "TODAY"
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap ${filter === "TODAY"
                                             ? "bg-amber-500 text-white shadow-sm"
                                             : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                                    }`}
+                                        }`}
                                 >
                                     Hari Ini ({counts.today})
                                 </button>
                                 <button
                                     onClick={() => setFilter("UPCOMING")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap ${
-                                        filter === "UPCOMING"
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap ${filter === "UPCOMING"
                                             ? "bg-sky-500 text-white shadow-sm"
                                             : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                                    }`}
+                                        }`}
                                 >
                                     Akan Datang ({counts.upcoming})
                                 </button>
                                 <button
                                     onClick={() => setFilter("PASSED")}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap ${
-                                        filter === "PASSED"
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap ${filter === "PASSED"
                                             ? "bg-purple-500 text-white shadow-sm"
                                             : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                                    }`}
+                                        }`}
                                 >
                                     Baru Lewat ({counts.passed})
                                 </button>

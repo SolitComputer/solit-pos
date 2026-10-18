@@ -107,6 +107,7 @@ export async function POST(request: Request) {
       overtime,
       total_income,
       deduction_loan,
+      deduction_cicilan, // ⬅️ BARU
       deduction_pension,
       total_deduction,
       net_salary,
@@ -144,6 +145,7 @@ export async function POST(request: Request) {
             total_income,
             deduction_violation: 0,
             deduction_loan: deduction_loan || 0,
+            deduction_cicilan: deduction_cicilan || 0, // ⬅️ BARU
             deduction_pension: deduction_pension || 0,
             total_deduction,
             net_salary,

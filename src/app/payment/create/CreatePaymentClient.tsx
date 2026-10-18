@@ -58,6 +58,11 @@ function fmt(n: number) {
     return "Rp" + (n || 0).toLocaleString("id-ID");
 }
 
+// ─── Label Unit: Aksesori dipanggil pakai SN, Laptop tetap pakai nama ────────
+function unitLabel(u: { unit_type?: "laptop" | "accessory"; laptop_name?: string; serial_number: string }) {
+    return u.unit_type === "accessory" ? u.serial_number : u.laptop_name;
+}
+
 // ─── ConfirmRow Helper ────────────────────────────────────────────────────────
 function ConfirmRow({ icon, label, value, bold, mono }: {
     icon: ReactNode; label: string; value: string; bold?: boolean; mono?: boolean;
@@ -77,7 +82,7 @@ function ConfirmRow({ icon, label, value, bold, mono }: {
 
 // ─── Unit Card (di daftar terpilih) ──────────────────────────────────────────
 function SelectedUnitCard({ unit, index, onRemove }: {
-    unit: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number }
+    unit: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number; unit_type?: "laptop" | "accessory" }
     index: number;
     onRemove: () => void;
 }) {
@@ -88,14 +93,16 @@ function SelectedUnitCard({ unit, index, onRemove }: {
                     <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
                         {index + 1}
                     </span>
-                    <p className="text-xs font-semibold text-gray-800 truncate">{unit.laptop_name}</p>
+                    <p className="text-xs font-semibold text-gray-800 truncate">{unitLabel(unit)}</p>
                     {unit.grade && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
                             {unit.grade}
                         </span>
                     )}
                 </div>
-                <p className="text-[10px] font-mono text-gray-500 mt-0.5 ml-5.5">SN: {unit.serial_number}</p>
+                <p className="text-[10px] font-mono text-gray-500 mt-0.5 ml-5.5">
+                    {unit.unit_type === "accessory" ? unit.laptop_name : `SN: ${unit.serial_number}`}
+                </p>
                 <p className="text-[10px] text-gray-400 ml-5.5">Jual: {fmt(unit.selling_price)}</p>
             </div>
             <button
@@ -137,10 +144,20 @@ export default function CreatePaymentPage() {
     const [isSubmitted, setIsSubmitted] = useState(false);
 
     // ── Multi-unit state ──────────────────────────────────────────────────────
-    const [selectedUnits, setSelectedUnits] = useState<(UnitItem & { grade?: string; condition_note?: string; purchase_price?: number })[]>([]);
+    const [selectedUnits, setSelectedUnits] = useState<(UnitItem & { grade?: string; condition_note?: string; purchase_price?: number; unit_type?: "laptop" | "accessory" })[]>([]);
     const [snSearch, setSnSearch] = useState("");
     const [snResults, setSnResults] = useState<UnitOption[]>([]);
     const [isLoadingUnits, setIsLoadingUnits] = useState(false);
+
+    // ── Kelompok MSJ (jual borongan) ──
+    interface MsjGroupLite {
+        id: string; name: string;
+        items: { item_type: "LAPTOP" | "ACCESSORY"; unit_id: string; parent_id: string | null; serial_number: string; name: string; selling_price: number }[];
+        item_count: number; total_selling: number;
+    }
+    const [msjGroups, setMsjGroups] = useState<MsjGroupLite[]>([]);
+    const [showGroupPicker, setShowGroupPicker] = useState(false);
+    const [loadingGroups, setLoadingGroups] = useState(false);
 
     const [rawDealPrice, setRawDealPrice] = useState<number>(0);
     const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
@@ -213,6 +230,16 @@ export default function CreatePaymentPage() {
 
     const paymentMethod = watch("payment_method");
     const pickupMethod = watch("pickup_method");
+
+    // FIX: sebelumnya setValue("units", ...) dipanggil manual di banyak tempat
+    // (handleSelectSnResult, handleRemoveUnit, load draft, load scan/prep, dst).
+    // Begitu ada SATU tempat yang lupa manggil (kasusnya: restore draft),
+    // field "units" di form jadi basi/kosong walau selectedUnits di UI sudah
+    // terisi — makanya validasi bisa gagal padahal user sudah pilih unit.
+    // useEffect ini jadi satu-satunya sumber sinkronisasi, tidak akan skip lagi.
+    useEffect(() => {
+        setValue("units", selectedUnits);
+    }, [selectedUnits, setValue]);
 
     const totalInventoryPrice = selectedUnits.reduce((s, u) => s + (u.purchase_price || 0), 0);
     const margin = rawDealPrice - totalInventoryPrice;
@@ -308,6 +335,7 @@ export default function CreatePaymentPage() {
         if (draft._customerType) setCustomerType(draft._customerType);
         if (draft._sellerType) setSellerType(draft._sellerType);
         if (draft._selectedUnits) setSelectedUnits(draft._selectedUnits);
+        if (draft._selectedAccessories) setSelectedAccessories(draft._selectedAccessories);
         if (draft._rawDealPrice) setRawDealPrice(draft._rawDealPrice);
         if (draft._unitPrices) setUnitPrices(draft._unitPrices);
         if (draft._isTradeIn) setIsTradeIn(draft._isTradeIn);
@@ -329,7 +357,7 @@ export default function CreatePaymentPage() {
         saveDraft({
             ...watchedFields,
             _step: step, _customerType: customerType, _sellerType: sellerType,
-            _selectedUnits: selectedUnits, _rawDealPrice: rawDealPrice,
+            _selectedUnits: selectedUnits, _selectedAccessories: selectedAccessories, _rawDealPrice: rawDealPrice,
             _unitPrices: unitPrices,
             _isTradeIn: isTradeIn, _tradeInItem: tradeInItem,
             _tradeInValue: tradeInValue, _tradeInCash: tradeInCash,
@@ -337,7 +365,7 @@ export default function CreatePaymentPage() {
             _customerBirthDate: customerBirthDate,
             _savedAt: new Date().toISOString(),
         });
-    }, [watchedFields, step, customerType, sellerType, selectedUnits, rawDealPrice,
+    }, [watchedFields, step, customerType, sellerType, selectedUnits, selectedAccessories, rawDealPrice,
         unitPrices, isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, isSubmitted]);
 
     // ── Load unit dari scan ───────────────────────────────────────────────────
@@ -350,20 +378,32 @@ export default function CreatePaymentPage() {
                 if (!result.success) return;
                 const unit = result.data;
                 const laptop = unit.laptop;
+                // FIX: dulu langsung baca laptop.id / laptop.laptop_name tanpa cek.
+                // Untuk unit non-laptop (PC/Printer via device_type) atau unit yang
+                // join `laptops`-nya null, `laptop` bisa undefined → CRASH
+                // (TypeError) ATAU laptop_id/laptop_name jadi "" yang GAGAL validasi
+                // zod (units.*.min(1)). Sekarang fallback ke field datar yang juga
+                // dikirim check-sn, lalu stop kalau tetap kosong.
+                const resolvedLaptopId = laptop?.id ?? unit.laptop_id ?? "";
+                const resolvedLaptopName = laptop?.laptop_name ?? unit.laptop_name ?? "";
+                if (!resolvedLaptopId || !resolvedLaptopName) {
+                    console.error("[loadScan] laptop_id/laptop_name kosong untuk SN:", unit.serial_number, { resolvedLaptopId, resolvedLaptopName });
+                    return;
+                }
                 const item: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number } = {
                     unit_id: unit.id,
-                    laptop_id: laptop.id,
+                    laptop_id: resolvedLaptopId,
                     serial_number: unit.serial_number,
-                    laptop_name: laptop.laptop_name,
+                    laptop_name: resolvedLaptopName,
                     grade: unit.grade,
                     selling_price: unit.selling_price ?? 0,
                     condition_note: unit.condition_note,
                 };
                 setSelectedUnits([item]);
                 setValue("units", [item]);
-                setValue("laptop_name", laptop.laptop_name);
+                setValue("laptop_name", resolvedLaptopName);
                 setValue("serial_number", unit.serial_number);
-                setValue("laptop_id", laptop.id);
+                setValue("laptop_id", resolvedLaptopId);
                 setValue("unit_id", unit.id);
             } catch { }
         };
@@ -406,11 +446,33 @@ export default function CreatePaymentPage() {
                     if (!ur.success || !ur.data) continue;
                     const u = ur.data;
                     const laptop = u.laptop;
+                    // FIX: unitItemSchema (validation.ts) mewajibkan laptop_id DAN
+                    // laptop_name sama-sama .min(1). Beberapa unit (PC/Printer via
+                    // device_type, atau join `laptops` null) tidak punya objek
+                    // `laptop`, jadi laptop?.id / laptop?.laptop_name = undefined →
+                    // sebelumnya di-fallback "" yang GAGAL validasi zod → seluruh
+                    // array `units` dianggap "tidak valid" (ini biang bug "units:
+                    // tidak valid"). Pakai fallback ke field datar yang juga dikirim
+                    // check-sn (u.laptop_id / u.laptop_name). Kalau salah satu tetap
+                    // kosong, skip unit ini supaya tidak memaksa form jadi invalid
+                    // total — unit yang di-skip tetap dilaporkan lewat prepResolveError
+                    // di bawah.
+                    const resolvedLaptopId = laptop?.id ?? u.laptop_id ?? "";
+                    const resolvedLaptopName =
+                        laptop?.laptop_name ?? u.laptop_name ?? it.laptop_name ?? "";
+                    if (!resolvedLaptopId || !resolvedLaptopName) {
+                        console.error(
+                            "[loadPrep] Unit dilewati — laptop_id/laptop_name kosong untuk SN:",
+                            u.serial_number,
+                            { resolvedLaptopId, resolvedLaptopName }
+                        );
+                        continue;
+                    }
                     resolved.push({
                         unit_id: u.id,
-                        laptop_id: laptop?.id ?? "",
+                        laptop_id: resolvedLaptopId,
                         serial_number: u.serial_number,
-                        laptop_name: laptop?.laptop_name ?? it.laptop_name ?? "",
+                        laptop_name: resolvedLaptopName,
                         grade: u.grade ?? undefined,
                         selling_price: u.selling_price ?? 0,
                         purchase_price: u.purchase_price ?? 0,
@@ -431,7 +493,7 @@ export default function CreatePaymentPage() {
                     console.error("[loadPrep] Unit gagal di-resolve via check-sn:", failedSNs);
                     setPrepResolveError(
                         resolved.length === 0
-                            ? `Semua unit gagal dimuat (SN: ${failedSNs}). Kemungkinan status unit sudah berubah dari SIAP_JUAL, sehingga tidak lolos pengecekan ketersediaan di /api/units/check-sn.`
+                            ? `Semua unit gagal dimuat (SN: ${failedSNs}). Kemungkinan status unit sudah berubah dari SIAP_JUAL, atau data produk (laptop_id/nama) unit tersebut kosong di master barang.`
                             : `${items.length - resolved.length} dari ${items.length} unit gagal dimuat (SN: ${failedSNs}).`
                     );
                 }
@@ -447,17 +509,42 @@ export default function CreatePaymentPage() {
         if (q.length < 2) { setSnResults([]); return; }
         setIsLoadingUnits(true);
         try {
-            const res = await fetch(`/api/units/search-sn?q=${encodeURIComponent(q)}`);
+            // CS (accessory-only) cari pakai SN aksesoris; role lain pakai SN unit gabungan (laptop + aksesoris)
+            const endpoint = isAccessoryOnlyRole
+                ? `/api/accessory-units/search-sn?q=${encodeURIComponent(q)}`
+                : `/api/units/search-sn?q=${encodeURIComponent(q)}`;
+            const res = await fetch(endpoint);
             const result = await res.json();
+
+            // Endpoint accessory-units bentuk datanya beda → normalisasi ke bentuk UnitOption
+            // supaya handleSelectSnResult & dropdown yang sudah ada bisa dipakai apa adanya.
+            const rows = (result.data || []).map((u: any) =>
+                isAccessoryOnlyRole
+                    ? {
+                        id: u.id,
+                        serial_number: u.serial_number,
+                        selling_price: u.selling_price ?? 0,
+                        purchase_price: u.buy_price ?? 0,
+                        condition_note: u.notes ?? "",
+                        laptop_name: u.display_name || u.accessory_name || "",
+                        unit_type: "accessory" as const,
+                        accessory_id: u.accessory_id,
+                        accessory_name: u.accessory_name,
+                        category: u.category,
+                        condition: u.condition,
+                    }
+                    : u
+            );
+
             // Filter out already-selected units
             const selectedIds = new Set(selectedUnits.map(u => u.unit_id));
-            setSnResults((result.data || []).filter((u: any) => !selectedIds.has(u.id)));
+            setSnResults(rows.filter((u: any) => !selectedIds.has(u.id)));
         } catch {
             setSnResults([]);
         } finally {
             setIsLoadingUnits(false);
         }
-    }, [selectedUnits]);
+    }, [selectedUnits, isAccessoryOnlyRole]);
 
     const handleAccSearch = useCallback(async (q: string) => {
         if (q.length < 2) { setAccResults([]); return; }
@@ -491,7 +578,65 @@ export default function CreatePaymentPage() {
     const removeAccessory = (idx: number) =>
         setSelectedAccessories(prev => prev.filter((_, i) => i !== idx));
 
+    const openGroupPicker = async () => {
+        setShowGroupPicker(true);
+        setLoadingGroups(true);
+        try {
+            const res = await fetch("/api/msj-groups?status=OPEN");
+            const json = await res.json();
+            setMsjGroups(json.success ? (json.data ?? []) : []);
+        } catch { setMsjGroups([]); }
+        finally { setLoadingGroups(false); }
+    };
+
+    // Panggil kelompok → semua SN di dalamnya masuk sebagai unit terpilih.
+    // item_type LAPTOP → unit_type "laptop", ACCESSORY → "accessory" (field
+    // laptop_id di-reuse untuk accessory_id, persis pola handleSelectSnResult).
+    const handlePickGroup = (g: MsjGroupLite) => {
+        const existing = new Set(selectedUnits.map(u => u.unit_id));
+        // Tolak item yang parent_id (laptop_id/accessory_id master) kosong —
+        // transaction/create mewajibkannya (gagal validasi kalau "").
+        const invalid = g.items.filter(it => !it.parent_id);
+        if (invalid.length > 0) {
+            alert(`Kelompok "${g.name}" punya ${invalid.length} barang tanpa data master (SN: ${invalid.map(i => i.serial_number).join(", ")}). Tidak bisa dijual sampai diperbaiki.`);
+            return;
+        }
+        const additions = g.items
+            .filter(it => !existing.has(it.unit_id))
+            .map(it => ({
+                unit_id: it.unit_id,
+                // Field laptop_id di-reuse untuk accessory_id juga (pola UnitItem
+                // existing di handleSelectSnResult) — transaction/create membaca
+                // accessory_id dari field ini untuk unit_type "accessory".
+                laptop_id: it.parent_id as string,
+                serial_number: it.serial_number,
+                laptop_name: it.name,
+                selling_price: it.selling_price ?? 0,
+                unit_type: it.item_type === "LAPTOP" ? ("laptop" as const) : ("accessory" as const),
+            }));
+        const newUnits = [...selectedUnits, ...additions];
+        setSelectedUnits(newUnits);
+        setValue("units", newUnits);
+        setUnitPrices(prev => {
+            const next = { ...prev };
+            for (const it of g.items) if (next[it.unit_id] === undefined) next[it.unit_id] = it.selling_price ?? 0;
+            return next;
+        });
+        setShowGroupPicker(false);
+    };
     const handleSelectSnResult = (u: UnitOption) => {
+        // FIX: tolak item yang laptop_id ATAU laptop_name-nya bakal kosong
+        // (laptop tanpa laptop_id, aksesori tanpa accessory_id, atau nama produk
+        // kosong) — sebelumnya di-fallback "" yang gagal validasi zod
+        // (units.*.min(1)). Lebih baik tolak di sini dengan pesan jelas daripada
+        // lolos lalu seluruh form invalid "units: tidak valid".
+        const resolvedLaptopId =
+            u.unit_type === "accessory" ? (u.accessory_id ?? "") : (u.laptop_id ?? "");
+        const resolvedLaptopName = u.laptop_name ?? "";
+        if (!resolvedLaptopId || !resolvedLaptopName) {
+            alert(`Unit "${u.serial_number}" tidak punya ID/nama produk yang valid, tidak bisa ditambahkan.`);
+            return;
+        }
         const item: UnitItem & {
             grade?: string | null;
             condition_note?: string;
@@ -499,11 +644,10 @@ export default function CreatePaymentPage() {
             unit_type?: "laptop" | "accessory";
         } = {
             unit_id: u.id,
-            // Untuk aksesori, laptop_id diisi accessory_id (konsistensi field)
-            laptop_id: u.unit_type === "accessory" ? (u.accessory_id ?? "") : (u.laptop_id ?? ""),
+            laptop_id: resolvedLaptopId,
             serial_number: u.serial_number,
             purchase_price: u.purchase_price ?? 0,
-            laptop_name: u.laptop_name ?? "",
+            laptop_name: resolvedLaptopName,
             grade: u.grade ?? undefined,
             selling_price: u.selling_price ?? 0,
             condition_note: u.condition_note ?? "",
@@ -569,7 +713,7 @@ export default function CreatePaymentPage() {
             return;
         }
 
-       if (paymentFlow === "DIRECT" && !paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
+        if (paymentFlow === "DIRECT" && !paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
         if (!latitude || !longitude) { alert("GPS wajib diambil"); return; }
 
         if (data.payment_method === "TF_CASH") {
@@ -610,18 +754,33 @@ export default function CreatePaymentPage() {
     // Sebelumnya tidak ada handler ini → kegagalan validasi senyap total,
     // modal konfirmasi tidak muncul dan tidak ada pesan apapun ke user.
     const onInvalidSubmit = (errs: Record<string, any>) => {
-        const fieldErrors = Object.entries(errs).map(
-            ([field, err]) => `${field}: ${(err as any)?.message ?? "tidak valid"}`
-        );
-        console.error("[CreatePayment] Validasi form gagal:", fieldErrors);
+        // FIX: error untuk field array (mis. "units") TIDAK punya .message di
+        // root — pesan aslinya ada di elemen anak (errs.units[0].laptop_id.message).
+        // Dulu cuma baca err?.message → selalu jatuh ke "units: tidak valid" yang
+        // menyesatkan. Sekarang digali supaya langsung kelihatan field mana yang
+        // gagal (mis. "units[0] → laptop_id: laptop_id/produk unit kosong").
+        const describe = (field: string, err: any): string => {
+            if (err?.message) return `${field}: ${err.message}`;
+            if (Array.isArray(err)) {
+                const idx = err.findIndex((e) => e && Object.keys(e).length > 0);
+                if (idx >= 0) {
+                    const child = err[idx];
+                    const sub = Object.entries(child)
+                        .map(([k, v]) => `${k}: ${(v as any)?.message ?? "tidak valid"}`)
+                        .join(", ");
+                    return `${field}[${idx}] → ${sub}`;
+                }
+            }
+            return `${field}: tidak valid`;
+        };
+        const fieldErrors = Object.entries(errs).map(([field, err]) => describe(field, err));
+        console.error("[CreatePayment] Validasi form gagal:", fieldErrors, errs);
         const firstKey = Object.keys(errs)[0];
-        const firstMsg = firstKey
-            ? (errs[firstKey]?.message || `Field "${firstKey}" tidak valid`)
-            : "Form tidak valid";
+        const firstMsg = firstKey ? describe(firstKey, errs[firstKey]) : "Form tidak valid";
         alert(`Tidak bisa lanjut — ${firstMsg}\n\n(Cek Console untuk detail lengkap semua field yang error)\n\n${fieldErrors.join("\n")}`);
     };
 
-   const handleConfirmedSubmit = async () => {
+    const handleConfirmedSubmit = async () => {
         if (!pendingSubmitData) return;
         setShowConfirmModal(false);
         setSubmitting(true);
@@ -851,7 +1010,7 @@ export default function CreatePaymentPage() {
                     {step === 1 && (paymentFlow === "DIRECT" || pendingSubType) && (
                         <>
                             <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
-                          <div>
+                            <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">
                                     Tanggal Lahir Customer {paymentFlow === "DIRECT" ? "*" : <span className="text-gray-400 font-normal">(opsional)</span>}
                                 </label>
@@ -947,164 +1106,175 @@ export default function CreatePaymentPage() {
                     {/* ──────────────────────── STEP 2: Pilih Unit ───────────────────── */}
                     {step === 2 && !fromScan && (
                         <>
-                            {!isAccessoryOnlyRole && (
-                                <>
-                                    {/* Search SN */}
-                                    <div>
-                                        <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
-                                            <Laptop size={13} /> Cari & Tambah Serial Number
-                                            {selectedUnits.length > 0 && (
-                                                <span className="text-gray-700 font-semibold">({selectedUnits.length} unit terpilih)</span>
+                            {/* Search SN — CS cari SN aksesoris, role lain cari SN unit (laptop/aksesoris) */}
+                            <>
+                                {/* Panggil Kelompok MSJ (jual borongan) — tidak untuk role accessory-only */}
+                                {!isAccessoryOnlyRole && (
+                                    <button type="button" onClick={openGroupPicker}
+                                        className="w-full mb-2 h-10 rounded-xl border border-violet-200 bg-violet-50 text-violet-700 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-violet-100 transition">
+                                        <Package size={14} /> Panggil Kelompok Minus Siap Jual
+                                    </button>
+                                )}
+
+                                {/* Search SN */}
+                                <div>
+                                    <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
+                                        <Laptop size={13} /> {isAccessoryOnlyRole ? "Cari & Tambah SN Aksesoris" : "Cari & Tambah Serial Number"}
+                                        {selectedUnits.length > 0 && (
+                                            <span className="text-gray-700 font-semibold">({selectedUnits.length} unit terpilih)</span>
+                                        )}
+                                    </label>
+                                    <div className="relative">
+                                        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                        <input
+                                            type="text"
+                                            placeholder={isAccessoryOnlyRole ? "Ketik SN aksesoris..." : "Ketik SN unit..."}
+                                            className={`${inputClass} pl-10`}
+                                            value={snSearch}
+                                            onChange={e => { setSnSearch(e.target.value); handleSnSearch(e.target.value); }}
+                                        />
+                                        {isLoadingUnits && (
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                <Loader2 size={16} className="text-gray-400 animate-spin" />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Dropdown hasil search */}
+                                    {snResults.length > 0 && (
+                                        <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                                            {snResults.map(u => (
+                                                <button key={u.id} type="button" onClick={() => handleSelectSnResult(u)}
+                                                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-mono text-sm font-semibold text-gray-800">{u.serial_number}</p>
+                                                        {u.unit_type === "accessory" ? (
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex-shrink-0">
+                                                                AKSESORI
+                                                            </span>
+                                                        ) : (
+                                                            u.grade && (
+                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
+                                                                    Grade {u.grade}
+                                                                </span>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-0.5">
+                                                        {u.laptop_name}
+                                                        {u.unit_type === "accessory" && u.condition ? ` · ${u.condition}` : ""}
+                                                        {u.selling_price ? ` · ${fmt(u.selling_price)}` : ""}
+                                                    </p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {snSearch.length >= 2 && snResults.length === 0 && !isLoadingUnits && (
+                                        <p className="text-xs text-red-500 mt-1.5 px-1">SN tidak ditemukan atau sudah dipilih</p>
+                                    )}
+                                </div>
+
+                                {/* Daftar unit terpilih */}
+                                {selectedUnits.length > 0 && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-semibold text-gray-600">
+                                                Unit Terpilih ({selectedUnits.length})
+                                            </label>
+                                        </div>
+                                        {selectedUnits.map((u, i) => (
+                                            <SelectedUnitCard key={u.unit_id} unit={u} index={i} onRemove={() => handleRemoveUnit(i)} />
+                                        ))}
+
+                                        {/* Harga Deal per Unit */}
+                                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
+                                            <label className="text-xs text-gray-500 block">
+                                                Harga Deal per Unit {isEcommercePending ? <span className="text-gray-400 font-normal">(opsional)</span> : "*"}
+                                                <span className="ml-1.5 text-gray-400">({selectedUnits.length} unit)</span>
+                                            </label>
+
+                                            {selectedUnits.map((u, i) => (
+                                                <div key={u.unit_id} className="space-y-1.5">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
+                                                            {i + 1}
+                                                        </span>
+                                                        <p className="text-xs font-semibold text-gray-700 truncate flex-1">{unitLabel(u)}</p>
+                                                        {u.grade && (
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
+                                                                {u.grade}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[10px] font-mono text-gray-400 ml-5.5">
+                                                        {u.unit_type === "accessory" ? u.laptop_name : `SN: ${u.serial_number}`}
+                                                    </p>
+                                                    {hasPedagangPrice(u.unit_id) && (
+                                                        <p className="text-[10px] text-emerald-600 font-medium ml-5.5">Harga mengikuti price list pedagang — masih bisa diubah manual</p>
+                                                    )}
+                                                    <input
+                                                        key={`${u.unit_id}-${pedagangPriceMap[u.unit_id] ?? "none"}`}
+                                                        type="text" inputMode="numeric"
+                                                        placeholder="Harga deal unit ini"
+                                                        className={inputClass}
+                                                        defaultValue={unitPrices[u.unit_id] > 0 ? unitPrices[u.unit_id].toLocaleString("id-ID") : ""}
+                                                        onChange={e => {
+                                                            const raw = e.target.value.replace(/\D/g, "");
+                                                            const num = raw ? Number(raw) : 0;
+                                                            setUnitPrices(prev => ({ ...prev, [u.unit_id]: num }));
+                                                        }}
+                                                        onBlur={e => {
+                                                            const raw = e.target.value.replace(/\D/g, "");
+                                                            if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
+                                                        }}
+                                                        onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
+                                                    />
+                                                </div>
+                                            ))}
+
+                                            {/* Total otomatis */}
+                                            <div className="flex justify-between text-xs border-t border-gray-200 pt-2.5">
+                                                <span className="text-gray-600 font-semibold">Total ({selectedUnits.length} unit)</span>
+                                                <span className="font-bold text-gray-800 font-mono">{fmt(rawDealPrice)}</span>
+                                            </div>
+
+                                            {pendingSubType === "DP_AMBIL" && (
+                                                <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-1.5 mt-2">
+                                                    <label className="text-xs font-semibold text-violet-700 block">
+                                                        Nominal DP <span className="text-violet-400 font-normal">(isi 0 = Ambil Dulu)</span>
+                                                    </label>
+                                                    <input
+                                                        type="text" inputMode="numeric"
+                                                        value={dpAmount > 0 ? dpAmount.toLocaleString("id-ID") : ""}
+                                                        placeholder="0"
+                                                        onChange={e => {
+                                                            const raw = e.target.value.replace(/\D/g, "");
+                                                            const num = raw ? Number(raw) : 0;
+                                                            setDpAmount(Math.min(num, Math.max(0, rawDealPrice - 1)));
+                                                        }}
+                                                        className={inputClass}
+                                                    />
+                                                    <p className="text-[11px] text-violet-500">
+                                                        {dpAmount > 0
+                                                            ? `Sisa setelah DP: ${fmt(Math.max(0, rawDealPrice - dpAmount))}`
+                                                            : "Status: Ambil Dulu (belum ada pembayaran)"}
+                                                    </p>
+                                                </div>
                                             )}
-                                        </label>
-                                        <div className="relative">
-                                            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                            <input
-                                                type="text"
-                                                placeholder="Ketik SN unit..."
-                                                className={`${inputClass} pl-10`}
-                                                value={snSearch}
-                                                onChange={e => { setSnSearch(e.target.value); handleSnSearch(e.target.value); }}
-                                            />
-                                            {isLoadingUnits && (
-                                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                                    <Loader2 size={16} className="text-gray-400 animate-spin" />
+
+                                            {rawDealPrice > 0 && canSeeMargin && (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-gray-500">Selisih / Margin</span>
+                                                    <span className={`font-semibold ${margin >= 0 ? "text-gray-600" : "text-red-500"}`}>
+                                                        {margin >= 0 ? "+" : ""}{fmt(margin)}
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Dropdown hasil search */}
-                                        {snResults.length > 0 && (
-                                            <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                                                {snResults.map(u => (
-                                                    <button key={u.id} type="button" onClick={() => handleSelectSnResult(u)}
-                                                        className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="font-mono text-sm font-semibold text-gray-800">{u.serial_number}</p>
-                                                            {u.unit_type === "accessory" ? (
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex-shrink-0">
-                                                                    AKSESORI
-                                                                </span>
-                                                            ) : (
-                                                                u.grade && (
-                                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
-                                                                        Grade {u.grade}
-                                                                    </span>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                        <p className="text-xs text-gray-500 mt-0.5">
-                                                            {u.laptop_name}
-                                                            {u.unit_type === "accessory" && u.condition ? ` · ${u.condition}` : ""}
-                                                            {u.selling_price ? ` · ${fmt(u.selling_price)}` : ""}
-                                                        </p>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {snSearch.length >= 2 && snResults.length === 0 && !isLoadingUnits && (
-                                            <p className="text-xs text-red-500 mt-1.5 px-1">SN tidak ditemukan atau sudah dipilih</p>
-                                        )}
-                                    </div>
-
-                                    {/* Daftar unit terpilih */}
-                                    {selectedUnits.length > 0 && (
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <label className="text-xs font-semibold text-gray-600">
-                                                    Unit Terpilih ({selectedUnits.length})
-                                                </label>
-                                            </div>
-                                            {selectedUnits.map((u, i) => (
-                                                <SelectedUnitCard key={u.unit_id} unit={u} index={i} onRemove={() => handleRemoveUnit(i)} />
-                                            ))}
-
-                                            {/* Harga Deal per Unit */}
-                                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
-                                                <label className="text-xs text-gray-500 block">
-                                                    Harga Deal per Unit {isEcommercePending ? <span className="text-gray-400 font-normal">(opsional)</span> : "*"}
-                                                    <span className="ml-1.5 text-gray-400">({selectedUnits.length} unit)</span>
-                                                </label>
-
-                                                {selectedUnits.map((u, i) => (
-                                                    <div key={u.unit_id} className="space-y-1.5">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
-                                                                {i + 1}
-                                                            </span>
-                                                            <p className="text-xs font-semibold text-gray-700 truncate flex-1">{u.laptop_name}</p>
-                                                            {u.grade && (
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
-                                                                    {u.grade}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-[10px] font-mono text-gray-400 ml-5.5">SN: {u.serial_number}</p>
-                                                        {hasPedagangPrice(u.unit_id) && (
-                                                            <p className="text-[10px] text-emerald-600 font-medium ml-5.5">Harga mengikuti price list pedagang — masih bisa diubah manual</p>
-                                                        )}
-                                                        <input
-                                                            key={`${u.unit_id}-${pedagangPriceMap[u.unit_id] ?? "none"}`}
-                                                            type="text" inputMode="numeric"
-                                                            placeholder="Harga deal unit ini"
-                                                            className={inputClass}
-                                                            defaultValue={unitPrices[u.unit_id] > 0 ? unitPrices[u.unit_id].toLocaleString("id-ID") : ""}
-                                                            onChange={e => {
-                                                                const raw = e.target.value.replace(/\D/g, "");
-                                                                const num = raw ? Number(raw) : 0;
-                                                                setUnitPrices(prev => ({ ...prev, [u.unit_id]: num }));
-                                                            }}
-                                                            onBlur={e => {
-                                                                const raw = e.target.value.replace(/\D/g, "");
-                                                                if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
-                                                            }}
-                                                            onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
-                                                        />
-                                                    </div>
-                                                ))}
-
-                                                {/* Total otomatis */}
-                                                <div className="flex justify-between text-xs border-t border-gray-200 pt-2.5">
-                                                    <span className="text-gray-600 font-semibold">Total ({selectedUnits.length} unit)</span>
-                                                    <span className="font-bold text-gray-800 font-mono">{fmt(rawDealPrice)}</span>
-                                                </div>
-
-                                                {pendingSubType === "DP_AMBIL" && (
-                                                    <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-1.5 mt-2">
-                                                        <label className="text-xs font-semibold text-violet-700 block">
-                                                            Nominal DP <span className="text-violet-400 font-normal">(isi 0 = Ambil Dulu)</span>
-                                                        </label>
-                                                        <input
-                                                            type="text" inputMode="numeric"
-                                                            value={dpAmount > 0 ? dpAmount.toLocaleString("id-ID") : ""}
-                                                            placeholder="0"
-                                                            onChange={e => {
-                                                                const raw = e.target.value.replace(/\D/g, "");
-                                                                const num = raw ? Number(raw) : 0;
-                                                                setDpAmount(Math.min(num, Math.max(0, rawDealPrice - 1)));
-                                                            }}
-                                                            className={inputClass}
-                                                        />
-                                                        <p className="text-[11px] text-violet-500">
-                                                            {dpAmount > 0
-                                                                ? `Sisa setelah DP: ${fmt(Math.max(0, rawDealPrice - dpAmount))}`
-                                                                : "Status: Ambil Dulu (belum ada pembayaran)"}
-                                                        </p>
-                                                    </div>
-                                                )}
-
-                                                {rawDealPrice > 0 && canSeeMargin && (
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="text-gray-500">Selisih / Margin</span>
-                                                        <span className={`font-semibold ${margin >= 0 ? "text-gray-600" : "text-red-500"}`}>
-                                                            {margin >= 0 ? "+" : ""}{fmt(margin)}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* ── Trade-In Toggle ── */}
+                                        {/* ── Trade-In Toggle (khusus role laptop, bukan CS/aksesoris) ── */}
+                                        {!isAccessoryOnlyRole && (
                                             <div className="border border-gray-200 rounded-xl overflow-hidden">
                                                 <button
                                                     type="button"
@@ -1172,16 +1342,16 @@ export default function CreatePaymentPage() {
                                                                 </div>
                                                             </div>
                                                         )}
-                                                    </div>
+                                                                                                       </div>
                                                 )}
                                             </div>
+                                            )}
                                         </div>
                                     )}
 
                                 </>
-                            )}
-
-                            {/* ── Aksesori (opsional, tanpa SN) ── */}
+                                
+                            {/* ── Aksesori (opsional, tanpa SN) ──
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
                                     <Gift size={13} /> Aksesori (opsional)
@@ -1220,7 +1390,7 @@ export default function CreatePaymentPage() {
                                 {accSearch.length >= 2 && accResults.length === 0 && !accLoading && (
                                     <p className="text-xs text-gray-400 mt-1.5 px-1">Aksesori tidak ditemukan / stok habis</p>
                                 )}
-                            </div>
+                            </div> */}
 
                             {selectedAccessories.length > 0 && (
                                 <div className="space-y-2">
@@ -1287,7 +1457,7 @@ export default function CreatePaymentPage() {
 
                             <div className="flex gap-2 pt-1">
                                 <button type="button" onClick={() => setStep(1)} className={`${btnSecondary} inline-flex items-center justify-center gap-1.5`}><ChevronLeft size={16} /> Kembali</button>
-                                                               <button type="button" onClick={() => {
+                                <button type="button" onClick={() => {
                                     const paidAcc = selectedAccessories.filter(a => !a.is_bonus).length;
                                     if (!selectedUnits.length && selectedAccessories.length === 0) { alert("Pilih minimal 1 unit atau aksesori dulu"); return; }
                                     if (!selectedUnits.length && paidAcc === 0) { alert("Transaksi hanya berisi bonus. Tambahkan unit atau aksesori berbayar."); return; }
@@ -1312,8 +1482,10 @@ export default function CreatePaymentPage() {
                                     {selectedUnits.map((u, i) => (
                                         <div key={u.unit_id} className="space-y-1.5 pb-2">
                                             <div className="text-xs text-gray-700">
-                                                <span className="font-semibold">{i + 1}. {u.laptop_name}</span>
-                                                <span className="font-mono text-gray-500 ml-2">SN: {u.serial_number}</span>
+                                                <span className="font-semibold">{i + 1}. {unitLabel(u)}</span>
+                                                <span className="font-mono text-gray-500 ml-2">
+                                                    {u.unit_type === "accessory" ? u.laptop_name : `SN: ${u.serial_number}`}
+                                                </span>
                                             </div>
                                             {hasPedagangPrice(u.unit_id) && (
                                                 <p className="text-[10px] text-emerald-600 font-medium">Harga mengikuti price list pedagang — masih bisa diubah manual</p>
@@ -1536,7 +1708,7 @@ export default function CreatePaymentPage() {
                             )}
 
                             {/* Foto */}
-                           <div>
+                            <div>
                                 <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
                                     <Camera size={14} /> Foto Bukti Pembayaran {paymentFlow === "DIRECT" ? "*" : <span className="text-gray-400 font-normal">(opsional)</span>}
                                 </label>
@@ -1589,6 +1761,45 @@ export default function CreatePaymentPage() {
                     )}
                 </form>
 
+                {/* ── Modal Picker Kelompok MSJ ── */}
+                {showGroupPicker && (
+                    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowGroupPicker(false)} />
+                        <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh]">
+                            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <p className="font-bold text-gray-800 text-sm">Panggil Kelompok Minus Siap Jual</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">Pilih kelompok — semua SN di dalamnya masuk sekaligus</p>
+                                </div>
+                                <button type="button" onClick={() => setShowGroupPicker(false)} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 transition">
+                                    <X size={16} />
+                                </button>
+                            </div>
+                            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2">
+                                {loadingGroups ? (
+                                    <p className="text-sm text-gray-400 text-center py-8">Memuat kelompok...</p>
+                                ) : msjGroups.length === 0 ? (
+                                    <p className="text-sm text-gray-400 text-center py-8">Belum ada kelompok tersedia</p>
+                                ) : (
+                                    msjGroups.map(g => (
+                                        <button key={g.id} type="button" onClick={() => handlePickGroup(g)}
+                                            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-violet-300 hover:bg-violet-50/40 transition">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-sm font-bold text-gray-800 truncate">{g.name}</p>
+                                                <span className="text-xs font-bold text-amber-600 tabular-nums flex-shrink-0">{fmt(g.total_selling)}</span>
+                                            </div>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">{g.item_count} barang · {g.items.map(i => i.serial_number).slice(0, 4).join(", ")}{g.items.length > 4 ? "…" : ""}</p>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                            <div className="px-5 py-4 border-t border-gray-100">
+                                <button type="button" onClick={() => setShowGroupPicker(false)} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Tutup</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* ── Modal Konfirmasi ── */}
                 {showConfirmModal && (selectedUnits.length > 0 || selectedAccessories.length > 0) && (
                     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -1640,7 +1851,7 @@ export default function CreatePaymentPage() {
                                             <p className="text-xs text-gray-400 mb-1.5 inline-flex items-center gap-1"><Laptop size={12} /> Unit ({selectedUnits.length})</p>
                                             {selectedUnits.map((u, i) => (
                                                 <div key={u.unit_id} className="flex justify-between text-xs mb-1">
-                                                    <span className="text-gray-600 truncate max-w-[45%]">{i + 1}. {u.laptop_name}</span>
+                                                    <span className="text-gray-600 truncate max-w-[45%]">{i + 1}. {unitLabel(u)}</span>
                                                     <span className="font-mono text-gray-700 font-semibold">{fmt(unitPrices[u.unit_id] || 0)}</span>
                                                 </div>
                                             ))}

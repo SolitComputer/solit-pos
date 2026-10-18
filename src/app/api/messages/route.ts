@@ -100,9 +100,11 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       const { sendPushToUser } = await import("@/lib/push-notify");
       const pushBody = attachment_type === "image"
         ? "📷 Mengirim foto"
-        : attachment_type === "file"
-          ? `📎 ${attachment_name ?? "File"}`
-          : trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent;
+        : attachment_type === "voice"
+          ? "🎤 Pesan suara"
+          : attachment_type === "file"
+            ? `📎 ${attachment_name ?? "File"}`
+            : trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent;
 
       const isBirthdayWish = trimmedContent.startsWith("🎂");
 

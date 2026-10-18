@@ -13,8 +13,8 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   try {
     const { data: users, error: uErr } = await admin
       .from("users")
-      .select("id, name, role")
-      .in("role", PREPARATION_DELIVERY_PERSON_ROLES)
+      .select("id, name, role, roles, is_active")
+      .or("role.in.(PENGANTARAN,PKL_PENGANTARAN),roles.ov.{PENGANTARAN,PKL_PENGANTARAN}")
       .order("name", { ascending: true });
     if (uErr) throw uErr;
 
@@ -24,15 +24,22 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
     if (sErr) throw sErr;
 
     const byUser = new Map((settings ?? []).map((s) => [s.user_id, s]));
-    const merged = (users ?? []).map((u) => ({
-      id: u.id,
-      name: u.name,
-      role: u.role,
-      sound_key: byUser.get(u.id)?.sound_key ?? "default",
-      repeat_enabled: byUser.get(u.id)?.repeat_enabled ?? false,
-      repeat_interval_ms: byUser.get(u.id)?.repeat_interval_ms ?? 4000,
-      custom_sound_url: byUser.get(u.id)?.custom_sound_url ?? null,
-    }));
+    const merged = (users ?? [])
+      .filter((u: any) => u.is_active !== false)
+      .map((u: any) => {
+        const userRoles: string[] = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles : [u.role];
+        const deliveryRole = userRoles.find((r: string) => PREPARATION_DELIVERY_PERSON_ROLES.includes(r as any)) || u.role;
+        return {
+          id: u.id,
+          name: u.name,
+          role: deliveryRole,
+          roles: userRoles,
+          sound_key: byUser.get(u.id)?.sound_key ?? "default",
+          repeat_enabled: byUser.get(u.id)?.repeat_enabled ?? false,
+          repeat_interval_ms: byUser.get(u.id)?.repeat_interval_ms ?? 4000,
+          custom_sound_url: byUser.get(u.id)?.custom_sound_url ?? null,
+        };
+      });
 
     return NextResponse.json({ success: true, data: merged });
   } catch (err) {

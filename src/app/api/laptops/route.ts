@@ -12,7 +12,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       .select(`
         *,
         laptop_categories ( id, name ),
-laptop_units (
+        laptop_units (
           id,
           serial_number,
           grade,
@@ -23,7 +23,12 @@ laptop_units (
           sparepart_cost,
           source,
           created_at,
-          is_pedagang_listed
+          is_pedagang_listed,
+          msj_group_id,
+          so_at,
+          so_by,
+          audited_at,
+          audited_by
         )
       `)
       .order("laptop_name", { ascending: true });
@@ -62,6 +67,13 @@ laptop_units (
             official_price: u.official_price,
             is_price_complete: u.is_price_complete,
             is_pedagang_listed: u.is_pedagang_listed,
+            msj_group_id: u.msj_group_id, // penanda sudah masuk Kelompok MSJ — dipakai filter Data Barang
+            // SO & Audit per-unit ikut dikirim ke SEMUA role (bukan data sensitif
+            // seperti harga) supaya tabel Data Barang bisa hitung progress X/Y.
+            so_at: u.so_at ?? null,
+            so_by: u.so_by ?? null,
+            audited_at: u.audited_at ?? null,
+            audited_by: u.audited_by ?? null,
           })),
       }));
 

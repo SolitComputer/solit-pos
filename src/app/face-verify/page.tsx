@@ -11,12 +11,23 @@ type Stage =
   | "enrolling" | "verifying" | "success" | "error"
   | "out-of-range" | "out-of-time" | "no-camera" | "day-off" | "gps-denied"
   | "gps-weak"
-  | "early-checkout-request";
+  | "early-checkout-request"
+  | "face-conflict";
 
 const MAX_ATTEMPTS = 5;
 const AUTO_CAPTURE_CONFIDENCE = 0.75;
 const HOLD_FRAMES = 3;
 const DETECTION_INPUT_SIZE = 224;
+
+// ✅ NEW — ambang kualitas gambar sebelum boleh auto-capture.
+// Brightness rata-rata 0–255; di bawah MIN = terlalu gelap, di atas MAX = silau/overexposed.
+const MIN_BRIGHTNESS = 55;      // di bawah ini → minta cari tempat lebih terang
+const MAX_BRIGHTNESS = 235;     // di atas ini → terlalu silau/backlight
+// Ketajaman (variance Laplacian). Makin kecil makin blur. Nilai ini empiris
+// untuk video 640×480; turunkan kalau device bagus sering kena "blur".
+const MIN_SHARPNESS = 12;
+// Berapa frame berturut-turut gambar harus "bagus" sebelum auto-capture jalan.
+const QUALITY_HOLD_FRAMES = 2;
 
 const COMPANY_LAT = -6.402123;
 const COMPANY_LNG = 106.787296;
@@ -35,6 +46,53 @@ type ShiftType = keyof typeof SHIFT_CONFIG_CLIENT;
 
 function ts() {
   return new Date().toLocaleTimeString("id-ID", { hour12: false });
+}
+
+// ✅ NEW — analisis kualitas frame kamera (brightness + ketajaman) langsung di
+// browser, TANPA kirim gambar ke mana pun. Menggambar video ke canvas kecil
+// (sampling) lalu menghitung rata-rata luminance & variance Laplacian.
+type FrameQuality = { ok: boolean; brightness: number; sharpness: number; reason: "DARK" | "BRIGHT" | "BLUR" | "OK" };
+function analyzeFrameQuality(
+  video: HTMLVideoElement,
+  work: HTMLCanvasElement
+): FrameQuality | null {
+  const W = 160, H = 120; // kecil = cepat, cukup untuk estimasi kualitas
+  if (video.videoWidth === 0) return null;
+  work.width = W; work.height = H;
+  const ctx = work.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(video, 0, 0, W, H);
+  const { data } = ctx.getImageData(0, 0, W, H);
+
+  // Luminance grayscale per pixel
+  const gray = new Float32Array(W * H);
+  let sum = 0;
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    gray[p] = lum;
+    sum += lum;
+  }
+  const brightness = sum / (W * H);
+
+  // Ketajaman: variance dari Laplacian 4-tetangga (makin besar makin tajam)
+  let lapSum = 0, lapSqSum = 0, n = 0;
+  for (let y = 1; y < H - 1; y++) {
+    for (let x = 1; x < W - 1; x++) {
+      const idx = y * W + x;
+      const lap = 4 * gray[idx] - gray[idx - 1] - gray[idx + 1] - gray[idx - W] - gray[idx + W];
+      lapSum += lap; lapSqSum += lap * lap; n++;
+    }
+  }
+  const mean = lapSum / n;
+  const sharpness = lapSqSum / n - mean * mean; // variance
+
+  let reason: FrameQuality["reason"] = "OK";
+  let ok = true;
+  if (brightness < MIN_BRIGHTNESS) { ok = false; reason = "DARK"; }
+  else if (brightness > MAX_BRIGHTNESS) { ok = false; reason = "BRIGHT"; }
+  else if (sharpness < MIN_SHARPNESS) { ok = false; reason = "BLUR"; }
+
+  return { ok, brightness, sharpness, reason };
 }
 
 function detectOS(): "android" | "ios" | "other" {
@@ -428,6 +486,8 @@ export default function FaceVerifyPage() {
   const holdCountRef = useRef(0);
   const isCapturingRef = useRef(false);
   const isDetectingRef = useRef(false);
+  const qualityOkCountRef = useRef(0); // ✅ NEW — berapa frame berturut gambar "bagus"
+  const qualityCanvasRef = useRef<HTMLCanvasElement | null>(null); // ✅ NEW — canvas kerja analisis
   const detectionErrLoggedRef = useRef(false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -439,6 +499,8 @@ export default function FaceVerifyPage() {
   const [faceDetected, setFaceDetected] = useState(false);
   const [confidence, setConfidence] = useState(0);
   const [holdProgress, setHoldProgress] = useState(0);
+  // ✅ NEW — peringatan kualitas gambar (cahaya/blur) yang tampil di layar
+  const [qualityWarning, setQualityWarning] = useState<null | "DARK" | "BRIGHT" | "BLUR">(null);
   const [clockStr, setClockStr] = useState(ts());
   const [logs, setLogs] = useState<LogEntry[]>([
     { time: ts(), msg: "solit biometric engine v3.0 started", type: "ok" },
@@ -473,6 +535,7 @@ export default function FaceVerifyPage() {
   const [biometricDeviceSupported, setBiometricDeviceSupported] = useState<boolean | null>(null);
   const [bioBusy, setBioBusy] = useState(false);
   const [bioError, setBioError] = useState<string | null>(null);
+  const [faceConflict, setFaceConflict] = useState<{ code: string; conflictName: string | null } | null>(null);
 
   const addLog = useCallback((msg: string, type: LogType = "info") => {
     setLogs(p => [...p.slice(-30), { time: ts(), msg, type }]);
@@ -524,7 +587,7 @@ export default function FaceVerifyPage() {
         setMessage("Lokasi valid. Silakan lakukan verifikasi wajah");
       }
     }
-  }, [addLog, needEnrollState]);
+  }, [addLog, needEnrollState, attendanceDirection]);
 
   const checkLocation = useCallback(async () => {
     setStage("checking");
@@ -772,6 +835,11 @@ export default function FaceVerifyPage() {
       for (let d = 0; d < dims; d++) avg[d] += emb[d];
     }
     for (let d = 0; d < dims; d++) avg[d] /= collected.length;
+    // ⛔ KEAMANAN KETAT: L2-Normalize vektor rata-rata sebelum dikirim
+    const norm = Math.sqrt(avg.reduce((s, v) => s + v * v, 0));
+    if (norm > 0) {
+      for (let d = 0; d < dims; d++) avg[d] /= norm;
+    }
     return avg;
   }, [captureEmbedding]);
 
@@ -828,6 +896,7 @@ export default function FaceVerifyPage() {
         setFaceDetected(detected);
         if (!detected) {
           holdCountRef.current = 0;
+          qualityOkCountRef.current = 0; // ✅ NEW
           setConfidence(0);
           setHoldProgress(0);
           return;
@@ -835,6 +904,24 @@ export default function FaceVerifyPage() {
 
         const score = detections[0].detection.score;
         setConfidence(Math.round(score * 100));
+
+        // ✅ NEW — cek kualitas gambar (cahaya/ketajaman) sebelum boleh capture.
+        // Kalau gelap/silau/blur: tahan auto-capture, reset hold, tampilkan warning.
+        if (!qualityCanvasRef.current) qualityCanvasRef.current = document.createElement("canvas");
+        const quality = analyzeFrameQuality(videoRef.current, qualityCanvasRef.current);
+        if (quality && !quality.ok) {
+          qualityOkCountRef.current = 0;
+          holdCountRef.current = 0;
+          setHoldProgress(0);
+          setQualityWarning(quality.reason as "DARK" | "BRIGHT" | "BLUR");
+          return; // jangan lanjut capture di frame jelek ini
+        }
+        // frame cukup bagus — butuh beberapa frame bagus berturut biar stabil
+        if (quality && quality.ok) {
+          qualityOkCountRef.current += 1;
+          if (qualityOkCountRef.current >= QUALITY_HOLD_FRAMES) setQualityWarning(null);
+          else { holdCountRef.current = 0; setHoldProgress(0); return; }
+        }
 
         if (score >= AUTO_CAPTURE_CONFIDENCE) {
           holdCountRef.current += 1;
@@ -861,7 +948,8 @@ export default function FaceVerifyPage() {
               const enrollData = await enrollRes.json();
 
               if (enrollData.success) {
-                addLog("enrollment berhasil ", "ok");
+                addLog("enrollment berhasil dikunci ke akun", "ok");
+                setNeedEnrollState(false);
                 const vd = await doVerify(embedding, 1, coords);
                 if (vd.success) {
                   setStage("success");
@@ -887,14 +975,32 @@ export default function FaceVerifyPage() {
                   setMessage("Posisikan wajah lagi untuk absen");
                 }
               } else {
-                addLog(`enrollment gagal: ${enrollData.message}`, "err");
-                setStage("enroll");
+                addLog(`enrollment ditolak: ${enrollData.message}`, "err");
+                setMessage(enrollData.message || "Pendaftaran wajah gagal");
+                if (enrollData.code === "FACE_DUPLICATE" || enrollData.code === "ALREADY_ENROLLED") {
+                  // Refresh tidak akan menyelesaikan kasus ini — butuh reset dari Admin.
+                  setFaceConflict({ code: enrollData.code, conflictName: enrollData.conflictUserName ?? null });
+                  setStage("face-conflict");
+                } else {
+                  setStage("error");
+                }
               }
             } else {
               const currentAttempt = attemptsRef.current + 1;
               setAttempts(currentAttempt);
               addLog(`mencoba verifikasi [${currentAttempt}/${MAX_ATTEMPTS}]...`, "info");
-              const vd = await doVerify(embedding, currentAttempt, coords);
+              // ✅ FIX: ambil 1 sample tambahan lalu kirim keduanya berurutan —
+              // server memutuskan match jika SALAH SATU lolos. Ini meredam
+              // fluktuasi frame-buruk tanpa mengubah data enroll yang tersimpan.
+              const embedding2 = await captureAveragedEmbedding(3);
+              let vd = await doVerify(embedding, currentAttempt, coords);
+              if (!vd.success && !vd.outOfTime && !vd.needEnroll
+                  && vd.code !== "EARLY_CHECKOUT_NOT_APPROVED"
+                  && vd.code !== "FACE_BELONGS_TO_OTHER" && embedding2) {
+                addLog("sample ke-2 (meredam frame buruk)...", "info");
+                const vd2 = await doVerify(embedding2, currentAttempt, coords);
+                if (vd2.success) vd = vd2;
+              }
 
               if (vd.success) {
                 setStage("success");
@@ -910,6 +1016,14 @@ export default function FaceVerifyPage() {
               } else if (vd.code === "EARLY_CHECKOUT_NOT_APPROVED") {
                 setEarlyCheckoutMsg(vd.message ?? "Belum waktunya pulang.");
                 setStage("early-checkout-request");
+              } else if (vd.code === "FACE_BELONGS_TO_OTHER") {
+                // ✅ FIX: dulu kasus ini jatuh ke "wajah tidak cocok" biasa —
+                // karyawan retry 5x tanpa tahu sebabnya. Sekarang diarahkan ke
+                // layar face-conflict dengan pesan jelas + saran hubungi admin.
+                setFaceConflict({ code: "FACE_BELONGS_TO_OTHER", conflictName: vd.conflictName ?? null });
+                setMessage(vd.message ?? "Wajah terdeteksi mirip dengan akun lain.");
+                setStage("face-conflict");
+                addLog("verifikasi ditolak: wajah mirip akun lain", "err");
               } else if (vd.outOfTime) {
                 setTimeInfo({
                   reason: vd.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
@@ -917,20 +1031,22 @@ export default function FaceVerifyPage() {
                 });
                 setStage("out-of-time");
               } else if (vd.needEnroll) {
+                // ✅ FIX: konsisten dgn perubahan di atas — arahkan ke enroll
+                // walau OUT (kasus wajah baru di-reset admin).
                 addLog("wajah belum terdaftar → enroll", "warn");
                 setStage("enroll");
                 setMessage("Wajah belum terdaftar. Daftarkan sekarang.");
               } else {
                 addLog(`match gagal [${currentAttempt}/${MAX_ATTEMPTS}] — dist: ${vd.distance?.toFixed(3) ?? "?"}`, "warn");
                 if (currentAttempt >= MAX_ATTEMPTS) {
-                  setAttempts(0);
-                  attemptsRef.current = 0;
+                  setAttempts(MAX_ATTEMPTS);
+                  attemptsRef.current = MAX_ATTEMPTS;
                   setStage("verify");
-                  setMessage("Wajah tidak dikenali. Pastikan pencahayaan cukup dan coba lagi.");
-                  addLog("reset attempts — silakan coba lagi", "warn");
+                  setMessage("Wajah tidak cocok dengan akun ini. Hubungi Admin jika ada kendala.");
+                  addLog("verifikasi terkunci: wajah tidak cocok", "err");
                 } else {
                   setStage("verify");
-                  setMessage(`Gagal (${currentAttempt}/${MAX_ATTEMPTS}) — Coba lagi`);
+                  setMessage(`Wajah tidak cocok (${currentAttempt}/${MAX_ATTEMPTS}) — Coba lagi`);
                 }
               }
             }
@@ -966,7 +1082,7 @@ export default function FaceVerifyPage() {
         }
       });
     }
-    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera", "day-off", "gps-denied", "gps-weak"].includes(stage)) {
+    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera", "day-off", "gps-denied", "gps-weak", "face-conflict"].includes(stage)) {
       stopCamera();
     }
   }, [stage]);
@@ -1447,6 +1563,43 @@ export default function FaceVerifyPage() {
           </div>
         )}
 
+        {/* Face conflict — wajah bentrok dengan akun lain / sudah terdaftar */}
+        {stage === "face-conflict" && (
+          <div style={{ padding: "8px 0 0" }}>
+            <StatusPanel
+              tone="red"
+              icon={<IconAlertCircle />}
+              title={faceConflict?.code === "ALREADY_ENROLLED" ? "Wajah Sudah Terdaftar" : "Wajah Terdeteksi di Akun Lain"}
+              body={message}
+            >
+              <div style={{ textAlign: "left", background: "rgba(255,255,255,0.03)", border: "0.5px solid var(--line)", borderRadius: 11, padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
+                  Yang perlu dilakukan
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.7 }}>
+                  Hubungi <b>Admin</b>. Admin cek di <b>Management User</b>
+                  {faceConflict?.conflictName && <> apakah data wajah akun <b>{faceConflict.conflictName}</b> benar milik orangnya</>}
+                  , lalu tekan <b>Reset Wajah</b> pada akun yang datanya salah. Setelah itu kamu bisa daftar ulang.
+                </div>
+              </div>
+            </StatusPanel>
+
+            <BiometricButton
+              eligible={biometricEligible} supported={biometricDeviceSupported}
+              busy={bioBusy} enrolled={biometricEnrolled} error={bioError}
+              onClick={handleBiometricAttendance}
+            />
+
+            <GhostButton
+              style={{ marginTop: 10, width: "100%", textAlign: "center", color: "rgba(248,113,113,0.55)" }}
+              onClick={handleRejectAttendance}
+              disabled={skipping}
+            >
+              {skipping ? "Mengalihkan..." : "Lewati absen →"}
+            </GhostButton>
+          </div>
+        )}
+
         {/* No Camera */}
         {stage === "no-camera" && (
           <div style={{ padding: "8px 0 0" }}>
@@ -1694,6 +1847,27 @@ export default function FaceVerifyPage() {
               </div>
             )}
 
+            {/* ✅ NEW — peringatan kualitas gambar (cahaya/blur) */}
+            {qualityWarning && !isProcessing && (
+              <div
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)",
+                  borderRadius: 10, padding: "9px 12px", marginBottom: 10,
+                  animation: "fadeSlide 0.2s ease",
+                }}
+              >
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", flexShrink: 0, animation: "pulse-amber 0.8s ease infinite" }} />
+                <div style={{ flex: 1, fontSize: 11, color: "#fbbf24", letterSpacing: 0.2, lineHeight: 1.5 }}>
+                  {qualityWarning === "DARK"
+                    ? "Ruangan terlalu gelap — cari tempat lebih terang atau hadap ke sumber cahaya."
+                    : qualityWarning === "BRIGHT"
+                      ? "Cahaya terlalu silau/backlight — hindari lampu/jendela tepat di belakangmu."
+                      : "Wajah kurang tajam — pegang HP lebih stabil & jaga jarak wajah."}
+                </div>
+              </div>
+            )}
+
             <div className="status-chip">
               <div className={`s-dot ${isProcessing ? "s-dot-amber" : faceDetected ? "s-dot-green" : "s-dot-gray"}`} />
               <div style={{ flex: 1, fontSize: 11, color: isProcessing ? "var(--warn)" : faceDetected ? "rgba(255,255,255,0.72)" : "var(--text-dim)", letterSpacing: 0.2 }}>
@@ -1739,20 +1913,24 @@ export default function FaceVerifyPage() {
               </div>
             )}
 
-            {attempts >= 3 && !isProcessing && (
-              <GhostButton
-                style={{ width: "100%", textAlign: "center", color: "rgba(248,113,113,0.55)", fontSize: 10 }}
-                onClick={async () => {
-                  addLog("re-enrollment requested", "warn");
-                  await fetch("/api/auth/face-enroll", { method: "PUT" });
-                  setAttempts(0);
-                  attemptsRef.current = 0;
-                  setStage("enroll");
-                  setMessage("Daftarkan wajah Anda");
+            {attempts >= MAX_ATTEMPTS && !isProcessing && (
+              <div
+                style={{
+                  background: "rgba(239, 68, 68, 0.12)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  marginTop: 10,
+                  textAlign: "center",
+                  fontSize: 11,
+                  color: "#f87171",
+                  lineHeight: 1.5,
                 }}
               >
-                Wajah tidak dikenali? Daftar ulang →
-              </GhostButton>
+                ⚠️ <b>Wajah Tidak Cocok</b><br />
+                Wajah di kamera tidak sesuai dengan akun <b>{userName || "ini"}</b>.<br />
+                Pendaftaran ulang atau reset data wajah hanya dapat dilakukan oleh <b>Admin</b>.
+              </div>
             )}
           </>
         )}

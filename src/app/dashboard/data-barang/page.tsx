@@ -2,15 +2,16 @@
 
   import { useEffect, useMemo, useRef, useState } from "react";
   import DashboardLayout from "@/components/layout/DashboardLayout";
-  import { UserRole, hasAnyRole, ITEM_OUTFLOW_ROLES, DATA_BARANG_LAPTOP_ROLES } from "@/lib/permissions";
+  import { UserRole, hasAnyRole, ITEM_OUTFLOW_ROLES, DATA_BARANG_LAPTOP_ROLES, BARANG_FULL_ACCESS_ROLES } from "@/lib/permissions";
   import UnifiedBarangContent from "./UnifiedBarangContent";
   import OutflowsContent from "./OutflowsContent";
   import CategoriesContent from "./CategoriesContent";
+  import ArsipContent from "./ArsipContent";
   import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
   import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
 
 
-  type TabKey = "barang" | "outflows" | "pedagang" | "kategori";
+  type TabKey = "barang" | "arsip" | "outflows" | "pedagang" | "kategori";
 
   interface TabDef {
     key: TabKey;
@@ -25,6 +26,12 @@
       label: "Data Barang",
       roles: DATA_BARANG_LAPTOP_ROLES,
       icon: "ti-device-laptop",
+    },
+    {
+      key: "arsip",
+      label: "Arsip Barang",
+      roles: BARANG_FULL_ACCESS_ROLES,
+      icon: "ti-archive",
     },
     {
       key: "outflows",
@@ -86,6 +93,14 @@
             <rect x="14" y="3" width="7" height="7" rx="1.5" />
             <rect x="3" y="14" width="7" height="7" rx="1.5" />
             <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          </svg>
+        );
+      case "ti-archive":
+        return (
+          <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="4" rx="1" />
+            <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+            <line x1="9" y1="12" x2="15" y2="12" />
           </svg>
         );
       default:
@@ -245,6 +260,7 @@
           ) : (
             <>
               {activeTab === "barang" && visibleTabs.some((t) => t.key === "barang") && <UnifiedBarangContent />}
+              {activeTab === "arsip" && visibleTabs.some((t) => t.key === "arsip") && <ArsipContent />}
               {activeTab === "outflows" && visibleTabs.some((t) => t.key === "outflows") && <OutflowsContent />}
               {activeTab === "pedagang" && visibleTabs.some((t) => t.key === "pedagang") && <PriceListPedagangTab />}
               {activeTab === "kategori" && visibleTabs.some((t) => t.key === "kategori") && <CategoriesContent />}          </>

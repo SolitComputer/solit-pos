@@ -60,6 +60,7 @@ type Attendance = {
     displayStatus?: "PRESENT" | "LATE" | "SKIP";
     source?: "AUTO" | "MANUAL";
     direction?: "IN" | "OUT"; // ✅ NEW
+    shift_snapshot?: "PAGI" | "SORE" | null; // ✅ NEW — shift yg berlaku saat absen (dikunci)
 };
 
 type ManualAttendance = {
@@ -80,6 +81,7 @@ type UserAllowances = {
     allowance_wife: number;
     allowance_child: number;
     deduction_loan: number;
+    deduction_cicilan: number; // ⬅️ BARU — potong Cicilan dari gaji
     deduction_pension: number;
     updated_at: string;
 };
@@ -188,6 +190,12 @@ function canViewSalary(role?: string): boolean {
     return !!role && (SALARY_ACCESS_ROLES as readonly string[]).includes(role);
 }
 
+// ⬅️ BARU — akses tab Kasbon & Cicilan (Admin, Programmer, Asisten CEO, Accounting)
+const KASBON_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"] as const;
+function canAccessKasbon(role?: string): boolean {
+    return !!role && (KASBON_ACCESS_ROLES as readonly string[]).includes(role);
+}
+
 // Multi-role aware: baca dari currentUser.role ATAU currentUser.roles[]
 function getUserRoles(user: any): string[] {
     if (!user) return [];
@@ -199,6 +207,9 @@ function userIsAdmin(user: any): boolean {
 }
 function userCanViewSalary(user: any): boolean {
     return getUserRoles(user).some(r => canViewSalary(r));
+}
+function userCanAccessKasbon(user: any): boolean {
+    return getUserRoles(user).some(r => canAccessKasbon(r));
 }
 function userIsPKL(user: any): boolean {
     return getUserRoles(user).some(r => isPKLRole(r));
@@ -274,7 +285,7 @@ function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" | "SKIP" {
         return "SKIP";
     }
 
-    if (isLate(a.check_in_time || a.created_at, a.user_shift ?? "PAGI")) return "LATE";
+    if (isLate(a.check_in_time || a.created_at, (a.shift_snapshot ?? a.user_shift) ?? "PAGI")) return "LATE";
     return "PRESENT";
 }
 
@@ -425,15 +436,16 @@ function computeMonthlySalary(
 
     // Potongan: selalu langsung (tidak disesuaikan %)
     const deductionLoan = allowance?.deduction_loan || 0;
+    const deductionCicilan = allowance?.deduction_cicilan || 0; // ⬅️ BARU
     const deductionPension = allowance?.deduction_pension || 0;
 
     const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtimeAmount;
-    const totalDeduction = deductionLoan + deductionPension;
+    const totalDeduction = deductionLoan + deductionCicilan + deductionPension;
     const netSalary = grossIncome - totalDeduction;
 
     return {
         salaryIncome, allowanceWife, allowanceChild, overtime: overtimeAmount,
-        grossIncome, deductionLoan, deductionPension, totalDeduction, netSalary,
+        grossIncome, deductionLoan, deductionCicilan, deductionPension, totalDeduction, netSalary,
     };
 }
 
@@ -988,6 +1000,7 @@ function EditAllowanceModal({
         allowance_wife: currentAllowance?.allowance_wife ?? 0,
         allowance_child: currentAllowance?.allowance_child ?? 0,
         deduction_loan: currentAllowance?.deduction_loan ?? 0,
+        deduction_cicilan: currentAllowance?.deduction_cicilan ?? 0, // ⬅️ BARU
         deduction_pension: currentAllowance?.deduction_pension ?? 0,
     });
     const [saving, setSaving] = useState(false);
@@ -1106,10 +1119,10 @@ function EditAllowanceModal({
                             Potongan (Langsung Potong, Tidak Disesuaikan %)
                         </p>
                         <div className="space-y-3">
-                            {/* Cicilan Kasbon */}
+                            {/* Bayar Kasbon (potong gaji) — mengurangi Sisa Kasbon */}
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                                    Cicilan Kasbon / Pinjaman
+                                    Bayar Kasbon (Potong Gaji)
                                 </label>
                                 <div className="relative">
                                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
@@ -1125,7 +1138,30 @@ function EditAllowanceModal({
                                     />
                                 </div>
                                 <p className="text-[10px] text-gray-400 mt-1">
-                                    Dipotong penuh setiap bulan, tidak disesuaikan kehadiran
+                                    Dipotong dari gaji & otomatis <strong className="text-emerald-600">mengurangi Sisa Kasbon</strong> karyawan di tab Kasbon &amp; Cicilan
+                                </p>
+                            </div>
+
+                            {/* Bayar Cicilan (potong gaji) — mengurangi Sisa Cicilan */}
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                                    Bayar Cicilan (Potong Gaji)
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={form.deduction_cicilan}
+                                        onChange={(e) =>
+                                            setForm((f) => ({ ...f, deduction_cicilan: parseInt(e.target.value) || 0 }))
+                                        }
+                                        placeholder="Contoh: 100000"
+                                        className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20 font-mono"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1">
+                                    Dipotong dari gaji & otomatis <strong className="text-emerald-600">mengurangi Sisa Cicilan</strong> karyawan di tab Kasbon &amp; Cicilan
                                 </p>
                             </div>
 
@@ -1167,8 +1203,12 @@ function EditAllowanceModal({
                                 <span className="font-bold text-gray-800">{formatRupiah(form.allowance_child)}</span>
                             </div>
                             <div className="flex justify-between text-gray-600">
-                                <span>Cicilan Kasbon</span>
+                                <span>Bayar Kasbon</span>
                                 <span className="font-bold text-red-600">-{formatRupiah(form.deduction_loan)}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-600">
+                                <span>Bayar Cicilan</span>
+                                <span className="font-bold text-red-600">-{formatRupiah(form.deduction_cicilan)}</span>
                             </div>
                             <div className="flex justify-between text-gray-600">
                                 <span>Dana Pensiun</span>
@@ -1723,7 +1763,13 @@ function TodayAttendanceCard({ status, loading, onRefresh, onRequestEarlyCheckou
                 icon: <Umbrella className="w-6 h-6 text-orange-600" />, gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100",
                 badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-400",
                 badgeText: "Hari Libur", title: "Kamu Libur Hari Ini",
-                sub: "Tidak perlu absen", showBtn: false,
+                // ✅ FIX (poin 2): dulu cuma info statis tanpa aksi. Sekarang ada
+                // tombol supaya karyawan bisa langsung pilih tetap absen (lembur).
+                sub: "Tidak wajib absen — kalau tetap masuk, jam kerjamu dihitung lembur penuh",
+                showBtn: true,
+                btnLabel: "Tetap Absen (Lembur) →",
+                btnColor: "bg-gradient-to-r from-purple-500 to-purple-700",
+                btnAction: goAbsen,
             };
             break;
         case "TOO_EARLY":
@@ -2604,6 +2650,7 @@ type SalarySlip = {
     total_income: number;
     deduction_violation: number;
     deduction_loan: number;
+    deduction_cicilan: number; // ⬅️ BARU
     deduction_pension: number;
     total_deduction: number;
     net_salary: number;
@@ -3352,6 +3399,584 @@ function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSa
     );
 }
 
+// ⬅️ BARU — Tab Kasbon & Cicilan
+function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpening, onOpenDetail, onExport }: {
+    data: any[];
+    loading: boolean;
+    calYear: number;
+    calMonth: number;
+    isAdmin: boolean;
+    onEditOpening: (u: { userId: string; userName: string; kasbon: number; cicilan: number }) => void;
+    onOpenDetail: (u: { userId: string; userName: string }) => void;
+    onExport: () => void; // ⬅️ BARU
+}) {
+    const cell = (n: number, color = "text-gray-700") =>
+        n && n !== 0
+            ? <span className={`font-mono font-semibold ${color}`}>{formatRupiah(n)}</span>
+            : <span className="text-gray-300 font-bold">—</span>;
+
+    const [search, setSearch] = useState(""); // ⬅️ BARU — cari nama karyawan
+    const filteredData = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return data;
+        return data.filter(r => (r.name ?? "").toLowerCase().includes(q));
+    }, [data, search]);
+
+    const totals = useMemo(() => filteredData.reduce((acc, r) => {
+        acc.totalKasbon += r.total_kasbon || 0;
+        acc.totalCicilan += r.total_cicilan || 0;
+        acc.sisaKasbon += r.sisa_kasbon || 0;
+        acc.sisaCicilan += r.sisa_cicilan || 0;
+        return acc;
+    }, { totalKasbon: 0, totalCicilan: 0, sisaKasbon: 0, sisaCicilan: 0 }), [filteredData]);
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <p className="text-base font-bold text-gray-800">Kasbon & Cicilan — {MONTH_NAMES[calMonth]} {calYear}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                        Kasbon dipecah per minggu · Cicilan langsung ke total ·
+                        <span className="text-blue-500 font-semibold"> Sisa = Total − Dibayar</span>
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative">
+                        <svg className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Cari nama karyawan..."
+                            className="h-9 w-48 sm:w-56 border border-gray-200 rounded-xl pl-9 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400/20 transition-all"
+                        />
+                    </div>
+                    <button
+                        onClick={onExport}
+                        disabled={loading || data.length === 0}
+                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-50 whitespace-nowrap">
+                        <FileText className="w-3.5 h-3.5" /> Export Excel
+                    </button>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+            ) : (
+                <div className="overflow-auto max-h-[70vh] p-4 pt-0">
+                    <table className="w-full text-sm border-separate border-spacing-0 min-w-[1200px]">
+                        <thead>
+                            <tr>
+                                <th className="sticky top-0 left-0 z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest w-11">#</th>
+                                <th className="sticky top-0 left-[44px] z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest">Nama</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Sebelumnya</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Sebelumnya</th>
+                                {[1, 2, 3, 4, 5].map(w => (
+                                    <th key={w} className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Minggu {w}</th>
+                                ))}
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Kasbon</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Cicilan</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Dibayar</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Dibayar</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Kasbon</th>
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Cicilan</th>
+                                {isAdmin && <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest">Saldo Awal</th>}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredData.length === 0 ? (
+                                <tr><td colSpan={isAdmin ? 16 : 15} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
+                            ) : filteredData.map((r, i) => (
+                                <tr key={r.user_id} className="hover:bg-sky-50/40 group">
+                                    <td className="sticky left-0 z-10 border border-gray-300 px-3 py-2 text-center text-[11px] text-gray-400 font-black bg-white group-hover:bg-sky-50">{i + 1}</td>
+                                    <td className="sticky left-[44px] z-10 border border-gray-300 px-3 py-2 bg-white group-hover:bg-sky-50">
+                                        <button
+                                            onClick={() => onOpenDetail({ userId: r.user_id, userName: r.name })}
+                                            className="flex items-center gap-2.5 text-left hover:opacity-80 transition-opacity group"
+                                            title="Lihat & edit detail kasbon/cicilan"
+                                        >
+                                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">{initials(r.name)}</div>
+                                            <div>
+                                                <p className="font-bold text-gray-800 text-sm leading-tight flex items-center gap-1.5 group-hover:text-indigo-600">
+                                                    {r.name}
+                                                    <Pencil className="w-3 h-3 text-indigo-400 group-hover:text-indigo-600" />
+                                                </p>
+                                                <p className="text-[10px] text-indigo-400 group-hover:text-indigo-600 font-semibold">Klik untuk detail & edit →</p>
+                                            </div>
+                                        </button>
+                                    </td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right">{cell(r.kasbon_sebelumnya)}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right">{cell(r.cicilan_sebelumnya)}</td>
+                                    {(r.minggu ?? [0, 0, 0, 0, 0]).map((w: number, idx: number) => (
+                                        <td key={idx} className="border border-gray-300 px-3 py-2 text-right">{cell(w)}</td>
+                                    ))}
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-emerald-50/40">{cell(r.total_kasbon, "text-emerald-700")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-emerald-50/40">{cell(r.total_cicilan, "text-emerald-700")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-blue-50/40">{cell(r.kasbon_dibayar, "text-blue-600")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-blue-50/40">{cell(r.cicilan_dibayar, "text-blue-600")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-red-50/40">{cell(r.sisa_kasbon, "text-red-600")}</td>
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-red-50/40">{cell(r.sisa_cicilan, "text-red-600")}</td>
+                                    {isAdmin && (
+                                        <td className="border border-gray-300 px-3 py-2 text-center bg-white">
+                                            <button
+                                                onClick={() => onEditOpening({ userId: r.user_id, userName: r.name, kasbon: r.kasbon_opening ?? 0, cicilan: r.cicilan_opening ?? 0 })}
+                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-all whitespace-nowrap"
+                                                title="Atur saldo awal kasbon/cicilan">
+                                                Atur
+                                            </button>
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                        </tbody>
+                        {filteredData.length > 0 && (
+                            <tfoot>
+                                <tr>
+                                    <td colSpan={9} className="sticky left-0 z-10 border border-gray-300 px-3 py-2.5 text-sm font-black text-gray-700 bg-gray-100">TOTAL</td>
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalKasbon)}</span></td>
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalCicilan)}</span></td>
+                                    <td colSpan={2} className="border border-gray-300 bg-gray-100"></td>
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaKasbon)}</span></td>
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaCicilan)}</span></td>
+                                    {isAdmin && <td className="border border-gray-300 bg-gray-100"></td>}
+                                </tr>
+                            </tfoot>
+                        )}
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ⬅️ BARU — modal atur saldo awal kasbon/cicilan per karyawan
+function SaldoAwalModal({ userId, userName, kasbon, cicilan, onClose, onSaved }: {
+    userId: string; userName: string; kasbon: number; cicilan: number;
+    onClose: () => void; onSaved: () => void;
+}) {
+    const [k, setK] = useState(String(kasbon ?? 0));
+    const [c, setC] = useState(String(cicilan ?? 0));
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const save = async () => {
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/attendance/kasbon-cicilan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userId,
+                    kasbon_opening: parseInt(k || "0", 10) || 0,
+                    cicilan_opening: parseInt(c || "0", 10) || 0,
+                }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+            onSaved();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-5 flex items-start justify-between">
+                    <div>
+                        <p className="font-bold text-white text-base">Saldo Awal Kasbon & Cicilan</p>
+                        <p className="text-xs text-white/70 mt-1">{userName}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-[11px] text-amber-700">
+                        Saldo awal = sisa utang kasbon/cicilan yang <strong>sudah ada sebelum</strong> dicatat di sistem. Carryover bulan berikutnya dihitung otomatis dari transaksi di atas angka ini.
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Saldo Awal Kasbon (Rp)</label>
+                        <input type="number" min={0} value={k} onChange={e => setK(e.target.value)} placeholder="0"
+                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400/20 font-mono" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Saldo Awal Cicilan (Rp)</label>
+                        <input type="number" min={0} value={c} onChange={e => setC(e.target.value)} placeholder="0"
+                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400/20 font-mono" />
+                    </div>
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
+                    <button onClick={save} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "Simpan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ⬅️ BARU — detail & edit entry kasbon/cicilan per karyawan (bulan terpilih)
+function KasbonDetailModal({ userId, userName, calYear, calMonth, canEdit, onClose, onChanged }: {
+    userId: string; userName: string; calYear: number; calMonth: number; canEdit: boolean;
+    onClose: () => void; onChanged: () => void;
+}) {
+    const [entries, setEntries] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [editId, setEditId] = useState<string | null>(null);
+    const [form, setForm] = useState<{ category: string; nominal: string; tanggal: string; keterangan: string }>({ category: "KASBON", nominal: "", tanggal: "", keterangan: "" });
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState("");
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/attendance/kasbon-cicilan/entries?user_id=${userId}&year=${calYear}&month=${calMonth + 1}`);
+            const d = await r.json();
+            if (d.success) setEntries(d.data || []);
+            else setError(d.message || "Gagal memuat");
+        } catch { setError("Gagal memuat"); }
+        finally { setLoading(false); }
+    }, [userId, calYear, calMonth]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const startEdit = (e: any) => {
+        setError("");
+        setEditId(e.id);
+        setForm({
+            category: e.category,
+            nominal: String(e.nominal ?? ""),
+            tanggal: String(e.tanggal ?? "").slice(0, 10),
+            keterangan: e.keterangan ?? "",
+        });
+    };
+
+    const saveEdit = async (e: any) => {
+        const nominal = parseInt(form.nominal || "0", 10);
+        if (!nominal || nominal <= 0) { setError("Nominal harus lebih dari 0"); return; }
+        if (!form.tanggal) { setError("Tanggal wajib diisi"); return; }
+        setBusy(true); setError("");
+        try {
+            const res = await fetch(`/api/cashflow/${e.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ category: form.category, nominal, tanggal: form.tanggal, keterangan: form.keterangan.trim() || null }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+            setEditId(null);
+            await load();
+            onChanged();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setBusy(false); }
+    };
+
+    const deleteEntry = async (e: any) => {
+        if (!confirm("Hapus entry kasbon/cicilan ini?")) return;
+        setBusy(true); setError("");
+        try {
+            const res = await fetch(`/api/cashflow/${e.id}`, { method: "DELETE" });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menghapus"); return; }
+            await load();
+            onChanged();
+        } catch { setError("Gagal menghapus"); }
+        finally { setBusy(false); }
+    };
+
+    const fmtDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[88dvh] overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">Detail Kasbon & Cicilan</p>
+                        <p className="text-xs text-white/70 mt-1">{userName} · {MONTH_NAMES[calMonth]} {calYear}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-3">
+                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
+                    {loading ? (
+                        <div className="space-y-2">{Array(3).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+                    ) : entries.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-10">Tidak ada transaksi kasbon/cicilan di bulan ini</p>
+                    ) : entries.map((e) => {
+                        const isEditing = editId === e.id;
+                        const isManual = e.source_type === "MANUAL";
+                        const locked = e.is_audited;
+                        const isOut = e.direction === "OUT";
+                        return (
+                            <div key={e.id} className="border border-gray-100 rounded-2xl p-3.5 bg-gradient-to-br from-gray-50 to-white">
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${e.category === "KASBON" ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-indigo-100 text-indigo-700 border-indigo-200"}`}>{e.category === "KASBON" ? "Kasbon" : "Cicilan"}</span>
+                                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${isOut ? "bg-red-50 text-red-600 border-red-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>{isOut ? "Beri (Keluar)" : "Bayar (Masuk)"}</span>
+                                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-gray-100 text-gray-500 border-gray-200">{isManual ? "Manual" : "Pengajuan Dana"}</span>
+                                    {locked && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-slate-100 text-slate-500 border-slate-200">Terkunci (diaudit)</span>}
+                                </div>
+
+                                {isEditing ? (
+                                    <div className="space-y-2.5">
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 block">Kategori</label>
+                                                <select value={form.category} onChange={(ev) => setForm(f => ({ ...f, category: ev.target.value }))} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white">
+                                                    <option value="KASBON">Kasbon</option>
+                                                    <option value="CICILAN">Cicilan</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 block">Tanggal</label>
+                                                <input type="date" value={form.tanggal} onChange={(ev) => setForm(f => ({ ...f, tanggal: ev.target.value }))} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 block">Nominal (Rp)</label>
+                                            <input type="number" min={0} value={form.nominal} onChange={(ev) => setForm(f => ({ ...f, nominal: ev.target.value }))} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white font-mono" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 block">Keterangan</label>
+                                            <input type="text" value={form.keterangan} onChange={(ev) => setForm(f => ({ ...f, keterangan: ev.target.value }))} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setEditId(null)} disabled={busy} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200">Batal</button>
+                                            <button onClick={() => saveEdit(e)} disabled={busy} className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-xs font-bold disabled:opacity-50">{busy ? "Menyimpan..." : "Simpan"}</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="font-mono font-black text-gray-800 text-sm">{formatRupiah(e.nominal)}</p>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">{fmtDate(e.tanggal)}{e.keterangan ? ` · ${e.keterangan}` : ""}</p>
+                                        </div>
+                                        {canEdit && (
+                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                <button
+                                                    onClick={() => startEdit(e)}
+                                                    disabled={locked}
+                                                    title={locked ? "Sudah diaudit — batalkan audit di Cashflow dulu" : "Edit entry"}
+                                                    className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteEntry(e)}
+                                                    disabled={locked || !isManual}
+                                                    title={locked ? "Sudah diaudit" : !isManual ? "Entry Pengajuan Dana — hapus lewat Batalkan Realisasi" : "Hapus entry"}
+                                                    className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed">
+                                                    Hapus
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Tutup</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ⬅️ BARU — Tab Dana Pensiun (tabel 12 bulan, gaya Excel dengan garis)
+function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }: {
+    data: any[];
+    loading: boolean;
+    calYear: number;
+    isAdmin: boolean;
+    onManual: () => void;
+    onExport: () => void; // ⬅️ BARU
+}) {
+    const [search, setSearch] = useState(""); // ⬅️ BARU — cari nama karyawan
+    const filteredData = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return data;
+        return data.filter(r => (r.name ?? "").toLowerCase().includes(q));
+    }, [data, search]);
+
+    const grandTotal = useMemo(() => filteredData.reduce((s, r) => s + (r.total || 0), 0), [filteredData]);
+    const monthTotals = useMemo(() => {
+        const t = new Array(12).fill(0);
+        filteredData.forEach(r => (r.months ?? []).forEach((v: number, i: number) => { t[i] += v || 0; }));
+        return t;
+    }, [filteredData]);
+
+    const cell = (n: number) =>
+        n && n !== 0
+            ? <span className="font-mono font-semibold text-gray-700">{formatRupiah(n)}</span>
+            : <span className="text-gray-300">—</span>;
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <p className="text-base font-bold text-gray-800">Dana Pensiun — {calYear}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                        Otomatis terisi dari potongan <span className="text-purple-500 font-semibold">Dana Pensiun</span> di tombol Tunjangan · bisa juga diisi manual
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative">
+                        <svg className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Cari nama karyawan..."
+                            className="h-9 w-48 sm:w-56 border border-gray-200 rounded-xl pl-9 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400/20 transition-all"
+                        />
+                    </div>
+                    <button
+                        onClick={onExport}
+                        disabled={loading || data.length === 0}
+                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-50 whitespace-nowrap">
+                        <FileText className="w-3.5 h-3.5" /> Export Excel
+                    </button>
+                    {isAdmin && (
+                        <button
+                            onClick={onManual}
+                            className="flex items-center gap-1.5 text-xs font-bold text-purple-600 bg-purple-50 border border-purple-200 px-4 py-2 rounded-xl hover:bg-purple-100 transition-all whitespace-nowrap">
+                            ＋ Isi Manual
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-12 bg-gray-50 rounded-xl animate-pulse" />)}</div>
+            ) : (
+                <div className="overflow-auto max-h-[70vh] p-4 pt-0">
+                    <table className="w-full text-sm border-separate border-spacing-0 min-w-[1400px]">
+                        <thead>
+                            <tr>
+                                <th className="sticky top-0 left-0 z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-xs font-bold whitespace-nowrap">Nama</th>
+                                {MONTH_NAMES.map(m => (
+                                    <th key={m} className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">{m}</th>
+                                ))}
+                                <th className="sticky top-0 z-20 border border-gray-300 bg-sky-300 text-gray-800 px-3 py-2.5 text-center text-xs font-bold">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredData.length === 0 ? (
+                                <tr><td colSpan={14} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
+                            ) : filteredData.map(r => (
+                                <tr key={r.user_id} className="hover:bg-sky-50/40 group">
+                                    <td className="sticky left-0 z-10 border border-gray-300 px-3 py-2 font-semibold text-gray-800 whitespace-nowrap bg-white group-hover:bg-sky-50">{r.name}</td>
+                                    {(r.months ?? new Array(12).fill(0)).map((v: number, i: number) => (
+                                        <td key={i} className="border border-gray-300 px-3 py-2 text-right">{cell(v)}</td>
+                                    ))}
+                                    <td className="border border-gray-300 px-3 py-2 text-right bg-sky-50 font-mono font-black text-gray-800">{formatRupiah(r.total || 0)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        {filteredData.length > 0 && (
+                            <tfoot>
+                                <tr>
+                                    <td className="sticky left-0 z-10 border border-gray-300 px-3 py-2.5 font-black text-gray-800 bg-gray-100">TOTAL</td>
+                                    {monthTotals.map((v, i) => (
+                                        <td key={i} className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100 font-mono font-bold text-gray-700 text-xs">{v ? formatRupiah(v) : "—"}</td>
+                                    ))}
+                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-200 font-mono font-black text-gray-900 text-xs">{formatRupiah(grandTotal)}</td>
+                                </tr>
+                            </tfoot>
+                        )}
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ⬅️ BARU — isi/koreksi Dana Pensiun manual per karyawan & bulan
+function PensionManualModal({ users, calYear, calMonth, onClose, onSaved }: {
+    users: UserInfo[]; calYear: number; calMonth: number;
+    onClose: () => void; onSaved: () => void;
+}) {
+    const karyawan = useMemo(() => users.filter(u => !isPKLRole(u.role)), [users]);
+    const [userId, setUserId] = useState(karyawan[0]?.id ?? "");
+    const [month, setMonth] = useState<number>(calMonth + 1); // 1..12
+    const [nominal, setNominal] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const save = async () => {
+        if (!userId) { setError("Pilih karyawan dulu"); return; }
+        const p = parseInt(nominal || "0", 10);
+        if (!Number.isFinite(p) || p < 0) { setError("Nominal tidak valid"); return; }
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/attendance/pension", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId, year: calYear, month, pension: p }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+            onSaved();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-purple-600 to-violet-700 px-6 py-5 flex items-start justify-between">
+                    <div>
+                        <p className="font-bold text-white text-base">Isi Dana Pensiun Manual</p>
+                        <p className="text-xs text-white/70 mt-1">Tahun {calYear}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 text-[11px] text-purple-700">
+                        Nominal ini juga jadi <strong>potongan Dana Pensiun</strong> di gaji bulan tsb — sama seperti mengisinya lewat tombol Tunjangan.
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Karyawan</label>
+                        <select value={userId} onChange={e => setUserId(e.target.value)} className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20">
+                            {!userId && <option value="" disabled>— Pilih karyawan —</option>}
+                            {karyawan.map(u => <option key={u.id} value={u.id}>{u.name} — {u.role.replace(/_/g, " ")}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Bulan</label>
+                        <select value={month} onChange={e => setMonth(parseInt(e.target.value, 10))} className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20">
+                            {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Nominal Dana Pensiun (Rp)</label>
+                        <input type="number" min={0} value={nominal} onChange={e => setNominal(e.target.value)} placeholder="Contoh: 150000"
+                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20 font-mono" />
+                    </div>
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
+                    <button onClick={save} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-purple-600 to-violet-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "Simpan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function AttendanceDashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -3385,9 +4010,9 @@ export default function AttendanceDashboardPage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [todayStatus, setTodayStatus] = useState<any>(null);
     const [statusLoading, setStatusLoading] = useState(false);
-    type ActiveTab = "calendar" | "summary" | "salary" | "salary-pkl" | "salary-slip" | "salary-history" | "leave" | "my-salary" | "my-slip";
+    type ActiveTab = "calendar" | "summary" | "kasbon-cicilan" | "dana-pensiun" | "salary" | "salary-pkl" | "salary-slip" | "salary-history" | "leave" | "my-salary" | "my-slip";
 
-    const VALID_TABS: ActiveTab[] = ["calendar", "summary", "salary", "salary-pkl", "salary-slip", "salary-history", "leave", "my-salary", "my-slip"];
+    const VALID_TABS: ActiveTab[] = ["calendar", "summary", "kasbon-cicilan", "dana-pensiun", "salary", "salary-pkl", "salary-slip", "salary-history", "leave", "my-salary", "my-slip"];
 
     const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
         const tabFromUrl = searchParams.get("tab");
@@ -3663,6 +4288,44 @@ export default function AttendanceDashboardPage() {
     const [mySlips, setMySlips] = useState<SalarySlip[]>([]);
     const [mySlipsLoading, setMySlipsLoading] = useState(false);
 
+    // ⬅️ BARU — tab Kasbon & Cicilan
+    const [kasbonData, setKasbonData] = useState<any[]>([]);
+    const [kasbonLoading, setKasbonLoading] = useState(false);
+    const [editOpeningUser, setEditOpeningUser] = useState<{ userId: string; userName: string; kasbon: number; cicilan: number } | null>(null);
+    const [kasbonDetailUser, setKasbonDetailUser] = useState<{ userId: string; userName: string } | null>(null);
+
+    // ⬅️ BARU — tab Dana Pensiun
+    const [pensionData, setPensionData] = useState<any[]>([]);
+    const [pensionLoading, setPensionLoading] = useState(false);
+    const [showPensionManual, setShowPensionManual] = useState(false);
+
+    const fetchKasbonCicilan = useCallback(async (y: number, m: number) => {
+        setKasbonLoading(true);
+        try {
+            const r = await fetch(`/api/attendance/kasbon-cicilan?year=${y}&month=${m + 1}`);
+            const d = await r.json();
+            if (d.success) setKasbonData(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch kasbon-cicilan:", err);
+        } finally {
+            setKasbonLoading(false);
+        }
+    }, []);
+
+    // ⬅️ BARU — Dana Pensiun 1 tahun penuh (Jan..Des)
+    const fetchPension = useCallback(async (y: number) => {
+        setPensionLoading(true);
+        try {
+            const r = await fetch(`/api/attendance/pension?year=${y}`);
+            const d = await r.json();
+            if (d.success) setPensionData(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch pension:", err);
+        } finally {
+            setPensionLoading(false);
+        }
+    }, []);
+
     const fetchMySlips = useCallback(async () => {
         setMySlipsLoading(true);
         try {
@@ -3802,6 +4465,20 @@ export default function AttendanceDashboardPage() {
         }
     }, [selectedSlipMonth, currentUser, fetchSalarySlips]);
 
+    // ⬅️ BARU — muat data Kasbon & Cicilan saat tab aktif / ganti bulan
+    useEffect(() => {
+        if (activeTab === "kasbon-cicilan" && userCanAccessKasbon(currentUser) && selectedMonth) {
+            fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
+        }
+    }, [activeTab, selectedMonth, currentUser, fetchKasbonCicilan]);
+
+    // ⬅️ BARU — muat data Dana Pensiun saat tab aktif / ganti tahun
+    useEffect(() => {
+        if (activeTab === "dana-pensiun" && userCanAccessKasbon(currentUser) && selectedMonth) {
+            fetchPension(selectedMonth.year);
+        }
+    }, [activeTab, selectedMonth, currentUser, fetchPension]);
+
     const openAddManual = useCallback(async (date?: string, userId?: string) => {
         setEditManualData(null);
         setManualPrefillDate(date ?? selectedDate);
@@ -3852,7 +4529,25 @@ export default function AttendanceDashboardPage() {
     }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchShiftSchedules, fetchShiftConfigs, fetchSalarySlips, currentUser]);
     // ── Derived ───────────────────────────────────────────────────────────────
     const dayOffByName = useMemo(() => { const m: Record<string, Set<number>> = {}; dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); }); return m; }, [dayOffs]);
-    const dateOffByName = useMemo(() => { const m: Record<string, Set<string>> = {}; allDateOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.off_date); }); return m; }, [allDateOffs]);
+    const dateOffByName = useMemo(() => {
+        const m: Record<string, Set<string>> = {};
+        // ✅ FIX: dulu nge-key dari d.users?.name, padahal endpoint /date-off GET
+        // TIDAK ikut join users → d.users undefined → semua date_off ter-skip,
+        // jadi libur per-tanggal tidak pernah kebaca di akun karyawan sendiri
+        // (muncul di admin karena jalur resolve-nya beda). Sekarang nge-key dari
+        // user_id → resolve ke nama via allUsers (konsisten dgn monthlyOffByName),
+        // dengan fallback ke d.users?.name / currentUser kalau user tidak ada di
+        // allUsers (kasus akun sendiri yg allUsers-nya terbatas).
+        allDateOffs.forEach(d => {
+            const n = allUsers.find(u => u.id === d.user_id)?.name
+                ?? d.users?.name
+                ?? (d.user_id === currentUser?.id ? currentUser?.name : null);
+            if (!n) return;
+            if (!m[n]) m[n] = new Set();
+            m[n].add(d.off_date);
+        });
+        return m;
+    }, [allDateOffs, allUsers, currentUser]);
 
     const dateWorkByName = useMemo(() => {
         const m: Record<string, Set<string>> = {};
@@ -4154,7 +4849,7 @@ export default function AttendanceDashboardPage() {
             absences: AbsenceItem[]; offDates: string[];
             holidayWorkDates: string[];
             pending: number; pendingDates: string[];
-            manualDays: number; perfectDays: number; violations: number;
+            manualDays: number; manualLateDays: number; perfectDays: number; violations: number;
             earlyDaysCount: number; avgEarlyMinutes: number;
         };
 
@@ -4273,7 +4968,7 @@ export default function AttendanceDashboardPage() {
             });
 
             let present = 0, late = 0, score = 0, leave = 0, pending = 0;
-            let manualDays = 0, perfectDays = 0, autoLateDays = 0;
+            let manualDays = 0, perfectDays = 0, autoLateDays = 0, manualLateDays = 0;
             let earlyMinutesSum = 0, earlyDaysCount = 0;
             const absences: AbsenceItem[] = [];
             const offDates: string[] = [];
@@ -4348,6 +5043,7 @@ export default function AttendanceDashboardPage() {
 
                     if (isManualDay) {
                         manualDays++;
+                        if (eff === "LATE") manualLateDays++; // ✅ NEW — telat input manual, dipisah utk sinkron kolom "Terlambat" Lencana
                     } else {
                         const arrivalIso = checkinIsoByName[name]?.[dk];
                         const eff2 = effectiveShiftFor(userId, dk);
@@ -4403,7 +5099,7 @@ export default function AttendanceDashboardPage() {
                 absences, offDates,
                 holidayWorkDates,
                 pending, pendingDates, // ✅ NEW
-                manualDays, perfectDays, violations, // ✅ NEW — untuk leaderboard Kualitas Absensi
+                manualDays, manualLateDays, perfectDays, violations, // ✅ NEW — untuk leaderboard Kualitas Absensi
                 earlyDaysCount, avgEarlyMinutes, // ✅ NEW — rata-rata menit lebih cepat dari jadwal
             });
         });
@@ -4419,12 +5115,17 @@ export default function AttendanceDashboardPage() {
     // lintas perusahaan akan tertimpa data yang tidak lengkap. Tidak ada UI
     // apa pun untuk ini di halaman ini.
     const qualitySyncedRef = useRef<string | null>(null);
+    // ✅ NEW — reset guard tiap ganti bulan, supaya sync quality-rank PASTI jalan
+    // sekali dengan data terbaru saat bulan dibuka (mencegah snapshot Lencana basi).
+    useEffect(() => {
+        qualitySyncedRef.current = null;
+    }, [calYear, calMonth]);
     useEffect(() => {
         const isAdminUser = userIsAdmin(currentUser);
         if (!isAdminUser || loading) return;
         const scores = userSummary.filter(u => u.userId);
         if (scores.length === 0) return;
-        const sig = `${calYear}-${calMonth}-${scores.map(u => `${u.userId}:${u.perfectDays}:${u.violations}`).join("|")}`;
+        const sig = `${calYear}-${calMonth}-${scores.map(u => `${u.userId}:${u.perfectDays}:${u.violations}:${u.late}`).join("|")}`;
         if (qualitySyncedRef.current === sig) return;
         qualitySyncedRef.current = sig;
         fetch("/api/attendance/quality-rank", {
@@ -4437,10 +5138,16 @@ export default function AttendanceDashboardPage() {
                     user_id: u.userId,
                     perfect_days: u.perfectDays,
                     manual_days: u.manualDays,
-                    late_days: Math.max(0, u.violations - u.manualDays - u.absences.length),
+                    // ✅ FIX: kolom "Terlambat" Lencana kini = u.late (auto + manual late),
+                    // biar SAMA persis dgn kolom Terlambat di halaman Absensi.
+                    late_days: u.late,
+                    // ✅ NEW: telat manual dikirim terpisah — dipakai server HANYA utk
+                    // hitung pelanggaran (ranking), supaya tidak dihitung dobel (telat
+                    // manual sudah ikut di manual_days).
+                    manual_late_days: u.manualLateDays,
                     absent_days: u.absences.length,
                     total_workdays: u.totalWorkdays,
-                    avg_early_minutes: u.avgEarlyMinutes, // ✅ NEW
+                    avg_early_minutes: u.avgEarlyMinutes,
                 })),
             }),
         })
@@ -4577,11 +5284,12 @@ export default function AttendanceDashboardPage() {
 
             // Potongan (langsung)
             const deductionLoan = allow?.deduction_loan || 0;
+            const deductionCicilan = allow?.deduction_cicilan || 0; // ⬅️ BARU
             const deductionPension = allow?.deduction_pension || 0;
 
             // Total
             const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtimeAmount;
-            const totalDeduction = deductionLoan + deductionPension;
+            const totalDeduction = deductionLoan + deductionCicilan + deductionPension;
             const netSalary = grossIncome - totalDeduction;
 
             console.log(`[generateSlipFromRecapan] Generate slip untuk ${userStat.name}:`, {
@@ -4610,6 +5318,7 @@ export default function AttendanceDashboardPage() {
                     overtime: overtimeAmount,
                     total_income: grossIncome,
                     deduction_loan: deductionLoan,
+                    deduction_cicilan: deductionCicilan, // ⬅️ BARU
                     deduction_pension: deductionPension,
                     total_deduction: totalDeduction,
                     net_salary: netSalary,
@@ -4760,7 +5469,7 @@ export default function AttendanceDashboardPage() {
             cell.alignment = { vertical: "middle", horizontal: "center" };
         });
 
-        const subHeaderLabels = ["Gaji Pokok", "Tunjangan Istri", "Tunjangan Anak", "Lemburan", "Kasbon", "Pensiun", "Gross", "Total Potongan", "Gaji Bersih (Net)"];
+        const subHeaderLabels = ["Gaji Pokok", "Tunjangan Istri", "Tunjangan Anak", "Lemburan", "Kasbon", "Cicilan", "Pensiun", "Gross", "Total Potongan", "Gaji Bersih (Net)"];
         subHeaderLabels.forEach((label, i) => {
             const cell = sheet.getCell(5, i + 3); // mulai kolom C
             cell.value = label;
@@ -4864,6 +5573,169 @@ export default function AttendanceDashboardPage() {
         link.click();
         URL.revokeObjectURL(url);
     }, [userSummary, allUsers, salaryMap, allowanceMap, overtimeTotal, calMonth, calYear]);
+
+    // ⬅️ BARU — Export tabel Kasbon & Cicilan ke Excel (gaya bergaris)
+    const exportKasbonCicilanToExcel = useCallback(async () => {
+        if (kasbonData.length === 0) { alert("Tidak ada data untuk di-export"); return; }
+        const { default: ExcelJS } = await import("exceljs");
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "Solit 03";
+        wb.created = new Date();
+        const ws = wb.addWorksheet("Kasbon & Cicilan", { views: [{ state: "frozen", xSplit: 2, ySplit: 3 }] });
+
+        const headers = ["No", "Nama", "Kasbon Sebelumnya", "Cicilan Sebelumnya", "Minggu 1", "Minggu 2", "Minggu 3", "Minggu 4", "Minggu 5", "Total Kasbon", "Total Cicilan", "Kasbon Dibayar", "Cicilan Dibayar", "Sisa Kasbon", "Sisa Cicilan"];
+        const colCount = headers.length;
+
+        ws.getColumn(1).width = 5;
+        ws.getColumn(2).width = 26;
+        for (let c = 3; c <= colCount; c++) ws.getColumn(c).width = 16;
+
+        ws.mergeCells(1, 1, 1, colCount);
+        const title = ws.getCell("A1");
+        title.value = `KASBON & CICILAN — ${MONTH_NAMES[calMonth].toUpperCase()} ${calYear}`;
+        title.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
+        title.alignment = { vertical: "middle", horizontal: "center" };
+        title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A1A2E" } };
+        ws.getRow(1).height = 26;
+
+        ws.mergeCells(2, 1, 2, colCount);
+        const sub = ws.getCell("A2");
+        sub.value = `Solit 03 · Diexport ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
+        sub.font = { italic: true, size: 10, color: { argb: "FF6B7280" } };
+        sub.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(2).height = 16;
+
+        const thin = { style: "thin" as const, color: { argb: "FF9CA3AF" } };
+        const border = { top: thin, left: thin, bottom: thin, right: thin };
+
+        const headerRow = ws.addRow(headers);
+        headerRow.height = 22;
+        headerRow.eachCell((cell) => {
+            cell.font = { bold: true, size: 10, color: { argb: "FF1F2937" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFBAE6FD" } };
+            cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+            cell.border = border;
+        });
+
+        const numCols = new Set([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+        const totals = { totalKasbon: 0, totalCicilan: 0, sisaKasbon: 0, sisaCicilan: 0 };
+
+        kasbonData.forEach((r: any, idx: number) => {
+            const weeks = r.minggu ?? [0, 0, 0, 0, 0];
+            const row = ws.addRow([
+                idx + 1, r.name,
+                r.kasbon_sebelumnya || 0, r.cicilan_sebelumnya || 0,
+                weeks[0] || 0, weeks[1] || 0, weeks[2] || 0, weeks[3] || 0, weeks[4] || 0,
+                r.total_kasbon || 0, r.total_cicilan || 0,
+                r.kasbon_dibayar || 0, r.cicilan_dibayar || 0,
+                r.sisa_kasbon || 0, r.sisa_cicilan || 0,
+            ]);
+            totals.totalKasbon += r.total_kasbon || 0;
+            totals.totalCicilan += r.total_cicilan || 0;
+            totals.sisaKasbon += r.sisa_kasbon || 0;
+            totals.sisaCicilan += r.sisa_cicilan || 0;
+            row.eachCell((cell, c) => {
+                cell.border = border;
+                cell.font = { size: 10 };
+                if (c === 1) cell.alignment = { horizontal: "center" };
+                else if (c === 2) cell.alignment = { horizontal: "left" };
+                else { cell.numFmt = "#,##0"; cell.alignment = { horizontal: "right" }; }
+            });
+        });
+
+        const totalRow = ws.addRow(["", "TOTAL", "", "", "", "", "", "", "", totals.totalKasbon, totals.totalCicilan, "", "", totals.sisaKasbon, totals.sisaCicilan]);
+        totalRow.eachCell((cell, c) => {
+            cell.border = border;
+            cell.font = { bold: true, size: 10 };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+            if (numCols.has(c)) { cell.numFmt = "#,##0"; cell.alignment = { horizontal: "right" }; }
+        });
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Kasbon_Cicilan_${MONTH_NAMES[calMonth]}_${calYear}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }, [kasbonData, calMonth, calYear]);
+
+    // ⬅️ BARU — Export tabel Dana Pensiun (12 bulan) ke Excel
+    const exportPensionToExcel = useCallback(async () => {
+        if (pensionData.length === 0) { alert("Tidak ada data untuk di-export"); return; }
+        const { default: ExcelJS } = await import("exceljs");
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "Solit 03";
+        wb.created = new Date();
+        const ws = wb.addWorksheet("Dana Pensiun", { views: [{ state: "frozen", xSplit: 1, ySplit: 3 }] });
+
+        const headers = ["Nama", ...MONTH_NAMES, "Total"];
+        const colCount = headers.length; // 14
+
+        ws.getColumn(1).width = 26;
+        for (let c = 2; c <= colCount; c++) ws.getColumn(c).width = 14;
+
+        ws.mergeCells(1, 1, 1, colCount);
+        const title = ws.getCell("A1");
+        title.value = `DANA PENSIUN — ${calYear}`;
+        title.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
+        title.alignment = { vertical: "middle", horizontal: "center" };
+        title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF6D28D9" } };
+        ws.getRow(1).height = 26;
+
+        ws.mergeCells(2, 1, 2, colCount);
+        const sub = ws.getCell("A2");
+        sub.value = `Solit 03 · Diexport ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
+        sub.font = { italic: true, size: 10, color: { argb: "FF6B7280" } };
+        sub.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(2).height = 16;
+
+        const thin = { style: "thin" as const, color: { argb: "FF9CA3AF" } };
+        const border = { top: thin, left: thin, bottom: thin, right: thin };
+
+        const headerRow = ws.addRow(headers);
+        headerRow.height = 20;
+        headerRow.eachCell((cell, c) => {
+            cell.font = { bold: true, size: 10, color: { argb: "FF1F2937" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: c === colCount ? "FF7DD3FC" : "FFBAE6FD" } };
+            cell.alignment = { vertical: "middle", horizontal: "center" };
+            cell.border = border;
+        });
+
+        const monthTotals = new Array(12).fill(0);
+        let grandTotal = 0;
+
+        pensionData.forEach((r: any) => {
+            const months = r.months ?? new Array(12).fill(0);
+            const row = ws.addRow([r.name, ...months.map((v: number) => v || 0), r.total || 0]);
+            months.forEach((v: number, i: number) => { monthTotals[i] += v || 0; });
+            grandTotal += r.total || 0;
+            row.eachCell((cell, c) => {
+                cell.border = border;
+                cell.font = { size: 10 };
+                if (c === 1) cell.alignment = { horizontal: "left" };
+                else { cell.numFmt = "#,##0"; cell.alignment = { horizontal: "right" }; }
+            });
+        });
+
+        const totalRow = ws.addRow(["TOTAL", ...monthTotals, grandTotal]);
+        totalRow.eachCell((cell, c) => {
+            cell.border = border;
+            cell.font = { bold: true, size: 10 };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+            if (c > 1) { cell.numFmt = "#,##0"; cell.alignment = { horizontal: "right" }; }
+        });
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Dana_Pensiun_${calYear}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }, [pensionData, calYear]);
 
     const buildAttendanceDetail = useCallback((
         userName: string,
@@ -4972,6 +5844,7 @@ export default function AttendanceDashboardPage() {
     const isAdmin = userIsAdmin(currentUser);
     const canManage = isAdmin || getEffectiveSubordinates(userRoles).length > 0;
     const canSalary = userCanViewSalary(currentUser);
+    const canKasbon = userCanAccessKasbon(currentUser);
 
     if (!selectedMonth) return (
         <DashboardLayout>
@@ -5125,6 +5998,8 @@ export default function AttendanceDashboardPage() {
                             { id: "calendar", label: "Kalender" },
                         ];
                         if (canManage) tabs.push({ id: "summary", label: "Ringkasan" });
+                        if (canKasbon) tabs.push({ id: "kasbon-cicilan", label: "Kasbon & Cicilan" });
+                        if (canKasbon) tabs.push({ id: "dana-pensiun", label: "Dana Pensiun" }); // ⬅️ BARU
                         if (canSalary) {
                             tabs.push({ id: "salary", label: "Rekap Gaji" });
                             tabs.push({ id: "salary-pkl", label: "Gaji PKL" });
@@ -5675,13 +6550,18 @@ export default function AttendanceDashboardPage() {
                                                             <td className="px-4 py-4 text-center">
                                                                 {(() => {
                                                                     const eff = effectiveShiftFor(userId, dateKey);
+                                                                    // ✅ FIX: pakai shift SNAPSHOT saat absen (a.shift_snapshot)
+                                                                    // kalau ada, jadi rekap hari lalu TIDAK ikut berubah waktu
+                                                                    // shift default diganti hari ini. effectiveShiftFor() cuma
+                                                                    // dipakai sbg fallback utk record lama yg belum punya snapshot.
+                                                                    const shownShift = (a.shift_snapshot ?? eff.shift) as "PAGI" | "SORE";
                                                                     return (
                                                                         <div className="flex flex-col items-center gap-0.5">
-                                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${eff.shift === "PAGI"
+                                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${shownShift === "PAGI"
                                                                                 ? "bg-amber-50 text-amber-700 border-amber-200"
                                                                                 : "bg-indigo-50 text-indigo-700 border-indigo-200"
                                                                                 }`}>
-                                                                                {eff.shift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {eff.shift}
+                                                                                {shownShift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {shownShift}
                                                                             </span>
                                                                             {eff.fromSchedule && (
                                                                                 <span className="text-[8px] font-bold text-violet-500">jadwal</span>
@@ -5742,7 +6622,7 @@ export default function AttendanceDashboardPage() {
                             <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="w-full text-sm [&_th]:px-2 [&_td]:px-2 [&_.w-10]:w-8 [&_.h-10]:h-8">
                                     <thead>
                                         <tr className="border-b border-gray-100 bg-gray-50/60">
                                             <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">#</th>
@@ -5755,7 +6635,7 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Lembur Libur</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[80px]">Persentase</th>
                                             {isAdmin && (
                                                 <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kontrak</th>
                                             )}
@@ -5892,10 +6772,10 @@ export default function AttendanceDashboardPage() {
                                                         </div>
                                                     </td>                                                        <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
+                                                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[40px]">
                                                                 <div className={`h-full rounded-full bg-gradient-to-r ${barGrad} transition-all duration-700`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
                                                             </div>
-                                                            <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
+                                                            <span className={`text-sm font-black w-12 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
                                                         </div>
                                                     </td>
                                                     {isAdmin && (
@@ -6002,6 +6882,32 @@ export default function AttendanceDashboardPage() {
                     </div>
                 )}
 
+                {/* ════ TAB KASBON & CICILAN ════ */}
+                {activeTab === "kasbon-cicilan" && canKasbon && (
+                    <KasbonCicilanTab
+                        data={kasbonData}
+                        loading={kasbonLoading}
+                        calYear={calYear}
+                        calMonth={calMonth}
+                        isAdmin={isAdmin}
+                        onEditOpening={(u) => setEditOpeningUser(u)}
+                        onOpenDetail={(u) => setKasbonDetailUser(u)}
+                        onExport={exportKasbonCicilanToExcel}
+                    />
+                )}
+
+                {/* ════ TAB DANA PENSIUN ════ */}
+                {activeTab === "dana-pensiun" && canKasbon && (
+                    <DanaPensiunTab
+                        data={pensionData}
+                        loading={pensionLoading}
+                        calYear={calYear}
+                        isAdmin={isAdmin}
+                        onManual={async () => { if (allUsers.length === 0) await fetchAllUsers(); setShowPensionManual(true); }}
+                        onExport={exportPensionToExcel}
+                    />
+                )}
+
                 {/* ════ TAB GAJI ════ */}
                 {activeTab === "salary" && canViewSalary(currentUser?.role) && (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -6030,23 +6936,23 @@ export default function AttendanceDashboardPage() {
                             <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-20 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm min-w-[1200px] border-collapse">
+                                <table className="min-w-[1000px] lg:min-w-0 w-full text-sm border-collapse lg:[&_th]:px-2 lg:[&_td]:px-2">
                                     <thead>
                                         <tr className="border-2 border-gray-300 bg-gray-50/60 sticky top-0">
-                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300">Karyawan</th>
+                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300 w-[160px]">Karyawan</th>
 
                                             {/* PENGHASILAN SECTION */}
-                                            <th colSpan={5} className="px-4 py-4 text-center text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/40 border-2 border-gray-300">
+                                            <th colSpan={5} className="px-4 py-4 text-center text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/40 border-2 border-gray-300 whitespace-nowrap">
                                                 PENGHASILAN
                                             </th>
 
                                             {/* POTONGAN SECTION */}
-                                            <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50/40 border-2 border-gray-300">
+                                            <th colSpan={3} className="px-4 py-4 text-center text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50/40 border-2 border-gray-300 whitespace-nowrap">
                                                 POTONGAN
                                             </th>
 
                                             {/* TOTAL SECTION */}
-                                            <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50/40 border-2 border-gray-300">
+                                            <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50/40 border-2 border-gray-300 whitespace-nowrap">
                                                 TOTAL
                                             </th>
 
@@ -6058,19 +6964,20 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 border-2 border-gray-200" />
 
                                             {/* Penghasilan sub-headers */}
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Gaji Pokok</th>
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Tunjangan Istri (×%)</th>
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Tunjangan Anak (×%)</th>
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Lemburan</th>
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Kehadiran %</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Gaji Pokok</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">T. Istri (×%)</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">T. Anak (×%)</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Lemburan</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Kehadiran %</th>
 
                                             {/* Potongan sub-headers */}
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Kasbon</th>
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Pensiun</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Kasbon</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Cicilan</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Pensiun</th>
 
                                             {/* Total sub-headers */}
-                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Gross</th>
-                                            <th className="px-3 py-3 text-right text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Net</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Gross</th>
+                                            <th className="px-3 py-3 text-right text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Net</th>
 
                                             <th className="px-4 py-3 border-2 border-gray-200" />
                                         </tr>
@@ -6089,19 +6996,19 @@ export default function AttendanceDashboardPage() {
 
                                                 const {
                                                     allowanceWife, allowanceChild,
-                                                    grossIncome, deductionLoan, deductionPension,
+                                                    grossIncome, deductionLoan, deductionCicilan, deductionPension,
                                                     netSalary,
                                                 } = computeMonthlySalary(sal, allow, overtime, u);
 
                                                 return (
                                                     <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200 border-2 border-gray-200">
-                                                        <td className="px-4 py-4 border-r-2 border-gray-200">
+                                                        <td className="px-4 py-4 border-r-2 border-gray-200 min-w-[160px]">
                                                             <div className="flex items-center gap-2.5">
                                                                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
                                                                     {initials(u.name)}
                                                                 </div>
                                                                 <div className="min-w-0">
-                                                                    <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
+                                                                    <span className="font-bold text-gray-800 block text-sm leading-tight break-words">{u.name}</span>
                                                                     <span className="text-[10px] text-gray-400">
                                                                         {sal ? (sal.salary_type === "FIXED" ? "Tetap" : "% Absen") : "—"}
                                                                     </span>
@@ -6220,6 +7127,17 @@ export default function AttendanceDashboardPage() {
                                                             {deductionLoan > 0 ? (
                                                                 <span className="font-mono font-bold text-red-600 text-xs">
                                                                     -{formatRupiah(deductionLoan)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 text-xs">—</span>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Cicilan */}
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            {deductionCicilan > 0 ? (
+                                                                <span className="font-mono font-bold text-red-600 text-xs">
+                                                                    -{formatRupiah(deductionCicilan)}
                                                                 </span>
                                                             ) : (
                                                                 <span className="text-gray-300 text-xs">—</span>
@@ -6354,6 +7272,18 @@ export default function AttendanceDashboardPage() {
                                                 <span className="text-[8px] text-gray-400">Total Kasbon</span>
                                             </td>
 
+                                            {/* Cicilan Total */}
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-red-600 text-xs block">
+                                                    -{formatRupiah(
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + (allowanceMap[u.userId]?.deduction_cicilan || 0), 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Total Cicilan</span>
+                                            </td>
+
                                             {/* Pensiun Total */}
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-red-600 text-xs block">
@@ -6372,7 +7302,7 @@ export default function AttendanceDashboardPage() {
                                                     -{formatRupiah(
                                                         userSummary
                                                             .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
-                                                            .reduce((sum, u) => sum + ((allowanceMap[u.userId]?.deduction_loan || 0) + (allowanceMap[u.userId]?.deduction_pension || 0)), 0)
+                                                            .reduce((sum, u) => sum + ((allowanceMap[u.userId]?.deduction_loan || 0) + (allowanceMap[u.userId]?.deduction_cicilan || 0) + (allowanceMap[u.userId]?.deduction_pension || 0)), 0)
                                                     )}
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Total Potongan</span>
@@ -7526,6 +8456,7 @@ export default function AttendanceDashboardPage() {
                     onClose={() => setEditAllowanceUser(null)}
                     onSaved={() => {
                         fetchAllowances(calYear, calMonth);
+                        fetchPension(calYear); // ⬅️ BARU — tabel Dana Pensiun ikut ter-update otomatis
                         setEditAllowanceUser(null);
                     }}
                 />
@@ -7577,6 +8508,47 @@ export default function AttendanceDashboardPage() {
                     dates={pendingDetail.dates}
                     monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
                     onClose={() => setPendingDetail(null)}
+                />
+            )}
+
+            {editOpeningUser && canKasbon && (
+                <SaldoAwalModal
+                    userId={editOpeningUser.userId}
+                    userName={editOpeningUser.userName}
+                    kasbon={editOpeningUser.kasbon}
+                    cicilan={editOpeningUser.cicilan}
+                    onClose={() => setEditOpeningUser(null)}
+                    onSaved={() => {
+                        if (selectedMonth) fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
+                        setEditOpeningUser(null);
+                    }}
+                />
+            )}
+
+            {kasbonDetailUser && canKasbon && selectedMonth && (
+                <KasbonDetailModal
+                    userId={kasbonDetailUser.userId}
+                    userName={kasbonDetailUser.userName}
+                    calYear={calYear}
+                    calMonth={calMonth}
+                    canEdit={getUserRoles(currentUser).some(r => ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING"].includes(r))}
+                    onClose={() => setKasbonDetailUser(null)}
+                    onChanged={() => {
+                        if (selectedMonth) fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
+                    }}
+                />
+            )}
+
+            {showPensionManual && canKasbon && (
+                <PensionManualModal
+                    users={allUsers}
+                    calYear={calYear}
+                    calMonth={calMonth}
+                    onClose={() => setShowPensionManual(false)}
+                    onSaved={() => {
+                        if (selectedMonth) fetchPension(selectedMonth.year);
+                        setShowPensionManual(false);
+                    }}
                 />
             )}
 

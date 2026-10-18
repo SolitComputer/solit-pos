@@ -1,0 +1,464 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { FUND_EXECUTOR_IDS, FUND_APPROVER_IDS } from "@/lib/fundConfig";
+
+function db() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+}
+
+// ── PATCH: approve, reject, execute, dsb. untuk pengajuan dana ────────────────
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const userId = request.headers.get("x-user-id");
+  const userName = decodeURIComponent(request.headers.get("x-user-name") || "");
+  const roles = (request.headers.get("x-user-roles") || "").split(",").filter(Boolean);
+
+  if (!userId) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: { action?: string; payment_method?: string; reason?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
+  }
+
+  const { action } = body;
+  const supabase = db();
+
+  // ── Approve ─────────────────────────────────────────────────────────────────
+  if (action === "approve") {
+    if (!FUND_APPROVER_IDS.includes(userId)) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang untuk menyetujui" },
+        { status: 403 }
+      );
+    }
+
+    // ⬅️ Guard: pengajuan yang sudah ditolak tidak bisa langsung di-approve —
+    // harus dibatalkan penolakannya (action "unreject") dulu.
+    const { data: existingForApprove } = await supabase
+      .from("fund_requests")
+      .select("is_rejected")
+      .eq("id", id)
+      .single();
+
+    if (existingForApprove?.is_rejected) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan ini sudah ditolak. Batalkan penolakan dulu sebelum menyetujui." },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_approved: true,
+        approved_by_id: userId,
+        approved_by_name: userName,
+        approved_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Batal Approve (un-approve) ──────────────────────────────────────────────
+  if (action === "unapprove") {
+    if (!FUND_APPROVER_IDS.includes(userId)) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang" },
+        { status: 403 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_approved: false,
+        approved_by_id: null,
+        approved_by_name: null,
+        approved_at: null,
+      })
+      .eq("id", id)
+      .eq("is_executed", false) // tidak bisa un-approve kalau sudah dieksekusi
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Tolak (reject) ────────────────────────────────────────────────────────────
+  // Hanya bisa menolak pengajuan yang belum disetujui & belum dieksekusi.
+  // Alasan penolakan (reason) opsional, dipakai sebagai jejak audit.
+  if (action === "reject") {
+    if (!FUND_APPROVER_IDS.includes(userId)) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang untuk menolak" },
+        { status: 403 }
+      );
+    }
+
+    const { data: existing } = await supabase
+      .from("fund_requests")
+      .select("is_approved, is_executed")
+      .eq("id", id)
+      .single();
+
+    if (existing?.is_approved || existing?.is_executed) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan yang sudah disetujui/dieksekusi tidak bisa ditolak" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_rejected: true,
+        rejected_by_id: userId,
+        rejected_by_name: userName,
+        rejected_at: new Date().toISOString(),
+        rejection_reason: body.reason?.trim() || null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Batal Tolak (un-reject) ────────────────────────────────────────────────────
+  if (action === "unreject") {
+    if (!FUND_APPROVER_IDS.includes(userId)) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang" },
+        { status: 403 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_rejected: false,
+        rejected_by_id: null,
+        rejected_by_name: null,
+        rejected_at: null,
+        rejection_reason: null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Execute ─────────────────────────────────────────────────────────────────
+  if (action === "execute") {
+    if (!FUND_EXECUTOR_IDS.includes(userId) && !roles.includes("ADMIN")) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang untuk mengeksekusi" },
+        { status: 403 }
+      );
+    }
+
+    // Cek apakah sudah disetujui dulu
+    const { data: existing } = await supabase
+      .from("fund_requests")
+      .select("is_approved")
+      .eq("id", id)
+      .single();
+
+    if (!existing?.is_approved) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan harus disetujui dulu sebelum dieksekusi" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_executed: true,
+        executed_by_id: userId,
+        executed_by_name: userName,
+        executed_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Batal Execute (un-execute) — SENGAJA DINONAKTIFKAN ────────────────────────
+  // Eksekusi bersifat FINAL: sekali sebuah pengajuan ditandai sudah dieksekusi,
+  // tidak ada cara untuk membatalkannya lagi lewat action ini (dulu bisa, kalau
+  // belum direalisasi — sekarang diblokir total, tanpa syarat).
+  if (action === "unexecute") {
+    return NextResponse.json(
+      { success: false, message: "Eksekusi tidak bisa dibatalkan setelah dilakukan" },
+      { status: 400 }
+    );
+  }
+
+  // ── Batalkan setelah Eksekusi (cancel) ────────────────────────────────────────
+  // Pengajuan yang SUDAH dieksekusi tapi BELUM direalisasi bisa dibatalkan di sini.
+  // Status jadi final "Dibatalkan" dan jalur realisasi otomatis tertutup.
+  // Boleh: eksekutor baris itu sendiri (executed_by_id) atau ADMIN.
+  if (action === "cancel") {
+    const { data: existing, error: fetchErr } = await supabase
+      .from("fund_requests")
+      .select("is_executed, is_cancelled, realisasi_cashflow_id, executed_by_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+    }
+
+    const isAdmin = roles.includes("ADMIN");
+    const isExecutor = existing.executed_by_id === userId;
+    if (!isAdmin && !isExecutor) {
+      return NextResponse.json(
+        { success: false, message: "Hanya eksekutor pengajuan ini atau Admin yang bisa membatalkan" },
+        { status: 403 }
+      );
+    }
+    if (!existing.is_executed) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan harus sudah dieksekusi dulu sebelum bisa dibatalkan" },
+        { status: 400 }
+      );
+    }
+    if (existing.is_cancelled) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan ini sudah dibatalkan" },
+        { status: 400 }
+      );
+    }
+    if (existing.realisasi_cashflow_id) {
+      return NextResponse.json(
+        { success: false, message: "Pengajuan yang sudah direalisasi tidak bisa dibatalkan dari sini" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_cancelled: true,
+        cancelled_by_id: userId,
+        cancelled_by_name: userName,
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: body.reason?.trim() || null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Batal Pembatalan (uncancel) ──────────────────────────────────────────────
+  if (action === "uncancel") {
+    const { data: existing, error: fetchErr } = await supabase
+      .from("fund_requests")
+      .select("executed_by_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+    }
+
+    const isAdmin = roles.includes("ADMIN");
+    const isExecutor = existing.executed_by_id === userId;
+    if (!isAdmin && !isExecutor) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang" },
+        { status: 403 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        is_cancelled: false,
+        cancelled_by_id: null,
+        cancelled_by_name: null,
+        cancelled_at: null,
+        cancellation_reason: null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Update Metode Pembayaran (Cash/Saldo) ─────────────────────────────────────
+  // Hanya role ADMIN yang boleh mengubah. Boleh kapan saja, termasuk setelah
+  // status Selesai — tapi kalau sudah pernah direalisasi (ada entry Cashflow
+  // terkait), entry itu ikut di-update juga supaya tetap sinkron, kecuali
+  // entry-nya sudah diaudit (sama seperti aturan edit realisasi biasa).
+  if (action === "update_payment_method") {
+    if (!roles.includes("ADMIN")) {
+      return NextResponse.json(
+        { success: false, message: "Hanya Admin yang bisa mengubah metode pembayaran" },
+        { status: 403 }
+      );
+    }
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from("fund_requests")
+      .select("realisasi_cashflow_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+    }
+
+    const newMethod = body.payment_method === "SALDO" ? "SALDO" : "CASH";
+
+    if (existing.realisasi_cashflow_id) {
+      const { data: cfEntry } = await supabase
+        .from("cashflow_entries")
+        .select("is_audited")
+        .eq("id", existing.realisasi_cashflow_id)
+        .single();
+
+      if (cfEntry?.is_audited) {
+        return NextResponse.json(
+          { success: false, message: "Entry cashflow sudah diaudit dan tidak bisa diubah. Batalkan status audit terlebih dahulu." },
+          { status: 400 }
+        );
+      }
+
+      const { error: cfUpdateErr } = await supabase
+        .from("cashflow_entries")
+        .update({ payment_method: newMethod })
+        .eq("id", existing.realisasi_cashflow_id);
+
+      if (cfUpdateErr) {
+        return NextResponse.json({ success: false, message: cfUpdateErr.message }, { status: 500 });
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({ payment_method: newMethod })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  return NextResponse.json({ success: false, message: "Action tidak valid" }, { status: 400 });
+}
+
+// ── DELETE: hapus pengajuan dana ──────────────────────────────────────────────
+// Hanya requester sendiri (belum disetujui) atau ADMIN/PROGRAMMER yang boleh hapus.
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const userId = request.headers.get("x-user-id");
+  const roles = (request.headers.get("x-user-roles") || "").split(",").filter(Boolean);
+
+  if (!userId) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+
+  const supabase = db();
+
+  // Ambil data dulu untuk cek ownership
+  const { data: existing, error: fetchErr } = await supabase
+    .from("fund_requests")
+    .select("requester_id, is_approved, realisasi_cashflow_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr || !existing) {
+    return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+  }
+
+  // ⬅️ Sudah direalisasi ke Cashflow — jangan biarkan pengajuannya dihapus,
+  // supaya entry Cashflow yang sudah tercatat tidak jadi yatim (source_id
+  // menunjuk ke pengajuan yang sudah tidak ada). Berlaku untuk SEMUA role,
+  // termasuk Admin/Programmer.
+  if (existing.realisasi_cashflow_id) {
+    return NextResponse.json(
+      { success: false, message: "Tidak bisa menghapus pengajuan yang sudah direalisasi ke Cashflow" },
+      { status: 400 }
+    );
+  }
+
+  const isAdmin = roles.some((r) => ["ADMIN", "PROGRAMMER"].includes(r));
+  const isOwner = existing.requester_id === userId;
+
+  if (!isAdmin && !isOwner) {
+    return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  }
+
+  // Owner hanya bisa hapus kalau belum disetujui
+  if (isOwner && !isAdmin && existing.is_approved) {
+    return NextResponse.json(
+      { success: false, message: "Tidak bisa menghapus pengajuan yang sudah disetujui" },
+      { status: 400 }
+    );
+  }
+
+  const { error } = await supabase.from("fund_requests").delete().eq("id", id);
+  if (error) {
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}

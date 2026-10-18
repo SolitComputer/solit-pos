@@ -14,56 +14,153 @@ export function isModalAwalActive(): boolean {
   return new Date() <= new Date(MODAL_AWAL_DEADLINE_ISO);
 }
 
-export const INCOME_CATEGORIES = {
-  PENJUALAN_LAPTOP: "Penjualan Laptop",
-  SERVICE: "Service",
-  PIUTANG: "Piutang",
-  AKSESORIS: "Aksesoris",
-  BIAYA_LAIN: "Biaya Lain-lain",
+// ── Kategori Cashflow — Uang Keluar & Uang Masuk pakai daftar yang SAMA ───────
+// Sesuai daftar akun dari divisi accounting. Key LAMA (mis. UTANG, MODAL_SERVICE,
+// OPERASIONAL_SOTECH) sengaja TIDAK dihapus — lihat LEGACY_CATEGORY_LABEL & alias
+// akun di CASHFLOW_ACCOUNT (lib/accounting.ts) — supaya entry lama di database
+// tetap tampil & tetap ke-posting ke akun yang benar. Dropdown baru cuma
+// menawarkan 16 key di bawah ini.
+export const CASHFLOW_CATEGORIES = {
+  BELANJA_LAPTOP: "Belanja Laptop",                  // 130
+  PIUTANG: "Piutang",                                // 140
+  INVEST: "Invest",                                  // 150
+  ASET_TETAP: "Beli Aset Tetap",                     // 160
+  AKSESORIS: "Belanja Aksesoris",                    // 170
+  SPAREPART_SERVICE: "Sparepart Service",            // 171
+  DANA_MARKETING: "Dana Marketing",                  // 181
+  DOMPET_LAIN_LAIN: "Dompet Lain-lain",              // 190
+  HUTANG: "Hutang",                                  // 210
+  MODAL_LAPTOP_KELUAR: "Modal Laptop Keluar",        // 440
+  BIAYA_PRINTILAN: "Biaya Printilan Barang",         // 450
+  MODAL_SERVICE_KELUAR: "Modal Service Keluar",      // 460
+  OPERASIONAL_HARIAN: "Operasional Harian/Mingguan", // 510
+  OPERASIONAL_BULANAN: "Operasional Bulanan",        // 520
+  BIAYA_LAIN: "Biaya Lain-lain",                     // 530
+  KEUNTUNGAN_MITRA: "Keuntungan Mitra/Reseller",     // 540
+  PENGELUARAN_TAHUNAN: "Pengeluaran Tahunan",        // 550
 } as const;
 
-// ── Kategori yang OTOMATIS dari sistem — tidak boleh diinput manual ───────────
-export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"] as const;
+// Label kategori AUTO dari sistem (auto-sync dari Transaksi/Service) — tidak
+// pernah ditawarkan di dropdown manual, tapi tetap butuh label buat ditampilkan.
+const AUTO_CATEGORY_LABEL: Record<string, string> = {
+  PENJUALAN_LAPTOP: "Penjualan Laptop",
+  SERVICE: "Service",
+};
 
-/** true = kategori ini boleh diinput manual oleh user */
-export function isManualIncomeCategory(category: string): boolean {
-  return (
-    Object.prototype.hasOwnProperty.call(INCOME_CATEGORIES, category) &&
-    !(AUTO_INCOME_CATEGORIES as readonly string[]).includes(category)
-  );
-}
-
-// ── Kategori Uang Keluar ─────────────────────────────────────────────────────
-export const EXPENSE_CATEGORIES = {
-  OPERASIONAL_HARIAN: "Operasional Harian",
-  OPERASIONAL_BULANAN: "Operasional Bulanan",
-  OPERASIONAL_MARKETING: "Operasional Marketing",
+// Label kategori LAMA — cuma dipakai supaya entry lama tampil dengan nama enak
+// dibaca (bukan raw key). Tidak ditawarkan di dropdown baru.
+const LEGACY_CATEGORY_LABEL: Record<string, string> = {
   OPERASIONAL_SOTECH: "Operasional Sotech",
   OPERASIONAL_ONPOINT: "Operasional Onpoint",
   OPERASIONAL_DAVID: "Operasional David",
   OPERASIONAL_KONTEN_KREATOR: "Operasional Konten Kreator",
-  BELANJA_LAPTOP: "Belanja Laptop",
-  AKSESORIS: "Aksesoris",
-  MODAL_SERVICE: "Modal Service",
-  UTANG: "Utang",
-  PIUTANG: "Piutang",
-  KEUNTUNGAN_MITRA: "Keuntungan Mitra Reseller",
-  BIAYA_PRINTILAN: "Biaya Printilan Barang",
-  BIAYA_LAIN: "Biaya Lain-lain",
+  OPERASIONAL_MARKETING: "Dana Marketing",
+  MODAL_SERVICE: "Sparepart Service",
+  UTANG: "Hutang",
+};
+
+// ── Kategori KHUSUS Uang Masuk — buat penjualan Laptop/Aksesoris/Service yang
+// TIDAK lewat sistem Transaksi/Service (mis. input susulan/backfill). Sengaja
+// key-nya BEDA dari AUTO_INCOME_CATEGORIES di bawah supaya tidak nabrak logic
+// auto-sync — entry yang beneran lewat Transaksi/Service tetap pakai category
+// "PENJUALAN_LAPTOP"/"SERVICE" apa adanya. HANYA ditawarkan di dropdown Uang
+// MASUK (lihat INCOME_CATEGORIES), tidak pernah muncul di dropdown Uang Keluar.
+export const MANUAL_INCOME_ONLY_CATEGORIES = {
+  PENJUALAN_LAPTOP_MANUAL: "Penjualan Laptop (Manual)",   // 410
+  PENJUALAN_AKSESORIS: "Penjualan Aksesoris",             // 420
+  SERVICE_MANUAL: "Service (Manual)",                     // 430
 } as const;
 
-export type IncomeCategory = keyof typeof INCOME_CATEGORIES;
-export type ExpenseCategory = keyof typeof EXPENSE_CATEGORIES;
+// ⬅️ BARU — Kategori KHUSUS Uang Keluar untuk Penjualan Laptop/Aksesoris/Jasa
+// Servis (mis. retur/koreksi yang perlu mengurangi akun pendapatan 410/420/430
+// yang SAMA dengan MANUAL_INCOME_ONLY_CATEGORIES di atas, tapi dari sisi Uang
+// Keluar). HANYA ditawarkan di dropdown Uang KELUAR & Realisasi Pengajuan Dana
+// (lihat EXPENSE_CATEGORIES), tidak pernah muncul di dropdown Uang Masuk.
+export const MANUAL_EXPENSE_ONLY_CATEGORIES = {
+  PENJUALAN_LAPTOP_OUT: "Penjualan Laptop",       // 410
+  PENJUALAN_AKSESORIS_OUT: "Penjualan Aksesoris", // 420
+  JASA_SERVICE_OUT: "Jasa Servis",                // 430
+} as const;
 
-export function categoryLabel(direction: CashflowDirection, category: string): string {
+// ⬅️ BARU — Kategori Kasbon & Cicilan. Valid di DUA arah (IN & OUT) dan WAJIB
+// punya target_user_id (karyawan pemilik). OUT = memberi kasbon/cicilan,
+// IN = karyawan membayar/menyicil. Ditawarkan di dropdown Uang Masuk & Keluar.
+export const KASBON_CICILAN_CATEGORIES = {
+  KASBON: "Kasbon",
+  CICILAN: "Cicilan",
+} as const;
+
+export function isKasbonCicilanCategory(category: string): boolean {
+  return Object.prototype.hasOwnProperty.call(KASBON_CICILAN_CATEGORIES, category);
+}
+
+/** Minggu ke-berapa dalam bulan dari tanggal "YYYY-MM-DD".
+ *  1–7 = Minggu 1, 8–14 = Minggu 2, …, 29–31 = Minggu 5. */
+export function weekOfMonth(dateStr: string): number {
+  const day = Number(String(dateStr).slice(8, 10));
+  if (!Number.isFinite(day) || day < 1) return 1;
+  return Math.min(5, Math.floor((day - 1) / 7) + 1);
+}
+
+// ── Kategori yang OTOMATIS dari sistem — tidak boleh diinput manual ───────────
+export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"] as const;
+
+/** true = kategori ini boleh diinput manual utk Uang Masuk (16 kategori umum
+ *  + 3 kategori Penjualan Laptop/Aksesoris/Service manual) */
+export function isManualIncomeCategory(category: string): boolean {
+  return (
+    Object.prototype.hasOwnProperty.call(CASHFLOW_CATEGORIES, category) ||
+    Object.prototype.hasOwnProperty.call(LEGACY_CATEGORY_LABEL, category) ||
+    Object.prototype.hasOwnProperty.call(MANUAL_INCOME_ONLY_CATEGORIES, category) ||
+    isKasbonCicilanCategory(category) // ⬅️ BARU: Kasbon/Cicilan boleh input manual sbg Uang Masuk (pembayaran)
+  );
+}
+
+// Alias nama lama — dipertahankan supaya file lain yang masih import
+// INCOME_CATEGORIES / EXPENSE_CATEGORIES tidak perlu diubah sama sekali.
+// INCOME_CATEGORIES = CASHFLOW_CATEGORIES + MANUAL_INCOME_ONLY_CATEGORIES —
+// dropdown Uang Masuk dapat 3 kategori Penjualan Laptop/Aksesoris/Service
+// (Manual). EXPENSE_CATEGORIES ⬅️ UPDATE: sekarang = CASHFLOW_CATEGORIES +
+// MANUAL_EXPENSE_ONLY_CATEGORIES — dropdown Uang Keluar & Realisasi Pengajuan
+// Dana otomatis dapat 3 kategori Penjualan Laptop/Aksesoris/Jasa Servis (sisi
+// keluar) tanpa halaman UI-nya perlu diubah sama sekali (asal me-render dari
+// konstanta ini, bukan hardcode sendiri).
+export const INCOME_CATEGORIES = { ...CASHFLOW_CATEGORIES, ...MANUAL_INCOME_ONLY_CATEGORIES, ...KASBON_CICILAN_CATEGORIES };
+export const EXPENSE_CATEGORIES = { ...CASHFLOW_CATEGORIES, ...MANUAL_EXPENSE_ONLY_CATEGORIES, ...KASBON_CICILAN_CATEGORIES };
+
+export type IncomeCategory = keyof typeof INCOME_CATEGORIES;
+export type ExpenseCategory = keyof typeof EXPENSE_CATEGORIES; // ⬅️ UPDATE: dulu keyof typeof CASHFLOW_CATEGORIES
+
+export function categoryLabel(_direction: CashflowDirection, category: string): string {
   if (category === "MODAL_AWAL") return "Modal Awal";
-  const map = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  return (map as Record<string, string>)[category] ?? category;
+  return (
+    (CASHFLOW_CATEGORIES as Record<string, string>)[category] ??
+    (MANUAL_INCOME_ONLY_CATEGORIES as Record<string, string>)[category] ??
+    (MANUAL_EXPENSE_ONLY_CATEGORIES as Record<string, string>)[category] ?? // ⬅️ BARU
+    (KASBON_CICILAN_CATEGORIES as Record<string, string>)[category] ?? // ⬅️ BARU
+    AUTO_CATEGORY_LABEL[category] ??
+    LEGACY_CATEGORY_LABEL[category] ??
+    category
+  );
 }
 
 export function isValidCategory(direction: CashflowDirection, category: string): boolean {
-  const map = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  return Object.prototype.hasOwnProperty.call(map, category);
+  // ⬅️ BARU: Kasbon & Cicilan valid di DUA arah (beri = OUT, bayar = IN).
+  if (isKasbonCicilanCategory(category)) return true;
+  // 3 kategori Penjualan Laptop/Aksesoris/Service manual cuma valid utk arah IN —
+  // supaya tidak bisa "nyasar" jadi kategori di Uang Keluar (Beban).
+  if (direction === "IN" && Object.prototype.hasOwnProperty.call(MANUAL_INCOME_ONLY_CATEGORIES, category)) {
+    return true;
+  }
+  // ⬅️ BARU: 3 kategori Penjualan Laptop/Aksesoris/Jasa Servis (sisi keluar) cuma
+  // valid utk arah OUT — supaya tidak bisa "nyasar" jadi kategori di Uang Masuk.
+  if (direction === "OUT" && Object.prototype.hasOwnProperty.call(MANUAL_EXPENSE_ONLY_CATEGORIES, category)) {
+    return true;
+  }
+  return (
+    Object.prototype.hasOwnProperty.call(CASHFLOW_CATEGORIES, category) ||
+    Object.prototype.hasOwnProperty.call(LEGACY_CATEGORY_LABEL, category)
+  );
 }
 
 export function isAutoIncomeCategory(category: string): boolean {
@@ -72,7 +169,7 @@ export function isAutoIncomeCategory(category: string): boolean {
 
 // ── Filter Types ──────────────────────────────────────────────────────────────
 export type AuditFilter = "ALL" | "AUDITED" | "NOT_AUDITED";
-export type SourceFilter = "ALL" | "MANUAL" | "AUTO";
+export type SourceFilter = "ALL" | "MANUAL" | "AUTO" | "PENGAJUAN_DANA";
 export type PaymentMethodFilter = "ALL" | "CASH" | "SALDO";
 export type StatusFilter = "ALL" | "ACTIVE" | "VOIDED";
 export type IncomeMethodFilter = "ALL" | "TUNAI" | "TRANSFER" | "TUNAI_TRANSFER"; // ⬅️ UPDATE: tambah opsi kombinasi Tunai+Transfer
@@ -98,7 +195,7 @@ export function defaultCashflowFilter(): CashflowFilter {
     audit: "ALL",
     source: "ALL",
     paymentMethod: "ALL", // ⬅️ BARU
-    status: "ALL", // ⬅️ BARU: filter Batal
+    status: "ACTIVE", // ⬅️ UPDATE: default sembunyikan entry dari transaksi BATAL
         incomeMethod: "ALL", // ⬅️ BARU
     nama: "ALL", // ⬅️ BARU
     search: "",
@@ -128,14 +225,14 @@ export function activeFilterCount(f: CashflowFilter): number {
   if (f.audit !== "ALL") c++;
   if (f.source !== "ALL") c++;
   if (f.paymentMethod !== "ALL") c++; // ⬅️ BARU
-  if (f.status !== "ALL") c++; // ⬅️ BARU
+  if (f.status !== defaultCashflowFilter().status) c++; // ⬅️ UPDATE: default ACTIVE tidak dihitung filter aktif
    if (f.incomeMethod !== "ALL") c++; // ⬅️ BARU
   if (f.nama !== "ALL") c++; // ⬅️ BARU
    if (f.search.trim()) c++;
   return c;
 }
 
-/** Nama yang ditampilkan di tabel & dipakai untuk filter Nama — MANUAL/MODAL_AWAL
+/** Nama yang ditampilkan di tabel & dipakai untuk filter Nama — MANUAL/MODAL_AWAL/PENGAJUAN_DANA
  *  pakai nama pengisi (created_by_user), selain itu pakai field `nama` apa adanya
  *  (teknisi utk SERVICE, sales/nama transaksi utk TRANSACTION, dst). */
 export function getEntryDisplayNama(e: {
@@ -143,7 +240,7 @@ export function getEntryDisplayNama(e: {
   nama?: string;
   created_by_user?: { name: string } | null;
 }): string {
-  if ((e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL") && e.created_by_user?.name) {
+  if ((e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA") && e.created_by_user?.name) {
     return e.created_by_user.name;
   }
   return (e.nama || "").trim();
@@ -160,6 +257,8 @@ export function applyFilters<T extends {
   nama?: string;
   keterangan?: string | null;
   created_by_user?: { name: string } | null; // ⬅️ BARU: buat filter Nama
+  nominal?: number | null; // ⬅️ BARU: buat search nominal
+  source_nominal?: number | null; // ⬅️ BARU: buat search nominal terkini (entry stale "Kini Rp…")
 }>(entries: T[], filter: CashflowFilter): T[] {
   const q = filter.search.trim().toLowerCase();
 
@@ -170,7 +269,8 @@ export function applyFilters<T extends {
     if (filter.audit === "AUDITED" && !e.is_audited) return false;
     if (filter.audit === "NOT_AUDITED" && e.is_audited) return false;
     if (filter.source === "MANUAL" && e.source_type !== "MANUAL") return false;
-    if (filter.source === "AUTO" && e.source_type === "MANUAL") return false;
+    if (filter.source === "PENGAJUAN_DANA" && e.source_type !== "PENGAJUAN_DANA") return false;
+    if (filter.source === "AUTO" && (e.source_type === "MANUAL" || e.source_type === "PENGAJUAN_DANA")) return false;
    if (filter.paymentMethod !== "ALL" && e.payment_method !== filter.paymentMethod) return false; // ⬅️ BARU
     if (filter.status === "ACTIVE" && e.is_voided) return false; // ⬅️ BARU
     if (filter.status === "VOIDED" && !e.is_voided) return false; // ⬅️ BARU
@@ -182,8 +282,24 @@ export function applyFilters<T extends {
     }
     if (filter.nama !== "ALL" && getEntryDisplayNama(e) !== filter.nama) return false; // ⬅️ BARU
    if (q) {
+      // Teks: cari di Nama & Keterangan seperti semula
       const haystack = `${e.nama || ""} ${e.keterangan || ""}`.toLowerCase();
-      if (!haystack.includes(q)) return false;
+      const textMatch = haystack.includes(q);
+
+      // Nominal: kalau query "berbau angka" (hanya digit + pemisah titik/koma/
+      // spasi, boleh diawali "rp"), buang semua non-digit lalu cek apakah nominal
+      // entry mengandung angka itu. Jadi "2850000", "2.850.000", & "Rp2.850.000"
+      // sama-sama ketemu. Query teks biasa (nama/keterangan) TIDAK dipaksa cocok
+      // ke nominal supaya nggak muncul false-positive.
+      const looksNumeric = /^[\s.,rp0-9]+$/i.test(q) && /\d/.test(q);
+      const qDigits = q.replace(/\D/g, "");
+      const nominalMatch =
+        looksNumeric &&
+        qDigits.length > 0 &&
+        (String(e.nominal ?? "").includes(qDigits) ||
+          (e.source_nominal != null && String(e.source_nominal).includes(qDigits)));
+
+      if (!textMatch && !nominalMatch) return false;
     }
     return true;
   });

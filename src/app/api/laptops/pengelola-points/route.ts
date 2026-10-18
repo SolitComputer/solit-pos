@@ -26,6 +26,7 @@ function toWibDateStr(d: Date): string {
 const POINTS_PER_UNIT_ADDED = 1;
 const POINTS_PER_SOLVED = 5;
 const POINTS_PER_SO = 0.3;
+const POINTS_PER_CONDITION_CHECK = 0.3; // ← tes kondisi, setara SO; dedupe 1x/barang/hari WIB
 
 const LOCK_LEVEL = 3;
 const MAX_LEVEL = 10;
@@ -72,7 +73,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     if (searchParams.get("list") === "true") {
         const { data: rows, error } = await supabase
             .from("pengelola_barang_scores")
-            .select("user_id, total_points, units_added, units_solved, so_count, rank")
+                        .select("user_id, total_points, units_added, units_solved, so_count, condition_check_count, rank")
             .eq("year", year)
             .eq("month", month)
             .order("rank", { ascending: true });
@@ -128,7 +129,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     const { data: historyRows, error: histErr } = await supabase
         .from("pengelola_barang_scores")
-        .select("year, month, rank, total_points, units_added, units_solved, so_count")
+        .select("year, month, rank, total_points, units_added, units_solved, so_count, condition_check_count")
         .eq("user_id", targetUserId)
         .order("year", { ascending: true })
         .order("month", { ascending: true });
@@ -161,6 +162,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
             unitsAdded: currentMonthRow?.units_added ?? null,
             unitsSolved: currentMonthRow?.units_solved ?? null,
             soCount: currentMonthRow?.so_count ?? null,
+            conditionCheckCount: currentMonthRow?.condition_check_count ?? null,
             level: levelInfo.displayLevel,
             isPermanent: levelInfo.isPermanent,
             isTemporary: levelInfo.isTemporary,
@@ -187,7 +189,7 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}T23:59:59+07:00`;
 
     // ⚠️ ASUMSI: kolom timestamp di activity_logs bernama `created_at`.
-    const [{ data: createLogs, error: createErr }, { data: solvedLogs, error: solvedErr }, { data: soLogs, error: soErr }] = await Promise.all([
+    const [{ data: createLogs, error: createErr }, { data: solvedLogs, error: solvedErr }, { data: soLogs, error: soErr }, { data: condLogs, error: condErr }] = await Promise.all([
         supabase.from("activity_logs").select("user_id, created_at")
             .eq("entity", "unit").eq("action", "CREATE")
             .gte("created_at", startDate).lte("created_at", endDate),
@@ -197,15 +199,20 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
         supabase.from("activity_logs").select("user_id, entity_id, created_at")
             .eq("entity", "laptop").eq("action", "SO")
             .gte("created_at", startDate).lte("created_at", endDate),
+        // Tes Kondisi: endpoint condition-checks selalu nulis label "... — tes kondisi"
+        // (entity bisa laptop ATAU unit) → itu penanda uniknya. entity_id dipakai buat dedupe.
+        supabase.from("activity_logs").select("user_id, entity_id, created_at")
+            .eq("action", "EDIT").ilike("entity_label", "%tes kondisi%")
+            .gte("created_at", startDate).lte("created_at", endDate),
     ]);
 
-    const firstError = createErr || solvedErr || soErr;
-    if (firstError) {
+    const firstError = createErr || solvedErr || soErr || condErr;
+        if (firstError) {
         return NextResponse.json({ success: false, message: firstError.message }, { status: 500 });
     }
 
-    const totals = new Map<string, { added: number; solved: number; so: number }>();
-    const getCur = (userId: string) => totals.get(userId) ?? { added: 0, solved: 0, so: 0 };
+    const totals = new Map<string, { added: number; solved: number; so: number; cond: number }>();
+    const getCur = (userId: string) => totals.get(userId) ?? { added: 0, solved: 0, so: 0, cond: 0 };
 
     (createLogs ?? []).forEach((r) => {
         const cur = getCur(r.user_id);
@@ -232,13 +239,28 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
         totals.set(r.user_id, cur);
     });
 
+    // Dedupe Tes Kondisi: 1x per (user, barang, tanggal WIB). entity_id = id laptop
+    // atau id unit — keduanya UUID unik, jadi tes model & tes per-SN di hari sama
+    // tetap kehitung terpisah. (Hapus seluruh blok ini kalau mau "tiap submit = poin".)
+    const seenCond = new Set<string>();
+    (condLogs ?? []).forEach((r) => {
+        const wibDate = toWibDateStr(new Date(r.created_at));
+        const dedupeKey = `${r.user_id}|${r.entity_id}|${wibDate}`;
+        if (seenCond.has(dedupeKey)) return;
+        seenCond.add(dedupeKey);
+        const cur = getCur(r.user_id);
+        cur.cond += 1;
+        totals.set(r.user_id, cur);
+    });
+
     const ranked = Array.from(totals.entries())
         .map(([user_id, v]) => ({
             user_id,
             units_added: v.added,
             units_solved: v.solved,
             so_count: v.so,
-            total_points: Math.round((v.added * POINTS_PER_UNIT_ADDED + v.solved * POINTS_PER_SOLVED + v.so * POINTS_PER_SO) * 100) / 100,
+            condition_check_count: v.cond,
+            total_points: Math.round((v.added * POINTS_PER_UNIT_ADDED + v.solved * POINTS_PER_SOLVED + v.so * POINTS_PER_SO + v.cond * POINTS_PER_CONDITION_CHECK) * 100) / 100,
         }))
         .filter((u) => u.total_points > 0)
         .sort((a, b) => b.total_points - a.total_points);

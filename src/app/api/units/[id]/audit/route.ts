@@ -15,6 +15,15 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
 
+    // Catatan audit (opsional) — sama pola dengan SO unit laptop.
+    let notes: string | null = null;
+    try {
+      const body = await req.json();
+      notes = typeof body?.notes === "string" && body.notes.trim() !== "" ? body.notes.trim() : null;
+    } catch {
+      // Body opsional (request tanpa JSON tetap valid)
+    }
+
     const { data: current, error: readErr } = await supabase
       .from("laptop_units")
       .select("id, serial_number, laptop_id, audited_at, audited_by")
@@ -68,6 +77,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       action: isActive ? "UNAUDIT" : "AUDIT",
       audited_by: user.name,
       audited_at: new Date().toISOString(),
+      notes,
     });
 
     return NextResponse.json({ success: true, data });
@@ -95,7 +105,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const { data: history, error: historyErr } = await supabase
       .from("laptop_unit_audit_logs")
-      .select("id, action, audited_by, audited_at")
+      .select("id, action, audited_by, audited_at, notes")
       .eq("unit_id", id)
       .order("audited_at", { ascending: false })
       .limit(20);

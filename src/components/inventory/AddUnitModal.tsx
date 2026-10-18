@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
 
 export interface CreatedUnit {
     id: string;
@@ -126,15 +127,18 @@ export default function AddUnitModal({
 
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Harga Modal">
-                            <input type="number" name="purchase_price" value={form.purchase_price} onChange={handleChange} className={inputCls} />
+                            <CurrencyInput name="purchase_price" value={Number(form.purchase_price) || 0}
+                                onChange={(v) => setForm(prev => ({ ...prev, purchase_price: String(v) }))} className={inputCls} />
                         </Field>
                         <Field label="Modal Sparepart">
-                            <input type="number" name="sparepart_cost" value={form.sparepart_cost} onChange={handleChange} className={inputCls} />
+                            <CurrencyInput name="sparepart_cost" value={Number(form.sparepart_cost) || 0}
+                                onChange={(v) => setForm(prev => ({ ...prev, sparepart_cost: String(v) }))} className={inputCls} />
                         </Field>
                     </div>
 
                     <Field label="Harga Jual">
-                        <input type="number" name="selling_price" value={form.selling_price} onChange={handleChange} className={inputCls} />
+                        <CurrencyInput name="selling_price" value={Number(form.selling_price) || 0}
+                            onChange={(v) => setForm(prev => ({ ...prev, selling_price: String(v) }))} className={inputCls} />
                     </Field>
 
                     <Field label="Kondisi">

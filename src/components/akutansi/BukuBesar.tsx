@@ -1,7 +1,7 @@
 "use client";
 // src/components/akutansi/BukuBesar.tsx
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ACCOUNTS, ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
 import { Lock, Pencil, BookOpen, Check, X, AlertTriangle, DollarSign, Search } from "lucide-react";
 
@@ -88,10 +88,15 @@ export default function BukuBesar({ period }: { period: string }) {
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [accountCode, setAccountCode] = useState<string>(ACCOUNTS[0]?.code ?? "");
     const [tableSearch, setTableSearch] = useState("");
+    // Filter status cek: "all" = semua, "checked" = sudah dicek, "unchecked" = belum dicek
+    const [checkFilter, setCheckFilter] = useState<"all" | "checked" | "unchecked">("all");
     const [data, setData] = useState<LedgerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [showOpeningModal, setShowOpeningModal] = useState(false);
+    // (fix) baris id yang lagi proses centang (PATCH belum selesai) — dipakai load()
+    // supaya auto-refresh nggak nimpa optimistic update yang belum ke-confirm server.
+    const pendingChecksRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         fetch("/api/akutansi/accounts")
@@ -115,7 +120,21 @@ export default function BukuBesar({ period }: { period: string }) {
                 }
                 return;
             }
-            setData(json.data);
+            setData((prev) => {
+                // (fix) kalau ada centang yang masih pending, pertahankan nilai checked
+                // lokal untuk baris itu — jangan biarkan snapshot GET yang datang telat
+                // (diambil sebelum PATCH commit) menimpa balik jadi unchecked.
+                if (pendingChecksRef.current.size === 0 || !prev) return json.data;
+                const prevById = new Map(prev.lines.map((l) => [l.id, l]));
+                const mergedLines = json.data.lines.map((l: LedgerLine) => {
+                    if (!pendingChecksRef.current.has(l.id)) return l;
+                    const local = prevById.get(l.id);
+                    return local
+                        ? { ...l, checked: local.checked, checked_at: local.checked_at, checked_by_name: local.checked_by_name }
+                        : l;
+                });
+                return { ...json.data, lines: mergedLines };
+            });
         } catch {
             if (!silent) {
                 setError("Koneksi bermasalah");
@@ -130,6 +149,12 @@ export default function BukuBesar({ period }: { period: string }) {
     // Optimistic update dulu (UI langsung berubah), lalu simpan ke server;
     // kalau gagal, rollback ke nilai sebelumnya supaya tidak beda dengan DB.
     const toggleChecked = useCallback(async (lineId: string, next: boolean) => {
+        // (fix) guard: kalau baris ini masih ada PATCH yang berjalan, abaikan klik baru.
+        // Tanpa ini, klik cepat berturut-turut bisa kirim 2 PATCH bareng untuk line_id
+        // yang sama dan responsnya bisa datang tidak berurutan — ini akar masalah
+        // checklist "kadang kesimpan kadang enggak".
+        if (pendingChecksRef.current.has(lineId)) return;
+        pendingChecksRef.current.add(lineId);
         setData((prev) =>
             prev
                 ? {
@@ -165,18 +190,25 @@ export default function BukuBesar({ period }: { period: string }) {
                 );
             }
         } catch {
+            // (fix) hanya balikin flag `checked` ke kebalikan `next` (state sebelum
+            // optimistic update). Sebelumnya di sini juga nebak-nebak checked_at/checked_by_name
+            // secara manual dan hasilnya salah (khusus gagal uncheck, checked_at malah
+            // ditulis ulang ke waktu sekarang, checked_by_name juga tidak dikembalikan).
+            // Solusinya: tarik ulang data asli dari server secara silent supaya kedua
+            // field itu akurat, bukan ditebak di client.
             setData((prev) =>
                 prev
                     ? {
                         ...prev,
-                        lines: prev.lines.map((l) =>
-                            l.id === lineId ? { ...l, checked: !next, checked_at: !next ? new Date().toISOString() : null } : l
-                        ),
+                        lines: prev.lines.map((l) => (l.id === lineId ? { ...l, checked: !next } : l)),
                     }
                     : prev
             );
+            load({ silent: true });
+        } finally {
+            pendingChecksRef.current.delete(lineId);
         }
-    }, []);
+    }, [load]);
 
     useEffect(() => {
         load();
@@ -200,16 +232,29 @@ export default function BukuBesar({ period }: { period: string }) {
     const filteredLines = useMemo(() => {
         if (!data) return [];
         const q = tableSearch.trim().toLowerCase();
-        if (!q) return data.lines;
         return data.lines.filter((l) => {
+            // 1) Filter status cek
+            //    - "checked": hanya baris yang sudah dicek
+            //    - "unchecked": belum dicek DAN bukan baris sintetis (sintetis nggak bisa dicek manual)
+            if (checkFilter === "checked" && !l.checked) return false;
+            if (checkFilter === "unchecked" && (l.checked || l.is_synthetic)) return false;
+
+            // 2) Filter pencarian teks (kalau kosong, lolos semua)
+            if (!q) return true;
             if (l.keterangan.toLowerCase().includes(q)) return true;
             if (l.debit > 0 && (String(l.debit).includes(q) || rp(l.debit).toLowerCase().includes(q))) return true;
             if (l.kredit > 0 && (String(l.kredit).includes(q) || rp(l.kredit).toLowerCase().includes(q))) return true;
             return false;
         });
-    }, [data, tableSearch]);
+    }, [data, tableSearch, checkFilter]);
 
     const normalSide = useMemo(() => getNormalSide(accountCode), [accountCode]);
+
+    // Jumlah baris yang sudah dicek, ditampilkan di header kolom "Cek" (paling atas tabel)
+    const checkedCount = useMemo(
+        () => (data ? data.lines.filter((l) => l.checked).length : 0),
+        [data]
+    );
 
     return (
         <div className="space-y-4">
@@ -324,9 +369,28 @@ export default function BukuBesar({ period }: { period: string }) {
                     )}
                 </div>
             )}
+
+            {/* ── Filter status cek ── */}
+            {data && data.lines.length > 0 && (
+                <div className="flex justify-end">
+                    <select
+                        value={checkFilter}
+                        onChange={(e) => setCheckFilter(e.target.value as "all" | "checked" | "unchecked")}
+                        className="h-9 border border-gray-200 rounded-lg px-3 pr-8 text-xs font-bold bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition cursor-pointer"
+                    >
+                        <option value="all">Semua ({data.lines.length})</option>
+                        <option value="checked">
+                            Sudah Dicek ({data.lines.filter((l) => l.checked).length})
+                        </option>
+                        <option value="unchecked">
+                            Belum Dicek ({data.lines.filter((l) => !l.checked && !l.is_synthetic).length})
+                        </option>
+                    </select>
+                </div>
+            )}
             {/* ── Cari baris buku besar ── */}
             {data && (
-                <div className="sticky top-0 z-20 bg-white py-2">
+                <div className="sticky top-0 z-20 bg-white py-2 relative">
                     <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                         value={tableSearch}
@@ -337,8 +401,134 @@ export default function BukuBesar({ period }: { period: string }) {
                 </div>
             )}
 
-            {/* ── Tabel Buku Besar ── */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* ── Mobile: kartu per mutasi, lebih gampang dibaca & tap "Cek" daripada tabel sempit ── */}
+            <div className="md:hidden space-y-2">
+                {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2 animate-pulse">
+                            <div className="h-3 bg-gray-100 rounded w-1/2" />
+                            <div className="h-3 bg-gray-100 rounded w-1/3" />
+                        </div>
+                    ))
+                ) : !data ? (
+                    <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-sm text-gray-400">
+                        Pilih akun untuk melihat buku besar
+                    </div>
+                ) : (
+                    <>
+                        {/* Saldo Awal */}
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-3.5 flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-gray-500 italic">Saldo Awal</span>
+                            <SaldoBadge amount={data.saldo_awal} normalSide={normalSide} />
+                        </div>
+
+                        {data.lines.length === 0 ? (
+                            <div className="bg-white rounded-xl border border-gray-200 py-14 text-center">
+                                <div className="flex justify-center mb-3 opacity-40"><BookOpen className="w-10 h-10" /></div>
+                                <p className="text-sm text-gray-500 font-medium">Belum ada mutasi di periode ini</p>
+                                <p className="text-xs text-gray-400 mt-1 px-6">Konfirmasi data di Jurnal Umum agar muncul di sini.</p>
+                            </div>
+                        ) : filteredLines.length === 0 ? (
+                            <div className="bg-white rounded-xl border border-gray-200 py-14 text-center">
+                                <div className="flex justify-center mb-3 opacity-40"><Search className="w-10 h-10" /></div>
+                                <p className="text-sm text-gray-500 font-medium">Tidak ada baris yang cocok</p>
+                                <p className="text-xs text-gray-400 mt-1 px-6">Coba kata kunci lain untuk keterangan, debit, atau kredit.</p>
+                            </div>
+                        ) : (
+                            filteredLines.map((l) => {
+                                const companyBadge = getCompanyBadge(l.trx_meta?.company_name);
+                                const specParts = [l.trx_meta?.cpu, l.trx_meta?.ram, l.trx_meta?.storage].filter(Boolean) as string[];
+                                return (
+                                    <div key={l.id} className="bg-white rounded-xl border border-gray-200 p-3.5">
+                                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                                            <span className="text-[11px] font-semibold text-gray-500">{fmtTgl(l.tanggal)}</span>
+                                            {l.is_synthetic ? (
+                                                <span
+                                                    title="Baris otomatis (modal belum diinput) — tidak bisa dicek manual"
+                                                    className="w-7 h-7 rounded-md border border-dashed border-gray-200 flex items-center justify-center text-gray-300 shrink-0"
+                                                >
+                                                    —
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => toggleChecked(l.id, !l.checked)}
+                                                    title={
+                                                        l.checked
+                                                            ? `Sudah dicek${l.checked_at ? " · " + fmtTglJam(l.checked_at) : ""} · ${l.checked_by_name ? "oleh " + l.checked_by_name : "pencentang tidak tercatat"}`
+                                                            : "Tandai sudah dicek"
+                                                    }
+                                                    className={`w-7 h-7 rounded-md border flex items-center justify-center active:scale-90 transition-all duration-150 shrink-0 ${l.checked
+                                                        ? "bg-green-600 border-green-600 text-white"
+                                                        : "bg-white border-gray-300 text-gray-300"
+                                                        }`}
+                                                >
+                                                    <Check className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                            {companyBadge && (
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
+                                                    {companyBadge.label}
+                                                </span>
+                                            )}
+                                            {l.is_synthetic && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
+                                                    <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
+                                                </span>
+                                            )}
+                                            {l.ref && <span className="text-[10px] font-mono font-bold text-gray-400">Ref: {l.ref}</span>}
+                                        </div>
+                                        <p className="text-[13px] text-gray-800">{l.keterangan}</p>
+                                        {specParts.length > 0 && (
+                                            <p className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</p>
+                                        )}
+                                        {l.checked && (
+                                            <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                                                <Check className="w-2.5 h-2.5" />
+                                                Dicek {l.checked_by_name ?? "—"}
+                                                {l.checked_at && <span className="text-gray-400 font-normal">· {fmtTglJam(l.checked_at)}</span>}
+                                            </p>
+                                        )}
+
+                                        <div className="mt-2.5 pt-2.5 border-t border-gray-100 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] font-mono">
+                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold">Debit</span>
+                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold text-right">Kredit</span>
+                                            <span className={l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}>
+                                                {l.debit > 0 || (l.is_synthetic && l.side === "DEBIT") ? rp(l.debit) : "—"}
+                                            </span>
+                                            <span className={`text-right ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
+                                                {l.kredit > 0 || (l.is_synthetic && l.side === "KREDIT") ? rp(l.kredit) : "—"}
+                                            </span>
+                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold">Saldo D</span>
+                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold text-right">Saldo K</span>
+                                            <span className="text-blue-700">{l.saldo_debit > 0 ? rp(l.saldo_debit) : "—"}</span>
+                                            <span className="text-emerald-700 text-right">{l.saldo_kredit > 0 ? rp(l.saldo_kredit) : "—"}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+
+                        {data.lines.length > 0 && (
+                            <div className="rounded-xl border-2 border-gray-300 bg-gray-50 p-3.5">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold text-gray-600 uppercase">Total &amp; Saldo Akhir</span>
+                                    <SaldoBadge amount={data.totals.saldo_akhir} size="md" normalSide={normalSide} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-3 text-sm font-black font-mono">
+                                    <span className="text-gray-900">{rp(data.totals.debit)}</span>
+                                    <span className="text-gray-900 text-right">{rp(data.totals.kredit)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* ── Desktop/tablet: Tabel Buku Besar ── */}
+            <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse" style={{ minWidth: "1040px" }}>
                         <thead>
@@ -362,7 +552,12 @@ export default function BukuBesar({ period }: { period: string }) {
                                     Saldo
                                 </th>
                                 <th rowSpan={2} className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[64px] align-bottom border-l-2 border-gray-200">
-                                    Cek
+                                    <div>Cek</div>
+                                    {data && data.lines.length > 0 && (
+                                        <div className="mt-1 text-[10px] font-bold text-gray-400 normal-case tracking-normal font-mono whitespace-nowrap">
+                                            {checkedCount}/{data.lines.length}
+                                        </div>
+                                    )}
                                 </th>
                             </tr>
                             <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
@@ -456,6 +651,15 @@ export default function BukuBesar({ period }: { period: string }) {
                                                         {specParts.length > 0 && (
                                                             <div className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</div>
                                                         )}
+                                                        {l.checked && (
+                                                            <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                                                                <Check className="w-2.5 h-2.5" />
+                                                                Dicek {l.checked_by_name ?? "—"}
+                                                                {l.checked_at && (
+                                                                    <span className="text-gray-400 font-normal">· {fmtTglJam(l.checked_at)}</span>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-2.5 text-center text-[10px] font-mono font-bold text-gray-400">
                                                         {l.ref || "—"}
@@ -524,9 +728,7 @@ export default function BukuBesar({ period }: { period: string }) {
                                     <td className="px-4 py-3 text-right text-sm font-black text-emerald-700 font-mono">
                                         {data.totals.saldo_akhir < 0 ? rp(Math.abs(data.totals.saldo_akhir)) : ""}
                                     </td>
-                                    <td className="px-3 py-3 text-center border-l-2 border-gray-200 text-[10px] font-bold text-gray-400">
-                                        {data.lines.filter((l) => l.checked).length}/{data.lines.length}
-                                    </td>
+                                    <td className="px-3 py-3 text-center border-l-2 border-gray-200" />
                                 </tr>
                             </tfoot>
                         )}

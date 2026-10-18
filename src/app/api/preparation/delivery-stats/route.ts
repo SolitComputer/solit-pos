@@ -51,8 +51,8 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     //    PKL yang sudah nonaktif otomatis tidak masuk daftar.
     const { data: activeUsers, error: userErr } = await admin
       .from("users")
-      .select("id, name, role, is_active")
-      .in("role", PREPARATION_DELIVERY_PERSON_ROLES)
+      .select("id, name, role, roles, is_active")
+      .or("role.in.(PENGANTARAN,PKL_PENGANTARAN),roles.ov.{PENGANTARAN,PKL_PENGANTARAN}")
       .eq("is_active", true);
 
     if (userErr) throw userErr;

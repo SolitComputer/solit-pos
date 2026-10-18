@@ -1,7 +1,6 @@
 // src/app/dashboard/cc-reports/laporan/page.tsx
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   type CCReport, type CCStatus, type CCBrand, type BrandFilter, type CCReportListResponse,
@@ -141,12 +140,6 @@ export default function CCLaporanPage() {
         <div className="mx-auto max-w-6xl">
           {/* Header */}
           <div className="mb-6 flex items-center gap-3">
-            <Link href="/dashboard/cc-reports"
-              className="rounded-xl border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-900">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </Link>
             <div>
               <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">Laporan Kerja</h1>
               <p className="text-sm text-gray-500">
@@ -210,7 +203,7 @@ export default function CCLaporanPage() {
           </div>
 
           {/* ── Tab brand ── */}
-          <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
             {BRAND_TABS.map((b) => {
               const active = brand === b.key;
               return (
@@ -218,8 +211,8 @@ export default function CCLaporanPage() {
                   key={b.key}
                   onClick={() => setBrand(b.key)}
                   className={`flex items-center justify-center gap-1.5 rounded-2xl border px-2 py-2.5 text-xs font-bold transition ${active
-                      ? "border-gray-900 bg-gray-900 text-white shadow-sm"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
+                    ? "border-gray-900 bg-gray-900 text-white shadow-sm"
+                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
                     }`}
                 >
                   <span
@@ -374,7 +367,7 @@ export default function CCLaporanPage() {
 function Dot({ done }: { done: boolean }) {
   return done ? (
     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-xs font-black text-emerald-600">
-      
+
     </span>
   ) : (
     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-50 text-xs font-black text-gray-300">

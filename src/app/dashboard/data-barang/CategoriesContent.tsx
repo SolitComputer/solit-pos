@@ -31,6 +31,13 @@ function TypeBadge({ type }: { type?: string | null }) {
             </span>
         );
     }
+    if (type === "PC") {
+        return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-indigo-600 text-white">
+                PC
+            </span>
+        );
+    }
     if (type === "SPAREPART") {
         return (
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-200">
@@ -290,18 +297,8 @@ function CategoryFormModal({
 }) {
     const isEdit = !!category;
     const [name, setName] = useState(category?.name ?? "");
-    const [description, setDescription] = useState(category?.description ?? "");
-    const [type, setType] = useState<string>(
-        category?.type ? category.type : "ALL"
-    );
+    const [type, setType] = useState(category?.type ?? "");
     const [submitting, setSubmitting] = useState(false);
-
-    const typeOptions = [
-        { value: "ALL", label: "Semua / Umum", desc: "Bisa untuk Laptop, Aksesoris & Sparepart" },
-        { value: "LAPTOP", label: "Laptop / Unit", desc: "Khusus untuk unit laptop" },
-        { value: "AKSESORIS", label: "Aksesoris", desc: "Charger, Tas, Kabel, Mouse, dll" },
-        { value: "SPAREPART", label: "Sparepart / Part", desc: "RAM, SSD, HDD, Fan, LCD, dll" },
-    ];
 
     const handleSubmit = async () => {
         if (!name.trim()) return toast.error("Nama kategori wajib diisi");
@@ -315,8 +312,7 @@ function CategoryFormModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     name: name.trim(),
-                    description: description.trim() || null,
-                    type: type === "ALL" ? null : type,
+                    type: type || null,
                 }),
             });
             const json = await res.json();
@@ -358,36 +354,20 @@ function CategoryFormModal({
                         />
                     </div>
                     <div>
-                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Tipe / Pengelompokan Kategori</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {typeOptions.map(t => (
-                                <button
-                                    key={t.value}
-                                    type="button"
-                                    onClick={() => setType(t.value)}
-                                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
-                                        type === t.value
-                                            ? "border-zinc-900 bg-zinc-900 text-white shadow-sm"
-                                            : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                                    }`}
-                                >
-                                    <div className="text-xs font-bold">{t.label}</div>
-                                    <div className={`text-[10px] mt-0.5 line-clamp-1 ${type === t.value ? "text-zinc-300" : "text-gray-400"}`}>
-                                        {t.desc}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Deskripsi (Opsional)</label>
-                        <textarea
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            rows={3}
-                            placeholder="Keterangan singkat tentang kategori ini…"
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-400"
-                        />
+                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Tipe Kategori</label>
+                        <select
+                            value={type ?? ""}
+                            onChange={e => setType(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                        >
+                            <option value="">Semua / Umum (Aksesoris)</option>
+                            <option value="LAPTOP">Laptop</option>
+                            <option value="PC">PC</option>
+                            <option value="SPAREPART">Sparepart</option>
+                        </select>
+                        <p className="mt-1 text-[11px] text-gray-400">
+                            Laptop &amp; PC menampilkan form spek (CPU/RAM/dll). Selain itu dianggap Aksesoris.
+                        </p>
                     </div>
                 </div>
 

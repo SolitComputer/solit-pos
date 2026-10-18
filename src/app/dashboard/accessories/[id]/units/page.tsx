@@ -7,6 +7,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import BarcodeModal from "@/components/ui/BarcodeModal";
 import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS } from "@/lib/permissions";
 import {
     HardDrive, MemoryStick, Plug, BatteryFull, Keyboard, Monitor,
@@ -22,11 +23,13 @@ interface AccessoryUnit {
     accessory_id: string;
     serial_number: string;
     condition: "BARU" | "BEKAS";
-    status: "TERSEDIA" | "TERJUAL" | "RESERVED";
+    status: string;
     buy_price: number;
     selling_price: number;
     so_at?: string | null;
     so_by?: string | null;
+    audited_at?: string | null;
+    audited_by?: string | null;
     notes: string | null;
     created_at: string;
 }
@@ -52,6 +55,12 @@ const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
 
+// Audit unit aksesoris: reset otomatis 3 hari (disamakan dengan AUDIT_TTL_MS
+// di endpoint /api/accessory-units/[id]/audit & ACCESSORY_AUDIT_TTL_MS).
+const ACCESSORY_AUDIT_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+const isAuditActive = (auditedAt?: string | null) =>
+    !!auditedAt && Date.now() - new Date(auditedAt).getTime() < ACCESSORY_AUDIT_TTL_MS;
+
 function fmtInput(val: number): string {
     if (!val) return "";
     return new Intl.NumberFormat("id-ID").format(val);
@@ -66,8 +75,10 @@ const CONDITION_STYLE: Record<string, { badge: string; label: string }> = {
 };
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
-    TERSEDIA: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Tersedia" },
-    RESERVED: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Reserved" },
+    TERSEDIA: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
+    MINUS_SIAP_JUAL: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Minus Siap Jual" },
+    BELUM_SIAP: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-400", label: "Belum Siap Jual" },
+    RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-400", label: "Reserved" },
     TERJUAL: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
 };
 
@@ -81,11 +92,42 @@ const CATEGORY_ICON: Record<string, LucideIcon> = {
 const EMPTY_UNIT_FORM = {
     serial_number: "",
     condition: "BARU" as "BARU" | "BEKAS",
-    status: "TERSEDIA" as "TERSEDIA" | "TERJUAL" | "RESERVED",
+    status: "TERSEDIA" as "TERSEDIA" | "BELUM_SIAP" | "MINUS_SIAP_JUAL" | "TERJUAL" | "RESERVED",
     buy_price: "",
     selling_price: "",
     notes: "",
 };
+
+// Batas per request di /api/accessory-units/bulk. Data lebih dari ini dipecah
+// jadi beberapa batch dan dikirim berurutan (bukan paralel) supaya server
+// tidak kewalahan dan urutan SN placeholder tetap terjaga.
+const MAX_UNITS_PER_BATCH = 500;
+
+async function postUnitsInChunks<T>(
+    accessoryId: string,
+    units: T[],
+): Promise<{ inserted: number; failed: number; message?: string }> {
+    let inserted = 0;
+    for (let i = 0; i < units.length; i += MAX_UNITS_PER_BATCH) {
+        const chunk = units.slice(i, i + MAX_UNITS_PER_BATCH);
+        try {
+            const res = await fetch(`/api/accessory-units/bulk`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ accessory_id: accessoryId, units: chunk }),
+            });
+            const json = await res.json();
+            if (!json.success) {
+                // Berhenti di batch yang gagal; batch sebelumnya sudah tersimpan.
+                return { inserted, failed: units.length - inserted, message: json.message };
+            }
+            inserted += json.count ?? chunk.length;
+        } catch {
+            return { inserted, failed: units.length - inserted, message: "Koneksi gagal" };
+        }
+    }
+    return { inserted, failed: 0 };
+}
 
 // ─── Price Input ─────────────────────────────────────────────────────────────
 function PriceInput({ label, value, onChange, required }: {
@@ -327,17 +369,16 @@ function BulkAddModal({
         setLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/accessory-units/bulk`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ accessory_id: accessoryId, units }),
-            });
-            const result = await res.json();
-            if (!result.success) {
-                setError(result.message || "Gagal menambahkan units");
+            const { inserted, failed, message } = await postUnitsInChunks(accessoryId, units);
+            if (failed > 0) {
+                if (inserted > 0) onSuccess(); // refresh tabel, unit yang sudah masuk langsung tampil
+                setError(
+                    `${inserted} unit berhasil, ${failed} gagal${message ? `: ${message}` : ""}. ` +
+                    `Unit yang sudah masuk tidak perlu dikirim ulang, sesuaikan SN awal untuk sisanya.`
+                );
                 return;
             }
-            toast.success(`${result.count} unit berhasil ditambahkan`);
+            toast.success(`${inserted} unit berhasil ditambahkan`);
             onSuccess();
             onClose();
         } catch {
@@ -744,7 +785,7 @@ function BulkEditSNModal({
         setError("");
     };
 
-    const handleSubmit = async () => {  
+    const handleSubmit = async () => {
         setError("");
         // Cuma unit yang nilainya benar-benar berubah yang perlu di-PATCH.
         const changed = visibleUnits
@@ -979,6 +1020,172 @@ function BulkEditSNModal({
         </div>
     );
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// BULK EDIT UNITS MODAL — bentuknya DISAMAKAN dengan form "Edit Unit" tunggal.
+// Beda logikanya: nilai awal sengaja kosong/tak terpilih, jadi hanya kolom yang
+// KAMU isi atau KAMU pilih yang dikirim — sisanya dibiarkan apa adanya per unit
+// (tidak ter-reset). Berlaku ke semua unit tercentang (kecuali TERJUAL).
+// Serial Number tidak ada di sini (SN unik per unit → pakai "Edit Banyak SN").
+// ═══════════════════════════════════════════════════════════════════════════
+function BulkEditUnitsModal({
+    units, canSeePrivate, onClose, onSuccess,
+}: {
+    units: AccessoryUnit[];
+    canSeePrivate: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}) {
+    const [condition, setCondition] = useState<"" | "BARU" | "BEKAS">("");
+    const [status, setStatus] = useState<"" | "TERSEDIA" | "BELUM_SIAP" | "MINUS_SIAP_JUAL">("");
+    const [buyInput, setBuyInput] = useState("");
+    const [sellInput, setSellInput] = useState("");
+    const [notes, setNotes] = useState("");
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    const handleSubmit = async () => {
+        setError("");
+        if (units.length === 0) { setError("Tidak ada unit yang bisa diedit (unit terjual dilewati)."); return; }
+
+        // Hanya kolom yang kamu isi/pilih yang masuk payload.
+        const patch: Record<string, unknown> = {};
+        if (condition) patch.condition = condition;
+        if (status) patch.status = status;
+        if (buyInput.trim() !== "") patch.buy_price = parseRupiah(buyInput);
+        if (sellInput.trim() !== "") patch.selling_price = parseRupiah(sellInput);
+        if (notes.trim() !== "") patch.notes = notes.trim();
+
+        if (Object.keys(patch).length === 0) {
+            setError("Belum ada yang diubah. Isi atau pilih minimal satu kolom di atas.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const results = await Promise.all(units.map(async (u) => {
+                try {
+                    const res = await fetch(`/api/accessory-units/${u.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(patch),
+                    });
+                    const json = await res.json().catch(() => null);
+                    return res.ok && json?.success !== false;
+                } catch { return false; }
+            }));
+            const failed = results.filter(ok => !ok).length;
+            if (failed > 0) toast.error(`${failed} dari ${results.length} unit gagal diperbarui. Sisanya berhasil.`);
+            else toast.success(`${results.length} unit berhasil diperbarui`);
+            onSuccess();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <h3 className="font-bold text-gray-900 text-[15px] tracking-tight">Edit {units.length} Unit</h3>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Hanya kolom yang kamu isi/pilih yang diubah — sisanya dibiarkan</p>
+                    </div>
+                    <button onClick={() => !loading && onClose()} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                    {/* Kondisi — klik untuk pilih, klik lagi untuk batal (biarkan) */}
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Kondisi</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(["BARU", "BEKAS"] as const).map(c => (
+                                <button key={c} type="button"
+                                    onClick={() => setCondition(prev => prev === c ? "" : c)}
+                                    className={`inline-flex items-center justify-center gap-1 h-10 rounded-xl text-xs font-bold border transition ${condition === c ? (c === "BARU" ? "bg-emerald-600 text-white border-emerald-600" : "bg-amber-500 text-white border-amber-500") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                    {c === "BARU" ? <><Sparkles size={13} /> Baru</> : <><RefreshCw size={13} /> Bekas</>}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Status — sama, klik lagi untuk batal */}
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {([
+                                { v: "TERSEDIA", l: "Siap Jual", dot: "bg-emerald-500", on: "border-emerald-500 bg-emerald-50", txt: "text-emerald-700" },
+                                { v: "BELUM_SIAP", l: "Belum Siap Jual", dot: "bg-orange-400", on: "border-orange-500 bg-orange-50", txt: "text-orange-700" },
+                                { v: "MINUS_SIAP_JUAL", l: "Minus Siap Jual", dot: "bg-amber-400", on: "border-amber-500 bg-amber-50", txt: "text-amber-700" },
+                            ] as const).map(o => (
+                                <button key={o.v} type="button"
+                                    onClick={() => setStatus(prev => prev === o.v ? "" : o.v)}
+                                    className={`py-2.5 px-2 rounded-xl text-left border-2 transition-all ${status === o.v ? o.on : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status === o.v ? o.dot : "bg-gray-300"}`} />
+                                        <p className={`text-[11px] font-bold leading-tight ${status === o.v ? o.txt : "text-gray-600"}`}>{o.l}</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className={canSeePrivate ? "grid grid-cols-2 gap-3" : ""}>
+                        {canSeePrivate && (
+                            <PriceInput label="Harga Modal" value={buyInput} onChange={setBuyInput} />
+                        )}
+                        <PriceInput label="Harga Jual" value={sellInput} onChange={setSellInput} />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                            Catatan <span className="text-gray-400 font-normal">(opsional)</span>
+                        </label>
+                        <input
+                            placeholder="Kosongkan = tidak diubah"
+                            value={notes}
+                            onChange={e => setNotes(e.target.value)}
+                            className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition"
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                            <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <p className="text-xs text-red-700">{error}</p>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
+                        <button type="button" onClick={() => !loading && onClose()} disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                            Batal
+                        </button>
+                        <button onClick={handleSubmit} disabled={loading}
+                            className="flex-1 h-10 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-gray-800/20">
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Simpan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SO HISTORY MODAL — riwayat siapa yang menandai SO untuk 1 unit, kapan
@@ -990,6 +1197,87 @@ interface SoHistoryEntry {
     so_by: string | null;
     so_at: string;
     notes?: string | null;
+}
+
+// Riwayat audit per-unit aksesoris — meniru SoHistoryModal, beda endpoint & field.
+function AuditHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose: () => void }) {
+    const [loading, setLoading] = useState(true);
+    const [history, setHistory] = useState<{ id: string; action: string; audited_by: string | null; audited_at: string; notes?: string | null }[]>([]);
+
+    useEffect(() => {
+        if (!unit) return;
+        let alive = true;
+        setLoading(true);
+        (async () => {
+            try {
+                const res = await fetch(`/api/accessory-units/${unit.id}/audit`);
+                const json = await res.json();
+                if (alive && json.success) setHistory(json.data?.history ?? []);
+            } finally {
+                if (alive) setLoading(false);
+            }
+        })();
+        return () => { alive = false; };
+    }, [unit]);
+
+    useEffect(() => {
+        if (!unit) return;
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [unit, onClose]);
+
+    if (!unit) return null;
+    const active = isAuditActive(unit.audited_at);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center px-0 sm:px-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] sm:mx-4 overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-600 to-gray-800 flex-shrink-0" />
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <p className="text-sm font-bold text-gray-900">Riwayat Audit</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 font-mono truncate max-w-[240px]">{unit.serial_number}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                        {active ? `Teraudit — ${unit.audited_by ?? "—"}` : "Belum teraudit (atau sudah lewat 3 hari)"}
+                    </span>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    {loading ? (
+                        <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Belum ada riwayat audit untuk unit ini</p>
+                    ) : (
+                        <ol className="space-y-2">
+                            {history.map(h => (
+                                <li key={h.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${h.action === "AUDIT" ? "bg-emerald-500" : "bg-gray-300"}`} />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">
+                                            {h.action === "AUDIT" ? "Ditandai sudah diaudit" : "Audit dibatalkan"} oleh {h.audited_by ?? "—"}
+                                        </p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                            {new Date(h.audited_at).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB
+                                        </p>
+                                        {h.notes && <p className="text-[11px] text-gray-500 italic mt-1">&quot;{h.notes}&quot;</p>}
+                                    </div>
+                                </li>
+                            ))}
+                        </ol>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function SoHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose: () => void }) {
@@ -1085,6 +1373,63 @@ function SoHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose
 // SO CONFIRM MODAL — pengganti window.prompt(). Cancel benar-benar membatalkan
 // (tidak memanggil API sama sekali), beda dari bug window.prompt sebelumnya.
 // ═══════════════════════════════════════════════════════════════════════════
+// Modal catatan audit — kembar SoConfirmModal, tema emerald/audit. Dipakai
+// untuk audit 1 unit maupun bulk (1 catatan untuk semua unit tercentang).
+function AuditConfirmModal({
+    title, subtitle, notes, onNotesChange, onConfirm, onCancel, loading,
+}: {
+    title: string; subtitle: string; notes: string; onNotesChange: (v: string) => void;
+    onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel, loading]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !loading && onCancel()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-800" />
+                <div className="bg-emerald-600 px-5 py-4 flex items-center gap-3">
+                    <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center ring-1 ring-white/20 flex-shrink-0">
+                        <CheckCircle2 size={18} className="text-white" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-bold text-white">{title}</p>
+                        <p className="text-[11px] text-white/70 mt-0.5 font-mono truncate max-w-[220px]">{subtitle}</p>
+                    </div>
+                </div>
+                <div className="p-5">
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                        Catatan Audit <span className="text-gray-400 font-normal">(opsional)</span>
+                    </label>
+                    <textarea
+                        autoFocus
+                        rows={3}
+                        placeholder="Kondisi barang, hasil audit, dll"
+                        value={notes}
+                        onChange={e => onNotesChange(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white transition resize-none"
+                    />
+                    <div className="flex gap-2 mt-5">
+                        <button onClick={onCancel} disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                            Batal
+                        </button>
+                        <button onClick={onConfirm} disabled={loading}
+                            className="flex-1 h-10 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25">
+                            {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle2 size={15} />}
+                            Konfirmasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function SoConfirmModal({
     unit, notes, onNotesChange, onConfirm, onCancel, loading,
 }: {
@@ -1177,10 +1522,18 @@ export default function AccessoryUnitsPage() {
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+    const [showBulkEditUnitsModal, setShowBulkEditUnitsModal] = useState(false); // ✅ bulk edit unit tercentang
     const [soingId, setSoingId] = useState<string | null>(null);
     const [soHistoryTarget, setSoHistoryTarget] = useState<AccessoryUnit | null>(null);
+    const [auditHistoryTarget, setAuditHistoryTarget] = useState<AccessoryUnit | null>(null);
     const [soConfirmTarget, setSoConfirmTarget] = useState<AccessoryUnit | null>(null);
     const [soConfirmNotes, setSoConfirmNotes] = useState("");
+    // ── Audit per-unit (toggle, TTL 3 hari) ──
+    const [auditingId, setAuditingId] = useState<string | null>(null);
+    const [bulkAuditing, setBulkAuditing] = useState(false);
+    // Target modal catatan audit. kind "single" = 1 unit; "bulk" = unit tercentang.
+    const [auditConfirm, setAuditConfirm] = useState<{ kind: "single"; unit: AccessoryUnit } | { kind: "bulk" } | null>(null);
+    const [auditConfirmNotes, setAuditConfirmNotes] = useState("");
 
     // Confirm
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -1193,6 +1546,10 @@ export default function AccessoryUnitsPage() {
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
+    const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
+    // Unit yang barcodenya sedang dibuka (null = tidak ada). Simpan objeknya
+    // di state supaya referensinya stabil untuk BarcodeModal.
+    const [barcodeUnit, setBarcodeUnit] = useState<AccessoryUnit | null>(null);
 
     useEffect(() => {
         getAuthUser().then(u => {
@@ -1203,7 +1560,9 @@ export default function AccessoryUnitsPage() {
         }).catch(() => setUserRoles([]));
     }, []);
 
-    useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterCondition, searchSN]);
+    // ✅ FIX #2: searchSN DIHAPUS dari dependency — sama seperti di halaman laptop.
+    // Centang tidak lagi hilang saat mengetik pencarian SN berikutnya.
+    useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterCondition]);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -1248,18 +1607,23 @@ export default function AccessoryUnitsPage() {
                 selling_price: accessory?.sell_price ?? 0,
                 notes: "",
             }));
-            const res = await fetch(`/api/accessory-units/bulk`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ accessory_id: accessoryId, units: unitsToCreate }),
-            });
-            const json = await res.json();
-            if (!json.success) {
-                setAutoGenFailed(true);
-                toast.error(json.message || "Gagal migrasi otomatis stok lama");
+            const { inserted, failed, message } = await postUnitsInChunks(accessoryId, unitsToCreate);
+            if (failed > 0) {
+                if (inserted > 0) {
+                    // Sebagian sudah masuk, jadi tabel tidak kosong lagi dan tombol "Coba Lagi"
+                    // tidak akan muncul. Sisa dibuat lewat "Tambah Banyak".
+                    toast.error(
+                        `${inserted} unit berhasil dibuat, ${failed} gagal${message ? ` (${message})` : ""}. ` +
+                        `Tambahkan sisa ${failed} unit lewat "Tambah Banyak".`
+                    );
+                    fetchData();
+                } else {
+                    setAutoGenFailed(true);
+                    toast.error(message || "Gagal migrasi otomatis stok lama");
+                }
                 return;
             }
-            toast.success(`${json.count} unit otomatis dibuat dari stok lama — klik "Edit" tiap unit untuk isi SN aslinya`);
+            toast.success(`${inserted} unit otomatis dibuat dari stok lama — klik "Edit" tiap unit untuk isi SN aslinya`);
             fetchData();
         } catch {
             setAutoGenFailed(true);
@@ -1291,6 +1655,8 @@ export default function AccessoryUnitsPage() {
         total: activeUnits.length,
         tersedia: activeUnits.filter(u => u.status === "TERSEDIA").length,
         reserved: activeUnits.filter(u => u.status === "RESERVED").length,
+        belumSiap: activeUnits.filter(u => u.status === "BELUM_SIAP").length,
+        minusSiapJual: activeUnits.filter(u => u.status === "MINUS_SIAP_JUAL").length,
         terjual: units.filter(u => u.status === "TERJUAL").length,
         baru: activeUnits.filter(u => u.condition === "BARU").length,
         bekas: activeUnits.filter(u => u.condition === "BEKAS").length,
@@ -1298,6 +1664,11 @@ export default function AccessoryUnitsPage() {
 
     // ── Filter ──
     const filteredUnits = units.filter(u => {
+        // Unit KELUAR = sudah diambil lewat Pengambilan Barang → hidden dari
+        // Kelola Unit (muncul lagi otomatis setelah di-Restore di Pengambilan
+        // Barang, karena status balik ke TERSEDIA). Konsisten dgn stok induk
+        // yang juga tidak menghitung KELUAR.
+        if (u.status === "KELUAR") return false;
         if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
         if (filterCondition !== "ALL" && u.condition !== filterCondition) return false;
         if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
@@ -1338,10 +1709,19 @@ export default function AccessoryUnitsPage() {
 
     const openEdit = (unit: AccessoryUnit) => {
         setEditingUnit(unit);
+        // unit.status bertipe string bebas (bisa RESERVED/HELD/PACKING/KELUAR
+        // dari sistem). Form cuma kenal 5 nilai → normalisasi: TERJUAL tetap
+        // (jadi badge read-only), 3 status manual dipertahankan, sisanya jatuh
+        // ke TERSEDIA (Siap Jual).
+        const formStatus: typeof EMPTY_UNIT_FORM["status"] =
+            unit.status === "TERJUAL" ? "TERJUAL" :
+                unit.status === "BELUM_SIAP" ? "BELUM_SIAP" :
+                    unit.status === "MINUS_SIAP_JUAL" ? "MINUS_SIAP_JUAL" :
+                        "TERSEDIA";
         setFormData({
             serial_number: unit.serial_number,
             condition: unit.condition,
-            status: unit.status,
+            status: formStatus,
             buy_price: fmtInput(unit.buy_price),
             selling_price: fmtInput(unit.selling_price),
             notes: unit.notes ?? "",
@@ -1460,6 +1840,87 @@ export default function AccessoryUnitsPage() {
         }
     };
 
+    // ── Klik tombol audit per-baris ──
+    // Belum teraudit → buka modal catatan dulu. Sudah teraudit → langsung batal
+    // (tanpa modal, sesuai keputusan). Eksekusi sebenarnya di runAudit().
+    const onAuditClick = (unit: AccessoryUnit) => {
+        if (!canManageSo) return;
+        if (isAuditActive(unit.audited_at)) {
+            runAudit(unit, ""); // batalkan langsung, tanpa catatan
+        } else {
+            setAuditConfirmNotes("");
+            setAuditConfirm({ kind: "single", unit });
+        }
+    };
+
+    // Eksekusi audit 1 unit (kirim notes ke endpoint — tersimpan ke riwayat).
+    const runAudit = async (unit: AccessoryUnit, note: string) => {
+        if (!canManageSo) return;
+        setAuditingId(unit.id);
+        try {
+            const res = await fetch(`/api/accessory-units/${unit.id}/audit`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal update audit");
+            setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, audited_at: json.data.audited_at, audited_by: json.data.audited_by } : u));
+            toast.success("Status audit diperbarui");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal update audit");
+        } finally {
+            setAuditingId(null);
+        }
+    };
+
+    // ── Klik "Audit N Unit" di bulk bar → buka modal catatan dulu (1 catatan
+    //    dipakai untuk semua unit tercentang). Eksekusi di runBulkAudit(). ──
+    const onBulkAuditClick = () => {
+        if (selectedIds.size === 0) return;
+        const targets = units.filter(
+            u => selectedIds.has(u.id) && u.status !== "TERJUAL" && !isAuditActive(u.audited_at)
+        );
+        if (targets.length === 0) {
+            toast.success("Semua unit terpilih sudah teraudit");
+            return;
+        }
+        setAuditConfirmNotes("");
+        setAuditConfirm({ kind: "bulk" });
+    };
+
+    // "Selalu tandai": skip unit yang sudah teraudit aktif supaya endpoint
+    // toggle tidak membatalkannya. notes yang sama dikirim ke tiap unit.
+    const runBulkAudit = async (note: string) => {
+        const targets = units.filter(
+            u => selectedIds.has(u.id) && u.status !== "TERJUAL" && !isAuditActive(u.audited_at)
+        );
+        if (targets.length === 0) return;
+        setBulkAuditing(true);
+        try {
+            const results = await Promise.all(
+                targets.map(async (u) => {
+                    try {
+                        const res = await fetch(`/api/accessory-units/${u.id}/audit`, {
+                            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+                        });
+                        const json = await res.json().catch(() => null);
+                        return res.ok && json?.success !== false;
+                    } catch {
+                        return false;
+                    }
+                })
+            );
+            const failed = results.filter(ok => !ok).length;
+            if (failed > 0) toast.error(`${failed} dari ${targets.length} unit gagal diaudit. Sisanya berhasil.`);
+            else toast.success(`${targets.length} unit berhasil ditandai teraudit`);
+            setSelectedIds(new Set());
+            fetchData();
+        } catch {
+            toast.error("Gagal mengaudit beberapa unit");
+        } finally {
+            setBulkAuditing(false);
+        }
+    };
+
     const buyVal = parseRupiah(buyInput);
     const sellVal = parseRupiah(sellInput);
     const marginPreview = sellVal - buyVal;
@@ -1535,8 +1996,8 @@ export default function AccessoryUnitsPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {[
                             { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: <Package size={16} /> },
-                            { label: "Tersedia", value: counts.tersedia, color: "text-emerald-600", icon: <CheckCircle2 size={16} /> },
-                            { label: "Reserved", value: counts.reserved, color: "text-amber-600", icon: <Lock size={16} /> },
+                            { label: "Siap Jual", value: counts.tersedia, color: "text-emerald-600", icon: <CheckCircle2 size={16} /> },
+                            { label: "Minus Siap Jual", value: counts.minusSiapJual, color: "text-amber-600", icon: <Lock size={16} /> },
                             { label: "Terjual", value: counts.terjual, color: "text-gray-500", icon: <Wallet size={16} /> },
                         ].map(stat => (
                             <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
@@ -1577,8 +2038,9 @@ export default function AccessoryUnitsPage() {
                         <div className="flex flex-wrap gap-1.5">
                             {[
                                 { value: "ALL", label: "Semua Status", count: units.length },
-                                { value: "TERSEDIA", label: "Tersedia", count: counts.tersedia },
-                                { value: "RESERVED", label: "Reserved", count: counts.reserved },
+                                { value: "TERSEDIA", label: "Siap Jual", count: counts.tersedia },
+                                { value: "BELUM_SIAP", label: "Belum Siap Jual", count: counts.belumSiap },
+                                { value: "MINUS_SIAP_JUAL", label: "Minus Siap Jual", count: counts.minusSiapJual },
                                 { value: "TERJUAL", label: "Terjual", count: counts.terjual },
                             ].map(opt => (
                                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
@@ -1656,6 +2118,29 @@ export default function AccessoryUnitsPage() {
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 transition">Batal pilih</button>
+                                {canManageUnits && (
+                                    <button onClick={() => setShowBulkEditUnitsModal(true)} disabled={bulkDeleting || bulkAuditing}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-50 transition disabled:opacity-50">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Edit {selectedIds.size} Unit
+                                    </button>
+                                )}
+                                {/* Audit Terpilih — tandai teraudit semua unit tercentang.
+                                    Yang sudah teraudit di-skip (tidak dibatalkan). */}
+                                {canManageSo && (
+                                    <button onClick={onBulkAuditClick} disabled={bulkDeleting || bulkAuditing}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
+                                        {bulkAuditing ? (
+                                            <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengaudit...</>
+                                        ) : (
+                                            <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                            </svg>Audit {selectedIds.size} Unit</>
+                                        )}
+                                    </button>
+                                )}
                                 <button onClick={handleBulkDelete} disabled={bulkDeleting}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50">
                                     {bulkDeleting
@@ -1669,7 +2154,7 @@ export default function AccessoryUnitsPage() {
                         </div>
                     )}
 
-                                       {/* Table */}
+                    {/* Table */}
                     {isLoading || autoGenerating ? (
                         <SkeletonUnits />
                     ) : filteredUnits.length === 0 ? (
@@ -1729,6 +2214,7 @@ export default function AccessoryUnitsPage() {
                                             {canSeePrivate && <Th right>Margin</Th>}
                                             <Th>Status</Th>
                                             <Th center>SO</Th>
+                                            <Th center>Audit</Th>
                                             <Th right>Aksi</Th>
                                         </tr>
                                     </thead>
@@ -1782,41 +2268,72 @@ export default function AccessoryUnitsPage() {
                                                             }
                                                         </td>
                                                     )}
-                                                                                                <td className="px-4 py-3 whitespace-nowrap">
-                                                {s && (
-                                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                                                        {s.label}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-center whitespace-nowrap">
-                                                {unit.status !== "TERJUAL" ? (
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        {canManageSo ? (
-                                                            <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(unit); }} disabled={soingId === unit.id}
-                                                                title={isSoActive(unit.so_at) ? `Di-SO oleh ${unit.so_by ?? "—"} · klik untuk tandai ulang` : "Tandai sudah SO hari ini"}
-                                                                className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
-                                                                {isSoActive(unit.so_at) ? "Sudah di SO" : "Tandai SO"}
-                                                            </button>
-                                                        ) : (
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
-                                                                {isSoActive(unit.so_at) ? "Sudah di SO" : "Belum SO"}
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        {s && (
+                                                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                                                                {s.label}
                                                             </span>
                                                         )}
-                                                        <button onClick={() => setSoHistoryTarget(unit)} title="Riwayat SO"
-                                                            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
-                                                            <History size={13} />
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-gray-300 text-xs">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    {unit.status !== "TERJUAL" && canManageUnits && (
-                                                        <button onClick={() => openEdit(unit)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                        {unit.status !== "TERJUAL" ? (
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                {canManageSo ? (
+                                                                    <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(unit); }} disabled={soingId === unit.id}
+                                                                        title={isSoActive(unit.so_at) ? `Di-SO oleh ${unit.so_by ?? "—"} · klik untuk tandai ulang` : "Tandai sudah SO hari ini"}
+                                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
+                                                                        {isSoActive(unit.so_at) ? "Sudah di SO" : "Tandai SO"}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
+                                                                        {isSoActive(unit.so_at) ? "Sudah di SO" : "Belum SO"}
+                                                                    </span>
+                                                                )}
+                                                                <button onClick={() => setSoHistoryTarget(unit)} title="Riwayat SO"
+                                                                    className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
+                                                                    <History size={13} />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                        {unit.status !== "TERJUAL" ? (
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                {canManageSo ? (
+                                                                    <button onClick={() => onAuditClick(unit)} disabled={auditingId === unit.id}
+                                                                        title={isAuditActive(unit.audited_at) ? `Diaudit oleh ${unit.audited_by ?? "—"} · klik untuk batalkan` : "Tandai sudah diaudit"}
+                                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isAuditActive(unit.audited_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}>
+                                                                        {isAuditActive(unit.audited_at) ? "Teraudit" : "Audit"}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${isAuditActive(unit.audited_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                                        {isAuditActive(unit.audited_at) ? "Teraudit" : "Belum"}
+                                                                    </span>
+                                                                )}
+                                                                <button onClick={() => setAuditHistoryTarget(unit)} title="Riwayat audit"
+                                                                    className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
+                                                                    <History size={13} />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            {/* Barcode hanya untuk unit yang SN-nya asli. SN placeholder
+                                                        "ISI-SN-..." belum boleh dibarcode — isi SN dulu. */}
+                                                            {canViewBarcode && !unit.serial_number.startsWith("ISI-SN-") && (
+                                                                <button onClick={() => setBarcodeUnit(unit)} title="Cetak Barcode"
+                                                                    className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
+                                                                    Barcode
+                                                                </button>
+                                                            )}
+                                                            {unit.status !== "TERJUAL" && canManageUnits && (
+                                                                <button onClick={() => openEdit(unit)}
                                                                     className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
                                                                     Edit
                                                                 </button>
@@ -1910,19 +2427,18 @@ export default function AccessoryUnitsPage() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {(["TERSEDIA", "RESERVED"] as const).map(s => (
-                                                <button key={s} type="button"
-                                                    onClick={() => setFormData(p => ({ ...p, status: s }))}
-                                                    className={`py-2.5 px-3 rounded-xl text-left border-2 transition-all ${formData.status === s
-                                                        ? s === "TERSEDIA" ? "border-emerald-500 bg-emerald-50" : "border-amber-500 bg-amber-50"
-                                                        : "border-gray-200 bg-white hover:border-gray-300"
-                                                        }`}>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === s ? (s === "TERSEDIA" ? "bg-emerald-500" : "bg-amber-400") : "bg-gray-300"}`} />
-                                                        <p className={`text-xs font-bold ${formData.status === s ? (s === "TERSEDIA" ? "text-emerald-700" : "text-amber-700") : "text-gray-600"}`}>
-                                                            {s === "TERSEDIA" ? "Tersedia" : "Reserved"}
-                                                        </p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {([
+                                                { v: "TERSEDIA", l: "Siap Jual", dot: "bg-emerald-500", on: "border-emerald-500 bg-emerald-50", txt: "text-emerald-700" },
+                                                { v: "BELUM_SIAP", l: "Belum Siap Jual", dot: "bg-orange-400", on: "border-orange-500 bg-orange-50", txt: "text-orange-700" },
+                                                { v: "MINUS_SIAP_JUAL", l: "Minus Siap Jual", dot: "bg-amber-400", on: "border-amber-500 bg-amber-50", txt: "text-amber-700" },
+                                            ] as const).map(o => (
+                                                <button key={o.v} type="button"
+                                                    onClick={() => setFormData(p => ({ ...p, status: o.v }))}
+                                                    className={`py-2.5 px-2 rounded-xl text-left border-2 transition-all ${formData.status === o.v ? o.on : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === o.v ? o.dot : "bg-gray-300"}`} />
+                                                        <p className={`text-[11px] font-bold leading-tight ${formData.status === o.v ? o.txt : "text-gray-600"}`}>{o.l}</p>
                                                     </div>
                                                 </button>
                                             ))}
@@ -1999,12 +2515,13 @@ export default function AccessoryUnitsPage() {
                 />
             )}
 
-            {/* ── Bulk Edit SN Modal ── */}
-            {showBulkEditModal && (
-                <BulkEditSNModal
-                    units={units}
-                    onClose={() => setShowBulkEditModal(false)}
-                    onSuccess={fetchData}
+            {/* ── Bulk Edit Units Modal (unit tercentang) ── */}
+            {showBulkEditUnitsModal && (
+                <BulkEditUnitsModal
+                    units={units.filter(u => selectedIds.has(u.id) && u.status !== "TERJUAL")}
+                    canSeePrivate={canSeePrivate}
+                    onClose={() => setShowBulkEditUnitsModal(false)}
+                    onSuccess={() => { setShowBulkEditUnitsModal(false); setSelectedIds(new Set()); fetchData(); }}
                 />
             )}
 
@@ -2020,6 +2537,26 @@ export default function AccessoryUnitsPage() {
                 <SoHistoryModal unit={soHistoryTarget} onClose={() => setSoHistoryTarget(null)} />
             )}
 
+            {auditHistoryTarget && (
+                <AuditHistoryModal unit={auditHistoryTarget} onClose={() => setAuditHistoryTarget(null)} />
+            )}
+
+            {barcodeUnit && (
+                <BarcodeModal
+                    laptopId={accessoryId}
+                    laptopName={accessory?.name ?? "Aksesoris"}
+                    itemType="ACCESSORY"
+                    presetUnit={{
+                        id: barcodeUnit.id,
+                        serial_number: barcodeUnit.serial_number,
+                        selling_price: barcodeUnit.selling_price,
+                        status: barcodeUnit.status,
+                        condition: barcodeUnit.condition,
+                    }}
+                    onClose={() => setBarcodeUnit(null)}
+                />
+            )}
+
             {soConfirmTarget && (
                 <SoConfirmModal
                     unit={soConfirmTarget}
@@ -2030,6 +2567,28 @@ export default function AccessoryUnitsPage() {
                     onConfirm={async () => {
                         await toggleSo(soConfirmTarget, soConfirmNotes);
                         setSoConfirmTarget(null);
+                    }}
+                />
+            )}
+
+            {auditConfirm && (
+                <AuditConfirmModal
+                    title={auditConfirm.kind === "bulk" ? `Audit ${selectedIds.size} Unit` : "Tandai Sudah Diaudit"}
+                    subtitle={auditConfirm.kind === "single" ? auditConfirm.unit.serial_number : `${selectedIds.size} unit terpilih`}
+                    notes={auditConfirmNotes}
+                    onNotesChange={setAuditConfirmNotes}
+                    loading={auditConfirm.kind === "single" ? auditingId === auditConfirm.unit.id : bulkAuditing}
+                    onCancel={() => {
+                        const busy = auditConfirm.kind === "single" ? auditingId === auditConfirm.unit.id : bulkAuditing;
+                        if (!busy) setAuditConfirm(null);
+                    }}
+                    onConfirm={async () => {
+                        if (auditConfirm.kind === "single") {
+                            await runAudit(auditConfirm.unit, auditConfirmNotes);
+                        } else {
+                            await runBulkAudit(auditConfirmNotes);
+                        }
+                        setAuditConfirm(null);
                     }}
                 />
             )}

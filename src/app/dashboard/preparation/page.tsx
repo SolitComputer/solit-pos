@@ -5,7 +5,8 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import { supabase } from "@/services/supabase";
-import { startLoopingSound, stopLoopingSound, unlockAudio } from "@/lib/preparationSound";
+import { startLoopingSound, stopLoopingSound, unlockAudio, isAudioUnlocked }
+  from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
 import { isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
 import { Clock, AlertCircle, Inbox, Camera, X, CheckCircle2, CalendarDays, Package, Wrench, Truck, FileText, Bike, List } from "lucide-react";
@@ -209,12 +210,19 @@ function CreateModal({
   const [salesChannel, setSalesChannel] = useState<"MANUAL" | "ECOMMERCE">("MANUAL");
   const [ecommercePlatform, setEcommercePlatform] = useState<"SHOPEE" | "TOKOPEDIA" | "TIKTOK" | "LAZADA" | "">("");
   const [dealPrice, setDealPrice] = useState("");
+  // Jenis item untuk SN yang DIKETIK/SCAN manual. Pencarian sendiri sudah
+  // mengembalikan laptop & aksesoris sekaligus (lihat unit_type), jadi toggle
+  // ini hanya menandai input manual yang jenisnya tak bisa ditebak dari teks SN.
+  const [itemKind, setItemKind] = useState<"laptop" | "accessory">("laptop");
   const [items, setItems] = useState<
     {
       serial_number: string;
-      laptop_name?: string;
+      item_type: "laptop" | "accessory";
+      laptop_name?: string;        // dipakai juga sbg nama tampil aksesoris
       laptop_id?: string;
-      unit_id?: string;
+      accessory_id?: string;
+      unit_id?: string;            // laptop_units.id
+      accessory_unit_id?: string;  // accessory_units.id
     }[]
   >([]);
   const [snSearch, setSnSearch] = useState("");
@@ -248,30 +256,41 @@ function CreateModal({
   );
 
   const addUnit = (u: any) => {
+    const isAcc = u.unit_type === "accessory" || !!u.accessory_id;
     setItems((prev) => [
       ...prev,
-      {
-        serial_number: u.serial_number,
-        laptop_name: u.laptop_name ?? undefined,
-        laptop_id: u.laptop_id ?? undefined,
-        unit_id: u.id ?? undefined,
-      },
+      isAcc
+        ? {
+          serial_number: u.serial_number,
+          item_type: "accessory",
+          laptop_name: u.laptop_name ?? u.accessory_name ?? undefined,
+          accessory_id: u.accessory_id ?? u.laptop_id ?? undefined,
+          accessory_unit_id: u.id ?? undefined,
+        }
+        : {
+          serial_number: u.serial_number,
+          item_type: "laptop",
+          laptop_name: u.laptop_name ?? undefined,
+          laptop_id: u.laptop_id ?? undefined,
+          unit_id: u.id ?? undefined,
+        },
     ]);
     setSnSearch("");
     setSnResults([]);
   };
- const addManual = () => {
+  const addManual = () => {
     const sn = manualSN.trim();
     if (!sn) return;
     // SENGAJA TIDAK cek duplikat — business rule mengizinkan SN yang sama
     // diinput berkali-kali pada fase persiapan (tidak memengaruhi stok).
-    setItems((prev) => [...prev, { serial_number: sn }]);
+    // item_type ikut toggle aktif; nama & id-nya di-resolve backend dari SN.
+    setItems((prev) => [...prev, { serial_number: sn, item_type: itemKind }]);
     setManualSN("");
   };
   const removeItem = (idx: number) =>
     setItems((prev) => prev.filter((_, i) => i !== idx));
 
-   const submit = async () => {
+  const submit = async () => {
     setError("");
     if (!customerName.trim()) {
       setError("Nama customer wajib diisi");
@@ -449,6 +468,20 @@ function CreateModal({
                 </span>
               )}
             </div>
+
+            {/* Jenis untuk input MANUAL/scan. Pencarian di bawah tetap
+                menampilkan laptop & aksesoris sekaligus. */}
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <button type="button" onClick={() => setItemKind("laptop")}
+                className={`h-9 rounded-2xl text-xs font-bold border transition ${itemKind === "laptop" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
+                Laptop
+              </button>
+              <button type="button" onClick={() => setItemKind("accessory")}
+                className={`h-9 rounded-2xl text-xs font-bold border transition ${itemKind === "accessory" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
+                Aksesoris
+              </button>
+            </div>
+
             <div className="relative">
               <input
                 value={snSearch}
@@ -475,11 +508,13 @@ function CreateModal({
                     <p className="font-mono text-sm font-bold text-slate-800">
                       {u.serial_number}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {u.laptop_name}
-                      {u.grade ? ` · Grade ${u.grade}` : ""}
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${u.unit_type === "accessory" ? "text-emerald-700 bg-emerald-50 border border-emerald-200" : "text-slate-600 bg-slate-100 border border-slate-200"}`}>
+                        {u.unit_type === "accessory" ? "AKSESORIS" : "LAPTOP"}
+                      </span>
+                      <span className="truncate">{u.laptop_name}{u.grade ? ` · Grade ${u.grade}` : ""}</span>
                     </p>
-                                        {u.in_other_preparation && (
+                    {u.in_other_preparation && (
                       <p className="text-[10px] text-amber-600 font-semibold mt-0.5">
                         ⚠ Sedang dipakai di penyiapan lain — masih boleh dipilih
                       </p>
@@ -532,8 +567,11 @@ function CreateModal({
                     className="flex items-center justify-between bg-slate-50/50 border border-slate-100 rounded-2xl px-4 py-2.5 hover:bg-slate-50 hover:border-slate-200 transition"
                   >
                     <div className="min-w-0">
-                      <p className="font-mono text-xs font-bold text-slate-800">
+                      <p className="font-mono text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         {it.serial_number}
+                        {it.item_type === "accessory" && (
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">AKSESORIS</span>
+                        )}
                       </p>
                       {it.laptop_name && (
                         <p className="text-[10px] text-slate-500 truncate">{it.laptop_name}</p>
@@ -582,7 +620,7 @@ function CreateModal({
                 const clean = sn.trim();
                 // SENGAJA TIDAK cek duplikat, sama seperti addManual di atas.
                 if (clean) {
-                  setItems((prev) => [...prev, { serial_number: clean }]);
+                  setItems((prev) => [...prev, { serial_number: clean, item_type: itemKind }]);
                 }
               }}
               onClose={() => setShowBarcode(false)}
@@ -773,12 +811,27 @@ export default function PreparationPage() {
   }, []);
 
   useEffect(() => {
+    // Sengaja TIDAK self-remove kayak sebelumnya. AudioContext bisa
+    // ke-suspend ULANG oleh browser (HP dikunci/tab background), jadi kita
+    // coba resume di SETIAP interaksi user, bukan cuma sekali di awal.
     const unlock = () => {
-      unlockAudio();
-      window.removeEventListener("pointerdown", unlock);
+      if (!isAudioUnlocked()) unlockAudio();
     };
-    window.addEventListener("pointerdown", unlock);
-    return () => window.removeEventListener("pointerdown", unlock);
+    const events: (keyof WindowEventMap)[] = ["pointerdown", "touchstart", "keydown"];
+    events.forEach((ev) => window.addEventListener(ev, unlock));
+
+    // Begitu tab/PWA balik keliatan lagi (mis. HP dibuka dari layar kunci),
+    // langsung coba resume juga — supaya pas notif masuk, context udah
+    // siap tanpa nunggu user sempat tap dulu.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") unlock();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      events.forEach((ev) => window.removeEventListener(ev, unlock));
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   useEffect(() => {
@@ -1082,7 +1135,7 @@ export default function PreparationPage() {
   return (
     <DashboardLayout>
       <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
-               {toast && (
+        {toast && (
           <div
             onClick={dismissToast}
             role="button"
@@ -1294,113 +1347,113 @@ export default function PreparationPage() {
             ))}
           </div>
 
-              {canDone && (sc?.menunggu ?? 0) > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center gap-4">
-                  <AlertCircle className="w-8 h-8 inline text-gray-500" />
-                  <div>
-                    <p className="text-sm font-bold text-amber-800">
-                      {sc?.menunggu} penyiapan menunggu diproses
-                    </p>
-                    <p className="text-xs text-amber-600 mt-0.5">
-                      Total {sc?.unit_menunggu ?? 0} unit perlu disiapkan
-                    </p>
-                  </div>
-                </div>
-              )}
+          {canDone && (sc?.menunggu ?? 0) > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center gap-4">
+              <AlertCircle className="w-8 h-8 inline text-gray-500" />
+              <div>
+                <p className="text-sm font-bold text-amber-800">
+                  {sc?.menunggu} penyiapan menunggu diproses
+                </p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  Total {sc?.unit_menunggu ?? 0} unit perlu disiapkan
+                </p>
+              </div>
+            </div>
+          )}
 
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4 sticky top-2 z-20">
-                <div className="flex flex-wrap gap-1.5">
-                  {TABS.map((t) => (
-                    <button
-                      key={t.value}
-                      onClick={() => setStatusFilter(t.value)}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${statusFilter === t.value
-                        ? "bg-[#1a1a2e] text-white shadow-sm"
-                        : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
-                        }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="relative">
-                  <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4 sticky top-2 z-20">
+            <div className="flex flex-wrap gap-1.5">
+              {TABS.map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => setStatusFilter(t.value)}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${statusFilter === t.value
+                    ? "bg-[#1a1a2e] text-white shadow-sm"
+                    : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                    }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="relative">
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+              />
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-44 bg-white rounded-2xl border border-gray-100 animate-pulse" />
+              ))}
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 py-20 text-center">
+              <div className="flex justify-center mb-4 opacity-40"><Inbox className="w-12 h-12" /></div>
+              <p className="text-gray-500 text-sm font-medium">
+                {debouncedSearch || statusFilter !== "ALL" || !allTime
+                  ? "Tidak ada penyiapan yang cocok di periode/filter ini"
+                  : "Belum ada penyiapan barang"}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {orders.map((o) => (
+                  <OrderCard
+                    key={o.id}
+                    o={o}
+                    canReceive={canDone}
+                    receivingId={receivingId}
+                    onReceive={handleReceive}
+                    isNew={newIds.has(o.id)}
                   />
-                </div>
+                ))}
               </div>
 
-              {isLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-44 bg-white rounded-2xl border border-gray-100 animate-pulse" />
-                  ))}
-                </div>
-              ) : orders.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-gray-100 py-20 text-center">
-                  <div className="flex justify-center mb-4 opacity-40"><Inbox className="w-12 h-12" /></div>
-                  <p className="text-gray-500 text-sm font-medium">
-                    {debouncedSearch || statusFilter !== "ALL" || !allTime
-                      ? "Tidak ada penyiapan yang cocok di periode/filter ini"
-                      : "Belum ada penyiapan barang"}
+              {total > PAGE_SIZE && (
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <p className="text-xs text-gray-400">
+                    Halaman <span className="font-bold text-gray-600">{page}</span> dari{" "}
+                    {totalPages} · {total} total
                   </p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {orders.map((o) => (
-                      <OrderCard
-                        key={o.id}
-                        o={o}
-                        canReceive={canDone}
-                        receivingId={receivingId}
-                        onReceive={handleReceive}
-                        isNew={newIds.has(o.id)}
-                      />
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={page <= 1 || isLoading}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="h-9 px-4 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition"
+                    >
+                      ← Sebelumnya
+                    </button>
+                    <button
+                      disabled={page >= totalPages || isLoading}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      className="h-9 px-4 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition"
+                    >
+                      Berikutnya →
+                    </button>
                   </div>
-
-                  {total > PAGE_SIZE && (
-                    <div className="flex items-center justify-between gap-3 pt-2">
-                      <p className="text-xs text-gray-400">
-                        Halaman <span className="font-bold text-gray-600">{page}</span> dari{" "}
-                        {totalPages} · {total} total
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          disabled={page <= 1 || isLoading}
-                          onClick={() => setPage((p) => Math.max(1, p - 1))}
-                          className="h-9 px-4 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition"
-                        >
-                          ← Sebelumnya
-                        </button>
-                        <button
-                          disabled={page >= totalPages || isLoading}
-                          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                          className="h-9 px-4 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition"
-                        >
-                          Berikutnya →
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </>
+                </div>
               )}
+            </>
+          )}
         </div>
       </main>
 

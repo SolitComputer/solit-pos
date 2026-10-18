@@ -32,13 +32,21 @@ interface ItemOutflow {
     // ── Khusus row hasil penjualan (sumber: accessory_outflows) ──
     status?: "active" | "cancelled";
     transaction_invoice?: string | null;
+    unit_id?: string | null;        // ✅ unit SN yang diambil
+    serial_number?: string | null;  // ✅ SN untuk tampilan "nama - SN" & pencarian
+    read_only?: boolean;            // ✅ baris dari sistem (service) — aksi audit/restore disembunyikan
 }
+
+interface AccOpt { unit_id: string; serial_number: string; accessory_id: string; accessory_name: string; buy_price: number; }
+interface LapOpt { unit_id: string; serial_number: string; laptop_id: string; laptop_name: string; purchase_price: number; }
 
 interface MasterItem {
     kind: ItemKind;
     id: string;
     name: string;
     meta?: string;
+    unit_id?: string | null;        // ✅ unit SN; null = barang stok manual tanpa SN
+    serial_number?: string | null;  // ✅ SN unit
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -186,7 +194,8 @@ export default function OutflowsContent() {
                 if (
                     !row.item_name.toLowerCase().includes(q) &&
                     !row.person_name.toLowerCase().includes(q) &&
-                    !row.purpose.toLowerCase().includes(q)
+                    !row.purpose.toLowerCase().includes(q) &&
+                    !(row.serial_number ?? "").toLowerCase().includes(q) // ✅ SN
                 ) return false;
             }
             return true;
@@ -240,7 +249,7 @@ export default function OutflowsContent() {
                         <input
                             value={searchText}
                             onChange={e => setSearchText(e.target.value)}
-                            placeholder="Cari barang, nama, kebutuhan…"
+                            placeholder="Cari barang, nama, kebutuhan, SN…"
                             className="w-full pl-8 pr-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400"
                         />
                     </div>
@@ -389,7 +398,7 @@ export default function OutflowsContent() {
                                                 <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded border ${KIND_BADGE[row.item_kind]}`}>
                                                     {KIND_LABEL[row.item_kind]}
                                                 </span>
-                                                <span className="text-gray-700">{row.item_name}</span>
+                                                <span className="text-gray-700">{row.item_name}{row.serial_number ? ` - ${row.serial_number}` : ""}</span>
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate" title={row.purpose}>
@@ -401,8 +410,8 @@ export default function OutflowsContent() {
 
                                         {/* ── Kolom Audit ── */}
                                         <td className="px-4 py-3 text-center">
-                                            {row.outflow_type === "TRANSAKSI" ? (
-                                                <span className="text-[11px] text-gray-300" title="Tercatat otomatis dari transaksi — tidak ada audit manual di sini">—</span>
+                                            {row.outflow_type === "TRANSAKSI" || row.read_only ? (
+                                                <span className="text-[11px] text-gray-300" title="Tercatat otomatis dari sistem — tidak ada audit manual di sini">—</span>
                                             ) : (
                                                 <button
                                                     onClick={() => toggleAudit(row.id)}
@@ -444,7 +453,9 @@ export default function OutflowsContent() {
 
                                         {/* ── Kolom Restore ── */}
                                         <td className="px-4 py-3 text-center">
-                                            {row.is_restored ? (
+                                            {row.read_only ? (
+                                                <span className="text-[11px] text-gray-300" title="Dikelola dari halaman Servis — stok dikembalikan otomatis saat servis dibatalkan">—</span>
+                                            ) : row.is_restored ? (
                                                 <span
                                                     title={`Dikembalikan oleh ${row.restored_by ?? "—"} · ${row.restored_at ? formatDate(row.restored_at) : ""}`}
                                                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-sky-50 text-sky-700 border-sky-200"
@@ -522,7 +533,7 @@ export default function OutflowsContent() {
     );
 }
 
-// ── Modal Form ──────────────────────────────────────────────────────────────
+// ── Modal Form (Kebutuhan: aksesoris keluar → modal pindah ke laptop) ────────
 function OutflowFormModal({
     currentUserName, onClose, onSuccess,
 }: {
@@ -530,51 +541,63 @@ function OutflowFormModal({
     onClose: () => void;
     onSuccess: () => void;
 }) {
-    const [type, setType] = useState<OutflowType>("SERVICE");
-    const [selected, setSelected] = useState<MasterItem | null>(null);
-    const [purpose, setPurpose] = useState("");
-    const [nominal, setNominal] = useState("");
+    // Sumber: SN aksesoris yang keluar
+    const [accSearch, setAccSearch] = useState("");
+    const [accResults, setAccResults] = useState<AccOpt[]>([]);
+    const [accSel, setAccSel] = useState<AccOpt | null>(null);
+    const [accSearching, setAccSearching] = useState(false);
+
+    // Tujuan: SN laptop yang menerima modal
+    const [lapSearch, setLapSearch] = useState("");
+    const [lapResults, setLapResults] = useState<LapOpt[]>([]);
+    const [lapSel, setLapSel] = useState<LapOpt | null>(null);
+    const [lapSearching, setLapSearching] = useState(false);
+
     const [submitting, setSubmitting] = useState(false);
 
-    const [options, setOptions] = useState<MasterItem[]>([]);
-    const [optLoading, setOptLoading] = useState(true);
-    const [search, setSearch] = useState("");
-    const [comboOpen, setComboOpen] = useState(false);
-
+    // Debounced search aksesoris (by SN)
     useEffect(() => {
-        (async () => {
+        if (accSel) return;
+        const q = accSearch.trim();
+        if (q.length < 2) { setAccResults([]); return; }
+        const t = setTimeout(async () => {
+            setAccSearching(true);
             try {
-                const res = await fetch("/api/item-outflows/options");
+                const res = await fetch(`/api/accessory-units/search-sn?q=${encodeURIComponent(q)}`);
                 const json = await res.json();
-                if (!res.ok || !json.success) throw new Error(json.message);
-                setOptions(json.data as MasterItem[]);
-            } catch { toast.error("Gagal memuat daftar barang"); }
-            finally { setOptLoading(false); }
-        })();
-    }, []);
+                if (json.success) {
+                    setAccResults((json.data as any[]).map(d => ({
+                        unit_id: d.id,
+                        serial_number: d.serial_number,
+                        accessory_id: d.accessory_id,
+                        accessory_name: d.accessory_name ?? "Aksesoris",
+                        buy_price: Math.round(Number(d.buy_price ?? 0)),
+                    })));
+                }
+            } catch { /* abaikan */ } finally { setAccSearching(false); }
+        }, 400);
+        return () => clearTimeout(t);
+    }, [accSearch, accSel]);
 
-    const filtered = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        const base = q
-            ? options.filter(o =>
-                o.name.toLowerCase().includes(q) ||
-                (o.meta ?? "").toLowerCase().includes(q)
-            )
-            : options;
-        return base.slice(0, 40);
-    }, [search, options]);
-
-    const selectItem = (opt: MasterItem) => {
-        setSelected(opt); setSearch(opt.name); setComboOpen(false);
-    };
+    // Debounced search laptop tujuan (by SN)
+    useEffect(() => {
+        if (lapSel) return;
+        const q = lapSearch.trim();
+        if (q.length < 2) { setLapResults([]); return; }
+        const t = setTimeout(async () => {
+            setLapSearching(true);
+            try {
+                const res = await fetch(`/api/units/search-sn-kebutuhan?q=${encodeURIComponent(q)}`);
+                const json = await res.json();
+                if (json.success) setLapResults(json.data as LapOpt[]);
+            } catch { /* abaikan */ } finally { setLapSearching(false); }
+        }, 400);
+        return () => clearTimeout(t);
+    }, [lapSearch, lapSel]);
 
     const handleSubmit = async () => {
-        if (!selected) return toast.error("Barang wajib dipilih dari daftar");
-        if (!purpose.trim()) return toast.error("Kebutuhan wajib diisi");
-        if (type === "SERVICE") {
-            const n = Number(nominal);
-            if (!Number.isFinite(n) || n < 0) return toast.error("Nominal biaya tidak valid");
-        }
+        if (!accSel) return toast.error("SN aksesoris (keluar) wajib dipilih");
+        if (!lapSel) return toast.error("SN laptop tujuan wajib dipilih");
 
         setSubmitting(true);
         try {
@@ -582,17 +605,20 @@ function OutflowFormModal({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    outflow_type: type,
-                    item_kind: selected.kind,
-                    item_ref_id: selected.id,
-                    item_name: selected.name,
-                    purpose: purpose.trim(),
-                    nominal: type === "SERVICE" ? Number(nominal) : null,
+                    outflow_type: "KEBUTUHAN",
+                    accessory_id: accSel.accessory_id,
+                    accessory_unit_id: accSel.unit_id,
+                    accessory_name: accSel.accessory_name,
+                    accessory_sn: accSel.serial_number,
+                    laptop_id: lapSel.laptop_id,
+                    laptop_unit_id: lapSel.unit_id,
+                    laptop_name: lapSel.laptop_name,
+                    laptop_sn: lapSel.serial_number,
                 }),
             });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan");
-            toast.success("Pengambilan barang berhasil dicatat");
+            toast.success("Kebutuhan dicatat — modal aksesoris pindah ke laptop");
             onSuccess();
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Terjadi kesalahan");
@@ -609,7 +635,7 @@ function OutflowFormModal({
                 onClick={e => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-                    <h3 className="text-base font-bold text-gray-900">Tambah Pengambilan Barang</h3>
+                    <h3 className="text-base font-bold text-gray-900">Pengambilan Barang (Kebutuhan)</h3>
                     <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -618,20 +644,6 @@ function OutflowFormModal({
                 </div>
 
                 <div className="p-5 space-y-4">
-                    {/* Tipe */}
-                    <div>
-                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Tipe Pengambilan</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {(["SERVICE", "KEBUTUHAN"] as OutflowType[]).map(t => (
-                                <button key={t} type="button" onClick={() => setType(t)}
-                                    className={`py-2.5 rounded-xl text-sm font-semibold border transition
-                    ${type === t ? "bg-zinc-900 text-white border-zinc-900 shadow-sm" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
-                                    {TYPE_LABEL[t]}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
                     {/* Nama read-only */}
                     <div>
                         <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Nama</label>
@@ -641,60 +653,92 @@ function OutflowFormModal({
                         </div>
                     </div>
 
-                    {/* Barang autocomplete */}
+                    {/* SN Aksesoris (keluar) */}
                     <div className="relative">
-                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Barang</label>
-                        <input
-                            value={search}
-                            onChange={e => { setSearch(e.target.value); setComboOpen(true); setSelected(null); }}
-                            onFocus={() => setComboOpen(true)}
-                            placeholder={optLoading ? "Memuat daftar barang…" : "Cari laptop / aksesoris…"}
-                            disabled={optLoading}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:bg-gray-50"
-                        />
-                        {comboOpen && !optLoading && (
-                            <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
-                                {filtered.length === 0 ? (
-                                    <div className="px-3.5 py-3 text-sm text-gray-400">Barang tidak ditemukan</div>
-                                ) : filtered.map(opt => (
-                                    <button key={`${opt.kind}-${opt.id}`} type="button" onClick={() => selectItem(opt)}
-                                        className="w-full text-left px-3.5 py-2.5 hover:bg-gray-50 transition flex items-center gap-2">
-                                        <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded border flex-shrink-0 ${KIND_BADGE[opt.kind]}`}>
-                                            {KIND_LABEL[opt.kind]}
-                                        </span>
-                                        <span className="min-w-0">
-                                            <span className="block text-sm text-gray-800 truncate">{opt.name}</span>
-                                            {opt.meta && <span className="block text-[11px] text-gray-400 truncate">{opt.meta}</span>}
-                                        </span>
+                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">
+                            SN Aksesoris (keluar) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                            <input
+                                value={accSearch}
+                                onChange={e => { setAccSearch(e.target.value); setAccSel(null); }}
+                                placeholder="Cari SN aksesoris…"
+                                className="w-full px-3.5 py-2.5 pr-8 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                            />
+                            {accSel && (
+                                <button onClick={() => { setAccSel(null); setAccSearch(""); }}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-sm">✕</button>
+                            )}
+                        </div>
+                        {!accSel && accSearch.trim().length >= 2 && (
+                            <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+                                {accSearching ? (
+                                    <div className="px-3.5 py-3 text-sm text-gray-400">Mencari…</div>
+                                ) : accResults.length === 0 ? (
+                                    <div className="px-3.5 py-3 text-sm text-gray-400">SN tidak ditemukan / stok habis</div>
+                                ) : accResults.map(o => (
+                                    <button key={o.unit_id} type="button" onClick={() => { setAccSel(o); setAccSearch(`${o.accessory_name} - ${o.serial_number}`); setAccResults([]); }}
+                                        className="w-full text-left px-3.5 py-2.5 hover:bg-gray-50 transition">
+                                        <span className="block text-sm text-gray-800">{o.serial_number}</span>
+                                        <span className="block text-[11px] text-gray-400">{o.accessory_name} · Modal {rupiah(o.buy_price)}</span>
                                     </button>
                                 ))}
                             </div>
                         )}
-                        {selected && (
+                        {accSel && (
                             <p className="mt-1 text-[11px] text-emerald-600 font-medium">
-                                Terpilih: [{KIND_LABEL[selected.kind]}] {selected.name}
+                                {accSel.accessory_name} — SN {accSel.serial_number} · Modal {rupiah(accSel.buy_price)}
                             </p>
                         )}
                     </div>
 
-                    {/* Kebutuhan */}
-                    <div>
-                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Kebutuhan</label>
-                        <textarea value={purpose} onChange={e => setPurpose(e.target.value)} rows={2}
-                            placeholder={type === "SERVICE" ? "Keterangan kebutuhan service…" : "Alasan pemakaian internal…"}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-400" />
+                    {/* SN Laptop (tujuan) */}
+                    <div className="relative">
+                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">
+                            SN Laptop (tujuan) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                            <input
+                                value={lapSearch}
+                                onChange={e => { setLapSearch(e.target.value); setLapSel(null); }}
+                                placeholder="Cari SN laptop tujuan…"
+                                className="w-full px-3.5 py-2.5 pr-8 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                            />
+                            {lapSel && (
+                                <button onClick={() => { setLapSel(null); setLapSearch(""); }}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-sm">✕</button>
+                            )}
+                        </div>
+                        {!lapSel && lapSearch.trim().length >= 2 && (
+                            <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+                                {lapSearching ? (
+                                    <div className="px-3.5 py-3 text-sm text-gray-400">Mencari…</div>
+                                ) : lapResults.length === 0 ? (
+                                    <div className="px-3.5 py-3 text-sm text-gray-400">SN laptop tidak ditemukan</div>
+                                ) : lapResults.map(o => (
+                                    <button key={o.unit_id} type="button" onClick={() => { setLapSel(o); setLapSearch(`${o.laptop_name} - ${o.serial_number}`); setLapResults([]); }}
+                                        className="w-full text-left px-3.5 py-2.5 hover:bg-gray-50 transition">
+                                        <span className="block text-sm text-gray-800">{o.serial_number}</span>
+                                        <span className="block text-[11px] text-gray-400">{o.laptop_name} · Modal {rupiah(o.purchase_price)}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {lapSel && (
+                            <p className="mt-1 text-[11px] text-emerald-600 font-medium">
+                                {lapSel.laptop_name} — SN {lapSel.serial_number}
+                            </p>
+                        )}
                     </div>
 
-                    {/* Nominal — SERVICE only */}
-                    {type === "SERVICE" && (
-                        <div>
-                            <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Nominal (Biaya)</label>
-                            <div className="relative">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
-                                <input type="number" min={0} value={nominal} onChange={e => setNominal(e.target.value)}
-                                    placeholder="0"
-                                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-gray-200 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-zinc-400" />
-                            </div>
+                    {/* Preview transfer */}
+                    {accSel && lapSel && (
+                        <div className={`text-[12px] rounded-xl px-3 py-2.5 border ${accSel.buy_price > 0 ? "bg-zinc-50 border-zinc-200 text-zinc-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+                            {accSel.buy_price > 0 ? (
+                                <>Modal <b>{rupiah(accSel.buy_price)}</b> akan pindah dari aksesoris → ditambahkan ke modal laptop tujuan. Jurnal: <b>D130 / K170</b>.</>
+                            ) : (
+                                <>Modal SN aksesoris ini <b>Rp0</b> — transfer modal & jurnal tidak akan terbuat. Cek harga modal unit aksesoris dulu.</>
+                            )}
                         </div>
                     )}
                 </div>

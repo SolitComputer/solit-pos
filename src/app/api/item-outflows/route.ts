@@ -5,21 +5,21 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { ITEM_OUTFLOW_ROLES, expandRolesWithParents } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
+import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
 
 const VALID_TYPES = ["SERVICE", "KEBUTUHAN"] as const;
 type OutflowType = (typeof VALID_TYPES)[number];
 
-const VALID_KINDS = ["LAPTOP", "ACCESSORY"] as const;
-type ItemKind = (typeof VALID_KINDS)[number];
 
 async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
-    try {
+        try {
         const { searchParams } = new URL(req.url);
         const type = searchParams.get("type");
 
         const wantsAll = !type || type === "ALL";
         const wantsItemOutflows = wantsAll || (VALID_TYPES as readonly string[]).includes(type as string);
         const wantsTransaksi = wantsAll || type === "TRANSAKSI";
+        const wantsService = wantsAll || type === "SERVICE";
 
         // ── Bagian 1: pengambilan manual (SERVICE / KEBUTUHAN) — dari item_outflows ──
         let manualRows: any[] = [];
@@ -179,8 +179,59 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
             }
         }
 
-        const combined = [...manualRows, ...transaksiRows, ...transaksiLaptopRows].sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        // ── Bagian 4: sparepart SERVICE (dari accessory_outflows source=service) ──
+        let serviceRows: any[] = [];
+        if (wantsService) {
+            const { data: svcOutflows, error: svcErr } = await supabaseAdmin
+                .from("accessory_outflows")
+                .select("id, accessory_id, unit_id, qty, status, service_id, notes, created_at, is_audited, audited_by, audited_at")
+                .eq("source_type", "service")
+                .eq("status", "active")
+                .order("created_at", { ascending: false });
+
+            if (svcErr) {
+                console.error("[item-outflows][GET] gagal ambil accessory_outflows (service):", svcErr.message);
+            } else if (svcOutflows && svcOutflows.length > 0) {
+                const accIds = [...new Set(svcOutflows.map((o) => o.accessory_id).filter(Boolean))];
+                const unitIds = [...new Set(svcOutflows.map((o) => o.unit_id).filter(Boolean))];
+                const serviceIds = [...new Set(svcOutflows.map((o) => o.service_id).filter(Boolean))];
+
+                const [{ data: accs }, { data: unitRows }, { data: svcs }] = await Promise.all([
+                    accIds.length ? supabaseAdmin.from("accessories").select("id, name").in("id", accIds) : Promise.resolve({ data: [] as any[] }),
+                    unitIds.length ? supabaseAdmin.from("accessory_units").select("id, serial_number").in("id", unitIds) : Promise.resolve({ data: [] as any[] }),
+                    serviceIds.length ? supabaseAdmin.from("service_orders").select("id, nama").in("id", serviceIds) : Promise.resolve({ data: [] as any[] }),
+                ]);
+                const accNameMap = new Map((accs ?? []).map((a: any) => [a.id, a.name]));
+                const unitSnMap = new Map((unitRows ?? []).map((u: any) => [u.id, u.serial_number]));
+                const svcNameMap = new Map((svcs ?? []).map((s: any) => [s.id, s.nama]));
+
+                serviceRows = svcOutflows.map((o: any) => ({
+                    id: o.id,
+                    outflow_type: "SERVICE",
+                    person_name: svcNameMap.get(o.service_id) ?? "—",
+                    item_kind: "ACCESSORY",
+                    item_ref_id: o.accessory_id,
+                    item_name: accNameMap.get(o.accessory_id) ?? "Aksesoris",
+                    purpose: o.notes ?? "Sparepart service",
+                    nominal: null,
+                    is_audited: Boolean(o.is_audited),
+                    audited_by: o.audited_by ?? null,
+                    audited_at: o.audited_at ?? null,
+                    is_restored: false,
+                    restored_by: null,
+                    restored_at: null,
+                    created_by_name: null,
+                    created_by_role: null,
+                    created_at: o.created_at,
+                    status: o.status,
+                    serial_number: unitSnMap.get(o.unit_id) ?? null,
+                    read_only: true, // dikelola dari halaman Servis → tidak diaudit/restore dari sini
+                }));
+            }
+        }
+
+        const combined = [...manualRows, ...transaksiRows, ...transaksiLaptopRows, ...serviceRows].sort(
+                        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
         return NextResponse.json({ success: true, data: combined });
@@ -190,7 +241,7 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
     }
 }
 
-// ── POST ──────────────────────────────────────────────────────────────────
+// ── POST — Kebutuhan: aksesoris keluar → modal pindah ke laptop tujuan ──────
 async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
     try {
         const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
@@ -203,95 +254,66 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         }
 
         const body = await req.json();
+        const accessory_id = body.accessory_id || null;
+        const accessory_unit_id = body.accessory_unit_id || null;
+        const accessory_name = String(body.accessory_name ?? "").trim();
+        const accessory_sn = body.accessory_sn ? String(body.accessory_sn).trim() : null;
+        const laptop_id = body.laptop_id || null;
+        const laptop_unit_id = body.laptop_unit_id || null;
+        const laptop_name = String(body.laptop_name ?? "").trim();
+        const laptop_sn = body.laptop_sn ? String(body.laptop_sn).trim() : null;
 
-        const outflow_type = String(body.outflow_type ?? "").toUpperCase() as OutflowType;
-        const item_kind = String(body.item_kind ?? "").toUpperCase() as ItemKind;
-        const item_ref_id = body.item_ref_id || null;
-        const item_name = String(body.item_name ?? "").trim();
-        const purpose = String(body.purpose ?? "").trim();
-        const person_name = user.name; // ← selalu dari akun, bukan body
-
-        // ── Validasi ──────────────────────────────────────────────────────────
-        if (!VALID_TYPES.includes(outflow_type)) {
-            return NextResponse.json(
-                { success: false, message: "Tipe pengambilan tidak valid" },
-                { status: 400 }
-            );
+        if (!accessory_unit_id || !accessory_id) {
+            return NextResponse.json({ success: false, message: "Unit aksesoris (SN) wajib dipilih" }, { status: 400 });
         }
-        if (!VALID_KINDS.includes(item_kind)) {
-            return NextResponse.json(
-                { success: false, message: "Jenis barang tidak valid" },
-                { status: 400 }
-            );
-        }
-        if (!item_name) {
-            return NextResponse.json(
-                { success: false, message: "Barang wajib dipilih" },
-                { status: 400 }
-            );
-        }
-        if (!purpose) {
-            return NextResponse.json(
-                { success: false, message: "Kebutuhan wajib diisi" },
-                { status: 400 }
-            );
+        if (!laptop_unit_id || !laptop_id) {
+            return NextResponse.json({ success: false, message: "Unit laptop tujuan (SN) wajib dipilih" }, { status: 400 });
         }
 
-        let nominal: number | null = null;
-        if (outflow_type === "SERVICE") {
-            const n = Math.round(Number(body.nominal));
-            if (!Number.isFinite(n) || n < 0) {
-                return NextResponse.json(
-                    { success: false, message: "Nominal biaya tidak valid" },
-                    { status: 400 }
-                );
-            }
-            nominal = n;
+        // ── Validasi unit aksesoris + ambil modal (buy_price per-SN, fallback induk) ──
+        const { data: accUnit } = await supabaseAdmin
+            .from("accessory_units")
+            .select("id, status, buy_price")
+            .eq("id", accessory_unit_id)
+            .single();
+        if (!accUnit || accUnit.status !== "TERSEDIA") {
+            return NextResponse.json({ success: false, message: "Unit aksesoris sudah tidak tersedia" }, { status: 400 });
+        }
+        let modal = Math.round(Number(accUnit.buy_price ?? 0));
+        if (modal <= 0) {
+            const { data: accParent } = await supabaseAdmin.from("accessories").select("buy_price").eq("id", accessory_id).single();
+            modal = Math.round(Number(accParent?.buy_price ?? 0));
         }
 
-        // ── Cek stok sebelum insert ───────────────────────────────────────────
-        // Pastikan stok tersedia agar tidak jadi negatif.
-        if (item_ref_id) {
-            if (item_kind === "ACCESSORY") {
-                const { data: acc } = await supabaseAdmin
-                    .from("accessories")
-                    .select("stock")
-                    .eq("id", item_ref_id)
-                    .single();
-
-                if (!acc || Number(acc.stock) < 1) {
-                    return NextResponse.json(
-                        { success: false, message: "Stok aksesoris tidak mencukupi" },
-                        { status: 400 }
-                    );
-                }
-            } else if (item_kind === "LAPTOP") {
-                const { data: lp } = await supabaseAdmin
-                    .from("laptops")
-                    .select("qty")
-                    .eq("id", item_ref_id)
-                    .single();
-
-                if (!lp || Number(lp.qty) < 1) {
-                    return NextResponse.json(
-                        { success: false, message: "Stok laptop tidak mencukupi" },
-                        { status: 400 }
-                    );
-                }
-            }
+        // ── Validasi unit laptop tujuan (harus aktif) ──
+        const { data: lapUnit } = await supabaseAdmin
+            .from("laptop_units")
+            .select("id, status, purchase_price")
+            .eq("id", laptop_unit_id)
+            .single();
+        if (!lapUnit || lapUnit.status === "SOLD" || lapUnit.status === "KELUAR") {
+            return NextResponse.json({ success: false, message: "Unit laptop tujuan tidak valid / sudah keluar" }, { status: 400 });
         }
 
-        // ── Insert pengambilan ────────────────────────────────────────────────
+        const purpose = `${accessory_name || "Aksesoris"} - ${accessory_sn ?? "—"} · Pindah ke ${laptop_name || "Laptop"} - ${laptop_sn ?? "—"}`;
+
+        // ── Catat pengambilan (item_outflows) ──
         const { data, error } = await supabase
             .from("item_outflows")
             .insert({
-                outflow_type,
-                person_name,
-                item_kind,
-                item_ref_id,
-                item_name,
+                outflow_type: "KEBUTUHAN",
+                person_name: user.name,
+                item_kind: "ACCESSORY",
+                item_ref_id: accessory_id,
+                item_name: accessory_name || "Aksesoris",
+                unit_id: accessory_unit_id,
+                serial_number: accessory_sn,
                 purpose,
-                nominal,
+                nominal: modal,
+                dest_unit_id: laptop_unit_id,
+                dest_serial_number: laptop_sn,
+                dest_item_name: laptop_name || "Laptop",
+                dest_laptop_id: laptop_id,
                 created_by: user.id,
                 created_by_name: user.name,
                 created_by_role: user.role,
@@ -300,59 +322,27 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             .single();
 
         if (error) {
-            return NextResponse.json(
-                { success: false, message: error.message },
-                { status: 400 }
-            );
+            return NextResponse.json({ success: false, message: error.message }, { status: 400 });
         }
 
-        // ── Kurangi stok 1 unit ───────────────────────────────────────────────
-        // Dilakukan SETELAH insert berhasil supaya kalau pengurangan gagal
-        // kita bisa tahu ada data yang masuk tapi stok belum terkurangi
-        // (lebih mudah di-debug vs rollback kompleks).
-        if (item_ref_id) {
-            if (item_kind === "ACCESSORY") {
-                // Pakai RPC yang sudah ada di sistem (decrement_accessory_stock)
-                const { error: rpcErr } = await supabaseAdmin.rpc(
-                    "decrement_accessory_stock",
-                    { p_accessory_id: item_ref_id, p_qty: 1 }
-                );
-                if (rpcErr) {
-                    // Pengambilan sudah tercatat — log warning, jangan fail response
-                    console.error("[item-outflows] Gagal kurangi stok aksesoris:", rpcErr.message);
-                }
-            } else if (item_kind === "LAPTOP") {
-                // Kurangi qty laptop langsung (sama seperti sync-units)
-                const { error: lpErr } = await supabaseAdmin.rpc(
-                    "decrement_laptop_qty",
-                    { p_laptop_id: item_ref_id, p_qty: 1 }
-                );
-                if (lpErr) {
-                    // ✅ FIX (race condition): dulu read-modify-write polos (baca qty,
-                    // lalu tulis qty-1) — dua pengambilan bersamaan bisa baca qty yang
-                    // sama sebelum salah satu sempat menulis, jadi qty kurang terpotong.
-                    // Sekarang pakai compare-and-swap: tulis cuma berhasil kalau qty
-                    // masih persis seperti saat dibaca, kalau gagal coba baca ulang.
-                    for (let attempt = 0; attempt < 5; attempt++) {
-                        const { data: currentLp } = await supabaseAdmin
-                            .from("laptops")
-                            .select("qty")
-                            .eq("id", item_ref_id)
-                            .single();
-                        if (!currentLp) break;
+        // ── Aksesoris KELUAR + hitung ulang stok induk ──
+        await supabaseAdmin
+            .from("accessory_units")
+            .update({ status: "KELUAR" })
+            .eq("id", accessory_unit_id)
+            .eq("status", "TERSEDIA");
+        await recalcAccessoryParentStock(supabaseAdmin, accessory_id);
 
-                        const { data: casRows } = await supabaseAdmin
-                            .from("laptops")
-                            .update({ qty: Math.max(0, Number(currentLp.qty) - 1) })
-                            .eq("id", item_ref_id)
-                            .eq("qty", currentLp.qty)
-                            .select("id");
+        // ── Modal aksesoris PINDAH ke modal laptop tujuan (purchase_price += modal) ──
+        const newPurchase = Math.round(Number(lapUnit.purchase_price ?? 0)) + modal;
+        await supabaseAdmin
+            .from("laptop_units")
+            .update({ purchase_price: newPurchase })
+            .eq("id", laptop_unit_id);
 
-                        if (casRows && casRows.length > 0) break;
-                    }
-                }
-            }
-        }
+        // Jurnal TIDAK dibuat instan di sini — entry Kebutuhan ini muncul sebagai
+        // draft PENDING di Jurnal Umum (buildItemOutflowKebutuhanDrafts), baru
+        // masuk jurnal umum setelah dikonfirmasi.
 
         await logActivity({
             userId: user.id,
@@ -361,17 +351,14 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             action: "CREATE",
             entity: "item_outflow",
             entityId: data.id,
-            entityLabel: `${data.item_name} — ${data.outflow_type}`,
+            entityLabel: purpose,
             afterData: data,
         });
 
         return NextResponse.json({ success: true, data });
     } catch (err) {
         console.error("[item-outflows][POST]", err);
-        return NextResponse.json(
-            { success: false, message: "Terjadi kesalahan server" },
-            { status: 500 }
-        );
+        return NextResponse.json({ success: false, message: "Terjadi kesalahan server" }, { status: 500 });
     }
 }
 

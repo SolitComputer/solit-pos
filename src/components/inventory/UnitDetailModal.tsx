@@ -11,6 +11,9 @@
 
 import { useEffect, useState } from "react";
 import { useRegisterOverlay } from "@/contexts/OverlayContext";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 
 export interface UnitDetailData {
     id: string;
@@ -25,6 +28,8 @@ export interface UnitDetailData {
     official_price?: number;
     status: string;
     notes: string;
+    condition_checks?: ConditionChecks | null;
+    kelengkapan?: string | null;
     created_at: string;
 }
 
@@ -42,6 +47,8 @@ interface Props {
     canManageUnit?: boolean;
     /** Boleh lihat Sumber, Harga Modal, Margin, Tanggal Masuk */
     canSeePrivate: boolean;
+    /** Boleh isi/ubah checklist Tes Kondisi unit (default false kalau tidak dikirim) */
+    canEditChecklist?: boolean;
     onClose: () => void;
     onSaved: (updated: UnitDetailData) => void;
     /** Opsional: tombol "Info Laptop" (nama/CPU/RAM) — hanya dari Data Barang */
@@ -62,6 +69,7 @@ const GRADE_STYLE: Record<string, { badge: string; desc: string }> = {
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
+    MINUS_SIAP_JUAL: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", label: "Minus Siap Jual" },
     BELUM_SIAP: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Belum Siap" },
     SERVICE: { badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500", label: "Service" },
     RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
@@ -72,7 +80,8 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
 
 // Status yang boleh dipilih manual. RESERVED/HELD/PACKING/SOLD digerakkan
 // oleh alur transaksi, bukan diedit tangan dari sini.
-const EDITABLE_STATUS = ["SIAP_JUAL", "BELUM_SIAP", "SERVICE"] as const;
+// "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual / dibikin payment.
+const EDITABLE_STATUS = ["SIAP_JUAL", "MINUS_SIAP_JUAL", "BELUM_SIAP"] as const;
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 const fmtDate = (iso: string) =>
@@ -96,7 +105,7 @@ const inputCls =
 const OFFICIAL_PRICE_MARKUP = 300_000;
 
 export default function UnitDetailModal({
-    unit, laptopName, laptopMeta, laptopSpecs, canEdit, canManageUnit, canSeePrivate, onClose, onSaved, onEditLaptop,
+    unit, laptopName, laptopMeta, laptopSpecs, canEdit, canManageUnit, canSeePrivate, canEditChecklist = false, onClose, onSaved, onEditLaptop,
     defaultSellingPrice, onCreated, onBack,
 }: Props) {
     useRegisterOverlay();
@@ -118,8 +127,12 @@ export default function UnitDetailModal({
         official_price: String(unit.official_price ?? 0),
         status: unit.status ?? "SIAP_JUAL",
         notes: unit.notes ?? "",
+        kelengkapan: unit.kelengkapan ?? "",
         received_at: toDateInput(unit.created_at),
     });
+    const [conditionChecks, setConditionChecks] = useState<ConditionChecks>(
+        () => sanitizeConditionChecks(unit.condition_checks)
+    );
 
     //  Mode "Tambah Unit" — supaya menambah unit baru tetap terjadi DI DALAM
     //  pop-up ini (tidak pindah halaman), khusus untuk kasus stok = 1 yang
@@ -138,6 +151,7 @@ export default function UnitDetailModal({
         official_price: "0",
         status: "SIAP_JUAL",
         notes: "",
+        kelengkapan: "",
     });
     const [addForm, setAddForm] = useState(emptyAddForm);
 
@@ -181,6 +195,8 @@ export default function UnitDetailModal({
                     official_price: (Number(form.selling_price) || 0) + OFFICIAL_PRICE_MARKUP,
                     status: form.status,
                     notes: form.notes,
+                    kelengkapan: form.kelengkapan,
+                    ...(canEditChecklist ? { condition_checks: conditionChecks } : {}),
                     received_at: form.received_at ? new Date(form.received_at).toISOString() : undefined,
                 }),
             });
@@ -215,6 +231,7 @@ export default function UnitDetailModal({
                     official_price: (Number(addForm.selling_price) || 0) + OFFICIAL_PRICE_MARKUP,
                     status: addForm.status,
                     notes: addForm.notes,
+                    kelengkapan: addForm.kelengkapan,
                 }),
             });
             const result = await res.json();
@@ -316,19 +333,19 @@ export default function UnitDetailModal({
                                         </Field>
                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                             <Field label="Harga Modal">
-                                                <input type="number" min={0} value={addForm.purchase_price}
-                                                    onChange={e => setAdd("purchase_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                <CurrencyInput value={Number(addForm.purchase_price) || 0}
+                                                    onChange={(v) => setAdd("purchase_price", String(v))} className={`${inputCls} tabular-nums`} />
                                             </Field>
                                             <Field label="Biaya Sparepart">
-                                                <input type="number" min={0} value={addForm.sparepart_cost}
-                                                    onChange={e => setAdd("sparepart_cost", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                <CurrencyInput value={Number(addForm.sparepart_cost) || 0}
+                                                    onChange={(v) => setAdd("sparepart_cost", String(v))} className={`${inputCls} tabular-nums`} />
                                             </Field>
                                             <Field label="Harga Setor">
-                                                <input type="number" min={0} value={addForm.selling_price}
-                                                    onChange={e => setAdd("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                <CurrencyInput value={Number(addForm.selling_price) || 0}
+                                                    onChange={(v) => setAdd("selling_price", String(v))} className={`${inputCls} tabular-nums`} />
                                             </Field>
                                             <Field label="Harga Official">
-                                                <input type="number" value={(Number(addForm.selling_price) || 0) + OFFICIAL_PRICE_MARKUP} disabled
+                                                <CurrencyInput value={(Number(addForm.selling_price) || 0) + OFFICIAL_PRICE_MARKUP} onChange={() => {}} disabled
                                                     className={`${inputCls} tabular-nums bg-gray-100 text-gray-500 cursor-not-allowed`} />
                                                 <p className="text-[10px] text-gray-400 mt-1">Otomatis: Harga Setor + Rp 300.000</p>
                                             </Field>
@@ -336,6 +353,11 @@ export default function UnitDetailModal({
                                     </div>
                                 </Section>
                             )}
+
+                            <Section title="Kelengkapan">
+                                <input value={addForm.kelengkapan} onChange={e => setAdd("kelengkapan", e.target.value)}
+                                    placeholder="Contoh: Dus, charger, tas, mouse..." className={inputCls} />
+                            </Section>
 
                             <Section title="Catatan Tambahan">
                                 <textarea rows={2} value={addForm.notes} onChange={e => setAdd("notes", e.target.value)}
@@ -455,24 +477,24 @@ export default function UnitDetailModal({
                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                             <Field label="Harga Modal">
                                                 {isEditing ? (
-                                                    <input type="number" min={0} value={form.purchase_price}
-                                                        onChange={e => set("purchase_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                    <CurrencyInput value={Number(form.purchase_price) || 0}
+                                                        onChange={(v) => set("purchase_price", String(v))} className={`${inputCls} tabular-nums`} />
                                                 ) : (
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(modalNow)}</p>
                                                 )}
                                             </Field>
                                             <Field label="Biaya Sparepart">
                                                 {isEditing ? (
-                                                    <input type="number" min={0} value={form.sparepart_cost}
-                                                        onChange={e => set("sparepart_cost", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                    <CurrencyInput value={Number(form.sparepart_cost) || 0}
+                                                        onChange={(v) => set("sparepart_cost", String(v))} className={`${inputCls} tabular-nums`} />
                                                 ) : (
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(sparepartNow)}</p>
                                                 )}
                                             </Field>
                                            <Field label="Harga Setor">
                                                 {isEditing ? (
-                                                    <input type="number" min={0} value={form.selling_price}
-                                                        onChange={e => set("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                    <CurrencyInput value={Number(form.selling_price) || 0}
+                                                        onChange={(v) => set("selling_price", String(v))} className={`${inputCls} tabular-nums`} />
                                                 ) : (
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(jualNow)}</p>
                                                 )}
@@ -541,6 +563,28 @@ export default function UnitDetailModal({
                                 </p>
                             )}
 
+                            {/* Kelengkapan unit — teks bebas, tampil untuk semua role */}
+                            <Section title="Kelengkapan">
+                                {isEditing ? (
+                                    <input value={form.kelengkapan} onChange={e => set("kelengkapan", e.target.value)}
+                                        placeholder="Contoh: Dus, charger, tas, mouse..." className={inputCls} />
+                                ) : (
+                                    <p className="text-sm text-gray-700 leading-relaxed">
+                                        {unit.kelengkapan || <span className="text-gray-300">Belum diisi</span>}
+                                    </p>
+                                )}
+                            </Section>
+
+                            {/* Tes Kondisi per unit — tampil untuk semua role (read-only),
+                                hanya bisa diisi/diubah kalau canEditChecklist & mode edit */}
+                            <Section title="Tes Kondisi Unit">
+                                <ConditionChecklist
+                                    value={conditionChecks}
+                                    onChange={setConditionChecks}
+                                    readOnly={!isEditing || !canEditChecklist}
+                                />
+                            </Section>
+
                             {error && (
                                 <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2">
                                     <p className="text-xs text-red-700">{error}</p>
@@ -567,7 +611,7 @@ export default function UnitDetailModal({
                         </>
                     ) : isEditing ? (
                         <>
-                            <button onClick={() => { setIsEditing(false); setError(""); }} disabled={saving}
+                            <button onClick={() => { setIsEditing(false); setError(""); setConditionChecks(sanitizeConditionChecks(unit.condition_checks)); }} disabled={saving}
                                 className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">
                                 Batal
                             </button>

@@ -75,6 +75,8 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       status,
       notes,
       received_at,
+      condition_checks, // ← tes kondisi per unit (per SN)
+      kelengkapan,      // ← keterangan kelengkapan unit (teks bebas)
     } = body;
 
     // Cek duplikat SN sebelum insert.
@@ -107,6 +109,8 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         official_price: selling_price != null ? Math.round(Number(selling_price)) + OFFICIAL_PRICE_MARKUP : 0, // ← auto: Harga Setor + markup
         status,
         notes,
+        condition_checks: condition_checks ?? {},
+        kelengkapan: kelengkapan ?? null,
         ...(received_at ? { created_at: received_at } : {}),
       })
       .select()

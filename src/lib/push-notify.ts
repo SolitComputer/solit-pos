@@ -12,7 +12,6 @@ function initVapid() {
         console.warn("[push-notify] VAPID env belum diset — push notification dinonaktifkan");
         return false;
     }
-
     try {
         webpush.setVapidDetails(email, pubKey, privKey);
         return true;
@@ -33,9 +32,32 @@ export interface PushPayload {
     url?: string;
     requireInteraction?: boolean;
     silent?: boolean;
+    renotify?: boolean; // ✅ BARU: kalau notif diganti (tag sama), tetap bunyi sekali
 }
 
-// ─── Helper internal ───────────────────────────────────────────────────────────
+const DEFAULT_ICON = "/assets/solit03.jpeg";
+
+// ✅ Satu sumber kebenaran untuk bentuk notifikasi (dulu di-copy 4x)
+function buildNotification(payload: PushPayload): string {
+    return JSON.stringify({
+        title: payload.title,
+        body: payload.body,
+        icon: payload.icon ?? DEFAULT_ICON,
+        badge: payload.badge ?? DEFAULT_ICON,
+        // ✅ KUNCI "notif sekali aja": tag STABIL (tanpa timestamp).
+        // Notif dari percakapan yang sama akan saling menggantikan, bukan menumpuk.
+        // Caller yang menentukan tag-nya (mis. "group-chat-<id>" / "dm-<senderId>").
+        tag: payload.tag ?? "solit-chat",
+        // ✅ renotify: walau notif lama diganti, user tetap dialert 1x untuk pesan baru
+        // → tidak numpuk, tapi juga tidak ada yang kelewat.
+        renotify: payload.renotify ?? true,
+        requireInteraction: payload.requireInteraction ?? false,
+        silent: payload.silent ?? false,
+        data: { url: payload.url ?? "/dashboard/users" },
+    });
+}
+
+// ─── Helper internal: kirim + bersihkan subscription mati ───────────────────────
 async function sendAndCleanup(
     subs: Array<{ user_id?: string; endpoint: string; p256dh: string; auth: string }>,
     notification: string
@@ -74,13 +96,8 @@ async function sendAndCleanup(
     }
 }
 
-/**
- * Kirim push notification ke semua device dari satu user
- */
-export async function sendPushToUser(
-    userId: string,
-    payload: PushPayload
-): Promise<void> {
+/** Kirim push ke semua device dari SATU user (dipakai untuk DM). */
+export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
     if (!vapidReady) return;
 
     const { data: subs, error } = await supabaseAdmin
@@ -91,28 +108,12 @@ export async function sendPushToUser(
     if (error) { console.error("[push] DB error:", error.message); return; }
     if (!subs || subs.length === 0) return;
 
-    const notification = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon ?? "/assets/solit03.jpeg",
-        badge: payload.badge ?? "/assets/solit03.jpeg",
-        tag: payload.tag ?? `notif-${Date.now()}`,
-        requireInteraction: payload.requireInteraction ?? false,
-        silent: payload.silent ?? false,
-        data: { url: payload.url ?? "/dashboard/users" },
-    });
-
     console.log(`[push] Sending DM to user ${userId}, ${subs.length} device(s)`);
-    await sendAndCleanup(subs, notification);
+    await sendAndCleanup(subs, buildNotification(payload));
 }
 
-/**
- * Kirim push notification ke semua user kecuali sender (group broadcast)
- */
-export async function sendPushBroadcast(
-    excludeUserId: string,
-    payload: PushPayload
-): Promise<void> {
+/** Kirim push ke SEMUA user kecuali sender (broadcast grup default "All Team"). */
+export async function sendPushBroadcast(excludeUserId: string, payload: PushPayload): Promise<void> {
     if (!vapidReady) return;
 
     const { data: subs, error } = await supabaseAdmin
@@ -121,30 +122,15 @@ export async function sendPushBroadcast(
         .neq("user_id", excludeUserId);
 
     if (error) { console.error("[push] DB error:", error.message); return; }
-    if (!subs || subs.length === 0) {
-        console.log("[push] Tidak ada subscriber untuk broadcast");
-        return;
-    }
-
-    const notification = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon ?? "/favicon.ico",
-        badge: "/favicon.ico",
-        // ✅ Tag unik per broadcast agar tidak saling replace
-        tag: `${payload.tag ?? "notif"}-${Date.now()}`,
-        requireInteraction: payload.requireInteraction ?? false,
-        data: { url: payload.url ?? "/dashboard/users" },
-    });
+    if (!subs || subs.length === 0) { console.log("[push] Tidak ada subscriber untuk broadcast"); return; }
 
     console.log(`[push] Broadcasting ke ${subs.length} device(s)`);
-    await sendAndCleanup(subs, notification);
+    await sendAndCleanup(subs, buildNotification(payload));
 }
 
 /**
- * Kirim push notification ke sekumpulan user tertentu (kecuali sender).
- * Dipakai untuk chat grup NON-default: hanya anggota grup yang menerima notif,
- * bukan semua orang seperti sendPushBroadcast.
+ * Kirim push ke sekumpulan user tertentu (kecuali sender).
+ * Dipakai chat grup NON-default: hanya anggota grup yang menerima notif.
  */
 export async function sendPushToUserIds(
     userIds: string[],
@@ -164,47 +150,10 @@ export async function sendPushToUserIds(
     if (error) { console.error("[push] DB error:", error.message); return; }
     if (!subs || subs.length === 0) return;
 
-    const notification = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon ?? "/favicon.ico",
-        badge: "/favicon.ico",
-        tag: `${payload.tag ?? "notif"}-${Date.now()}`,
-        requireInteraction: payload.requireInteraction ?? false,
-        data: { url: payload.url ?? "/dashboard/users" },
-    });
-
     console.log(`[push] Sending to ${subs.length} device(s) of ${targetIds.length} member(s)`);
-    await sendAndCleanup(subs, notification);
+    await sendAndCleanup(subs, buildNotification(payload));
 }
 
-// ✅ Sama untuk sendPushToUser — tag unik per DM
-export async function sendPushToUsers(
-    userId: string,
-    payload: PushPayload
-): Promise<void> {
-    if (!vapidReady) return;
-
-    const { data: subs, error } = await supabaseAdmin
-        .from("push_subscriptions")
-        .select("endpoint, p256dh, auth")
-        .eq("user_id", userId);
-
-    if (error) { console.error("[push] DB error:", error.message); return; }
-    if (!subs || subs.length === 0) return;
-
-    const notification = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon ?? "/favicon.ico",
-        badge: "/favicon.ico",
-        // ✅ DM: tag per sender agar masih bisa group per orang
-        // tapi tetap unique dengan timestamp jika spam
-        tag: payload.tag ? `${payload.tag}-${Date.now()}` : `notif-${Date.now()}`,
-        requireInteraction: payload.requireInteraction ?? false,
-        data: { url: payload.url ?? "/dashboard/users" },
-    });
-
-    console.log(`[push] Sending to user ${userId}, ${subs.length} device(s)`);
-    await sendAndCleanup(subs, notification);
-}
+// ✅ Alias untuk kompatibilitas import lama. Perilakunya kini sama persis dengan
+// sendPushToUser (dulu fungsi kembar dengan icon berbeda — sudah disatukan).
+export const sendPushToUsers = sendPushToUser;

@@ -99,7 +99,7 @@ export const POST = withAuth(async (req: NextRequest) => {
 
     // Build rows
     const VALID_CONDITIONS = ["BARU", "BEKAS"];
-    const VALID_STATUSES = ["TERSEDIA", "RESERVED"];
+    const VALID_STATUSES = ["TERSEDIA", "BELUM_SIAP", "MINUS_SIAP_JUAL"];
 
     const rows = units.map((u) => ({
         accessory_id,

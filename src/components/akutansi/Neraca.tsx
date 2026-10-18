@@ -106,8 +106,59 @@ export default function Neraca({ period }: { period: string }) {
                 </div>
             )}
 
-            {/* ── Tabel Neraca Saldo ── */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* ── Mobile: kartu per akun, lebih gampang dibaca daripada tabel sempit ── */}
+            <div className="md:hidden space-y-2">
+                {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2 animate-pulse">
+                            <div className="h-3 bg-gray-100 rounded w-1/2" />
+                            <div className="h-3 bg-gray-100 rounded w-1/3" />
+                        </div>
+                    ))
+                ) : !data || data.rows.length === 0 ? (
+                    <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
+                        <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
+                        <p className="text-sm text-gray-500 font-medium">Belum ada saldo di periode ini</p>
+                        <p className="text-xs text-gray-400 mt-1 px-6">
+                            Konfirmasi jurnal di Jurnal Umum, atau input Saldo Awal Manual di Buku Besar dulu.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        {data.rows.map((r) => (
+                            <div key={r.code} className="bg-white rounded-xl border border-gray-200 p-3.5">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="text-[11px] font-mono font-bold text-gray-500">{r.code}</span>
+                                    {r.is_abnormal && (
+                                        <span className="inline-flex text-amber-500" title="Posisi saldo tidak wajar — cek Buku Besar akun ini">
+                                            <AlertTriangle className="w-3 h-3" />
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-[13px] text-gray-800 font-medium mb-2">{r.name}</p>
+                                <div className="flex items-center justify-between text-[12px] font-mono font-bold">
+                                    <span className={r.is_abnormal ? "text-red-600" : "text-blue-700"}>
+                                        D {r.debit > 0 ? rp(r.debit) : "—"}
+                                    </span>
+                                    <span className={r.is_abnormal ? "text-red-600" : "text-emerald-700"}>
+                                        K {r.kredit > 0 ? rp(r.kredit) : "—"}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                        <div className={`rounded-xl border-2 p-3.5 ${data.totals.balanced ? "border-gray-300 bg-gray-50" : "border-red-300 bg-red-50"}`}>
+                            <p className="text-xs font-bold text-gray-600 uppercase mb-2">Total</p>
+                            <div className="flex items-center justify-between text-sm font-black font-mono">
+                                <span className="text-blue-700">{rp(data.totals.debit)}</span>
+                                <span className="text-emerald-700">{rp(data.totals.kredit)}</span>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* ── Desktop/tablet: Tabel Neraca Saldo ── */}
+            <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse" style={{ minWidth: "640px" }}>
                         <thead>

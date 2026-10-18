@@ -49,8 +49,13 @@ export interface InventoryRow {
     sn: string | null;
     sn_note?: string;
 
+    /** Kelengkapan unit (teks bebas, mis. "Dus, charger, tas") — opt-in via showKelengkapan */
+    kelengkapan?: string | null;
+
     stok_tersisa: number;
     siap_jual: number;
+    /** Minus tapi sudah boleh dijual — kolom opt-in via showMinusSiapJual */
+    minus_siap_jual?: number;
     minus: number;
 
     is_audited?: boolean;
@@ -82,14 +87,28 @@ interface Props {
     canSeePrivate: boolean;
     /** Boleh lihat kolom ST & M (agregat stok internal) */
     canSeeStock: boolean;
+    /** Tampilkan kolom MSJ (Minus Siap Jual) — opt-in, dipakai halaman Units */
+    showMinusSiapJual?: boolean;
     /** Tampilkan kolom Modal Sparepart (opt-in — hanya Data Barang) */
     showSparepart?: boolean;
     /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
     showTotalJual?: boolean;
+    /** Tampilkan kolom Kelengkapan unit (opt-in — halaman Units) */
+    showKelengkapan?: boolean;
     /** Label kolom tanggal — default "Tanggal Masuk", dipakai "Tanggal Terjual" di tab Terjual */
     dateColumnLabel?: string;
     onRowClick?: (row: InventoryRow) => void;
     renderActions?: (row: InventoryRow) => React.ReactNode;
+    /** Checkbox pilih-unit (opt-in — hanya halaman Kelola Unit). Kalau ketiga
+     *  prop ini tidak dikirim, kolom checkbox TIDAK muncul sama sekali — jadi
+     *  halaman lain (Data Barang/Ready/Minus) tetap seperti semula. */
+    selectedIds?: Set<string>;
+    onToggleSelect?: (id: string) => void;
+    onToggleSelectAll?: () => void;
+    /** true = semua baris tampil tercentang (untuk checkbox header) */
+    allSelected?: boolean;
+    /** true = sebagian tercentang (indeterminate di header) */
+    someSelected?: boolean;
     /** Render kolom Audit di samping Aksi (opt-in — Data Barang) */
     renderAudit?: (row: InventoryRow) => React.ReactNode;
     /** Render kolom SO (Stock Opname) — independen dari Audit (opt-in — Data Barang) */
@@ -117,7 +136,7 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
-type SortKey = "NAMA" | "CATEGORY" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "TOTAL_MODAL" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "SO" | "AKSI";
+type SortKey = "NAMA" | "CATEGORY" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "TOTAL_MODAL" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MSJ" | "MINUS" | "AUDIT" | "SO" | "AKSI";
 //  Badge "NEW" — dipakai di kolom Nama Laptop saat row.is_new === true.
 //  Nilai is_new sudah dihitung di pemanggil (LaptopsContent.tsx / ready/page.tsx),
 //  jadi komponen ini murni presentasional, tidak menghitung TTL sendiri.
@@ -144,9 +163,12 @@ const BelumLunasBadge = ({ label }: { label?: string }) => (
 
 
 export default function InventoryTable({
-    rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual, dateColumnLabel,
+    rows, canSeePrivate, canSeeStock, showSparepart, showMinusSiapJual, showTotalJual, showKelengkapan, dateColumnLabel,
     onRowClick, renderActions, renderAudit, renderSo, renderPedagang, sortBy, onSort,
+    selectedIds, onToggleSelect, onToggleSelectAll, allSelected, someSelected,
 }: Props) {
+    // Checkbox aktif hanya kalau handler toggle dikirim oleh pemanggil.
+    const selectable = !!onToggleSelect;
     const [localSort, setLocalSort] = useState<{ col: SortKey; dir: "asc" | "desc" } | null>(null);
 
     // Apply local column sorting if selected
@@ -177,6 +199,7 @@ export default function InventoryTable({
                 case "SN": valA = a.sn || a.sn_note || ""; valB = b.sn || b.sn_note || ""; break;
                 case "STOK": valA = a.stok_tersisa ?? 0; valB = b.stok_tersisa ?? 0; break;
                 case "SIAP": valA = a.siap_jual ?? 0; valB = b.siap_jual ?? 0; break;
+                case "MSJ": valA = a.minus_siap_jual ?? 0; valB = b.minus_siap_jual ?? 0; break;
                 case "MINUS": valA = a.minus ?? 0; valB = b.minus ?? 0; break;
                 case "AUDIT": valA = a.is_audited ? 1 : 0; valB = b.is_audited ? 1 : 0; break;
                 case "SO": valA = a.is_so_active ? 1 : 0; valB = b.is_so_active ? 1 : 0; break;
@@ -204,6 +227,21 @@ export default function InventoryTable({
             <table className="w-full text-sm border-collapse">
                 <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
+                        {selectable && (
+                            <th className="sticky top-0 z-20 px-3 py-3 bg-gray-50 w-12">
+                                <button
+                                    type="button"
+                                    onClick={onToggleSelectAll}
+                                    className={`w-4 h-4 rounded border-2 flex items-center justify-center transition flex-shrink-0 mx-auto ${allSelected ? "bg-gray-800 border-gray-800" : someSelected ? "bg-gray-300 border-gray-300" : "bg-white border-gray-300 hover:border-gray-400"}`}
+                                >
+                                    {(allSelected || someSelected) && (
+                                        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d={someSelected && !allSelected ? "M5 12h14" : "M5 13l4 4L19 7"} />
+                                        </svg>
+                                    )}
+                                </button>
+                            </th>
+                        )}
                         <Th center>No</Th>
                         <Th sortKey="NAMA" activeSort={sortBy} onSort={onSort}>Nama Laptop</Th>
                         <Th sortKey="CATEGORY" activeSort={sortBy} onSort={onSort}>Kategori</Th>
@@ -220,8 +258,10 @@ export default function InventoryTable({
                         {canSeePrivate && <Th sortKey="SUMBER" activeSort={sortBy} onSort={onSort}>Sumber</Th>}
                         {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>{dateColumnLabel ?? "Tanggal Masuk"}</Th>}
                         <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
+                        {showKelengkapan && <Th>Kelengkapan</Th>}
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
-                        <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
+                                                <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
+                        {showMinusSiapJual && <Th center sortKey="MSJ" activeSort={sortBy} onSort={onSort} title="Minus Siap Jual">MSJ</Th>}
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
                         {renderSo && <Th center sortKey="SO" activeSort={sortBy} onSort={onSort}>SO</Th>}
                         {renderAudit && <Th center sortKey="AUDIT" activeSort={sortBy} onSort={onSort}>Audit</Th>}
@@ -234,8 +274,29 @@ export default function InventoryTable({
                         <tr
                             key={row.unit_id ?? row.id}
                             onClick={onRowClick ? () => onRowClick(row) : undefined}
-                            className={`group data-row border-b border-gray-50 last:border-0 hover:bg-gray-50/60 ${onRowClick ? "cursor-pointer" : ""}`}
+                            className={`group data-row border-b border-gray-50 last:border-0 hover:bg-gray-50/60 ${onRowClick ? "cursor-pointer" : ""} ${selectable && (row.unit_id ?? row.id) && selectedIds?.has(row.unit_id ?? row.id) ? "bg-red-50/60" : ""}`}
                         >
+                            {selectable && (
+                                <td className="px-3 py-3.5 text-center w-12" onClick={e => e.stopPropagation()}>
+                                    {(() => {
+                                        const rid = row.unit_id ?? row.id;
+                                        const checked = !!selectedIds?.has(rid);
+                                        return (
+                                            <button
+                                                type="button"
+                                                onClick={() => onToggleSelect?.(rid)}
+                                                className={`w-4 h-4 rounded border-2 flex items-center justify-center transition flex-shrink-0 mx-auto ${checked ? "bg-red-500 border-red-500" : "bg-white border-gray-300 hover:border-gray-400"}`}
+                                            >
+                                                {checked && (
+                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                        );
+                                    })()}
+                                </td>
+                            )}
                             <td className="px-3 py-3.5 text-center w-10">
                                 <span className="text-xs font-semibold text-gray-300 tabular-nums">
                                     {String(idx + 1).padStart(2, "0")}
@@ -357,6 +418,14 @@ export default function InventoryTable({
                                 ) : row.sn_note ? <Note>{row.sn_note}</Note> : <Dash />}
                             </td>
 
+                            {showKelengkapan && (
+                                <td className="px-3.5 py-3.5 max-w-[160px]">
+                                    {row.kelengkapan ? (
+                                        <span className="block text-xs text-gray-600 truncate" title={row.kelengkapan}>{row.kelengkapan}</span>
+                                    ) : <Dash />}
+                                </td>
+                            )}
+
                             {canSeeStock && (
                                 <td className="px-3 py-3.5 text-center whitespace-nowrap">
                                     <span className={`text-sm font-semibold tabular-nums ${row.stok_tersisa === 0 ? "text-red-400" : "text-gray-700"}`}>
@@ -370,6 +439,14 @@ export default function InventoryTable({
                                     {row.siap_jual}
                                 </span>
                             </td>
+
+                            {showMinusSiapJual && (
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                                    <span className={`text-sm font-semibold tabular-nums ${(row.minus_siap_jual ?? 0) > 0 ? "text-amber-600" : "text-gray-200"}`}>
+                                        {(row.minus_siap_jual ?? 0) > 0 ? (row.minus_siap_jual ?? 0) : "—"}
+                                    </span>
+                                </td>
+                            )}
 
                             {canSeeStock && (
                                 <td className="px-3 py-3.5 text-center whitespace-nowrap">

@@ -4,15 +4,18 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
-import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, OFFICIAL_PRICE_EDIT_ROLES } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, OFFICIAL_PRICE_EDIT_ROLES, canEditConditionChecks } from "@/lib/permissions";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { Trash2, Package, CheckCircle2, Wrench, Wallet } from "lucide-react";
 import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
 import UnitFormModal from "@/components/inventory/UnitFormModal";
 import EditablePriceCell from "@/components/inventory/EditablePriceCell";
 import { exportInventoryExcel } from "@/lib/inventoryExport";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import BarcodeModal from "@/components/ui/BarcodeModal";
 
 interface LaptopUnit {
     id: string;
@@ -27,6 +30,8 @@ interface LaptopUnit {
     official_price?: number;
     status: string;
     notes: string;
+    condition_checks?: ConditionChecks | null;
+    kelengkapan?: string | null;
     received_at?: string;
     created_at: string;
     audited_at?: string | null;
@@ -56,8 +61,8 @@ const GRADE_STYLE: Record<string, { badge: string; label: string; desc: string; 
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
-    BELUM_SIAP: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Belum Siap" },
-    SERVICE: { badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500", label: "Service" },
+    MINUS_SIAP_JUAL: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Minus Siap Jual" },
+    BELUM_SIAP: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-400", label: "Belum Siap Jual" },
     SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
 };
 
@@ -253,9 +258,12 @@ export default function UnitsPage() {
     const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
 
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canAuditUnits = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canSOUnits = hasAnyRole(userRoles, SO_ROLES);
+    // Barcode per unit — sama seperti halaman Kelola Unit Aksesoris.
+    const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
     const canSeePriceInfo = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
@@ -269,17 +277,33 @@ export default function UnitsPage() {
     ] as UserRole[]);
     //  Full Access → boleh toggle mode Edit di Pop-up Detail unit
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
+    //  Boleh isi/ubah checklist Tes Kondisi per unit (Rafi Salim, Fikri Aryansyah & Admin)
+    const canEditChecklist = canEditConditionChecks(userId, userRoles);
+    //  Tombol "Tes Kondisi" per unit: cukup hak checklist (canEditChecklist).
+    //  Simpannya lewat endpoint khusus PATCH /api/units/[id]/condition-checks
+    //  yang di-gate canEditConditionChecks saja — TIDAK butuh full-access barang,
+    //  jadi PKL Pengelola Barang pun bisa isi tes kondisi di sini.
+    const canQuickCondition = !!canEditChecklist;
     //  Unit yang sedang dibuka di Pop-up Detail
     const [detailUnit, setDetailUnit] = useState<LaptopUnit | null>(null);
+    //  Unit yang barcode-nya sedang dibuka (1 unit = 1 barcode) — null = tidak ada
+    const [barcodeUnit, setBarcodeUnit] = useState<LaptopUnit | null>(null);
+    //  Target & draft modal "Tes Kondisi" per unit
+    const [conditionTarget, setConditionTarget] = useState<LaptopUnit | null>(null);
+    const [conditionDraft, setConditionDraft] = useState<ConditionChecks>({});
+    const [conditionSaving, setConditionSaving] = useState(false);
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
+    const [showBulkEditModal, setShowBulkEditModal] = useState(false); // ✅ bulk edit unit tercentang
     const [toast, setToast] = useState("");
     const [auditingUnitId, setAuditingUnitId] = useState<string | null>(null);
     const [soUnitId, setSoUnitId] = useState<string | null>(null);
+    // Target modal catatan audit. "single" = 1 unit; "bulk" = unit tercentang.
+    const [auditConfirm, setAuditConfirm] = useState<{ kind: "single"; unit: LaptopUnit } | { kind: "bulk" } | null>(null);
     const [pedagangSavingId, setPedagangSavingId] = useState<string | null>(null);
     const [filterAudit, setFilterAudit] = useState<"ALL" | "AUDITED" | "UNAUDITED">("ALL");
     const [filterSO, setFilterSO] = useState<"ALL" | "SO" | "BELUM_SO">("ALL");
@@ -313,6 +337,7 @@ export default function UnitsPage() {
                         ? r.user.roles
                         : r.user?.role ? [r.user.role] : [];
                 setUserRoles(roles as UserRole[]);
+                setUserId((r.user as { id?: string } | null)?.id ?? null);
             })
             .catch(() => setUserRoles([]));
     }, []);
@@ -351,7 +376,11 @@ export default function UnitsPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterGradeTab, searchSN]);
+    // ✅ FIX #2: searchSN DIHAPUS dari dependency. Dulu tiap ketikan di kotak
+    // Cari SN me-reset seluruh centang, jadi hasil centang pencarian sebelumnya
+    // hilang. Sekarang centang hanya reset saat ganti tab Status/Grade, bukan
+    // saat search — selection bertahan lintas pencarian.
+    useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterGradeTab]);
 
     const syncLaptopStats = useCallback(async (latestUnits: LaptopUnit[]) => {
         const siapCount = latestUnits.filter(u => u.status === "SIAP_JUAL").length;
@@ -374,14 +403,25 @@ export default function UnitsPage() {
 
     const [soPromptTarget, setSoPromptTarget] = useState<{ unit: LaptopUnit; isActive: boolean } | null>(null);
 
-    const toggleUnitAudit = async (unit: LaptopUnit) => {
+    // Klik tombol audit per-baris: sudah teraudit → batal langsung; belum →
+    // buka modal catatan dulu (eksekusi di runUnitAudit).
+    const toggleUnitAudit = (unit: LaptopUnit) => {
+        if (isUnitAuditActive(unit)) {
+            runUnitAudit(unit, ""); // batalkan langsung, tanpa catatan
+        } else {
+            setAuditConfirm({ kind: "single", unit });
+        }
+    };
+
+    const runUnitAudit = async (unit: LaptopUnit, note: string) => {
         setAuditingUnitId(unit.id);
         try {
-            const res = await fetch(`/api/units/${unit.id}/audit`, { method: "PATCH" });
+            const res = await fetch(`/api/units/${unit.id}/audit`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+            });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal update audit");
             const wasActive = isUnitAuditActive(unit);
-            // Audit per-unit: hanya update unit yang diklik di state lokal
             setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, ...json.data } : u));
             setToast(wasActive ? "Audit unit dibatalkan" : "Unit ditandai sudah diaudit");
         } catch (e) {
@@ -453,6 +493,37 @@ export default function UnitsPage() {
         }
     };
 
+    //  Buka modal Tes Kondisi untuk 1 unit — prefill dari condition_checks unit itu.
+    const openCondition = (unit: LaptopUnit) => {
+        setConditionDraft(sanitizeConditionChecks(unit.condition_checks));
+        setConditionTarget(unit);
+    };
+
+    //  Simpan checklist per unit lewat PUT /api/units/[id] (endpoint yang SAMA
+    //  dengan mode Edit di UnitDetailModal — sudah terima condition_checks).
+    //  Payload sengaja cuma condition_checks: status/harga TIDAK ikut dikirim,
+    //  jadi tidak ada side-effect sync qty/harga.
+    const saveCondition = async () => {
+        if (!conditionTarget) return;
+        setConditionSaving(true);
+        try {
+            const res = await fetch(`/api/units/${conditionTarget.id}/condition-checks`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ condition_checks: conditionDraft }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan tes kondisi");
+            setUnits(prev => prev.map(u => u.id === conditionTarget.id ? { ...u, condition_checks: conditionDraft } : u));
+            setToast("Tes kondisi berhasil diperbarui!");
+            setConditionTarget(null);
+        } catch (e) {
+            setAlertModal(e instanceof Error ? e.message : "Gagal menyimpan tes kondisi");
+        } finally {
+            setConditionSaving(false);
+        }
+    };
+
     const filteredUnits = useMemo(() => {
         const searchSNTrim = searchSN.trim().toLowerCase();
         const hasMatchInGroup = searchSNTrim
@@ -515,6 +586,72 @@ export default function UnitsPage() {
         });
     };
 
+    // ── Bulk AUDIT unit tercentang ──────────────────────────────────────────
+    // "Selalu tandai audit": hanya kirim unit yang BELUM teraudit aktif, supaya
+    // endpoint /api/units/[id]/audit (yang sifatnya toggle) tidak malah
+    // MEMBATALKAN audit unit yang sudah benar. Unit teraudit di-skip.
+    const [bulkAuditing, setBulkAuditing] = useState(false);
+    // Klik "Audit N Unit" → buka modal catatan dulu (1 catatan untuk semua).
+    const handleBulkAudit = () => {
+        if (selectedIds.size === 0) return;
+        const targets = units.filter(
+            u => selectedIds.has(u.id) && u.status !== "SOLD" && !isUnitAuditActive(u)
+        );
+        if (targets.length === 0) {
+            setToast("Semua unit terpilih sudah teraudit");
+            return;
+        }
+        setAuditConfirm({ kind: "bulk" });
+    };
+
+    const runBulkAudit = async (note: string) => {
+        // Saring: unit tercentang, aktif (bukan SOLD), dan audit-nya BELUM aktif.
+        const targets = units.filter(
+            u => selectedIds.has(u.id) && u.status !== "SOLD" && !isUnitAuditActive(u)
+        );
+        if (targets.length === 0) return;
+        setBulkAuditing(true);
+        try {
+            const results = await Promise.all(
+                targets.map(async (u) => {
+                    try {
+                        const res = await fetch(`/api/units/${u.id}/audit`, {
+                            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+                        });
+                        const json = await res.json().catch(() => null);
+                        return res.ok && json?.success !== false;
+                    } catch {
+                        return false;
+                    }
+                })
+            );
+            const failed = results.filter(ok => !ok).length;
+
+            // Refetch supaya audited_at/audited_by terbaru ikut (sumber kebenaran DB).
+            const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
+            const freshData = await freshRes.json();
+            const freshUnits: LaptopUnit[] = (freshData.data || []).map((u: LaptopUnit) => ({
+                ...u,
+                purchase_price: Math.round(Number(u.purchase_price) || 0),
+                sparepart_cost: Math.round(Number(u.sparepart_cost) || 0),
+                selling_price: Math.round(Number(u.selling_price) || 0),
+                official_price: Math.round(Number(u.official_price) || 0),
+            }));
+            setUnits(freshUnits);
+            setSelectedIds(new Set());
+
+            if (failed > 0) {
+                setAlertModal(`${failed} dari ${targets.length} unit gagal diaudit. Sisanya berhasil.`);
+            } else {
+                setToast(`${targets.length} unit berhasil ditandai teraudit`);
+            }
+        } catch {
+            setAlertModal("Gagal mengaudit beberapa unit");
+        } finally {
+            setBulkAuditing(false);
+        }
+    };
+
     const handleBulkDelete = () => {
         if (selectedIds.size === 0) return;
         setConfirmModal({
@@ -565,7 +702,7 @@ export default function UnitsPage() {
         total: activeUnits.length,
         siap: activeUnits.filter(u => u.status === "SIAP_JUAL").length,
         sold: units.filter(u => u.status === "SOLD").length,
-        service: activeUnits.filter(u => u.status === "SERVICE").length,
+        minusSiapJual: activeUnits.filter(u => u.status === "MINUS_SIAP_JUAL").length,
         belum: activeUnits.filter(u => u.status === "BELUM_SIAP").length,
         gradeA: activeUnits.filter(u => u.grade === "A").length,
         gradeB: activeUnits.filter(u => u.grade === "B").length,
@@ -598,8 +735,13 @@ export default function UnitsPage() {
         sumber: u.source ?? null,
         tanggal_masuk: u.created_at ?? null,
         sn: u.serial_number,
+        kelengkapan: u.kelengkapan ?? null,
         stok_tersisa: u.status !== "SOLD" ? 1 : 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
+        // MSJ dipisah dari M (Minus biasa): Minus Siap Jual TETAP kehitung ST
+        // (stok nyata & boleh dijual) tapi punya kolomnya sendiri. "SERVICE"
+        // masih dicek untuk unit lama yang belum dimigrasi ke BELUM_SIAP.
+        minus_siap_jual: u.status === "MINUS_SIAP_JUAL" ? 1 : 0,
         minus: (u.status === "SERVICE" || u.status === "BELUM_SIAP") ? 1 : 0,
         is_audited: isUnitAuditActive(u),
         audited_at: u.audited_at ?? null,
@@ -906,8 +1048,8 @@ export default function UnitsPage() {
                             icon={<CheckCircle2 size={16} className="text-green-600" />} />
                         <StatCard label="Belum Siap" value={`${counts.belum} unit`} accent="bg-amber-400"
                             icon={<svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>} />
-                        <StatCard label="Service" value={`${counts.service} unit`} accent="bg-blue-500"
-                            icon={<Wrench size={16} className="text-blue-600" />} />
+                        <StatCard label="Minus Siap Jual" value={`${counts.minusSiapJual} unit`} accent="bg-amber-400"
+                            icon={<Wrench size={16} className="text-amber-500" />} />
                         <StatCard label="Terjual" value={`${counts.sold} unit`} accent="bg-gray-400"
                             icon={<Wallet size={16} className="text-gray-500" />} />
                     </div>
@@ -943,8 +1085,8 @@ export default function UnitsPage() {
                             {[
                                 { value: "ALL", label: "Semua Status", count: filterGradeTab === "ALL" ? units.length : units.filter(u => u.grade === filterGradeTab).length },
                                 { value: "SIAP_JUAL", label: "Siap Jual", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SIAP_JUAL").length },
-                                { value: "BELUM_SIAP", label: "Belum Siap", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length },
-                                { value: "SERVICE", label: "Service", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SERVICE").length },
+                                { value: "MINUS_SIAP_JUAL", label: "Minus Siap Jual", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "MINUS_SIAP_JUAL").length },
+                                { value: "BELUM_SIAP", label: "Belum Siap Jual", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length },
                             ].map(opt => (
                                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterStatus === opt.value ? "bg-[#1a1a2e] text-white shadow-sm" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
@@ -1057,16 +1199,22 @@ export default function UnitsPage() {
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 active:opacity-60 transition">Batal pilih</button>
-                                <button onClick={handleBulkDelete} disabled={bulkDeleting}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold active:bg-red-600 transition disabled:opacity-50">
-                                    {bulkDeleting ? (
-                                        <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menghapus...</>
-                                    ) : (
-                                        <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>Hapus {selectedIds.size} Unit</>
-                                    )}
-                                </button>
+                                {/* Bulk bar laptop sengaja HANYA Audit — Edit & Hapus massal
+                                    dihilangkan (tombol Edit/Hapus per-baris di kolom Aksi tetap ada).
+                                    Centang di halaman ini khusus untuk audit massal.
+                                    Yang sudah teraudit di-skip (tidak dibatalkan). */}
+                                {canAuditUnits && (
+                                    <button onClick={handleBulkAudit} disabled={bulkAuditing}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
+                                        {bulkAuditing ? (
+                                            <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengaudit...</>
+                                        ) : (
+                                            <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                            </svg>Audit {selectedIds.size} Unit</>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1114,9 +1262,16 @@ export default function UnitsPage() {
                                 canSeePrivate={canSeePriceInfo}
                                 canSeeStock={canSeePriceInfo}
                                 showSparepart
+                                showMinusSiapJual
                                 showTotalJual
+                                showKelengkapan
                                 sortBy={sortBy}
                                 onSort={handleSort}
+                                selectedIds={selectedIds}
+                                onToggleSelect={toggleSelect}
+                                onToggleSelectAll={toggleSelectAll}
+                                allSelected={isAllSelected}
+                                someSelected={isIndeterminate}
                                 onRowClick={(row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
                                     if (u) setDetailUnit(u);
@@ -1184,12 +1339,39 @@ export default function UnitsPage() {
                                 } : undefined}
                                 renderActions={(row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
-                                    if (!u || !canManageUnits) return null;
+                                    if (!u) return null;
+                                    //  Dulu: `if (!u || !canManageUnits) return null` — kolom Aksi
+                                    //  nutup penuh kalau bukan pengelola unit, jadi editor checklist
+                                    //  yang bukan EDIT_UNITS tidak kebagian tombol apa pun. Sekarang
+                                    //  dipisah per-tombol sesuai gate masing-masing.
+                                    //  canViewBarcode ditambahkan ke guard supaya baris yang HANYA
+                                    //  boleh lihat barcode (tanpa checklist/manage) tetap dapat tombol.
+                                    if (!canQuickCondition && !canManageUnits && !canViewBarcode) return null;
                                     return (
-                                        <button onClick={() => handleDelete(u)}
-                                            className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        <>
+                                            {/* Barcode per unit — 1 unit = 1 barcode, pakai presetUnit
+                                                di BarcodeModal (tak perlu fetch, RESERVED pun muncul). */}
+                                            {canViewBarcode && (
+                                                <button onClick={() => setBarcodeUnit(u)}
+                                                    className="h-8 px-2 rounded-lg text-[11px] font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-center whitespace-nowrap"
+                                                    title="Cetak barcode unit ini">
+                                                    Barcode
+                                                </button>
+                                            )}
+                                            {canQuickCondition && (
+                                                <button onClick={() => openCondition(u)}
+                                                    className="h-8 px-2 rounded-lg text-[11px] font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 transition flex items-center justify-center whitespace-nowrap"
+                                                    title="Edit tes kondisi unit ini tanpa buka mode Edit">
+                                                    Tes Kondisi
+                                                </button>
+                                            )}
+                                            {canManageUnits && (
+                                                <button onClick={() => handleDelete(u)}
+                                                    className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </>
                                     );
                                 }}
                             />
@@ -1219,9 +1401,29 @@ export default function UnitsPage() {
                     laptopId={laptopId}
                     defaultSellingPrice={laptop?.selling_price ?? 0}
                     editingUnit={editingUnit}
+                    canEditChecklist={!!canEditChecklist}
                     onClose={closeForm}
                     onSuccess={handleFormSuccess}
                     onError={(msg) => setAlertModal(msg)}
+                />
+            )}
+
+            {/*  Barcode per unit — 1 unit = 1 barcode. presetUnit = kirim unit
+                langsung, jadi modal tidak fetch & RESERVED/BELUM_SIAP pun bisa
+                dibarcode. grade dikirim untuk badge warna (A/B/C). */}
+            {barcodeUnit && (
+                <BarcodeModal
+                    laptopId={laptopId}
+                    laptopName={laptop?.laptop_name ?? "Laptop"}
+                    itemType="LAPTOP"
+                    presetUnit={{
+                        id: barcodeUnit.id,
+                        serial_number: barcodeUnit.serial_number,
+                        selling_price: barcodeUnit.selling_price,
+                        status: barcodeUnit.status,
+                        grade: barcodeUnit.grade,
+                    }}
+                    onClose={() => setBarcodeUnit(null)}
                 />
             )}
 
@@ -1232,6 +1434,7 @@ export default function UnitsPage() {
                     laptopName={laptop?.laptop_name}
                     laptopMeta={[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage].filter(Boolean).join(" · ")}
                     canEdit={canFullAccessBarang}
+                    canEditChecklist={!!canEditChecklist}
                     canSeePrivate={canSeePriceInfo}
                     onClose={() => setDetailUnit(null)}
                     onSaved={(updated) => {
@@ -1239,6 +1442,17 @@ export default function UnitsPage() {
                         setDetailUnit(null);
                         setToast("Data unit berhasil diperbarui!");
                     }}
+                />
+            )}
+
+            {conditionTarget && (
+                <ConditionChecksModal
+                    label={`SN: ${conditionTarget.serial_number}`}
+                    value={conditionDraft}
+                    onChange={setConditionDraft}
+                    loading={conditionSaving}
+                    onClose={() => { if (!conditionSaving) setConditionTarget(null); }}
+                    onConfirm={saveCondition}
                 />
             )}
 
@@ -1269,12 +1483,31 @@ export default function UnitsPage() {
                     loading={soUnitId === soPromptTarget.unit.id}
                 />
             )}
-            {showBulkModal && (
-                <BulkAddUnitModal
-                    laptopId={laptopId}
-                    defaultSellingPrice={laptop?.selling_price ?? 0}
-                    onClose={() => setShowBulkModal(false)}
-                    onSuccess={handleFormSuccess}
+
+            {auditConfirm && (
+                <AuditNotePromptModal
+                    title={auditConfirm.kind === "bulk" ? `Tandai Audit ${selectedIds.size} Unit` : "Tandai Sudah Diaudit"}
+                    label={auditConfirm.kind === "single" ? `SN: ${auditConfirm.unit.serial_number}` : `${selectedIds.size} unit terpilih`}
+                    onConfirm={async (note) => {
+                        if (auditConfirm.kind === "single") await runUnitAudit(auditConfirm.unit, note);
+                        else await runBulkAudit(note);
+                        setAuditConfirm(null);
+                    }}
+                    onClose={() => setAuditConfirm(null)}
+                    loading={auditConfirm.kind === "single" ? auditingUnitId === auditConfirm.unit.id : bulkAuditing}
+                />
+            )}
+            {showBulkEditModal && (
+                <BulkEditUnitsModal
+                    units={units.filter(u => selectedIds.has(u.id) && u.status !== "SOLD")}
+                    canSeePrivate={canSeePriceInfo}
+                    canEditPurchasePrice={canFullAccessBarang}
+                    onClose={() => setShowBulkEditModal(false)}
+                    onSuccess={async () => {
+                        setShowBulkEditModal(false);
+                        setSelectedIds(new Set());
+                        await handleFormSuccess(); // refetch units + sync stats parent
+                    }}
                 />
             )}
             {toast && <Toast message={toast} onDone={() => setToast("")} />}
@@ -1338,6 +1571,175 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
         <th className={`px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
             {children}
         </th>
+    );
+}
+
+//  Modal Bulk Edit unit TERCENTANG — bentuknya disamakan dengan form Edit Unit
+//  tunggal. Nilai awal kosong/tak terpilih → hanya kolom yang kamu isi/pilih
+//  yang dikirim, sisanya dibiarkan apa adanya per unit. Berlaku ke semua unit
+//  tercentang (kecuali SOLD). Semua lewat PUT /api/units/[id].
+function BulkEditUnitsModal({
+    units, canSeePrivate, canEditPurchasePrice, onClose, onSuccess,
+}: {
+    units: LaptopUnit[];
+    canSeePrivate: boolean;
+    canEditPurchasePrice: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}) {
+    const [grade, setGrade] = useState<"" | "A" | "B" | "C">("");
+    const [status, setStatus] = useState<"" | "SIAP_JUAL" | "BELUM_SIAP" | "MINUS_SIAP_JUAL">("");
+    const [sellInput, setSellInput] = useState("");
+    const [buyInput, setBuyInput] = useState("");
+    const [spareInput, setSpareInput] = useState("");
+    const [notes, setNotes] = useState("");
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    const num = (s: string) => Number(s.replace(/\D/g, "")) || 0;
+
+    const handleSubmit = async () => {
+        setError("");
+        if (units.length === 0) { setError("Tidak ada unit yang bisa diedit (unit terjual dilewati)."); return; }
+
+        const patch: Record<string, unknown> = {};
+        if (grade) patch.grade = grade;
+        if (status) patch.status = status;
+        if (sellInput.trim() !== "") patch.selling_price = num(sellInput);
+        if (buyInput.trim() !== "") patch.purchase_price = num(buyInput);
+        if (spareInput.trim() !== "") patch.sparepart_cost = num(spareInput);
+        if (notes.trim() !== "") patch.notes = notes.trim();
+
+        if (Object.keys(patch).length === 0) {
+            setError("Belum ada yang diubah. Isi atau pilih minimal satu kolom di atas.");
+            return;
+        }
+
+        setLoading(true);
+        const results = await Promise.all(units.map(async (u) => {
+            try {
+                const res = await fetch(`/api/units/${u.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(patch),
+                });
+                const json = await res.json().catch(() => null);
+                return res.ok && json?.success !== false;
+            } catch { return false; }
+        }));
+        setLoading(false);
+
+        const failed = results.filter(ok => !ok).length;
+        if (failed > 0) { setError(`${failed} dari ${results.length} unit gagal diperbarui. Sisanya berhasil.`); return; }
+        onSuccess(); // sukses semua → parent menutup modal & refetch
+    };
+
+    const priceField = (label: string, val: string, set: (v: string) => void) => (
+        <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
+            <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">Rp</span>
+                <input inputMode="numeric" placeholder="Kosongkan = tidak diubah" value={val}
+                    onChange={e => { const raw = e.target.value.replace(/\D/g, ""); set(raw ? new Intl.NumberFormat("id-ID").format(parseInt(raw, 10)) : ""); }}
+                    className="w-full h-9 border border-gray-200 rounded-lg pl-8 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-700 focus:bg-white transition tabular-nums" />
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <h3 className="font-bold text-gray-900 text-[15px] tracking-tight">Edit {units.length} Unit</h3>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Hanya kolom yang kamu isi/pilih yang diubah — sisanya dibiarkan</p>
+                    </div>
+                    <button onClick={() => !loading && onClose()} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Grade</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {(["A", "B", "C"] as const).map(g => (
+                                <button key={g} type="button" onClick={() => setGrade(prev => prev === g ? "" : g)}
+                                    className={`h-10 rounded-xl text-xs font-bold border transition ${grade === g ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                    Grade {g}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {([
+                                { v: "SIAP_JUAL", l: "Siap Jual" },
+                                { v: "MINUS_SIAP_JUAL", l: "Minus Siap Jual" },
+                                { v: "BELUM_SIAP", l: "Belum Siap Jual" },
+                            ] as const).map(o => (
+                                <button key={o.v} type="button" onClick={() => setStatus(prev => prev === o.v ? "" : o.v)}
+                                    className={`h-10 rounded-xl text-[11px] font-semibold border transition ${status === o.v ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                    {o.l}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className={canEditPurchasePrice ? "grid grid-cols-2 gap-3" : ""}>
+                        {priceField("Harga Store", sellInput, setSellInput)}
+                        {canEditPurchasePrice && priceField("Harga Modal", buyInput, setBuyInput)}
+                    </div>
+                    {canSeePrivate && priceField("Harga Sparepart", spareInput, setSpareInput)}
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                            Catatan <span className="text-gray-400 font-normal">(opsional)</span>
+                        </label>
+                        <input
+                            placeholder="Kosongkan = tidak diubah"
+                            value={notes}
+                            onChange={e => setNotes(e.target.value)}
+                            className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-700 focus:bg-white transition"
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                            <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <p className="text-xs text-red-700">{error}</p>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
+                        <button type="button" onClick={() => !loading && onClose()} disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                            Batal
+                        </button>
+                        <button onClick={handleSubmit} disabled={loading}
+                            className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-gray-800/20">
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Simpan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -1720,12 +2122,120 @@ function AuditHistoryModal({ unitId, unitLabel, onClose }: {
     );
 }
 
+//  Modal "Tes Kondisi" per unit — checklist kondisi per SN, edit langsung dari
+//  kolom Aksi tabel tanpa buka pop-up Detail → mode Edit. Simpan ke
+//  PUT /api/units/[id] (lihat saveCondition di UnitsPage).
+function ConditionChecksModal({ label, value, onChange, loading, onClose, onConfirm }: {
+    label: string;
+    value: ConditionChecks;
+    onChange: (v: ConditionChecks) => void;
+    loading: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[85vh] flex flex-col animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-sky-400 via-sky-600 to-sky-800 flex-shrink-0" />
+                <div className="px-5 py-4 bg-sky-600 flex-shrink-0">
+                    <p className="font-bold text-white text-sm">Tes Kondisi Unit</p>
+                    <p className="text-xs text-white/70 mt-0.5 truncate">{label}</p>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    <ConditionChecklist value={value} onChange={onChange} readOnly={false} />
+                </div>
+                <div className="flex gap-3 px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} disabled={loading}
+                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button onClick={onConfirm} disabled={loading}
+                        className="flex-1 h-10 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                        {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        Simpan
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 interface SoHistoryEntry {
     id: string;
     action: "SO" | "UNSO";
     so_by: string;
     so_at: string;
     notes?: string | null;
+}
+
+// Modal catatan AUDIT — kembar SoNotePromptModal tapi teks & tema khusus audit
+// (emerald), SAMA dengan AuditConfirmModal di Data Barang (luar). Dipakai untuk
+// audit 1 unit maupun bulk. Catatan opsional, ikut tersimpan ke riwayat audit.
+function AuditNotePromptModal({ title, label, initialNote = "", onConfirm, onClose, loading }: {
+    title: string;
+    label: string;
+    initialNote?: string;
+    onConfirm: (note: string) => void;
+    onClose: () => void;
+    loading: boolean;
+}) {
+    const [note, setNote] = useState(initialNote);
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, loading]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-800" />
+                <div className="bg-emerald-600 px-5 py-4">
+                    <p className="text-sm font-bold text-white">{title}</p>
+                    <p className="text-[11px] text-white/70 mt-0.5 truncate">{label}</p>
+                </div>
+                <div className="p-5">
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                        Catatan Audit <span className="text-gray-400 font-normal">(opsional)</span>
+                    </label>
+                    <textarea
+                        autoFocus
+                        value={note}
+                        onChange={e => setNote(e.target.value)}
+                        placeholder="Kondisi barang, hasil audit, dll"
+                        className="w-full text-sm p-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white focus:outline-none min-h-[70px] resize-none transition"
+                        rows={3}
+                    />
+                    <div className="flex gap-2 mt-5">
+                        <button
+                            onClick={onClose}
+                            disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={() => onConfirm(note)}
+                            disabled={loading}
+                            className="flex-1 h-10 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25"
+                        >
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Konfirmasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function SoNotePromptModal({ title, label, initialNote = "", onConfirm, onClose, loading }: {

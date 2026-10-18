@@ -15,10 +15,11 @@ type QualityInput = {
     user_id: string;
     perfect_days: number;
     manual_days: number;
-    late_days: number;
-    absent_days: number;
+    late_days: number; // ✅ total telat (auto + manual) — utk DISPLAY kolom Terlambat Lencana
+    manual_late_days?: number; // ✅ telat manual saja, utk ranking (hindari dobel hitung)
+    absent_days?: number; // ✅ FIX: sebelumnya tidak dideklarasikan → TS error "Property 'absent_days' does not exist"
     total_workdays: number;
-    avg_early_minutes: number; // ✅ NEW — rata-rata menit lebih cepat dari batas telat jadwal masing-masing
+    avg_early_minutes: number; // ✅ rata-rata jarak (menit) ke jam buka jadwal efektif masing-masing
 };
 
 const LOCK_LEVEL = 3;
@@ -95,10 +96,23 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
             historyByUser.get(r.user_id)!.push({ year: r.year, month: r.month, rank: r.rank });
         });
 
-        const list = (rows ?? []).map((r) => {
+        // ✅ FIX BUG: snapshot bulan lama di-generate SEBELUM guard "total_workdays > 0"
+        // ada di POST, jadi akun baru (hari kerja 0) ke-freeze dengan rank 1/2/3 di DB.
+        // GET ini cuma baca `rank` apa adanya → mereka muncul di atas/podium.
+        // Re-order defensif: yang punya hari kerja selalu di atas, yang 0 hari kerja
+        // selalu di bawah — tanpa perlu generate ulang bulan lama.
+        const orderedRows = [...(rows ?? [])].sort((a, b) => {
+            const aHasWork = (a.total_workdays ?? 0) > 0;
+            const bHasWork = (b.total_workdays ?? 0) > 0;
+            if (aHasWork !== bHasWork) return aHasWork ? -1 : 1;
+            return (a.rank ?? 9999) - (b.rank ?? 9999); // sisanya ikut urutan rank tersimpan
+        });
+
+        const list = orderedRows.map((r, i) => {
             const levelInfo = computeBadgeLevel(historyByUser.get(r.user_id) ?? []);
             return {
                 ...r,
+                rank: i + 1, // ✅ rank display dihitung ulang → akun 0 hari kerja gak bisa nyangkut di Top 3/podium
                 name: userMap.get(r.user_id)?.name ?? "Unknown",
                 role: userMap.get(r.user_id)?.role ?? "",
                 level: levelInfo.displayLevel,
@@ -181,8 +195,23 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     // dari jadwal — tiebreak terakhir ini yang menjelaskan "kenapa dia posisi
     // nomor 1" kalau 3 kriteria di atas sama persis.
     const ranked = [...scores].sort((a, b) => {
-        const va = a.manual_days + a.late_days + a.absent_days;
-        const vb = b.manual_days + b.late_days + b.absent_days;
+        // ✅ FIX BUG: orang yang BELUM punya hari kerja sama sekali (total_workdays = 0)
+        // — biasanya akun baru yang belum pernah absen — SELALU didorong ke paling
+        // bawah. Tanpa guard ini mereka "menang" di kriteria pelanggaran (0 pelanggaran
+        // = angka terkecil) dan nyelonong ke Top 3, ngalahin karyawan rajin yang Hari
+        // Sempurna-nya puluhan.
+        const aHasWork = a.total_workdays > 0;
+        const bHasWork = b.total_workdays > 0;
+        if (aHasWork !== bHasWork) return aHasWork ? -1 : 1; // yang punya hari kerja selalu di atas
+
+        // ✅ FIX: late_days sekarang total (auto + manual). Telat manual sudah ikut di
+        // manual_days, jadi dikurangi manual_late_days agar tidak dihitung dobel.
+        // Kalau client tidak kirim manual_late_days (versi lama) → dianggap 0,
+        // hasilnya sama persis dengan rumus lama (manual + late + absen).
+        // ✅ FIX: absent_days pakai fallback 0 — kalau client tidak kirim,
+        // hasil hitungan jadi NaN dan urutan sort jadi acak.
+        const va = a.manual_days + (a.late_days - (a.manual_late_days || 0)) + (a.absent_days || 0);
+        const vb = b.manual_days + (b.late_days - (b.manual_late_days || 0)) + (b.absent_days || 0);
         if (va !== vb) return va - vb;
         if (b.perfect_days !== a.perfect_days) return b.perfect_days - a.perfect_days;
         const pctA = a.total_workdays > 0 ? a.perfect_days / a.total_workdays : 0;
@@ -193,7 +222,9 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
         // 0 makin bagus, diurutkan ASCENDING.
         return (a.avg_early_minutes || 0) - (b.avg_early_minutes || 0);
     });
-    const rows = ranked.map((s) => {
+
+    const computedAt = new Date().toISOString();
+    const rows = ranked.map((s, i) => {
         const pctRaw = s.total_workdays > 0 ? (s.perfect_days / s.total_workdays) * 100 : 0;
         return {
             user_id: s.user_id,
@@ -202,19 +233,15 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
             perfect_days: s.perfect_days,
             manual_days: s.manual_days,
             late_days: s.late_days,
-            absent_days: s.absent_days,
+            absent_days: s.absent_days || 0,
             total_workdays: s.total_workdays,
             // ✅ NEW — presisi dinaikkan jadi 4 desimal (sebelumnya 2)
             quality_pct: Math.round(pctRaw * 10000) / 10000,
             // ✅ FIXED — presisi dinaikkan ke 4 desimal (sebelumnya 2)
             avg_early_minutes: Math.round((s.avg_early_minutes || 0) * 10000) / 10000,
-            rank: 0, // diisi di bawah
-            computed_at: new Date().toISOString(),
+            rank: i + 1,
+            computed_at: computedAt,
         };
-    });
-
-    rows.forEach((cur, i) => {
-        cur.rank = i + 1;
     });
 
     const { error } = await supabase

@@ -4,8 +4,11 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
-import { Laptop, CheckCircle2, Lock, Trophy, ThumbsUp, AlertTriangle, Camera, Wrench } from "lucide-react";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import { compressImage } from "@/lib/imageCompression";
+import { Trophy, ThumbsUp, AlertTriangle, Wrench, Laptop, CheckCircle2, Lock, Camera, ClipboardList } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface LaptopUnit {
@@ -19,6 +22,9 @@ interface LaptopUnit {
     selling_price: number;
     status: string;
     notes: string;
+    condition_checks?: ConditionChecks | null;
+    condition_checked_by?: string | null;
+    condition_checked_at?: string | null;
     created_at: string;
     reserved_by?: string;
     reserved_invoice?: string;
@@ -52,6 +58,10 @@ const NEW_BADGE_TTL_MS = NEW_BADGE_TTL_DAYS * 24 * 60 * 60 * 1000;
 const isNewArrival = (createdAt?: string | null) =>
     !!createdAt && Date.now() - new Date(createdAt).getTime() < NEW_BADGE_TTL_MS;
 
+// ── Tema brand (dipakai konsisten di seluruh halaman) ────────────────────────
+const BRAND_GRADIENT = "bg-gradient-to-br from-[#1a1545] to-[#0f0c29]";
+const BRAND_GRADIENT_H = "bg-gradient-to-r from-[#1a1545] to-[#0f0c29]";
+
 const GRADE_BADGE: Record<string, string> = {
     A: "bg-emerald-50 text-emerald-700 border-emerald-200",
     B: "bg-amber-50 text-amber-700 border-amber-200",
@@ -65,7 +75,12 @@ const STATUS_CONFIG: Record<string, { badge: string; dot: string; label: string 
     RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
 };
 
-const selectCls = "h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-400/20 focus:border-violet-400 focus:bg-white transition cursor-pointer font-medium w-full";
+// Input & select dibuat konsisten satu gaya — tinggi 10, radius xl, fokus violet.
+const fieldBase =
+    "h-10 w-full rounded-xl border border-gray-200 bg-gray-50/80 text-xs font-medium text-gray-700 " +
+    "transition-all duration-200 focus:outline-none focus:border-violet-400 focus:bg-white " +
+    "focus:ring-4 focus:ring-violet-400/10 hover:border-gray-300";
+const selectCls = `${fieldBase} px-3 pr-8 cursor-pointer appearance-none`;
 
 // ─── AlertModal ───────────────────────────────────────────────────────────────
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
@@ -77,14 +92,14 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center animate-scaleIn">
-                <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-7 h-7 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="relative bg-white rounded-3xl shadow-2xl ring-1 ring-black/5 w-full max-w-sm p-7 text-center animate-scaleIn">
+                <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-5">
+                    <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
-                <button onClick={onClose} className="w-full h-11 bg-gradient-to-r from-[#1a1545] to-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-all duration-200 shadow-md shadow-[#1a1545]/25">OK</button>
+                <p className="text-gray-700 text-sm font-medium leading-relaxed mb-6">{message}</p>
+                <button onClick={onClose} className={`w-full h-11 ${BRAND_GRADIENT_H} text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-all duration-200 shadow-lg shadow-[#1a1545]/25 active:scale-[0.98]`}>OK</button>
             </div>
         </div>
     );
@@ -127,13 +142,13 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
     return (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center animate-fadeIn">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
-                <div className="bg-gradient-to-br from-[#1a1545] to-[#0f0c29] px-5 py-4 flex-shrink-0">
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl ring-1 ring-black/5 flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
+                <div className={`${BRAND_GRADIENT} px-5 py-5 flex-shrink-0`}>
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <h3 className="font-bold text-white truncate">{unit.laptop?.laptop_name || "—"}</h3>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <code className="font-mono text-[11px] text-gray-200 bg-white/10 px-2 py-0.5 rounded-md">{unit.serial_number}</code>
+                            <h3 className="font-bold text-white truncate text-[15px]">{unit.laptop?.laptop_name || "—"}</h3>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <code className="font-mono text-[11px] text-gray-100 bg-white/10 ring-1 ring-white/10 px-2 py-0.5 rounded-md">{unit.serial_number}</code>
                                 {st && (
                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${st.badge}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
@@ -141,14 +156,14 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
                                 )}
                             </div>
                         </div>
-                        <button onClick={onClose} className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition">
+                        <button onClick={onClose} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition active:scale-95">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
                 </div>
 
                 <div className="overflow-y-auto flex-1 px-5 py-4">
-                    <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
+                    <div className="bg-gray-50 rounded-2xl border border-gray-100 divide-y divide-gray-100">
                         {rows.map(row => (
                             <div key={row.label} className="flex items-center justify-between gap-3 px-4 py-3">
                                 <span className="text-xs text-gray-400 flex-shrink-0">{row.label}</span>
@@ -159,17 +174,85 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
                 </div>
 
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
-                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Tutup</button>
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition active:scale-[0.98]">Tutup</button>
                 </div>
             </div>
         </div>
     );
 }
 
+// ─── ConditionViewModal — "Cek Kondisi" read-only untuk sales (per SN) ─────────
+function ConditionViewModal({ unit, checks, checkedBy, checkedAt, loading, onClose }: {
+    unit: LaptopUnit;
+    checks: ConditionChecks;
+    checkedBy?: string | null;
+    checkedAt?: string | null;
+    loading: boolean;
+    onClose: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center animate-fadeIn">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl ring-1 ring-black/5 flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
+                <div className={`${BRAND_GRADIENT} px-5 py-5 flex-shrink-0`}>
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <h3 className="font-bold text-white truncate flex items-center gap-2">
+                                <ClipboardList size={16} className="flex-shrink-0 text-white/80" /> Cek Kondisi
+                            </h3>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <span className="text-xs text-gray-200 truncate">{unit.laptop?.laptop_name || "—"}</span>
+                                <code className="font-mono text-[11px] text-gray-100 bg-white/10 ring-1 ring-white/10 px-2 py-0.5 rounded-md">{unit.serial_number}</code>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition active:scale-95">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-10 gap-3">
+                            <div className="w-6 h-6 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin" />
+                            <p className="text-sm text-gray-400">Memuat kondisi...</p>
+                        </div>
+                    ) : (
+                        <>
+                            {checkedBy ? (
+                                <p className="text-[11px] text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+                                    Diisi oleh <span className="font-semibold text-gray-700">{checkedBy}</span>
+                                    {checkedAt && <> · {new Date(checkedAt).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</>}
+                                </p>
+                            ) : (
+                                <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                                    Tes kondisi unit ini belum diisi oleh penanggung jawab.
+                                </p>
+                            )}
+                            <ConditionChecklist value={checks} onChange={() => {}} readOnly />
+                        </>
+                    )}
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition active:scale-[0.98]">Tutup</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
 // ─── SkeletonRows ─────────────────────────────────────────────────────────────
 function SkeletonRows() {
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] overflow-hidden">
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
@@ -197,23 +280,25 @@ function SkeletonRows() {
 }
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
-// RESPONSIVE FIX: scale down padding, font, icon size di mobile (< sm)
-function StatCard({ label, value, icon, color, bg, bar }: {
+// RESPONSIVE: scale down padding, font, icon size di mobile (< sm)
+function StatCard({ label, value, icon, color, bg, bar, dark = false }: {
     label: string; value: number; icon: React.ReactNode;
-    color: string; bg: string; bar: string;
+    color: string; bg: string; bar: string; dark?: boolean;
 }) {
     return (
-        <div className={`${bg} rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 p-3 sm:p-5 relative overflow-hidden group hover:-translate-y-0.5`}>
-            <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${bar} opacity-50 group-hover:opacity-100 transition-opacity`} />
-            <div className="flex items-start justify-between gap-1.5 sm:gap-3">
+        <div className={`${bg} rounded-2xl border ${dark ? "border-white/10" : "border-gray-100"} shadow-sm ring-1 ${dark ? "ring-white/5 shadow-lg shadow-[#1a1545]/25" : "ring-black/[0.02]"} hover:shadow-lg ${dark ? "" : "hover:ring-black/5"} transition-all duration-300 p-3 sm:p-5 relative overflow-hidden group hover:-translate-y-1`}>
+            {/* dekorasi lingkaran samar di pojok kanan atas — kasih dimensi */}
+            <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full ${dark ? "bg-white/[0.06]" : "bg-black/[0.015]"} blur-2xl`} />
+            <div className={`absolute bottom-0 left-0 right-0 h-1 ${bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
+            <div className="relative flex items-start justify-between gap-1.5 sm:gap-3">
                 <div className="min-w-0">
                     {/* Label lebih kecil di HP agar tidak truncate */}
-                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1.5 sm:mb-2 truncate">{label}</p>
+                    <p className={`text-[9px] sm:text-[10px] font-bold ${dark ? "text-white/60" : "text-gray-400"} uppercase tracking-wider leading-none mb-1.5 sm:mb-2.5 truncate`}>{label}</p>
                     {/* Angka scale down: text-xl di HP, text-3xl di desktop */}
-                    <p className={`text-xl sm:text-3xl font-black tracking-tight leading-none ${color}`}>{value}</p>
+                    <p className={`text-2xl sm:text-3xl font-black tracking-tight leading-none tabular-nums ${color}`}>{value}</p>
                 </div>
                 {/* Icon container scale down di HP */}
-                <div className={`w-7 h-7 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl ${bar} flex items-center justify-center flex-shrink-0 shadow-sm opacity-80 group-hover:opacity-100 transition-opacity`}>
+                <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl ${dark ? "bg-white/15 ring-1 ring-white/10" : bar} flex items-center justify-center flex-shrink-0 shadow-md opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all`}>
                     <span className="scale-75 sm:scale-100 flex items-center justify-center">{icon}</span>
                 </div>
             </div>
@@ -223,17 +308,31 @@ function StatCard({ label, value, icon, color, bg, bar }: {
 
 // ─── TotalBar ─────────────────────────────────────────────────────────────────
 // Harga Beli / Margin sengaja tidak ditampilkan di sini.
-// RESPONSIVE FIX: hapus flex-wrap + min-w, pakai divide-x konsisten, scale font
+// RESPONSIVE: hapus flex-wrap + min-w, pakai divide-x konsisten, scale font
 function TotalBar({ totalSelling, count }: { totalSelling: number; count: number }) {
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 sm:px-5 py-3.5 sm:py-4 flex divide-x divide-gray-100 animate-fadeUp">
-            <div className="flex-1 pr-4 sm:pr-6">
-                <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Unit (difilter)</p>
-                <p className="text-xl sm:text-2xl font-black bg-gradient-to-r from-[#1a1545] to-[#0f0c29] bg-clip-text text-transparent tabular-nums">{count}</p>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] px-4 sm:px-6 py-4 sm:py-5 flex divide-x divide-gray-100 animate-fadeUp">
+            <div className="flex-1 pr-3 sm:pr-6 flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl ${BRAND_GRADIENT} flex items-center justify-center flex-shrink-0 shadow-md shadow-[#1a1545]/20`}>
+                    <Laptop size={16} className="text-white" />
+                </div>
+                <div className="min-w-0">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Unit (difilter)</p>
+                    <p className="text-xl sm:text-3xl font-black bg-gradient-to-r from-[#1a1545] to-[#0f0c29] bg-clip-text text-transparent tabular-nums">{count}</p>
+                </div>
             </div>
-            <div className="flex-1 pl-4 sm:pl-6">
-                <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Jual</p>
-                <p className="text-lg sm:text-xl font-black text-emerald-700 tabular-nums">{fmt(totalSelling)}</p>
+            <div className="flex-1 pl-3 sm:pl-6 flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="2" y="6" width="20" height="12" rx="2" strokeWidth={2} />
+                        <circle cx="12" cy="12" r="2.5" strokeWidth={2} />
+                        <path strokeLinecap="round" strokeWidth={2} d="M6 12h.01M18 12h.01" />
+                    </svg>
+                </div>
+                <div className="min-w-0">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Jual</p>
+                    <p className="text-base sm:text-2xl font-black text-emerald-600 tabular-nums truncate">{fmt(totalSelling)}</p>
+                </div>
             </div>
         </div>
     );
@@ -263,10 +362,10 @@ const SORT_LABELS: Record<string, string> = {
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
     return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200 shadow-sm animate-fadeIn">
+        <span className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-lg text-[11px] font-semibold bg-violet-50 text-violet-700 border border-violet-100 shadow-sm animate-fadeIn">
             {label}
-            <button onClick={onRemove} className="hover:text-gray-900 rounded p-0.5 transition">
-                <svg className="w-3 h-3 text-gray-400 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button onClick={onRemove} className="hover:bg-violet-100 rounded p-0.5 transition">
+                <svg className="w-3 h-3 text-violet-400 hover:text-violet-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
@@ -381,7 +480,7 @@ function ExportButton({ label, colorClass, loading, disabled, noData, onClick }:
             onClick={onClick}
             disabled={disabled}
             title={noData ? "Tidak ada data untuk di-export" : label}
-            className={`flex items-center gap-1.5 text-xs font-semibold h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl border transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 ${colorClass}`}
+            className={`flex items-center gap-1.5 text-xs font-semibold h-9 px-2.5 sm:px-3.5 rounded-xl border shadow-sm transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 ${colorClass}`}
         >
             {loading ? (
                 <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -420,6 +519,38 @@ function ReadyContent() {
 
     const isPKL = userRole ? (userRole === "PKL" || userRole.startsWith("PKL_") || userRole.startsWith("PKL-")) : false;
     const canConfirmTx = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) && !isPKL : false;
+    // Sales & role lain yang boleh lihat unit → boleh buka "Cek Kondisi".
+    // Juga jadi gate tombolnya: role di luar VIEW_UNITS tidak bisa fetch unit-nya
+    // (GET /api/laptops/[id]/units di-gate VIEW_UNITS), jadi tombolnya disembunyikan.
+    const canViewUnits = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_UNITS) : false;
+
+    // Modal "Cek Kondisi" (read-only) — kondisi per SN untuk sales.
+    const [conditionUnit, setConditionUnit] = useState<LaptopUnit | null>(null);
+    const [conditionData, setConditionData] = useState<{ checks: ConditionChecks; by?: string | null; at?: string | null } | null>(null);
+    const [conditionLoading, setConditionLoading] = useState(false);
+
+    // Ambil kondisi unit on-demand saat tombol diklik — reuse GET
+    // /api/laptops/[id]/units (select * → bawa condition_checks + siapa pengisi,
+    // sudah menyaring harga modal untuk non-private). Tidak perlu endpoint baru.
+    const openCondition = async (u: LaptopUnit) => {
+        setConditionUnit(u);
+        setConditionData(null);
+        setConditionLoading(true);
+        try {
+            const res = await fetch(`/api/laptops/${u.laptop_id}/units`);
+            const json = await res.json();
+            const found = (json.data ?? []).find((x: { id: string }) => x.id === u.id);
+            setConditionData({
+                checks: sanitizeConditionChecks(found?.condition_checks),
+                by: found?.condition_checked_by ?? null,
+                at: found?.condition_checked_at ?? null,
+            });
+        } catch {
+            setConditionData({ checks: {}, by: null, at: null });
+        } finally {
+            setConditionLoading(false);
+        }
+    };
 
     useEffect(() => {
         getAuthUser().then(u => ({ success: true, user: u }))
@@ -739,6 +870,13 @@ function ReadyContent() {
         is_new: isNewArrival(u.created_at),
     }));
 
+    // Ikon panah untuk <select> custom (karena appearance-none)
+    const SelectArrow = () => (
+        <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+        </svg>
+    );
+
     return (
         <>
             <style>{`
@@ -763,28 +901,26 @@ function ReadyContent() {
             `}</style>
 
             {/*
-             * RESPONSIVE FIX (main container):
-             * - p-3 di HP (naik dari p-4) supaya tabel punya lebih banyak ruang horizontal
-             * - space-y-3 di HP (naik dari space-y-5) supaya konten lebih compact
+             * RESPONSIVE (main container):
+             * - p-3 di HP supaya tabel punya lebih banyak ruang horizontal
+             * - space-y-3 di HP supaya konten lebih compact
              */}
-            <main className="min-h-screen bg-[#F7F7F8] p-3 sm:p-6 lg:p-8">
+            <main className="min-h-screen bg-gradient-to-b from-[#F7F7F8] via-[#F7F7F8] to-[#ECECF0] p-3 sm:p-6 lg:p-8">
                 <div className="max-w-full mx-auto space-y-3 sm:space-y-5 lg:space-y-6">
 
                     {/* ── Header ──────────────────────────────────────────────────────────────
-                     * RESPONSIVE FIX:
-                     * - Hapus flex-wrap dari container utama — biar header selalu 1 baris
-                     * - Tombol di HP: ikon saja (teks hidden), h-8 lebih compact
-                     * - gap dikurangi di mobile
-                     * - Baris tombol aksi jadi horizontal-scroll (overflow-x-auto + scrollbar-hide)
-                     *   supaya 3 tombol export + refresh tidak mendorong layout melebar (overflow)
-                     *   di layar HP kecil
+                     * RESPONSIVE:
+                     * - Header selalu 1 baris (tanpa flex-wrap)
+                     * - Tombol di HP: ikon saja (teks hidden)
+                     * - Baris tombol aksi horizontal-scroll (overflow-x-auto + scrollbar-hide)
+                     *   supaya 3 tombol export + refresh tidak melebar/overflow di HP kecil
                      */}
                     <div className="flex items-center justify-between gap-2 sm:gap-3 animate-slideIn">
                         {/* Kiri: ikon + judul */}
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                            <div className="w-1 h-7 sm:h-8 rounded-full bg-gradient-to-b from-[#1a1545] to-[#0f0c29] flex-shrink-0" />
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-[#1a1545] to-[#0f0c29] rounded-xl flex items-center justify-center shadow-md shadow-[#1a1545]/25 flex-shrink-0">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                            <div className={`w-1.5 h-9 sm:h-10 rounded-full ${BRAND_GRADIENT} flex-shrink-0`} />
+                            <div className={`w-9 h-9 sm:w-11 sm:h-11 ${BRAND_GRADIENT} rounded-2xl flex items-center justify-center shadow-lg shadow-[#1a1545]/25 flex-shrink-0`}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                                     <path d="M9 12l2 2 4-4" />
                                     <rect x="2" y="3" width="20" height="14" rx="2" />
                                     <line x1="8" y1="21" x2="16" y2="21" />
@@ -793,9 +929,12 @@ function ReadyContent() {
                             </div>
                             <div className="min-w-0">
                                 <h1 className="text-lg sm:text-2xl font-black text-gray-900 tracking-tight truncate">Barang Siap Jual</h1>
-                                <p className="text-[11px] sm:text-xs text-gray-400 font-medium mt-0.5">
-                                    {isLoading ? "Memuat data..." : `${units.length} unit terdaftar`}
-                                </p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    {!isLoading && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />}
+                                    <p className="text-[11px] sm:text-xs text-gray-400 font-medium truncate">
+                                        {isLoading ? "Memuat data..." : `${units.length} unit terdaftar`}
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
@@ -830,7 +969,7 @@ function ReadyContent() {
                             {/* Refresh: teks hanya tampil di ≥ sm */}
                             <button
                                 onClick={fetchUnits}
-                                className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-white hover:bg-gray-50 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl transition-all active:scale-[0.98] group flex-shrink-0"
+                                className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-white hover:bg-gray-50 shadow-sm h-9 px-2.5 sm:px-3.5 rounded-xl transition-all active:scale-[0.97] group flex-shrink-0"
                             >
                                 <svg
                                     className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`}
@@ -844,32 +983,38 @@ function ReadyContent() {
                     </div>
 
                     {/* ── Stat Cards ───────────────────────────────────────────────────────────
-                     * RESPONSIVE FIX:
-                     * - gap-2 di HP (lebih rapat), gap-3 di ≥ sm
-                     * - StatCard sendiri sudah di-scale via komponen di atas
+                     * RESPONSIVE: gap-2 di HP (lebih rapat), gap-3 di ≥ sm
                      */}
                     <div className="grid grid-cols-3 gap-2 sm:gap-3 animate-fadeUp">
-                        <StatCard label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="bg-gradient-to-r from-[#1a1545] to-[#0f0c29] bg-clip-text text-transparent" bg="bg-white" bar="bg-gradient-to-br from-[#1a1545] to-[#0f0c29]" />
+                        <StatCard dark label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="text-white" bg={BRAND_GRADIENT} bar="bg-white/25" />
                         <StatCard label="Siap Jual" value={counts.siap} icon={<CheckCircle2 size={18} className="text-white" />} color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
                         <StatCard label="Dipesan" value={counts.reserved} icon={<Lock size={18} className="text-white" />} color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
                     </div>
 
                     {/* ── Filter — disamakan dengan Data Barang ───────────── */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2.5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">                            <div className="relative">
-                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] p-3.5 sm:p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L14 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 019 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                             </svg>
-                            <input
-                                type="text"
-                                placeholder="Cari nama, brand, CPU, RAM, storage..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 focus:border-violet-400 focus:bg-white transition"
-                            />
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Filter &amp; Pencarian</span>
                         </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
+                            {/* Search umum — full width di mobile (col-span-2) */}
+                            <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    placeholder="Cari nama, brand, CPU, RAM, storage..."
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    className={`${fieldBase} pl-8 pr-3`}
+                                />
+                            </div>
                             {/* Search SN — full width di mobile (col-span-2) */}
-                            <div className="relative col-span-2 sm:col-span-1">
+                            <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                                 </svg>
@@ -878,41 +1023,56 @@ function ReadyContent() {
                                     placeholder="Cari Serial Number..."
                                     value={filterSN}
                                     onChange={e => setFilterSN(e.target.value)}
-                                    className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 focus:border-violet-400 focus:bg-white transition"
+                                    className={`${fieldBase} pl-8 pr-3`}
                                 />
                             </div>
-                            <select value={filterBrand} onChange={e => setFilterBrand(e.target.value)} className={selectCls}>
-                                {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
-                            </select>
-                            <select value={filterRam} onChange={e => setFilterRam(e.target.value)} className={selectCls}>
-                                {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
-                            </select>
-                            <select value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)} className={selectCls}>
-                                <option value="ALL">Semua Harga</option>
-                                <option value="1-2">Rp 1 jt – 2 jt</option>
-                                <option value="2-3">Rp 2 jt – 3 jt</option>
-                                <option value="3-4">Rp 3 jt – 4 jt</option>
-                                <option value="4+">Rp 4 jt ke atas</option>
-                            </select>
-                            <select value={filterPrepared} onChange={e => setFilterPrepared(e.target.value)} className={selectCls}>
-                                <option value="ALL">Semua Status Penyiapan</option>
-                                <option value="YES">🔧 Sedang Disiapkan</option>
-                                <option value="NO">Belum/Tidak Disiapkan</option>
-                            </select>
+                            <div className="relative">
+                                <select value={filterBrand} onChange={e => setFilterBrand(e.target.value)} className={selectCls}>
+                                    {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
+                                </select>
+                                <SelectArrow />
+                            </div>
+                            <div className="relative">
+                                <select value={filterRam} onChange={e => setFilterRam(e.target.value)} className={selectCls}>
+                                    {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
+                                </select>
+                                <SelectArrow />
+                            </div>
+                            <div className="relative">
+                                <select value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)} className={selectCls}>
+                                    <option value="ALL">Semua Harga</option>
+                                    <option value="1-2">Rp 1 jt – 2 jt</option>
+                                    <option value="2-3">Rp 2 jt – 3 jt</option>
+                                    <option value="3-4">Rp 3 jt – 4 jt</option>
+                                    <option value="4+">Rp 4 jt ke atas</option>
+                                </select>
+                                <SelectArrow />
+                            </div>
+                            <div className="relative">
+                                <select value={filterPrepared} onChange={e => setFilterPrepared(e.target.value)} className={selectCls}>
+                                    <option value="ALL">Semua Status Penyiapan</option>
+                                    <option value="YES">🔧 Sedang Disiapkan</option>
+                                    <option value="NO">Belum/Tidak Disiapkan</option>
+                                </select>
+                                <SelectArrow />
+                            </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2.5">
-                            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className={selectCls}>
-                                <option value="DEFAULT">Urutan Default</option>
-                                <option value="AZ">Nama: A → Z</option>
-                                <option value="ZA">Nama: Z → A</option>
-                                <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
-                                <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
-                                <option value="SN">Urut SN</option>
-                            </select>
+                            <div className="relative">
+                                <select value={sortBy} onChange={e => setSortBy(e.target.value)} className={`${selectCls} w-auto min-w-[180px]`}>
+                                    <option value="DEFAULT">Urutan Default</option>
+                                    <option value="AZ">Nama: A → Z</option>
+                                    <option value="ZA">Nama: Z → A</option>
+                                    <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
+                                    <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
+                                    <option value="SN">Urut SN</option>
+                                </select>
+                                <SelectArrow />
+                            </div>
                             {hasActiveFilter && (
                                 <button
                                     onClick={resetFilters}
-                                    className="h-9 px-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1.5 active:scale-[0.98] flex-shrink-0"
+                                    className="h-10 px-3.5 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1.5 active:scale-[0.97] flex-shrink-0"
                                 >
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                                     Reset
@@ -922,7 +1082,7 @@ function ReadyContent() {
 
                         {/* Filter Chips */}
                         {hasActiveFilter && (
-                            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-50">
+                            <div className="flex flex-wrap gap-1.5 pt-2.5 border-t border-gray-50">
                                 {search && <FilterChip label={`Cari: "${search}"`} onRemove={() => setSearch("")} />}
                                 {filterSN && <FilterChip label={`SN: "${filterSN}"`} onRemove={() => setFilterSN("")} />}
                                 {filterStatus !== "ALL" && <FilterChip label={`Status: ${STATUS_CONFIG[filterStatus]?.label ?? filterStatus}`} onRemove={() => setFilterStatus("ALL")} />}
@@ -939,9 +1099,9 @@ function ReadyContent() {
                     {isLoading ? (
                         <SkeletonRows />
                     ) : filtered.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-16 sm:py-20 gap-3">
-                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gray-100 flex items-center justify-center">
-                                <Laptop size={28} className="text-gray-300" />
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] flex flex-col items-center justify-center py-16 sm:py-20 gap-3">
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gray-100 flex items-center justify-center">
+                                <Laptop size={32} className="text-gray-300" />
                             </div>
                             <div className="text-center px-4">
                                 <p className="text-gray-600 font-bold text-sm">Tidak ada unit ditemukan</p>
@@ -952,17 +1112,17 @@ function ReadyContent() {
                             {hasActiveFilter && (
                                 <button
                                     onClick={resetFilters}
-                                    className="mt-1 h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition"
+                                    className="mt-1 h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition active:scale-[0.97]"
                                 >
                                     Reset Filter
                                 </button>
                             )}
                         </div>
                     ) : (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            {/* RESPONSIVE FIX: bungkus InventoryTable dengan overflow-x-auto sendiri,
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] overflow-hidden">
+                            {/* RESPONSIVE: bungkus InventoryTable dengan overflow-x-auto sendiri,
                                 supaya tabel bisa discroll horizontal di HP tanpa merusak rounded corner card */}
-                            <div className="overflow-x-auto">
+                            <div className="overflow-x-auto table-scroll">
                                 <InventoryTable
                                     rows={tableRows}
                                     canSeePrivate={false}
@@ -980,6 +1140,15 @@ function ReadyContent() {
                                         const isPending = u.status === "RESERVED";
                                         return (
                                             <div className="flex items-center gap-1.5">
+                                                {canViewUnits && (
+                                                    <button
+                                                        onClick={() => openCondition(u)}
+                                                        title="Lihat hasil tes kondisi unit ini"
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition active:scale-95 whitespace-nowrap"
+                                                    >
+                                                        <ClipboardList size={12} /> Cek Kondisi
+                                                    </button>
+                                                )}
                                                 {st && (
                                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap ${st.badge}`}>
                                                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.dot}`} />
@@ -1018,12 +1187,12 @@ function ReadyContent() {
                             </div>
 
                             {/*
-                             * RESPONSIVE FIX (footer tabel):
+                             * RESPONSIVE (footer tabel):
                              * - px-3 di HP (dikurangi dari px-4)
-                             * - text-xs (naik dari text-[11px]) — lebih mudah dibaca di HP
+                             * - text-xs — lebih mudah dibaca di HP
                              * - flex-wrap biar teks & badge "(difilter)" gak mepet/overflow di layar sempit
                              */}
-                            <div className="px-3 sm:px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+                            <div className="px-3 sm:px-4 py-3 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
                                 <p className="text-xs text-gray-400">
                                     Menampilkan{" "}
                                     <span className="font-bold text-gray-600">{filtered.length}</span>
@@ -1048,6 +1217,17 @@ function ReadyContent() {
             {alertMsg && <AlertModal message={alertMsg} onClose={() => setAlertMsg(null)} />}
 
             {detailUnit && <UnitInfoModal unit={detailUnit} onClose={() => setDetailUnit(null)} />}
+
+            {conditionUnit && (
+                <ConditionViewModal
+                    unit={conditionUnit}
+                    checks={conditionData?.checks ?? {}}
+                    checkedBy={conditionData?.by}
+                    checkedAt={conditionData?.at}
+                    loading={conditionLoading}
+                    onClose={() => { setConditionUnit(null); setConditionData(null); }}
+                />
+            )}
 
             {confirmTarget && (
                 <ConfirmPaymentModal
@@ -1089,19 +1269,27 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
     }, [onClose]);
 
     const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const rawFile = e.target.files?.[0];
+        if (!rawFile) return;
         setUploadingProof(true);
+        setError("");
         try {
+            const file = await compressImage(rawFile, { maxSizeMB: 1, maxWidthOrHeight: 1600 });
             const formData = new FormData();
             formData.append("file", file);
             formData.append("invoice", unit.reserved_invoice || "proof");
             const res = await fetch("/api/receipt/upload-image", { method: "POST", body: formData });
             const result = await res.json();
-            if (result.url) setPaymentProof(result.url);
-            else throw new Error("URL tidak ditemukan");
-        } catch { setError("Gagal upload foto"); }
-        finally { setUploadingProof(false); }
+            if (res.ok && result.url) {
+                setPaymentProof(result.url);
+            } else {
+                setError(result.error || result.message || "Gagal upload foto");
+            }
+        } catch (err: any) {
+            setError(err?.message || "Gagal upload foto");
+        } finally {
+            setUploadingProof(false);
+        }
     };
 
     const handleConfirm = async () => {
@@ -1128,12 +1316,12 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
     return (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center animate-fadeIn">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl ring-1 ring-black/5 flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
 
-                <div className="bg-gradient-to-br from-[#1a1545] to-[#0f0c29] px-5 py-4 flex-shrink-0">
+                <div className={`${BRAND_GRADIENT} px-5 py-5 flex-shrink-0`}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                            <div className="w-11 h-11 bg-white/20 ring-1 ring-white/10 rounded-2xl flex items-center justify-center">
                                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
@@ -1143,7 +1331,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                                 <p className="text-xs text-gray-300 mt-0.5">Transaksi akan menjadi PAID</p>
                             </div>
                         </div>
-                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition">
+                        <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition active:scale-95">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -1152,7 +1340,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                 </div>
 
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-                    <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
+                    <div className="bg-gray-50 rounded-2xl border border-gray-100 divide-y divide-gray-100">
                         {[
                             {
                                 label: "Status",
@@ -1185,7 +1373,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploadingProof}
-                            className={`w-full h-10 border-2 border-dashed rounded-xl text-xs font-medium transition flex items-center justify-center gap-2 ${paymentProof
+                            className={`w-full h-11 border-2 border-dashed rounded-xl text-xs font-medium transition flex items-center justify-center gap-2 ${paymentProof
                                 ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                                 : "border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300 hover:bg-gray-100"
                                 }`}
@@ -1210,7 +1398,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     </div>
 
                     {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 flex items-center gap-2">
                             <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
                             </svg>
@@ -1220,13 +1408,13 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                 </div>
 
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
-                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition active:scale-[0.98]">
                         Batal
                     </button>
                     <button
                         onClick={handleConfirm}
                         disabled={loading || uploadingProof}
-                        className="flex-1 h-11 bg-gradient-to-r from-[#1a1545] to-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md shadow-[#1a1545]/25"
+                        className={`flex-1 h-11 ${BRAND_GRADIENT_H} text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-[#1a1545]/25 active:scale-[0.98]`}
                     >
                         {loading ? (
                             <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>

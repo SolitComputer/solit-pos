@@ -41,8 +41,7 @@ function applyCompanyFilter(query: any, companyName: string) {
       .not("company_name", "ilike", "%on point%");
   }
   if (q === "onpoint") return query.or("company_name.ilike.%onpoint%,company_name.ilike.%on point%");
-  if (q === "zenit.id") return query.ilike("company_name", "%zenit.id%");
-  if (q === "zenit") return query.ilike("company_name", "%zenit%").not("company_name", "ilike", "%zenit.id%");
+  if (q === "sultop") return query.ilike("company_name", "%sultop%");
   return query.eq("company_name", companyName);
 }
 
@@ -372,9 +371,29 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
 
       const items = txItemsMap.get(trx.invoice_number) ?? [];
 
-      const itemDealPriceMap = new Map<string, number>();
+      // ✅ FIX: transaction_items adalah sumber kebenaran paling reliable —
+      // transactions.unit_ids/serial_numbers bisa nyangkut/stale kalau ada
+      // proses (mis. edit "ganti unit") yang cuma menambah baris
+      // transaction_items tanpa ikut menyinkronkan transactions.unit_ids
+      // (lihat komentar "FIX PENCEGAHAN" di putHandler). Tanpa ini, unit
+      // seperti SN 0007208 (restored:true, transaction_items-nya benar)
+      // tidak pernah ikut ter-grouping — SN-nya hilang dari tampilan padahal
+      // search masih bisa menemukannya karena search query transaction_items
+      // langsung.
       for (const item of items) {
-        if (item.unit_id) itemDealPriceMap.set(item.unit_id, Number(item.deal_price ?? 0));
+        if (item.unit_id && !resolvedIdSet.has(item.unit_id)) {
+          resolvedIdSet.add(item.unit_id);
+          unitIds.push(item.unit_id);
+        }
+      }
+
+      const itemDealPriceMap = new Map<string, number>();
+      const restoredUnitIds = new Set<string>(); // ✅ unit yang sudah direstore sebagian
+      for (const item of items) {
+        if (item.unit_id) {
+          itemDealPriceMap.set(item.unit_id, Number(item.deal_price ?? 0));
+          if (item.restored) restoredUnitIds.add(item.unit_id);
+        }
       }
 
       const laptopGroups = new Map<string, {
@@ -382,6 +401,7 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         laptop_name: string;
         cpu?: string; ram?: string; storage?: string; vga?: string;
         serial_numbers: string[];
+        restored_serial_numbers: string[]; // ✅ subset SN yang sudah direstore — ditampilkan dicoret di UI
         purchase_price_total: number;
         selling_price_total: number;
         allocated_deal_price: number;
@@ -397,8 +417,12 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         const unitData = unitMap.get(uid);
         if (!unitData) continue;
 
-        matchedAnyUnit = true;
-        totalPurchasePrice += unitData.purchase_price;
+        const isRestored = restoredUnitIds.has(uid); // ✅ unit ini sudah direstore sebagian
+
+        if (!isRestored) {
+          matchedAnyUnit = true;
+          totalPurchasePrice += unitData.purchase_price;
+        }
         if (unitData.serial_number) allSerialNumbers.push(unitData.serial_number);
 
         const laptopId = unitData.laptop_id ?? trx.laptop_id ?? "unknown";
@@ -415,6 +439,7 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             storage: specs?.storage,
             vga: specs?.vga,
             serial_numbers: [],
+            restored_serial_numbers: [],
             purchase_price_total: 0,
             selling_price_total: 0,
             allocated_deal_price: 0,
@@ -424,12 +449,19 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         }
 
         const group = laptopGroups.get(laptopId)!;
-        if (unitData.serial_number) group.serial_numbers.push(unitData.serial_number);
-        group.purchase_price_total += unitData.purchase_price;
-        group.selling_price_total += unitData.selling_price ?? 0;
-        group.has_matched_unit = true;
-        group.allocated_deal_price += unitDealPrice;
-        group.unit_count += 1;
+        if (unitData.serial_number) {
+          group.serial_numbers.push(unitData.serial_number);
+          // ✅ SN tetap masuk daftar (supaya tampil), tapi ditandai kalau sudah direstore
+          if (isRestored) group.restored_serial_numbers.push(unitData.serial_number);
+        }
+        // ✅ Unit yang sudah direstore TIDAK dihitung ke modal/jual/deal/unit_count lagi
+        if (!isRestored) {
+          group.purchase_price_total += unitData.purchase_price;
+          group.selling_price_total += unitData.selling_price ?? 0;
+          group.has_matched_unit = true;
+          group.allocated_deal_price += unitDealPrice;
+          group.unit_count += 1;
+        }
       }
 
       // ── Legacy: transaksi lama tanpa unit_ids ──────────────────────────────
@@ -444,6 +476,7 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
           storage: specs?.storage ?? trx.storage,
           vga: specs?.vga ?? trx.vga,
           serial_numbers: trx.serial_number ? [trx.serial_number] : [],
+          restored_serial_numbers: [], // ✅ transaksi legacy tidak punya konsep restore-sebagian
           purchase_price_total: Number(trx.inventory_price ?? 0),
           selling_price_total: Number(trx.deal_price ?? trx.amount ?? 0),
           allocated_deal_price: dealPrice, // full deal price untuk legacy

@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { CurrencyInput } from "@/components/ui/CurrencyInputField";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 
 export interface LaptopUnit {
     id: string;
@@ -12,6 +15,8 @@ export interface LaptopUnit {
     selling_price: number;
     status: string;
     notes: string;
+    condition_checks?: ConditionChecks | null;
+    kelengkapan?: string | null;
     received_at?: string;
     created_at: string;
 }
@@ -37,6 +42,7 @@ const EMPTY_FORM = {
     selling_price: "",
     status: "SIAP_JUAL",
     notes: "",
+    kelengkapan: "",
     received_at: "",
 };
 
@@ -49,13 +55,13 @@ function buildInitialFormData(editingUnit: LaptopUnit | null, defaultSellingPric
     if (!editingUnit) {
         return { ...EMPTY_FORM, selling_price: String(defaultSellingPrice || "") };
     }
-    // Preserve status asli — hanya normalisasi saat form ditampilkan untuk pilihan user
-    // SOLD dan SERVICE tetap disimpan, bukan di-override ke BELUM_SIAP
+    // SOLD tetap dipertahankan (digerakkan transaksi). SERVICE sudah tidak
+    // dipakai lagi → unit lama berstatus SERVICE otomatis dianggap BELUM_SIAP
+    // saat form edit dibuka, lalu ikut tersimpan sebagai BELUM_SIAP.
     const editableStatus =
         editingUnit.status === "SIAP_JUAL" ? "SIAP_JUAL" :
             editingUnit.status === "SOLD" ? "SOLD" :
-                editingUnit.status === "SERVICE" ? "SERVICE" :
-                    "BELUM_SIAP";
+                "BELUM_SIAP";
     return {
         serial_number: editingUnit.serial_number,
         grade: editingUnit.grade,
@@ -64,6 +70,7 @@ function buildInitialFormData(editingUnit: LaptopUnit | null, defaultSellingPric
         selling_price: String(editingUnit.selling_price || ""),
         status: editableStatus,
         notes: editingUnit.notes || "",
+        kelengkapan: editingUnit.kelengkapan || "",
         received_at: editingUnit.created_at ? new Date(editingUnit.created_at).toISOString().split("T")[0] : "",
     };
 }
@@ -75,6 +82,7 @@ export default function UnitFormModal({
     onClose,
     onSuccess,
     onError,
+    canEditChecklist = true,
 }: {
     laptopId: string;
     defaultSellingPrice: number;
@@ -82,11 +90,15 @@ export default function UnitFormModal({
     onClose: () => void;
     onSuccess: () => void;
     onError: (message: string) => void;
+    canEditChecklist?: boolean;
 }) {
     const [formData, setFormData] = useState<Record<string, string>>(() =>
         buildInitialFormData(editingUnit, defaultSellingPrice)
     );
     const [formLoading, setFormLoading] = useState(false);
+    const [conditionChecks, setConditionChecks] = useState<ConditionChecks>(
+        () => sanitizeConditionChecks(editingUnit?.condition_checks)
+    );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -99,6 +111,7 @@ export default function UnitFormModal({
                 ...formData,
                 purchase_price: Number(formData.purchase_price),
                 selling_price: Number(formData.selling_price),
+                ...(canEditChecklist ? { condition_checks: conditionChecks } : {}),
                 ...(formData.received_at
                     ? { received_at: new Date(formData.received_at).toISOString() }
                     : { received_at: undefined }),
@@ -151,7 +164,7 @@ export default function UnitFormModal({
                                         window.open(`https://www.google.com/search?q=${encodeURIComponent(formData.serial_number + " laptop")}`, "_blank");
                                     }}
                                     className="px-3 h-9 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">
-                                     Cek
+                                    Cek
                                 </button>
                             </div>
                         </div>
@@ -161,8 +174,10 @@ export default function UnitFormModal({
                             <label className="block text-xs font-medium text-gray-500 mb-1.5">
                                 Harga Jual <span className="text-red-400">*</span>
                             </label>
-                            <input name="selling_price" type="number" placeholder="0"
-                                value={formData.selling_price} onChange={handleChange} required
+                            <CurrencyInput name="selling_price"
+                                value={Number(formData.selling_price) || 0}
+                                onChange={(v) => setFormData(prev => ({ ...prev, selling_price: String(v) }))}
+                                required
                                 className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
                             {editingUnit && (
                                 <p className="text-[10px] text-violet-600 mt-1 flex items-center gap-1">
@@ -312,6 +327,19 @@ export default function UnitFormModal({
                             </div>
                         )}
 
+                        {/* Tes Kondisi per unit — tiap SN dites sendiri, bukan sekaligus 1 model */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                Tes Kondisi
+                                <span className="text-gray-400 font-normal ml-1">(per unit / SN)</span>
+                            </label>
+                            <ConditionChecklist
+                                value={conditionChecks}
+                                onChange={setConditionChecks}
+                                readOnly={!canEditChecklist}
+                            />
+                        </div>
+
                         {/* Tanggal Masuk */}
                         <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1.5">
@@ -324,6 +352,17 @@ export default function UnitFormModal({
                             {formData.received_at && (
                                 <p className="text-[10px] text-gray-400 mt-1">Barang masuk: {fmtDate(formData.received_at)}</p>
                             )}
+                        </div>
+
+                        {/* Kelengkapan — teks bebas, mis. "Dus, charger, tas" */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                Kelengkapan
+                                <span className="text-gray-400 font-normal ml-1">(opsional)</span>
+                            </label>
+                            <input name="kelengkapan" placeholder="Contoh: Dus, charger, tas, mouse..."
+                                value={formData.kelengkapan} onChange={handleChange}
+                                className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
                         </div>
 
                         {/* Notes Internal */}
