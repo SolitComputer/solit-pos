@@ -1073,7 +1073,15 @@ export default function CreatePaymentPage() {
                             />
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tahu Solit dari mana?</label>
-                                <select className={selectClass} {...register("source_platform")}>
+                                {/* Input bebas + saran kategori. Sales bisa klik saran ATAU ketik manual. */}
+                                <input
+                                    type="text"
+                                    list="source-platform-options"
+                                    className={inputClass}
+                                    placeholder="Pilih dari daftar atau ketik sendiri..."
+                                    {...register("source_platform")}
+                                />
+                                <datalist id="source-platform-options">
                                     {[
                                         "Ads Facebook",
                                         "Ads Instagram",
@@ -1085,11 +1093,18 @@ export default function CreatePaymentPage() {
                                         "Shopee",
                                         "Tokopedia",
                                         "Teman",
+                                        "Sosmed",
+                                        "OLX",
+                                        "Carousell",
+                                        "E-commerce",
+                                        "Threads",
+                                        "Mitra",
+                                        "Reseller",
                                         "Lainnya"
                                     ].map(s => (
-                                        <option key={s} value={s}>{s}</option>
+                                        <option key={s} value={s} />
                                     ))}
-                                </select>
+                                </datalist>
                             </div>
 
                             <button type="button" onClick={() => {
@@ -1342,15 +1357,15 @@ export default function CreatePaymentPage() {
                                                                 </div>
                                                             </div>
                                                         )}
-                                                                                                       </div>
+                                                    </div>
                                                 )}
                                             </div>
-                                            )}
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
+                                )}
 
-                                </>
-                                
+                            </>
+
                             {/* ── Aksesori (opsional, tanpa SN) ──
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">

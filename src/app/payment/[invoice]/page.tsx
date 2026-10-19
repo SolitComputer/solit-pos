@@ -1071,13 +1071,19 @@ export default function EditTransactionPage() {
               />
             </Field>
             <Field label="Sumber Platform">
-              <select
+              {/* Input bebas + saran kategori — nilai lama apa pun tetap tampil & bisa diubah manual. */}
+              <input
                 name="source_platform"
+                list="source-platform-options-edit"
                 value={formData.source_platform || ""}
                 onChange={handleChange}
-                className={selectCls}
-              >
+                className={inputCls}
+                placeholder="Pilih dari daftar atau ketik sendiri..."
+              />
+              <datalist id="source-platform-options-edit">
                 {[
+                  "Ads Facebook",
+                  "Ads Instagram",
                   "Instagram",
                   "TikTok",
                   "Facebook",
@@ -1086,13 +1092,18 @@ export default function EditTransactionPage() {
                   "Shopee",
                   "Tokopedia",
                   "Teman",
+                  "Sosmed",
+                  "OLX",
+                  "Carousell",
+                  "E-commerce",
+                  "Threads",
+                  "Mitra",
+                  "Reseller",
                   "Lainnya",
                 ].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
+                  <option key={s} value={s} />
                 ))}
-              </select>
+              </datalist>
             </Field>
           </div>
 
