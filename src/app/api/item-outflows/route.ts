@@ -7,7 +7,7 @@ import { ITEM_OUTFLOW_ROLES, expandRolesWithParents } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
 
-const VALID_TYPES = ["SERVICE", "KEBUTUHAN"] as const;
+const VALID_TYPES = ["SERVICE", "KEBUTUHAN", "LAIN"] as const;
 type OutflowType = (typeof VALID_TYPES)[number];
 
 
@@ -51,7 +51,7 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
         if (wantsTransaksi) {
             const { data: accOutflows, error: accErr } = await supabaseAdmin
                 .from("accessory_outflows")
-               .select("id, accessory_id, qty, status, transaction_invoice, notes, created_at, is_audited, audited_by, audited_at, audit_cancel_reason, audit_cancelled_by, audit_cancelled_at")
+               .select("id, accessory_id, unit_id, qty, status, transaction_invoice, notes, created_at, is_audited, audited_by, audited_at, audit_cancel_reason, audit_cancelled_by, audit_cancelled_at")
                 .eq("source_type", "transaction")
                 .order("created_at", { ascending: false });
 
@@ -60,18 +60,26 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
             } else if (accOutflows && accOutflows.length > 0) {
                 const accessoryIds = [...new Set(accOutflows.map((o) => o.accessory_id).filter(Boolean))];
                 const invoiceNumbers = [...new Set(accOutflows.map((o) => o.transaction_invoice).filter(Boolean))];
+                // ✅ FIX: kumpulkan unit_id aksesori ber-SN supaya SN bisa di-resolve.
+                // Tanpa ini, penjualan aksesori ber-SN (mis. HDD-483) tampil tanpa SN
+                // di Pengambilan Barang — beda dari laptop & service yang sudah benar.
+                const accUnitIds = [...new Set(accOutflows.map((o) => o.unit_id).filter(Boolean))];
 
-                const [{ data: accessories }, { data: transactions }] = await Promise.all([
+                const [{ data: accessories }, { data: transactions }, { data: accUnitRows }] = await Promise.all([
                     accessoryIds.length > 0
                         ? supabaseAdmin.from("accessories").select("id, name").in("id", accessoryIds)
                         : Promise.resolve({ data: [] as any[] }),
                     invoiceNumbers.length > 0
                         ? supabaseAdmin.from("transactions").select("invoice_number, customer_name, sales_name").in("invoice_number", invoiceNumbers)
                         : Promise.resolve({ data: [] as any[] }),
+                    accUnitIds.length > 0
+                        ? supabaseAdmin.from("accessory_units").select("id, serial_number").in("id", accUnitIds)
+                        : Promise.resolve({ data: [] as any[] }),
                 ]);
 
                 const accessoryNameMap = new Map((accessories ?? []).map((a: any) => [a.id, a.name]));
                 const txMap = new Map((transactions ?? []).map((t: any) => [t.invoice_number, t]));
+                const accUnitSnMap = new Map((accUnitRows ?? []).map((u: any) => [u.id, u.serial_number]));
 
                 transaksiRows = accOutflows.map((o: any) => {
                     const tx = o.transaction_invoice ? txMap.get(o.transaction_invoice) : null;
@@ -95,6 +103,7 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
                         created_at: o.created_at,
                         status: o.status,
                         transaction_invoice: o.transaction_invoice,
+                        serial_number: o.unit_id ? (accUnitSnMap.get(o.unit_id) ?? null) : null, // ✅ SN aksesori ber-SN
                     };
                 });
             }
@@ -266,6 +275,89 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         if (!accessory_unit_id || !accessory_id) {
             return NextResponse.json({ success: false, message: "Unit aksesoris (SN) wajib dipilih" }, { status: 400 });
         }
+
+        // ── MODE "LAIN-LAIN": aksesoris keluar TANPA laptop tujuan ──────────────
+        // Menandai unit yang fisiknya sudah keluar tapi tak lewat alur mana pun
+        // (mis. RAM yang nyangkut TERSEDIA padahal sudah hilang). TIDAK memindah
+        // modal & TIDAK membuat jurnal — murni koreksi stok keluar + catatan.
+        // Unit diklaim KELUAR secara ATOMIK (guard TERSEDIA) = anti double-give,
+        // pola sama persis dgn alur Kebutuhan di bawah.
+        const outflowMode = body.outflow_type === "LAIN" ? "LAIN" : "KEBUTUHAN";
+        if (outflowMode === "LAIN") {
+            const keterangan = String(body.keterangan ?? body.purpose ?? "").trim();
+            if (!keterangan) {
+                return NextResponse.json({ success: false, message: "Keterangan wajib diisi" }, { status: 400 });
+            }
+
+            const { data: claimedLain } = await supabaseAdmin
+                .from("accessory_units")
+                .update({ status: "KELUAR" })
+                .eq("id", accessory_unit_id)
+                .eq("status", "TERSEDIA")
+                .select("id, buy_price")
+                .maybeSingle();
+            if (!claimedLain) {
+                return NextResponse.json(
+                    { success: false, message: "Unit aksesoris sudah tidak tersedia / sudah diambil" },
+                    { status: 400 }
+                );
+            }
+            await recalcAccessoryParentStock(supabaseAdmin, accessory_id);
+
+            // Nominal = modal unit (fallback ke induk) — cuma buat ditampilkan,
+            // tidak dipindah ke mana-mana.
+            let modalLain = Math.round(Number(claimedLain.buy_price ?? 0));
+            if (modalLain <= 0) {
+                const { data: accParent } = await supabaseAdmin.from("accessories").select("buy_price").eq("id", accessory_id).single();
+                modalLain = Math.round(Number(accParent?.buy_price ?? 0));
+            }
+
+            const purposeLain = `${accessory_name || "Aksesoris"} - ${accessory_sn ?? "—"} · ${keterangan}`;
+
+            const { data: lainRow, error: lainErr } = await supabase
+                .from("item_outflows")
+                .insert({
+                    outflow_type: "LAIN",
+                    person_name: user.name,
+                    item_kind: "ACCESSORY",
+                    item_ref_id: accessory_id,
+                    item_name: accessory_name || "Aksesoris",
+                    unit_id: accessory_unit_id,
+                    serial_number: accessory_sn,
+                    purpose: purposeLain,
+                    nominal: modalLain,
+                    created_by: user.id,
+                    created_by_name: user.name,
+                    created_by_role: user.role,
+                })
+                .select()
+                .single();
+
+            if (lainErr) {
+                // Insert gagal setelah unit di-claim → balikin ke TERSEDIA (kompensasi).
+                await supabaseAdmin
+                    .from("accessory_units")
+                    .update({ status: "TERSEDIA" })
+                    .eq("id", accessory_unit_id)
+                    .eq("status", "KELUAR");
+                await recalcAccessoryParentStock(supabaseAdmin, accessory_id);
+                return NextResponse.json({ success: false, message: lainErr.message }, { status: 400 });
+            }
+
+            await logActivity({
+                userId: user.id,
+                userName: user.name,
+                userRole: user.role,
+                action: "CREATE",
+                entity: "item_outflow",
+                entityId: lainRow.id,
+                entityLabel: purposeLain,
+                afterData: lainRow,
+            });
+
+            return NextResponse.json({ success: true, data: lainRow });
+        }
+
         if (!laptop_unit_id || !laptop_id) {
             return NextResponse.json({ success: false, message: "Unit laptop tujuan (SN) wajib dipilih" }, { status: 400 });
         }

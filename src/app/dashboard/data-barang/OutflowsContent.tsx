@@ -8,7 +8,7 @@ import { usePagePermission } from "@/hooks/usePagePermission";
 import { ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
 import { getAuthUser } from "@/hooks/useAuthUser";
 
-type OutflowType = "SERVICE" | "KEBUTUHAN" | "TRANSAKSI";
+type OutflowType = "SERVICE" | "KEBUTUHAN" | "TRANSAKSI" | "LAIN";
 type ItemKind = "LAPTOP" | "ACCESSORY";
 
 interface ItemOutflow {
@@ -63,11 +63,13 @@ const TYPE_BADGE: Record<OutflowType, string> = {
     SERVICE: "bg-blue-50 text-blue-700 border-blue-200",
     KEBUTUHAN: "bg-amber-50 text-amber-700 border-amber-200",
     TRANSAKSI: "bg-zinc-100 text-zinc-700 border-zinc-200",
+    LAIN: "bg-purple-50 text-purple-700 border-purple-200",
 };
 const TYPE_LABEL: Record<OutflowType, string> = {
     SERVICE: "Service",
     KEBUTUHAN: "Kebutuhan",
     TRANSAKSI: "Penjualan",
+    LAIN: "Lain-lain",
 };
 const KIND_BADGE: Record<ItemKind, string> = {
     LAPTOP: "bg-zinc-900 text-white border-zinc-900",
@@ -264,6 +266,7 @@ export default function OutflowsContent() {
                         <option value="SERVICE">Service</option>
                         <option value="KEBUTUHAN">Kebutuhan</option>
                         <option value="TRANSAKSI">Penjualan</option>
+                        <option value="LAIN">Lain-lain</option>
                     </select>
 
                     {/* Jenis Barang */}
@@ -555,6 +558,12 @@ function OutflowFormModal({
 
     const [submitting, setSubmitting] = useState(false);
 
+    // ── Mode pengambilan ──────────────────────────────────────────────────
+    // "KEBUTUHAN" = aksesoris keluar & modalnya pindah ke laptop tujuan (lama).
+    // "LAIN"      = aksesoris keluar saja + keterangan, tanpa laptop tujuan.
+    const [mode, setMode] = useState<"KEBUTUHAN" | "LAIN">("KEBUTUHAN");
+    const [keterangan, setKeterangan] = useState("");
+
     // Debounced search aksesoris (by SN)
     useEffect(() => {
         if (accSel) return;
@@ -597,24 +606,35 @@ function OutflowFormModal({
 
     const handleSubmit = async () => {
         if (!accSel) return toast.error("SN aksesoris (keluar) wajib dipilih");
-        if (!lapSel) return toast.error("SN laptop tujuan wajib dipilih");
+        if (mode === "KEBUTUHAN" && !lapSel) return toast.error("SN laptop tujuan wajib dipilih");
+        if (mode === "LAIN" && !keterangan.trim()) return toast.error("Keterangan wajib diisi");
 
         setSubmitting(true);
         try {
-            const res = await fetch("/api/item-outflows", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+            const payload = mode === "LAIN"
+                ? {
+                    outflow_type: "LAIN",
+                    accessory_id: accSel.accessory_id,
+                    accessory_unit_id: accSel.unit_id,
+                    accessory_name: accSel.accessory_name,
+                    accessory_sn: accSel.serial_number,
+                    keterangan: keterangan.trim(),
+                }
+                : {
                     outflow_type: "KEBUTUHAN",
                     accessory_id: accSel.accessory_id,
                     accessory_unit_id: accSel.unit_id,
                     accessory_name: accSel.accessory_name,
                     accessory_sn: accSel.serial_number,
-                    laptop_id: lapSel.laptop_id,
-                    laptop_unit_id: lapSel.unit_id,
-                    laptop_name: lapSel.laptop_name,
-                    laptop_sn: lapSel.serial_number,
-                }),
+                    laptop_id: lapSel!.laptop_id,
+                    laptop_unit_id: lapSel!.unit_id,
+                    laptop_name: lapSel!.laptop_name,
+                    laptop_sn: lapSel!.serial_number,
+                };
+            const res = await fetch("/api/item-outflows", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
             });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan");
@@ -622,8 +642,12 @@ function OutflowFormModal({
             // langsung ter-refresh saat pindah ke tab Data Barang (tidak lagi
             // kebaca dari cache lama 5 menit yang masih menampilkan unit itu).
             try { sessionStorage.removeItem("unified-barang-cache-v1"); } catch { /* storage diblokir — abaikan */ }
-            toast.success("Kebutuhan dicatat — modal aksesoris pindah ke laptop");
-            onSuccess();
+            toast.success(
+                mode === "LAIN"
+                    ? "Aksesoris ditandai keluar — stok diperbarui"
+                    : "Kebutuhan dicatat — modal aksesoris pindah ke laptop"
+            );
+                        onSuccess();
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Terjadi kesalahan");
         } finally { setSubmitting(false); }
@@ -639,8 +663,10 @@ function OutflowFormModal({
                 onClick={e => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-                    <h3 className="text-base font-bold text-gray-900">Pengambilan Barang (Kebutuhan)</h3>
-                    <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition">
+                    <h3 className="text-base font-bold text-gray-900">
+                        {mode === "LAIN" ? "Pengambilan Barang (Lain-lain)" : "Pengambilan Barang (Kebutuhan)"}
+                    </h3>
+                                        <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
@@ -654,6 +680,21 @@ function OutflowFormModal({
                         <div className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 flex items-center justify-between">
                             <span className="font-medium">{currentUserName || "—"}</span>
                             <span className="text-[10px] text-gray-400 font-medium">otomatis dari akun</span>
+                        </div>
+                    </div>
+
+                    {/* Mode pengambilan */}
+                    <div>
+                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Jenis Pengambilan</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button type="button" onClick={() => setMode("KEBUTUHAN")}
+                                className={`py-2.5 rounded-xl text-[13px] font-semibold border transition ${mode === "KEBUTUHAN" ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                Kebutuhan (ke laptop)
+                            </button>
+                            <button type="button" onClick={() => setMode("LAIN")}
+                                className={`py-2.5 rounded-xl text-[13px] font-semibold border transition ${mode === "LAIN" ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                Lain-lain (keluar saja)
+                            </button>
                         </div>
                     </div>
 
@@ -696,7 +737,8 @@ function OutflowFormModal({
                         )}
                     </div>
 
-                    {/* SN Laptop (tujuan) */}
+                    {/* SN Laptop (tujuan) — hanya mode Kebutuhan */}
+                    {mode === "KEBUTUHAN" && (
                     <div className="relative">
                         <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">
                             SN Laptop (tujuan) <span className="text-red-500">*</span>
@@ -734,9 +776,26 @@ function OutflowFormModal({
                             </p>
                         )}
                     </div>
+                    )}
+
+                    {/* Keterangan — hanya mode Lain-lain */}
+                    {mode === "LAIN" && (
+                        <div>
+                            <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">
+                                Keterangan <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                                value={keterangan}
+                                onChange={e => setKeterangan(e.target.value)}
+                                rows={3}
+                                placeholder="Alasan / catatan unit ini keluar…"
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 resize-none"
+                            />
+                        </div>
+                    )}
 
                     {/* Preview transfer */}
-                    {accSel && lapSel && (
+                    {mode === "KEBUTUHAN" && accSel && lapSel && (
                         <div className={`text-[12px] rounded-xl px-3 py-2.5 border ${accSel.buy_price > 0 ? "bg-zinc-50 border-zinc-200 text-zinc-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
                             {accSel.buy_price > 0 ? (
                                 <>Modal <b>{rupiah(accSel.buy_price)}</b> akan pindah dari aksesoris → ditambahkan ke modal laptop tujuan. Jurnal: <b>D130 / K170</b>.</>

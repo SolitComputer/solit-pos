@@ -236,6 +236,12 @@ export default function EditTransactionPage() {
               deal_price: Number(a.deal_price ?? 0),
               selling_price: Number(a.selling_price ?? 0),
               is_bonus: Boolean(a.is_bonus || Number(a.deal_price) === 0),
+              // ✅ FIX: bawa balik SN (+ unit_id) aksesori ber-SN. Tanpa ini,
+              // tiap transaksi di-edit, serial_number hilang dari state →
+              // handleSave kirim null → backend tak bisa tandai unit KELUAR →
+              // unit nyangkut TERSEDIA di Data Barang (persis kasus HDD-483).
+              serial_number: a.serial_number ?? undefined,
+              unit_id: a.unit_id ?? undefined,
             }));
             setActiveAccessories(accs);
           }
