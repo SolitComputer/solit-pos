@@ -35,6 +35,7 @@ interface ApiRow {
   days_left: number;
   next_career_level: string | null;
   contract_duration: string | null;
+  contract_duration_months: number | null; // durasi kontrak (bulan): TTD → berlaku sampai
   next_contract_duration: string | null;
 }
 
@@ -56,6 +57,10 @@ const fullDate = (iso: string): string => {
     return iso;
   }
 };
+
+// Label durasi untuk kolom "Kontrak Sebelumnya": "X bulan" atau "-".
+const durationLabel = (months: number | null): string =>
+  months && months > 0 ? `${months} bulan` : "-";
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 function Avatar({
@@ -277,7 +282,7 @@ function JenjangTable({
                 {p.role ? getRoleLabel(p.role, lookup) : "-"}
               </td>
               <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#64748b" }}>
-                {p.contract_duration ?? "-"}
+                {durationLabel(p.contract_duration_months)}
               </td>
               <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#334155" }}>
                 {p.career_level ?? "-"}
@@ -388,8 +393,8 @@ export default function ContractExpiringPage() {
           role: p.role ? getRoleLabel(p.role, customLookup) : "-",
           next_level: p.next_career_level ?? "-",
           prev_level: p.career_level ?? "-",
-          kontrak_prev: p.contract_duration ?? "-",
-          kontrak_next: p.next_contract_duration ?? "-",
+          kontrak_prev: durationLabel(p.contract_duration_months),
+                    kontrak_next: p.next_contract_duration ?? "-",
         }))
       );
     } catch (e) {

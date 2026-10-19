@@ -18,6 +18,28 @@ interface ContractInfoData {
   admin?: { name: string } | null;
 }
 
+// Format timestamp TTD (ISO lengkap) → "31 Oktober 2026, 14.30"
+const fmtSignedAt = (iso: string | null): string | null => {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleString("id-ID", {
+      day: "numeric", month: "long", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch { return iso; }
+};
+
+// Format tanggal "berlaku sampai" (string "YYYY-MM-DD") → "31 Oktober 2026".
+// Pakai suffix "T00:00:00" supaya tidak bergeser 1 hari karena timezone.
+const fmtDate = (ymd: string | null): string | null => {
+  if (!ymd) return null;
+  try {
+    return new Date(ymd + "T00:00:00").toLocaleDateString("id-ID", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+  } catch { return ymd; }
+};
+
 const STATUS_META: Record<string, { icon: React.ReactNode; color: string; title: string }> = {
   APPROVED: { icon: <CheckCircle2 className="w-10 h-10" />, color: "#059669", title: "Kontrak sudah disetujui" },
   PENDING: { icon: <Clock className="w-10 h-10" />, color: "#d97706", title: "Menunggu persetujuan karyawan" },
@@ -58,9 +80,21 @@ export default function ContractInfoModal({
           <div className="text-center py-2">
             <div className="mx-auto mb-2" style={{ color: meta.color }}>{meta.icon}</div>
             <p className="text-sm font-bold" style={{ color: meta.color }}>{meta.title}</p>
-            {contract.status === "APPROVED" && contract.valid_until && (
-              <p className="text-xs text-slate-400 mt-1">Berlaku sampai {contract.valid_until}</p>
+
+            {/* ATAS: kapan karyawan menandatangani kontrak */}
+            {contract.user_signed_at && (
+              <p className="text-xs text-slate-400 mt-1">
+                Ditandatangani pada {fmtSignedAt(contract.user_signed_at)}
+              </p>
             )}
+
+            {/* BAWAH: masa berlaku kontrak sampai kapan */}
+            {contract.valid_until && (
+              <p className="text-xs text-slate-400 mt-0.5">
+                Berlaku sampai {fmtDate(contract.valid_until)}
+              </p>
+            )}
+
             {contract.career_level && (
               <div className="mt-2.5 flex justify-center"><CareerLevelBadge level={contract.career_level} /></div>
             )}
