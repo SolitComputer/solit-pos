@@ -116,21 +116,26 @@ function isAuditActive(row: Pick<UnifiedRow, "tipe" | "audited_at">): boolean {
 }
 
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
-const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
-const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
+// ⏰ SO di-reset tiap jam 22:00 WIB (bukan tengah malam). Caranya: geser waktu
+// WIB mundur SO_RESET_HOUR jam lalu ambil tanggalnya sebagai "kunci periode".
+// Semua waktu 22:00 hari ini s/d 21:59 WIB besok jatuh ke kunci yang SAMA,
+// jadi dihitung satu sesi SO; begitu lewat 22:00 kuncinya berganti = reset.
+const SO_RESET_HOUR = 22;
+const soPeriodKey = (d: Date) =>
+    new Date(d.getTime() + WIB_OFFSET_MS - SO_RESET_HOUR * 60 * 60 * 1000).toISOString().slice(0, 10);
+const isSoActive = (soAt?: string | null) => !!soAt && soPeriodKey(new Date(soAt)) === soPeriodKey(new Date());
 
 // ── Helper per-unit untuk progress X/Y ─────────────────────────────────────
 // Logika reset DISAMAKAN dengan halaman Kelola Unit:
 //  • Audit unit laptop  → TTL 2 hari sejak audited_at.
-//  • SO unit (laptop & aksesoris) → aktif kalau di-SO pada TANGGAL WIB yang
-//    sama dengan hari ini (reset tiap 00:00 WIB), bukan rolling 24 jam.
+//  • SO unit (laptop & aksesoris) → aktif kalau di-SO dalam periode SO
+//    berjalan (reset tiap 22:00 WIB), bukan rolling 24 jam.
 function isUnitAuditActiveLaptop(u: LaptopUnitLite): boolean {
     return !!u.audited_at && Date.now() - new Date(u.audited_at).getTime() < LAPTOP_AUDIT_TTL_MS;
 }
 function isUnitSoActive(soAt?: string | null): boolean {
-    return !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
+    return !!soAt && soPeriodKey(new Date(soAt)) === soPeriodKey(new Date());
 }
-
 // Arsip MANUAL hanya boleh muncul saat stok BENAR-BENAR habis (0 semua).
 function isStockEmpty(row: UnifiedRow): boolean {
     const stok = row.tipe === "LAPTOP" ? (row.stok_tersedia ?? 0) : (row.stok ?? 0);

@@ -49,11 +49,15 @@ interface Accessory {
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
-// SO dianggap aktif kalau ditandai pada TANGGAL KALENDER yang sama (WIB),
-// bukan hitung mundur 24 jam — persis logika di UnifiedBarangContent.tsx.
+// SO di-reset tiap jam 22:00 WIB (bukan tengah malam) — persis logika di
+// UnifiedBarangContent.tsx. "Kunci periode" dihitung dengan menggeser waktu WIB
+// mundur SO_RESET_HOUR jam lalu ambil tanggalnya; semua waktu 22:00 hari ini
+// s/d 21:59 WIB besok jatuh ke kunci yang sama = satu sesi SO.
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
-const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
-const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
+const SO_RESET_HOUR = 22;
+const soPeriodKey = (d: Date) =>
+    new Date(d.getTime() + WIB_OFFSET_MS - SO_RESET_HOUR * 60 * 60 * 1000).toISOString().slice(0, 10);
+const isSoActive = (soAt?: string | null) => !!soAt && soPeriodKey(new Date(soAt)) === soPeriodKey(new Date());
 
 // Audit unit aksesoris: reset otomatis 3 hari (disamakan dengan AUDIT_TTL_MS
 // di endpoint /api/accessory-units/[id]/audit & ACCESSORY_AUDIT_TTL_MS).
@@ -1333,7 +1337,7 @@ function SoHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose
                     </span>
                     {active && unit.so_at && (
                         <p className="text-[11px] text-gray-400 mt-1.5">
-                            Terakhir: {new Date(unit.so_at).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB · reset tiap jam 00:00
+                            Terakhir: {new Date(unit.so_at).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB · reset tiap jam 22:00
                         </p>
                     )}
                 </div>
