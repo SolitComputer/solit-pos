@@ -835,27 +835,18 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
-                {/* Sumber traffic — tandai leads ini datang dari iklan (Ads) atau organik.
-                    Nilainya ikut mengalir ke halaman Audit Marketing. */}
-                <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1.5 block">Sumber Traffic</label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAds(true)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${ads ? "bg-violet-600 border-violet-600 text-white shadow-sm shadow-violet-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"}`}
-                    >
-                      <Megaphone className="w-3.5 h-3.5" /> Ads
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAds(false)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/30 ${!ads ? "bg-gray-800 border-gray-800 text-white shadow-sm shadow-gray-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"}`}
-                    >
-                      Organik
-                    </button>
-                  </div>
-                </div>
+                {/* Ads — opsional. Dicentang = leads dari iklan, tidak dicentang = organik.
+                    Nilainya tetap ikut mengalir ke halaman Audit Marketing. */}
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none pt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={ads}
+                    onChange={(e) => setAds(e.target.checked)}
+                    className="w-4 h-4 rounded accent-violet-600"
+                  />
+                  <Megaphone className="w-3.5 h-3.5 text-violet-600" />
+                  Dari Ads (opsional)
+                </label>
 
                 {formError && (
                   <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">

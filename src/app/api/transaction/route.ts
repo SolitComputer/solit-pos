@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { canViewTransactions } from "@/lib/permissions";
 
 function splitSerials(raw: any): string[] {
   if (Array.isArray(raw)) return raw.filter(Boolean).map((s: string) => String(s).trim()).filter(Boolean);
@@ -47,6 +48,18 @@ function applyCompanyFilter(query: any, companyName: string) {
 
 async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
   try {
+    // ── Gate akses: role VIEW_TRANSACTIONS ATAU akun whitelist per-UUID ──────
+    // Dulu gate ini ada di withAuth(handler, VIEW_TRANSACTIONS) — murni per-role,
+    // jadi akun whitelist (mis. Fikri — MARKETING) kena 403 sebelum handler jalan.
+    // Dipindah ke sini supaya canViewTransactions() bisa cek role + user.id.
+    const roles = user.roles ?? [user.role];
+    if (!canViewTransactions(roles, user.id)) {
+      return NextResponse.json(
+        { success: false, message: "Forbidden: tidak punya akses ke data transaksi" },
+        { status: 403 }
+      );
+    }
+
     // ✅ SECURITY FIX: dulu endpoint ini withAuth(handler) TANPA daftar role
     // (siapa saja yang login lolos) DAN responsnya menyertakan harga modal +
     // margin mentah untuk setiap transaksi — beda dari semua endpoint
@@ -601,4 +614,6 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(handler, PERMISSIONS.VIEW_TRANSACTIONS);
+// Gate role/UUID dipindah ke dalam handler (canViewTransactions) supaya akun
+// whitelist per-UUID ikut lolos. withAuth tetap dipakai utk autentikasi (user login).
+export const GET = withAuth(handler);

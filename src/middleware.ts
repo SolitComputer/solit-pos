@@ -11,6 +11,7 @@ import {
 import {
   expandRolesWithParents,
   getEffectivePrimaryRole,
+  TRANSACTION_VIEW_EXTRA_USER_IDS,
 } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 import { checkDynamicPageAccess, expandDynamicParents } from "@/lib/dynamicPermissions";
@@ -568,6 +569,21 @@ export async function middleware(request: NextRequest) {
   } else if (dyn.matched) {
     hasRouteAccess = false;
   } else {
+    hasRouteAccess = true;
+  }
+
+  // ── By-pass per-AKUN: Riwayat Transaksi ──────────────────────────────────
+  // Akun di TRANSACTION_VIEW_EXTRA_USER_IDS (mis. Fikri — MARKETING) boleh
+  // buka /dashboard/transactions + /api/transaction walau role-nya tidak ada
+  // di ROUTE_PERMISSIONS. Hanya menambah akses (OR), tidak pernah mencabut.
+  if (
+    !hasRouteAccess &&
+    TRANSACTION_VIEW_EXTRA_USER_IDS.includes(user.id) &&
+    (pathname === "/dashboard/transactions" ||
+      pathname.startsWith("/dashboard/transactions/") ||
+      pathname === "/api/transaction" ||
+      pathname.startsWith("/api/transaction/"))
+  ) {
     hasRouteAccess = true;
   }
 

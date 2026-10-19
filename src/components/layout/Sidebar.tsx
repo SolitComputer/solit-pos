@@ -11,7 +11,7 @@ import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES, CONTRACT_EXPIRING_VIEW_ROLES } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES, CONTRACT_EXPIRING_VIEW_ROLES, TRANSACTION_VIEW_EXTRA_USER_IDS } from "@/lib/permissions";
 import { hasSopAccess } from "@/lib/sop";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
@@ -1743,7 +1743,9 @@ export default function Sidebar() {
 
   const isContractSigner = user?.id === YOGA_ADMIN_ID || user?.id === REINALDY_ADMIN_ID;
   const isContractExpiringAdmin = userRoles.some((r) => (CONTRACT_EXPIRING_VIEW_ROLES as string[]).includes(r));
-
+  // Akun whitelist boleh lihat Riwayat Transaksi walau role-nya tidak termasuk
+  // (mis. Fikri — MARKETING). Sumber: TRANSACTION_VIEW_EXTRA_USER_IDS di permissions.ts.
+  const canViewTransaksiByUserId = !!user?.id && (TRANSACTION_VIEW_EXTRA_USER_IDS as string[]).includes(user.id);
   const groups: MenuGroup[] = withSopGroup(withKendaraanGroup(
     dedupeGroups([
       ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
@@ -1751,8 +1753,10 @@ export default function Sidebar() {
       ...(isContractExpiringAdmin ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT_EXPIRING] }] : []),
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
-      ...dynamicGroups.map((g) => ({
-        label: g.label,
+      ...(canViewTransaksiByUserId
+        ? [{ label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] }]
+        : []),
+      ...dynamicGroups.map((g) => ({        label: g.label,
         items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
       })),
     ])

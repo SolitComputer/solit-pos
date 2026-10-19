@@ -1294,6 +1294,25 @@ export const SO_LIMITED_USER_IDS: string[] = [
   "203810b5-f9e0-4de4-9495-e1378451fa29",
 ];
 
+// ── Riwayat Transaksi: akses per-AKUN (bukan per-role) ───────────────────────
+// Akun spesifik yang boleh buka /dashboard/transactions + /api/transaction
+// SETARA KEPALA_MARKETING, walau role-nya cuma MARKETING. Pakai UUID users.id
+// (BUKAN nomor telepon). Tambah/hapus user id di array ini.
+export const TRANSACTION_VIEW_EXTRA_USER_IDS: string[] = [
+  "20c4df76-db02-4e36-977b-27b76c7fa803", // Fikri Aryansyah (MARKETING)
+];
+
+/** True kalau user boleh LIHAT Riwayat Transaksi:
+ *  - role-nya termasuk VIEW_TRANSACTIONS, ATAU
+ *  - user id-nya di-whitelist di TRANSACTION_VIEW_EXTRA_USER_IDS. */
+export function canViewTransactions(
+  userRoles: string[],
+  userId: string | null | undefined
+): boolean {
+  if (hasAnyRole(userRoles, PERMISSIONS.VIEW_TRANSACTIONS)) return true;
+  return !!userId && TRANSACTION_VIEW_EXTRA_USER_IDS.includes(userId);
+}
+
 // ── Checklist Tes Kondisi (Laptop & Monitor) ─────────────────────────────
 // Yang boleh ISI/UBAH checklist tes kondisi di form Data Barang: akun spesifik
 // (Rafi Salim, Fikri Aryansyah) + semua role di CONDITION_CHECK_EDITOR_ROLES.
