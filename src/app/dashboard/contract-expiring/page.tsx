@@ -13,7 +13,9 @@ import {
   X,
   RotateCcw,
   CheckCircle2,
+  FileSpreadsheet,
 } from "lucide-react";
+import { exportKenaikanJenjangExcel } from "@/lib/exportKenaikanJenjang";
 import {
   buildCustomRoleLookup,
   getAvatarColor,
@@ -33,6 +35,9 @@ interface ApiRow {
   career_level: string | null;
   contract_valid_until: string;
   days_left: number;
+  next_career_level: string | null;
+  contract_duration: string | null;
+  next_contract_duration: string | null;
 }
 
 interface ContractEntry extends ApiRow {
@@ -40,7 +45,7 @@ interface ContractEntry extends ApiRow {
   monthIndex: number;
 }
 
-type ViewMode = "terdekat" | "bulan";
+type ViewMode = "terdekat" | "bulan" | "jenjang";
 
 /** Kelompok waktu untuk mode "Terdekat". */
 type BucketKey = "minggu" | "bulan" | "nanti";
@@ -363,6 +368,92 @@ function GroupLabel({ label, count, hint }: { label: string; count: number; hint
   );
 }
 
+// ── Tabel Kenaikan Jenjang (gaya foto: header kuning + grid) ──────────────────
+function JenjangTable({
+  rows,
+  lookup,
+  busy,
+}: {
+  rows: ContractEntry[];
+  lookup: Map<string, CustomRoleRow>;
+  busy: boolean;
+}) {
+  if (busy) {
+    return (
+      <div className="py-14 text-center text-xs font-semibold" style={{ color: "#94a3b8" }}>
+        Memuat data…
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="text-center py-14 px-5">
+        <Inbox className="w-9 h-9 mx-auto mb-3" style={{ color: "#cbd5e1" }} />
+        <p className="text-sm font-bold" style={{ color: "#475569" }}>
+          Tidak ada data
+        </p>
+      </div>
+    );
+  }
+
+  const HEAD = [
+    "NO",
+    "NAMA KARYAWAN",
+    "DIVISI",
+    "SELANJUTNYA",
+    "SEBELUMNYA",
+    "KONTRAK SEBELUMNYA",
+    "KONTRAK SELANJUTNYA",
+  ];
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-[11px] sm:text-xs whitespace-nowrap">
+        <thead>
+          <tr style={{ background: "#FDE047" }}>
+            {HEAD.map((h) => (
+              <th
+                key={h}
+                className="px-2.5 py-2 font-black text-center"
+                style={{ border: "1px solid #eab308", color: "#1f2937" }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((p, i) => (
+            <tr key={p.id} className="transition-colors hover:bg-amber-50/40">
+              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#64748b" }}>
+                {i + 1}
+              </td>
+              <td className="px-2.5 py-1.5 font-semibold" style={{ border: "1px solid #eef2f7", color: "#0f172a" }}>
+                {p.name}
+              </td>
+              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#475569" }}>
+                {p.role ? getRoleLabel(p.role, lookup) : "-"}
+              </td>
+              <td className="px-2.5 py-1.5 text-center font-bold" style={{ border: "1px solid #eef2f7", color: "#7c3aed" }}>
+                {p.next_career_level ?? "-"}
+              </td>
+              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#334155" }}>
+                {p.career_level ?? "-"}
+              </td>
+              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#64748b" }}>
+                {p.contract_duration ?? "-"}
+              </td>
+              <td className="px-2.5 py-1.5 text-center font-bold" style={{ border: "1px solid #eef2f7", color: "#059669" }}>
+                {p.next_contract_duration ?? "-"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Halaman ───────────────────────────────────────────────────────────────────
 export default function ContractExpiringPage() {
   const [rows, setRows] = useState<ApiRow[]>([]);
@@ -373,6 +464,7 @@ export default function ContractExpiringPage() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("terdekat");
   const [month, setMonth] = useState(0);
+  const [exporting, setExporting] = useState(false);
 
   // `today` di-set setelah mount supaya HTML server (UTC) dan client (WIB) tidak
   // berbeda → tidak ada hydration mismatch (hanya dipakai untuk default bulan).
@@ -450,6 +542,36 @@ export default function ContractExpiringPage() {
     }
     return base.sort((a, b) => a.days_left - b.days_left || a.name.localeCompare(b.name));
   }, [entries, search, view, month]);
+
+  // Daftar untuk tab Jenjang — semua entry yang dimuat, difilter pencarian, urut nama.
+  const jenjangList = useMemo<ContractEntry[]>(() => {
+    const q = search.trim().toLowerCase();
+    return entries
+      .filter((e) => !q || e.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [entries, search]);
+
+  const handleExport = useCallback(async () => {
+    if (jenjangList.length === 0) return;
+    setExporting(true);
+    try {
+      await exportKenaikanJenjangExcel(
+        jenjangList.map((p, i) => ({
+          no: i + 1,
+          name: p.name,
+          role: p.role ? getRoleLabel(p.role, customLookup) : "-",
+          next_level: p.next_career_level ?? "-",
+          prev_level: p.career_level ?? "-",
+          kontrak_prev: p.contract_duration ?? "-",
+          kontrak_next: p.next_contract_duration ?? "-",
+        }))
+      );
+    } catch (e) {
+      console.error("Export gagal:", e);
+    } finally {
+      setExporting(false);
+    }
+  }, [jenjangList, customLookup]);
 
   const listItems = useMemo<ListItem[]>(() => {
     if (view === "bulan") {
@@ -602,6 +724,7 @@ export default function ContractExpiringPage() {
                     [
                       { key: "terdekat", label: "Terdekat" },
                       { key: "bulan", label: "Per Bulan" },
+                      { key: "jenjang", label: "Jenjang Karir" },
                     ] as const
                   ).map((t) => (
                     <button
@@ -668,11 +791,27 @@ export default function ContractExpiringPage() {
               >
                 {view === "bulan"
                   ? `${visible.length} kontrak habis di ${MONTH_NAMES_ID[month]}`
-                  : `${visible.length} kontrak, diurutkan dari yang terdekat habis`}
+                  : view === "jenjang"
+                    ? `${jenjangList.length} karyawan`
+                    : `${visible.length} kontrak, diurutkan dari yang terdekat habis`}
               </p>
+
+              {view === "jenjang" && (
+                <button
+                  onClick={handleExport}
+                  disabled={exporting || jenjangList.length === 0}
+                  className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black text-white flex-shrink-0 transition-all active:scale-95 disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, #059669, #047857)" }}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  {exporting ? "Menyiapkan…" : "Export Excel"}
+                </button>
+              )}
             </div>
 
-            {isBusy ? (
+            {view === "jenjang" ? (
+              <JenjangTable rows={jenjangList} lookup={customLookup} busy={isBusy} />
+            ) : isBusy ? (
               <ul>
                 {Array.from({ length: 6 }).map((_, i) => (
                   <li

@@ -13,6 +13,12 @@ const WARNING_WINDOW_DAYS = 7;
 // Jendela halaman Daftar Kontrak — lebih lebar supaya 3 kelompok terisi.
 const LIST_WINDOW_DAYS = 30;
 
+// ── Nama kolom "Kenaikan Jenjang" di tabel `users` ────────────────────────────
+// ⚠️ GANTI di sini kalau nama kolom di Supabase-mu berbeda:
+const COL_NEXT_LEVEL = "next_career_level";        // SELANJUTNYA (level tujuan)
+const COL_KONTRAK_PREV = "contract_duration";      // KONTRAK SEBELUMNYA
+const COL_KONTRAK_NEXT = "next_contract_duration"; // KONTRAK SELANJUTNYA
+
 function canView(user: AuthUser): boolean {
   const roles = user.roles?.length ? user.roles : [user.role];
   return roles.some((r) => (CONTRACT_EXPIRING_VIEW_ROLES as string[]).includes(r));
@@ -38,7 +44,9 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, name, role, career_level, contract_valid_until")
+    .select(
+      `id, name, role, career_level, contract_valid_until, ${COL_NEXT_LEVEL}, ${COL_KONTRAK_PREV}, ${COL_KONTRAK_NEXT}`
+    )
     .eq("contract_status", "APPROVED")
     .not("contract_valid_until", "is", null)
     .gte("contract_valid_until", todayWIB)      // dari hari ini (days_left >= 0)
@@ -60,6 +68,9 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       career_level: u.career_level,
       contract_valid_until: u.contract_valid_until,
       days_left: daysLeft,
+      next_career_level: u[COL_NEXT_LEVEL] ?? null,
+      contract_duration: u[COL_KONTRAK_PREV] ?? null,
+      next_contract_duration: u[COL_KONTRAK_NEXT] ?? null,
     };
   });
 
