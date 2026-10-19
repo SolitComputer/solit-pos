@@ -560,13 +560,32 @@ export const GET = withAuth(async (req) => {
     }
 
     // 4) Entry periode berjalan + lines-nya sekalian (dipakai Jurnal Umum & Buku Besar)
-    const { data: periodEntriesRaw, error: entryErr } = await supabase
-      .from("journal_entries")
-      .select("id, tanggal, keterangan, ref, source_type, created_at, lines:journal_lines(*)")
-      .eq("period", period)
-      .order("tanggal", { ascending: true })
-      .order("created_at", { ascending: true });
-    if (entryErr) throw entryErr;
+    //    WAJIB di-page: PostgREST default max 1000 baris/response. Karena diurut
+    //    tanggal ASC, entri tanggal termuda (mis. hari ini) justru yang kebuang
+    //    duluan saat jumlah entri > 1000 → tanggal 19 hilang di Excel.
+    const periodEntriesRaw: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: page, error: entryErr } = await supabase
+          .from("journal_entries")
+          .select("id, tanggal, keterangan, ref, source_type, created_at, lines:journal_lines(*)")
+          .eq("period", period)
+          .order("tanggal", { ascending: true })
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true }) // tiebreaker — urutan antar-page stabil
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (entryErr) throw entryErr;
+        if (!page || page.length === 0) break;
+
+        periodEntriesRaw.push(...page);
+
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
 
     const entryMap = new Map<string, EntryMeta>();
     const entryAccountsMap = new Map<string, string[]>();
