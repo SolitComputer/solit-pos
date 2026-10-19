@@ -65,7 +65,8 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
 
-  // Cegah user mengajukan dobel untuk kendaraan yang sama saat masih ada pengajuan aktif
+  // Cegah user mengajukan dobel untuk kendaraan yang sama saat masih ada pengajuan aktif.
+  // (Beda kendaraan tetap bebas; user lain tetap boleh antri di kendaraan yang sama.)
   const { data: dup } = await supabaseVehicles
     .from("vehicle_borrow_requests")
     .select("id")
@@ -78,21 +79,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { success: false, message: "Kamu sudah punya pengajuan aktif untuk kendaraan ini." },
       { status: 400 }
-    );
-
-  // Kunci per-kendaraan: tolak kalau SUDAH ADA pengajuan aktif dari user MANA PUN
-  // di kendaraan yang sama. Cegah 2 orang antri di 1 motor sekaligus.
-  const { data: taken } = await supabaseVehicles
-    .from("vehicle_borrow_requests")
-    .select("id")
-    .eq("vehicle_id", vehicleId)
-    .in("status", ["PENDING", "APPROVED"])
-    .limit(1);
-
-  if (taken && taken.length > 0)
-    return NextResponse.json(
-      { success: false, message: "Kendaraan ini sedang diajukan karyawan lain. Tunggu di-ACC / ditolak admin dulu." },
-      { status: 409 }
     );
 
   const { data, error } = await supabaseVehicles
