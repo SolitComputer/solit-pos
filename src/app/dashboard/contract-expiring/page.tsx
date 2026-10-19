@@ -247,8 +247,7 @@ function JenjangTable({
     );
   }
 
-  const HEAD = ["NO", "NAMA KARYAWAN", "DIVISI", "SELANJUTNYA", "SEBELUMNYA"];
-
+  const HEAD = ["NO", "NAMA KARYAWAN", "DIVISI", "KONTRAK SEBELUMNYA", "JENJANG KARIR SEBELUMNYA"];
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[11px] sm:text-xs whitespace-nowrap">
@@ -277,8 +276,8 @@ function JenjangTable({
               <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#475569" }}>
                 {p.role ? getRoleLabel(p.role, lookup) : "-"}
               </td>
-              <td className="px-2.5 py-1.5 text-center font-bold" style={{ border: "1px solid #eef2f7", color: "#7c3aed" }}>
-                {p.next_career_level ?? "-"}
+              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#64748b" }}>
+                {p.contract_duration ?? "-"}
               </td>
               <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#334155" }}>
                 {p.career_level ?? "-"}
