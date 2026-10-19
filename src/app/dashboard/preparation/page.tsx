@@ -213,7 +213,6 @@ function CreateModal({
   // Jenis item untuk SN yang DIKETIK/SCAN manual. Pencarian sendiri sudah
   // mengembalikan laptop & aksesoris sekaligus (lihat unit_type), jadi toggle
   // ini hanya menandai input manual yang jenisnya tak bisa ditebak dari teks SN.
-  const [itemKind, setItemKind] = useState<"laptop" | "accessory">("laptop");
   const [items, setItems] = useState<
     {
       serial_number: string;
@@ -228,10 +227,8 @@ function CreateModal({
   const [snSearch, setSnSearch] = useState("");
   const [snResults, setSnResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
-  const [manualSN, setManualSN] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [showBarcode, setShowBarcode] = useState(false);
 
   const search = useCallback(
     async (q: string) => {
@@ -277,15 +274,6 @@ function CreateModal({
     ]);
     setSnSearch("");
     setSnResults([]);
-  };
-  const addManual = () => {
-    const sn = manualSN.trim();
-    if (!sn) return;
-    // SENGAJA TIDAK cek duplikat — business rule mengizinkan SN yang sama
-    // diinput berkali-kali pada fase persiapan (tidak memengaruhi stok).
-    // item_type ikut toggle aktif; nama & id-nya di-resolve backend dari SN.
-    setItems((prev) => [...prev, { serial_number: sn, item_type: itemKind }]);
-    setManualSN("");
   };
   const removeItem = (idx: number) =>
     setItems((prev) => prev.filter((_, i) => i !== idx));
@@ -469,18 +457,6 @@ function CreateModal({
               )}
             </div>
 
-            {/* Jenis untuk input MANUAL/scan. Pencarian di bawah tetap
-                menampilkan laptop & aksesoris sekaligus. */}
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <button type="button" onClick={() => setItemKind("laptop")}
-                className={`h-9 rounded-2xl text-xs font-bold border transition ${itemKind === "laptop" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
-                Laptop
-              </button>
-              <button type="button" onClick={() => setItemKind("accessory")}
-                className={`h-9 rounded-2xl text-xs font-bold border transition ${itemKind === "accessory" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
-                Aksesoris
-              </button>
-            </div>
 
             <div className="relative">
               <input
@@ -529,35 +505,15 @@ function CreateModal({
               </div>
             )}
 
-            <div className="flex gap-2 mt-2">
-              <input
-                value={manualSN}
-                onChange={(e) => setManualSN(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addManual();
-                  }
-                }}
-                placeholder="Atau ketik SN manual..."
-                className={`${inputCls} font-mono flex-1`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowBarcode(true)}
-                className="px-3 h-10 rounded-2xl bg-indigo-500 text-white text-sm font-bold hover:bg-indigo-600 transition whitespace-nowrap shadow-sm hover:shadow-md"
-                title="Scan barcode SN"
-              >
-                <Camera size={18} />
-              </button>
-              <button
-                type="button"
-                onClick={addManual}
-                className="px-4 h-10 rounded-2xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition whitespace-nowrap shadow-md shadow-indigo-500/20"
-              >
-                + Tambah
-              </button>
-            </div>
+            {/* Input manual & scan DIHAPUS — item HARUS dipilih dari hasil
+                search stok (addUnit) supaya accessory_id/laptop_id + unit id
+                ikut tersimpan. SN ketik-bebas dulu bikin preparation_items
+                tanpa id → gagal ditarik di payment ("X unit gagal dimuat"). */}
+            {snSearch.trim().length >= 2 && !searching && snResults.length === 0 && (
+              <p className="text-[11px] text-slate-400 mt-2 px-1">
+                SN tidak ditemukan di stok. Hanya SN terdaftar yang bisa ditambahkan.
+              </p>
+            )}
 
             {items.length > 0 && (
               <div className="mt-3 space-y-1.5">
@@ -614,18 +570,8 @@ function CreateModal({
               {error}
             </div>
           )}
-          {showBarcode && (
-            <BarcodeScanModal
-              onScan={(sn) => {
-                const clean = sn.trim();
-                // SENGAJA TIDAK cek duplikat, sama seperti addManual di atas.
-                if (clean) {
-                  setItems((prev) => [...prev, { serial_number: clean, item_type: itemKind }]);
-                }
-              }}
-              onClose={() => setShowBarcode(false)}
-            />
-          )}
+          {/* BarcodeScanModal dihapus — scan hanya menghasilkan SN teks tanpa
+              id produk, sama bermasalahnya dengan ketik manual. */}
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 flex gap-3 flex-shrink-0 bg-slate-50/50">

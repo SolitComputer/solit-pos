@@ -1073,15 +1073,7 @@ export default function CreatePaymentPage() {
                             />
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tahu Solit dari mana?</label>
-                                {/* Input bebas + saran kategori. Sales bisa klik saran ATAU ketik manual. */}
-                                <input
-                                    type="text"
-                                    list="source-platform-options"
-                                    className={inputClass}
-                                    placeholder="Pilih dari daftar atau ketik sendiri..."
-                                    {...register("source_platform")}
-                                />
-                                <datalist id="source-platform-options">
+                                <select className={selectClass} {...register("source_platform")}>
                                     {[
                                         "Ads Facebook",
                                         "Ads Instagram",
@@ -1102,9 +1094,9 @@ export default function CreatePaymentPage() {
                                         "Reseller",
                                         "Lainnya"
                                     ].map(s => (
-                                        <option key={s} value={s} />
+                                        <option key={s} value={s}>{s}</option>
                                     ))}
-                                </datalist>
+                                </select>
                             </div>
 
                             <button type="button" onClick={() => {
