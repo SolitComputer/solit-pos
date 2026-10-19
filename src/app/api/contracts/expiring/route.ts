@@ -11,7 +11,7 @@ const supabase = createClient(
 // Jendela badge sidebar (?count=1) — tetap H-7 biar angka notif tetap "urgent".
 const WARNING_WINDOW_DAYS = 7;
 // Jendela halaman Daftar Kontrak — lebih lebar supaya 3 kelompok terisi.
-const LIST_WINDOW_DAYS = 30;
+const LIST_WINDOW_DAYS = 365;
 
 // ── Nama kolom "Kenaikan Jenjang" di tabel `users` ────────────────────────────
 // ⚠️ GANTI di sini kalau nama kolom di Supabase-mu berbeda:

@@ -12,7 +12,6 @@ import {
   Search,
   X,
   RotateCcw,
-  CheckCircle2,
   FileSpreadsheet,
 } from "lucide-react";
 import { exportKenaikanJenjangExcel } from "@/lib/exportKenaikanJenjang";
@@ -20,7 +19,6 @@ import {
   buildCustomRoleLookup,
   getAvatarColor,
   getInitials,
-  getRoleBadge,
   getRoleLabel,
   type CustomRoleRow,
 } from "@/lib/roleMeta";
@@ -45,22 +43,6 @@ interface ContractEntry extends ApiRow {
   monthIndex: number;
 }
 
-type ViewMode = "terdekat" | "bulan" | "jenjang";
-
-/** Kelompok waktu untuk mode "Terdekat". */
-type BucketKey = "minggu" | "bulan" | "nanti";
-
-const BUCKETS: { key: BucketKey; label: string; hint: string }[] = [
-  { key: "minggu", label: "7 hari ke depan", hint: "segera perpanjang" },
-  { key: "bulan", label: "30 hari ke depan", hint: "" },
-  { key: "nanti", label: "Setelah itu", hint: "" },
-];
-
-/** Item hasil flatten: label kelompok atau baris karyawan. */
-type ListItem =
-  | { kind: "label"; key: string; label: string; count: number; hint: string }
-  | { kind: "row"; key: string; person: ContractEntry };
-
 // ── Util kecil ────────────────────────────────────────────────────────────────
 
 const fullDate = (iso: string): string => {
@@ -74,15 +56,6 @@ const fullDate = (iso: string): string => {
     return iso;
   }
 };
-
-const labelSisaHari = (days: number): string => {
-  if (days <= 0) return "Habis hari ini";
-  if (days === 1) return "Besok habis";
-  return `${days} hari lagi`;
-};
-
-const bucketOf = (days: number): BucketKey =>
-  days <= 7 ? "minggu" : days <= 30 ? "bulan" : "nanti";
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 function Avatar({
@@ -120,27 +93,6 @@ function Avatar({
         </div>
       )}
     </div>
-  );
-}
-
-// ── Pill countdown ────────────────────────────────────────────────────────────
-function CountdownPill({ days }: { days: number }) {
-  const tone =
-    days <= 0
-      ? { bg: "#fef3c7", text: "#92400e", border: "#fde68a" }
-      : days <= 7
-        ? { bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" }
-        : { bg: "#f8fafc", text: "#64748b", border: "#e8ecf5" };
-
-  return (
-    <span
-      className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10.5px] font-black whitespace-nowrap tabular-nums ${
-        days <= 0 ? "animate-pulse" : ""
-      }`}
-      style={{ background: tone.bg, color: tone.text, border: `1px solid ${tone.border}` }}
-    >
-      {labelSisaHari(days)}
-    </span>
   );
 }
 
@@ -267,107 +219,6 @@ function TodayBanner({
   );
 }
 
-
-
-
-// ── Baris karyawan ────────────────────────────────────────────────────────────
-function ContractRow({
-  person,
-  lookup,
-  isLast,
-}: {
-  person: ContractEntry;
-  lookup: Map<string, CustomRoleRow>;
-  isLast: boolean;
-}) {
-  const badge = person.role ? getRoleBadge(person.role, lookup) : null;
-  const isToday = person.days_left <= 0;
-
-  return (
-    <li
-      className="relative px-3.5 sm:px-5 py-3 sm:py-3.5 transition-colors hover:bg-slate-50/70"
-      style={{
-        borderBottom: isLast ? "none" : "1px solid #f5f5fb",
-        background: isToday ? "#fffdf5" : undefined,
-      }}
-    >
-      {isToday && (
-        <span
-          className="absolute left-0 top-0 bottom-0 w-[3px]"
-          style={{ background: "linear-gradient(180deg, #fbbf24, #d97706)" }}
-        />
-      )}
-
-      <div className="flex items-center gap-3 sm:gap-3.5">
-        <Avatar name={person.name} role={person.role ?? ""} highlight={isToday} />
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span
-              className="text-[13px] sm:text-sm font-bold truncate max-w-[9.5rem] sm:max-w-none"
-              style={{ color: "#0f172a" }}
-            >
-              {person.name}
-            </span>
-            {badge && person.role && (
-              <span
-                className="inline-flex items-center text-[9.5px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 max-w-[8rem] truncate"
-                style={{ background: badge.bg, color: badge.text, border: `1px solid ${badge.border}` }}
-              >
-                {getRoleLabel(person.role, lookup)}
-              </span>
-            )}
-            {person.career_level && <CareerLevelBadge level={person.career_level} />}
-          </div>
-
-          <p
-            className="text-[10.5px] sm:text-[11px] font-medium mt-1 truncate"
-            style={{ color: "#94a3b8" }}
-          >
-            Berakhir{" "}
-            <span className="font-bold" style={{ color: "#64748b" }}>
-              {fullDate(person.contract_valid_until)}
-            </span>
-          </p>
-        </div>
-
-        <div className="flex-shrink-0">
-          <CountdownPill days={person.days_left} />
-        </div>
-      </div>
-    </li>
-  );
-}
-
-// ── Label kelompok di dalam list ─────────────────────────────────────────────
-function GroupLabel({ label, count, hint }: { label: string; count: number; hint: string }) {
-  return (
-    <li
-      className="px-3.5 sm:px-5 py-2 flex items-center gap-2"
-      style={{
-        background: "#fafbff",
-        borderTop: "1px solid #f5f5fb",
-        borderBottom: "1px solid #f5f5fb",
-      }}
-    >
-      <span className="text-[9.5px] font-black uppercase tracking-[0.14em]" style={{ color: "#94a3b8" }}>
-        {label}
-      </span>
-      <span
-        className="px-1.5 py-0.5 rounded-full text-[9.5px] font-black tabular-nums"
-        style={{ background: "#e8ecf5", color: "#64748b" }}
-      >
-        {count}
-      </span>
-      {hint && (
-        <span className="text-[9.5px] hidden sm:inline" style={{ color: "#cbd5e1" }}>
-          {hint}
-        </span>
-      )}
-    </li>
-  );
-}
-
 // ── Tabel Kenaikan Jenjang (gaya foto: header kuning + grid) ──────────────────
 function JenjangTable({
   rows,
@@ -396,15 +247,7 @@ function JenjangTable({
     );
   }
 
-  const HEAD = [
-    "NO",
-    "NAMA KARYAWAN",
-    "DIVISI",
-    "SELANJUTNYA",
-    "SEBELUMNYA",
-    "KONTRAK SEBELUMNYA",
-    "KONTRAK SELANJUTNYA",
-  ];
+  const HEAD = ["NO", "NAMA KARYAWAN", "DIVISI", "SELANJUTNYA", "SEBELUMNYA"];
 
   return (
     <div className="overflow-x-auto">
@@ -440,12 +283,6 @@ function JenjangTable({
               <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#334155" }}>
                 {p.career_level ?? "-"}
               </td>
-              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#64748b" }}>
-                {p.contract_duration ?? "-"}
-              </td>
-              <td className="px-2.5 py-1.5 text-center font-bold" style={{ border: "1px solid #eef2f7", color: "#059669" }}>
-                {p.next_contract_duration ?? "-"}
-              </td>
             </tr>
           ))}
         </tbody>
@@ -462,7 +299,6 @@ export default function ContractExpiringPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<ViewMode>("terdekat");
   const [month, setMonth] = useState(0);
   const [exporting, setExporting] = useState(false);
 
@@ -530,26 +366,17 @@ export default function ContractExpiringPage() {
     [entries, today]
   );
 
-
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const base = entries.filter((e) => !q || e.name.toLowerCase().includes(q));
-
-    if (view === "bulan") {
-      return base
-        .filter((e) => e.monthIndex === month)
-        .sort((a, b) => a.expiry.getDate() - b.expiry.getDate() || a.name.localeCompare(b.name));
-    }
-    return base.sort((a, b) => a.days_left - b.days_left || a.name.localeCompare(b.name));
-  }, [entries, search, view, month]);
-
-  // Daftar untuk tab Jenjang — semua entry yang dimuat, difilter pencarian, urut nama.
+  // Daftar Jenjang Karir — difilter per bulan terpilih + pencarian, urut tanggal.
   const jenjangList = useMemo<ContractEntry[]>(() => {
     const q = search.trim().toLowerCase();
     return entries
+      .filter((e) => e.monthIndex === month)
       .filter((e) => !q || e.name.toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries, search]);
+      .sort(
+        (a, b) =>
+          a.expiry.getDate() - b.expiry.getDate() || a.name.localeCompare(b.name)
+      );
+  }, [entries, search, month]);
 
   const handleExport = useCallback(async () => {
     if (jenjangList.length === 0) return;
@@ -572,24 +399,6 @@ export default function ContractExpiringPage() {
       setExporting(false);
     }
   }, [jenjangList, customLookup]);
-
-  const listItems = useMemo<ListItem[]>(() => {
-    if (view === "bulan") {
-      return visible.map((p) => ({ kind: "row", key: p.id, person: p }));
-    }
-
-    const map: Record<BucketKey, ContractEntry[]> = { minggu: [], bulan: [], nanti: [] };
-    for (const e of visible) map[bucketOf(e.days_left)].push(e);
-
-    const out: ListItem[] = [];
-    for (const b of BUCKETS) {
-      const items = map[b.key];
-      if (items.length === 0) continue;
-      out.push({ kind: "label", key: `label-${b.key}`, label: b.label, count: items.length, hint: b.hint });
-      for (const p of items) out.push({ kind: "row", key: p.id, person: p });
-    }
-    return out;
-  }, [visible, view]);
 
   const isBusy = loading || !today;
   const monthLabel = MONTH_NAMES_ID[today?.getMonth() ?? 0];
@@ -714,61 +523,27 @@ export default function ContractExpiringPage() {
                     </button>
                   )}
                 </div>
-
-                {/* Toggle tampilan — full width di HP, auto di laptop */}
-                <div
-                  className="flex gap-1 p-1 rounded-xl flex-shrink-0"
-                  style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}
-                >
-                  {(
-                    [
-                      { key: "terdekat", label: "Terdekat" },
-                      { key: "bulan", label: "Per Bulan" },
-                      { key: "jenjang", label: "Jenjang Karir" },
-                    ] as const
-                  ).map((t) => (
-                    <button
-                      key={t.key}
-                      onClick={() => setView(t.key)}
-                      aria-pressed={view === t.key}
-                      className="flex-1 sm:flex-initial h-8 px-3.5 rounded-lg text-[11px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-                      style={
-                        view === t.key
-                          ? {
-                              background: "linear-gradient(135deg, #0f0c29, #1a1545)",
-                              color: "#fff",
-                              boxShadow: "0 2px 8px rgba(15,12,41,0.22)",
-                            }
-                          : { background: "transparent", color: "#64748b" }
-                      }
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
-              {/* Chip bulan — grid rapi, tidak berantakan di layar sempit */}
-              {view === "bulan" && (
-                <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 pt-0.5">
-                  {MONTH_NAMES_ID.map((m, i) => (
-                    <button
-                      key={m}
-                      onClick={() => setMonth(i)}
-                      title={m}
-                      aria-pressed={month === i}
-                      className="h-8 rounded-lg text-[10px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-                      style={
-                        month === i
-                          ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
-                          : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }
-                      }
-                    >
-                      {m.slice(0, 3)}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Chip bulan — filter periode untuk Jenjang Karir */}
+              <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 pt-0.5">
+                {MONTH_NAMES_ID.map((m, i) => (
+                  <button
+                    key={m}
+                    onClick={() => setMonth(i)}
+                    title={m}
+                    aria-pressed={month === i}
+                    className="h-8 rounded-lg text-[10px] font-black transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                    style={
+                      month === i
+                        ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                        : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }
+                    }
+                  >
+                    {m.slice(0, 3)}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -789,98 +564,21 @@ export default function ContractExpiringPage() {
                 className="text-[10.5px] sm:text-[11px] font-bold truncate"
                 style={{ color: "#64748b" }}
               >
-                {view === "bulan"
-                  ? `${visible.length} kontrak habis di ${MONTH_NAMES_ID[month]}`
-                  : view === "jenjang"
-                    ? `${jenjangList.length} karyawan`
-                    : `${visible.length} kontrak, diurutkan dari yang terdekat habis`}
+                {`${jenjangList.length} karyawan — kontrak habis di ${MONTH_NAMES_ID[month]}`}
               </p>
 
-              {view === "jenjang" && (
-                <button
-                  onClick={handleExport}
-                  disabled={exporting || jenjangList.length === 0}
-                  className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black text-white flex-shrink-0 transition-all active:scale-95 disabled:opacity-50"
-                  style={{ background: "linear-gradient(135deg, #059669, #047857)" }}
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  {exporting ? "Menyiapkan…" : "Export Excel"}
-                </button>
-              )}
+              <button
+                onClick={handleExport}
+                disabled={exporting || jenjangList.length === 0}
+                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black text-white flex-shrink-0 transition-all active:scale-95 disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg, #059669, #047857)" }}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                {exporting ? "Menyiapkan…" : "Export Excel"}
+              </button>
             </div>
 
-            {view === "jenjang" ? (
-              <JenjangTable rows={jenjangList} lookup={customLookup} busy={isBusy} />
-            ) : isBusy ? (
-              <ul>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <li
-                    key={i}
-                    className="px-3.5 sm:px-5 py-3.5 flex items-center gap-3 animate-pulse"
-                    style={{ borderBottom: "1px solid #f8f8fc" }}
-                  >
-                    <div className="w-11 h-11 rounded-2xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
-                    <div className="flex-1 space-y-2 min-w-0">
-                      <div className="h-3 rounded-full w-32 max-w-full" style={{ background: "#e2e8f0" }} />
-                      <div className="h-2.5 rounded-full w-24" style={{ background: "#f1f5f9" }} />
-                    </div>
-                    <div className="w-16 h-6 rounded-full flex-shrink-0" style={{ background: "#f1f5f9" }} />
-                  </li>
-                ))}
-              </ul>
-            ) : visible.length === 0 ? (
-              <div className="text-center py-14 sm:py-20 px-5">
-                <div className="flex justify-center mb-3">
-                  {search ? (
-                    <Inbox className="w-9 h-9" style={{ color: "#cbd5e1" }} />
-                  ) : (
-                    <CheckCircle2 className="w-10 h-10" style={{ color: "#34d399" }} />
-                  )}
-                </div>
-                <p className="text-sm font-bold" style={{ color: "#475569" }}>
-                  {search ? "Nama tidak ditemukan" : "Tidak ada kontrak yang akan habis"}
-                </p>
-                <p
-                  className="text-xs mt-1.5 leading-relaxed max-w-xs mx-auto"
-                  style={{ color: "#94a3b8" }}
-                >
-                  {search
-                    ? "Coba kata kunci lain."
-                    : view === "bulan"
-                      ? `Tidak ada kontrak yang habis di bulan ${MONTH_NAMES_ID[month]}.`
-                      : `Belum ada karyawan dengan kontrak berakhir dalam ${windowDays} hari ke depan.`}
-                </p>
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="mt-4 text-xs font-bold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95"
-                    style={{ color: "#6366f1", background: "#eff3ff" }}
-                  >
-                    Reset pencarian
-                  </button>
-                )}
-              </div>
-            ) : (
-              <ul>
-                {listItems.map((item, i) =>
-                  item.kind === "label" ? (
-                    <GroupLabel
-                      key={item.key}
-                      label={item.label}
-                      count={item.count}
-                      hint={item.hint}
-                    />
-                  ) : (
-                    <ContractRow
-                      key={item.key}
-                      person={item.person}
-                      lookup={customLookup}
-                      isLast={i === listItems.length - 1}
-                    />
-                  )
-                )}
-              </ul>
-            )}
+            <JenjangTable rows={jenjangList} lookup={customLookup} busy={isBusy} />
           </div>
         </div>
       </div>
