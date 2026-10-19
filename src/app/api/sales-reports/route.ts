@@ -37,8 +37,8 @@ interface NormalizedReport {
   interest: string;
   keterangan: string | null;
   sumber: string | null;
+  ads: string | null;
   purchased: boolean;
-  ads: boolean;
 }
 // Discriminated union (pakai flag `success`) supaya TypeScript bisa menyempitkan
 // (narrow) tipe `value` menjadi PASTI ada begitu `success === true` dicek —
@@ -77,7 +77,7 @@ function validateAndNormalize(body: any): ValidationResult {
   const keterangan = (body.keterangan ?? "").toString().trim();
   const sumber = (body.sumber ?? "").toString().trim();
   const purchased = Boolean(body.purchased);
-  const ads = Boolean(body.ads); // baru: tandai leads dari iklan (bukan organik)
+  const ads = (body.ads ?? "").toString().trim(); // teks bebas, opsional (seperti sumber)
   const isNoPhone = NO_PHONE_CHANNELS.includes(channel);
 
   if (!interest) return { success: false, error: "Minat wajib diisi" };
@@ -97,7 +97,7 @@ function validateAndNormalize(body: any): ValidationResult {
       keterangan: keterangan || null,
       sumber: sumber || null,
       purchased,
-      ads,
+      ads: ads || null, // null jika string kosong
     },
   };
 }

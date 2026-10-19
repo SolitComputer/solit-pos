@@ -165,7 +165,7 @@ interface SalesReportEntry {
   keterangan: string | null;
   sumber: string | null;
   purchased: boolean;
-  ads: boolean;
+  ads: string | null;
   filled_by: string;
   filled_by_name: string;
   audited: boolean;
@@ -279,7 +279,7 @@ export default function LaporanHarianSalesPage() {
   const [keterangan, setKeterangan] = useState("");
   const [sumber, setSumber] = useState("");
   const [purchased, setPurchased] = useState(false);
-  const [ads, setAds] = useState(false);
+  const [ads, setAds] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -418,8 +418,7 @@ export default function LaporanHarianSalesPage() {
     setInterest("");
     setKeterangan("");
     setSumber("");
-    setPurchased(false);
-    setFormError("");    setSumber("");
+    setAds("");
     setPurchased(false);
     setFormError("");
   };
@@ -440,7 +439,7 @@ export default function LaporanHarianSalesPage() {
     setKeterangan(entry.keterangan ?? "");
     setSumber(entry.sumber ?? "");
     setPurchased(entry.purchased);
-    setAds(entry.ads ?? false); // ?? false biar baris lama (ads null) aman
+    setAds(entry.ads ?? "");
     setShowModal(true);
   };
 
@@ -835,18 +834,20 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
-                {/* Ads — opsional. Dicentang = leads dari iklan, tidak dicentang = organik.
-                    Nilainya tetap ikut mengalir ke halaman Audit Marketing. */}
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none pt-0.5">
-                  <input
-                    type="checkbox"
-                    checked={ads}
-                    onChange={(e) => setAds(e.target.checked)}
-                    className="w-4 h-4 rounded accent-violet-600"
-                  />
-                  <Megaphone className="w-3.5 h-3.5 text-violet-600" />
-                  Dari Ads (opsional)
-                </label>
+                {/* Ads (opsional) — teks bebas diketik sales, persis gaya Sumber.
+                    Nilainya ikut mengalir ke halaman Audit Marketing. */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Ads (opsional)</label>
+                  <div className="relative">
+                    <Megaphone className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      value={ads}
+                      onChange={(e) => setAds(e.target.value)}
+                      placeholder="Contoh: Ads FB, Ads IG, Organik..."
+                      className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
+                    />
+                  </div>
+                </div>
 
                 {formError && (
                   <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">

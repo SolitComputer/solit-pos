@@ -82,9 +82,8 @@ export async function GET(request: NextRequest) {
     keterangan: r.keterangan,
     sumber: r.sumber ?? null,
     transaksi: r.transaksi,
-    ads: r.ads,
-    audited: r.audited,
-    audited_by_name: r.audited_by_name,
+    ads: typeof r.ads === "string" ? r.ads : null, // tabel audit_leads bertipe boolean — jangan ikut
+    audited: r.audited,    audited_by_name: r.audited_by_name,
     created_by: r.created_by,
     created_by_name: r.created_by_name,
     created_at: r.created_at,
@@ -99,7 +98,7 @@ export async function GET(request: NextRequest) {
     keterangan: r.keterangan,
     sumber: r.sumber ?? null,
     transaksi: r.purchased,
-    ads: r.ads ?? false, // dulu di-hardcode false — ini penyebab ADS selalu kosong utk Laporan Sales
+    ads: r.ads ?? null, // teks bebas dari sales
     audited: r.audited,
     audited_by_name: r.audited_by_name,
     created_by: r.filled_by,

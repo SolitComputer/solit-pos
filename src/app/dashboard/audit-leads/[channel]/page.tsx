@@ -42,7 +42,7 @@ const channelLabels: Record<Channel, string> = {
 interface LeadRow {
   id: string; channel: Channel; nama: string; minat: string; keterangan: string | null;
   sumber: string | null;
-  transaksi: boolean; ads: boolean; audited: boolean; audited_by_name: string | null;
+  transaksi: boolean; ads: string | null; audited: boolean; audited_by_name: string | null;
   created_by: string; created_by_name: string; created_at: string;
   source: "manual" | "sales_report";
 }
@@ -402,8 +402,8 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                       <td className="border border-gray-200 px-4 py-3.5 text-center">
                         <TransaksiBadge value={row.transaksi} />
                       </td>
-                      <td className="border border-gray-200 px-4 py-3.5 text-center hidden lg:table-cell">
-                        <AdsBadge value={row.ads} />
+                      <td className="border border-gray-200 px-4 py-3.5 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.ads || undefined}>
+                        {row.ads || "—"}
                       </td>
                       <td className="border border-gray-200 px-4 py-3.5 text-center">
                         {row.audited ? (
@@ -523,7 +523,7 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <AdsBadge value={row.ads} />
+                    {row.ads && <span className="text-[11px] text-gray-400">Ads: {row.ads}</span>}
                     {row.audited ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600">
                         <ShieldCheck className="w-2.5 h-2.5" /> {row.audited_by_name}
@@ -636,20 +636,6 @@ function TransaksiBadge({ value }: { value: boolean }) {
   );
 }
 
-function AdsBadge({ value }: { value: boolean }) {
-  if (value) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-violet-50 text-violet-600">
-        <Megaphone className="w-3 h-3" /> Ads
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-400">
-      Organik
-    </span>
-  );
-}
 
 function ConfirmModal({
   title,
@@ -712,7 +698,10 @@ function LeadFormModal({
   const [minat, setMinat] = useState(editingRow?.minat ?? "");
   const [keterangan, setKeterangan] = useState(editingRow?.keterangan ?? "");
   const [transaksi, setTransaksi] = useState(editingRow?.transaksi ?? false);
-  const [ads, setAds] = useState(editingRow?.ads ?? false);
+  // editingRow.ads bertipe string|null (tipe bersama LeadRow), tapi form manual
+  // ini nulis ke tabel audit_leads yang kolom ads-nya masih boolean. Konversi:
+  // ada isi = tercentang, kosong/null = tidak.
+  const [ads, setAds] = useState<boolean>(Boolean(editingRow?.ads));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
