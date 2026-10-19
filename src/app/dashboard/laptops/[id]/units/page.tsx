@@ -72,17 +72,21 @@ const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 };
 const AUDIT_TTL_DAYS = 2;
 const AUDIT_TTL_MS = AUDIT_TTL_DAYS * 24 * 60 * 60 * 1000;
 
-//  SO: reset otomatis begitu GANTI TANGGAL KALENDER WIB (00:00), BUKAN rolling
+//  SO: reset otomatis tiap jam 22:00 WIB, BUKAN tengah malam & BUKAN rolling
 //  24 jam dari waktu SO dibuat — harus sama persis dgn logika di
 //  /api/laptops/[id]/so/route.ts (level model) supaya konsisten di semua halaman.
+//  Caranya: geser waktu WIB mundur SO_RESET_HOUR jam, lalu ambil tanggalnya
+//  sebagai "kunci periode" — 22:00 hari ini s/d 21:59 WIB besok = kunci sama.
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7, Indonesia tidak pakai DST
-const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+const SO_RESET_HOUR = 22;
+const soPeriodKey = (d: Date) =>
+    new Date(d.getTime() + WIB_OFFSET_MS - SO_RESET_HOUR * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 function isUnitAuditActive(u: LaptopUnit): boolean {
     return !!u.audited_at && Date.now() - new Date(u.audited_at).getTime() < AUDIT_TTL_MS;
 }
 function isUnitSOActive(u: LaptopUnit): boolean {
-    return !!u.so_at && toWibDateStr(new Date(u.so_at)) === toWibDateStr(new Date());
+    return !!u.so_at && soPeriodKey(new Date(u.so_at)) === soPeriodKey(new Date());
 }
 
 function sortUnits(units: LaptopUnit[]): LaptopUnit[] {
