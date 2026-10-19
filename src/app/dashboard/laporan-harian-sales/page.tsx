@@ -821,6 +821,21 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
+                {/* Ads (opsional) — teks bebas diketik sales, persis gaya Sumber.
+                    Nilainya ikut mengalir ke halaman Audit Marketing. */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Ads (opsional)</label>
+                  <div className="relative">
+                    <Megaphone className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      value={ads}
+                      onChange={(e) => setAds(e.target.value)}
+                      placeholder="Contoh: Ads FB, Ads IG, Organik..."
+                      className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1.5 block">Status</label>
                   <div className="flex gap-2">
@@ -843,20 +858,7 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
-                {/* Ads (opsional) — teks bebas diketik sales, persis gaya Sumber.
-                    Nilainya ikut mengalir ke halaman Audit Marketing. */}
-                <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Ads (opsional)</label>
-                  <div className="relative">
-                    <Megaphone className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      value={ads}
-                      onChange={(e) => setAds(e.target.value)}
-                      placeholder="Contoh: Ads FB, Ads IG, Organik..."
-                      className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
-                    />
-                  </div>
-                </div>
+
 
                 {formError && (
                   <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
