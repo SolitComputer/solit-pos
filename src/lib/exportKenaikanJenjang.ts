@@ -14,9 +14,9 @@ const HEADERS = [
   "NO",
   "NAMA KARYAWAN",
   "DIVISI",
-  "SELANJUTNYA",
-  "SEBELUMNYA",
   "KONTRAK SEBELUMNYA",
+  "JENJANG KARIR SEBELUMNYA",
+  "JENJANG KARIR SELANJUTNYA",
   "KONTRAK SELANJUTNYA",
 ];
 
@@ -48,9 +48,9 @@ export async function exportKenaikanJenjangExcel(
       r.no,
       r.name,
       r.role,
-      r.next_level,
-      r.prev_level,
       r.kontrak_prev,
+      r.prev_level,
+      r.next_level,
       r.kontrak_next,
     ]);
     row.eachCell((cell, col) => {
@@ -66,9 +66,9 @@ export async function exportKenaikanJenjangExcel(
     { width: 5 },  // NO
     { width: 28 }, // NAMA KARYAWAN
     { width: 30 }, // DIVISI
-    { width: 14 }, // SELANJUTNYA
-    { width: 14 }, // SEBELUMNYA
     { width: 20 }, // KONTRAK SEBELUMNYA
+    { width: 22 }, // JENJANG KARIR SEBELUMNYA
+    { width: 22 }, // JENJANG KARIR SELANJUTNYA
     { width: 20 }, // KONTRAK SELANJUTNYA
   ];
 
