@@ -1798,7 +1798,8 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
         </td>
         <td className="px-4 py-3.5">{renderLaptopCell()}</td>
         <td className="px-4 py-3.5">{renderCpuCell()}</td>
-        <td className="px-4 py-3.5">
+        <td className="px-4 py-3.5 align-top">
+          <div className="w-[120px] max-w-[120px] break-words">
           {(() => {
             const grouped: any[] = item.grouped_items ?? [];
             if (grouped.length > 1) {
@@ -1815,6 +1816,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
             const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
             return <SerialNumberList serials={sns} maxVisible={3} size="sm" stack />;
           })()}
+          </div>
         </td>
         <td className="px-4 py-3.5 text-right">
           {(() => {
