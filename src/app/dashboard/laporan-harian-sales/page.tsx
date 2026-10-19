@@ -207,6 +207,15 @@ function initials(name: string) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
+// Tampilkan nilai ads sebagai teks. Nilai sisa dari fase boolean lama
+// ("true"/"false") & string kosong dianggap tidak ada → kembalikan null,
+// supaya di UI jatuh ke "—" / dikosongkan, bukan nampilin tulisan "false".
+function displayAds(ads: string | null): string | null {
+  const v = (ads ?? "").trim();
+  if (!v || v.toLowerCase() === "false" || v.toLowerCase() === "true") return null;
+  return v;
+}
+
 // Pencarian: semua kata yang diketik harus ketemu di salah satu kolom
 // (kontak, minat, keterangan, sumber, nama sales/auditor). Kata yang berupa
 // nomor (mis. "0812-3456") juga dicocokkan versi angka-saja ke nomor telepon,
@@ -812,6 +821,21 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
+                {/* Ads (opsional) — teks bebas diketik sales, persis gaya Sumber.
+                    Nilainya ikut mengalir ke halaman Audit Marketing. */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Ads (opsional)</label>
+                  <div className="relative">
+                    <Megaphone className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      value={ads}
+                      onChange={(e) => setAds(e.target.value)}
+                      placeholder="Contoh: Ads FB, Ads IG, Organik..."
+                      className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1.5 block">Status</label>
                   <div className="flex gap-2">
@@ -834,20 +858,7 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
-                {/* Ads (opsional) — teks bebas diketik sales, persis gaya Sumber.
-                    Nilainya ikut mengalir ke halaman Audit Marketing. */}
-                <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Ads (opsional)</label>
-                  <div className="relative">
-                    <Megaphone className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      value={ads}
-                      onChange={(e) => setAds(e.target.value)}
-                      placeholder="Contoh: Ads FB, Ads IG, Organik..."
-                      className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
-                    />
-                  </div>
-                </div>
+
 
                 {formError && (
                   <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
@@ -1211,7 +1222,7 @@ export default function LaporanHarianSalesPage() {
                         <td className="border border-gray-200 px-4 py-3 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={entry.interest}>{entry.interest}</td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden md:table-cell" title={entry.keterangan || undefined}>{entry.keterangan || "—"}</td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[160px] truncate hidden lg:table-cell" title={entry.sumber || undefined}>{entry.sumber || "—"}</td>
-                        <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={entry.ads || undefined}>{entry.ads || "—"}</td>
+                        <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={displayAds(entry.ads) || undefined}>{displayAds(entry.ads) || "—"}</td>
                         <td className="border border-gray-200 px-4 py-3 text-center">
                           <StatusBadge purchased={entry.purchased} />
                         </td>
@@ -1302,7 +1313,7 @@ export default function LaporanHarianSalesPage() {
                     <p className="text-xs text-gray-600 pl-10">{entry.interest}</p>
                     {entry.keterangan && <p className="text-[11px] text-gray-400 pl-10">{entry.keterangan}</p>}
                     {entry.sumber && <p className="text-[11px] text-gray-400 pl-10">Sumber: {entry.sumber}</p>}
-                    {entry.ads && <p className="text-[11px] text-gray-400 pl-10">Ads: {entry.ads}</p>}
+                    {displayAds(entry.ads) && <p className="text-[11px] text-gray-400 pl-10">Ads: {displayAds(entry.ads)}</p>}
                     <div className="flex items-center gap-2 pt-1">
                       {!entry.audited && canAudit && (
                         <button
