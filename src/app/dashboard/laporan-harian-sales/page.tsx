@@ -1176,6 +1176,7 @@ export default function LaporanHarianSalesPage() {
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Minat</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Keterangan</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Sumber</th>
+                      <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Ads</th>
                       <th className="border border-gray-200 px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Transaksi</th>
                       <th className="border border-gray-200 px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Audit</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Diinput Oleh</th>
@@ -1210,6 +1211,7 @@ export default function LaporanHarianSalesPage() {
                         <td className="border border-gray-200 px-4 py-3 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={entry.interest}>{entry.interest}</td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden md:table-cell" title={entry.keterangan || undefined}>{entry.keterangan || "—"}</td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[160px] truncate hidden lg:table-cell" title={entry.sumber || undefined}>{entry.sumber || "—"}</td>
+                        <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={entry.ads || undefined}>{entry.ads || "—"}</td>
                         <td className="border border-gray-200 px-4 py-3 text-center">
                           <StatusBadge purchased={entry.purchased} />
                         </td>
@@ -1300,6 +1302,7 @@ export default function LaporanHarianSalesPage() {
                     <p className="text-xs text-gray-600 pl-10">{entry.interest}</p>
                     {entry.keterangan && <p className="text-[11px] text-gray-400 pl-10">{entry.keterangan}</p>}
                     {entry.sumber && <p className="text-[11px] text-gray-400 pl-10">Sumber: {entry.sumber}</p>}
+                    {entry.ads && <p className="text-[11px] text-gray-400 pl-10">Ads: {entry.ads}</p>}
                     <div className="flex items-center gap-2 pt-1">
                       {!entry.audited && canAudit && (
                         <button
