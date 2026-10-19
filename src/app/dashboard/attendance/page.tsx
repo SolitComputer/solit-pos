@@ -3373,12 +3373,23 @@ function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSa
     calYear: number; calMonth: number;
     onClose: () => void; onSaved: () => void | Promise<void>;
 }) {
+    // ✅ NEW — search karyawan biar nggak perlu scroll cari-cari akun
+    const [search, setSearch] = useState("");
+    const filteredUsers = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return users;
+        return users.filter(u =>
+            u.name.toLowerCase().includes(q) ||
+            u.role.replace(/_/g, " ").toLowerCase().includes(q)
+        );
+    }, [users, search]);
+
     return (
         <ModalShell
             onClose={onClose}
             headerColor="bg-gradient-to-r from-violet-600 to-purple-700"
             title="Jadwal Shift per Tanggal"
-            subtitle={`${MONTH_NAMES[calMonth]} ${calYear} · ${users.length} karyawan · ${schedules.length} jadwal aktif`}
+            subtitle={`${MONTH_NAMES[calMonth]} ${calYear} · ${filteredUsers.length}/${users.length} karyawan · ${schedules.length} jadwal aktif`}
             wide
             footer={
                 <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
@@ -3386,14 +3397,46 @@ function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSa
                 </button>
             }
         >
+            {/* ✅ NEW — kolom pencarian (sticky di atas list) */}
+            <div className="px-6 pt-4 pb-3 flex-shrink-0 border-b border-gray-100 bg-white">
+                <div className="relative">
+                    <svg className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Cari nama karyawan atau role..."
+                        autoFocus
+                        className="w-full h-11 border border-gray-200 rounded-xl pl-10 pr-10 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 transition-all"
+                    />
+                    {search && (
+                        <button
+                            onClick={() => setSearch("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all"
+                            title="Hapus pencarian"
+                        >×</button>
+                    )}
+                </div>
+            </div>
+
             <div className="overflow-y-auto flex-1 px-6 py-5 bg-[#F7F7F8]">
-                <ShiftScheduleTab
-                    users={users}
-                    schedules={schedules}
-                    calYear={calYear}
-                    calMonth={calMonth}
-                    onSaved={onSaved}
-                />
+                {filteredUsers.length === 0 ? (
+                    <div className="py-16 text-center">
+                        <p className="text-sm text-gray-400">
+                            Tidak ada karyawan cocok dengan "{search.trim()}"
+                        </p>
+                    </div>
+                ) : (
+                    <ShiftScheduleTab
+                        users={filteredUsers}
+                        schedules={schedules}
+                        calYear={calYear}
+                        calMonth={calMonth}
+                        onSaved={onSaved}
+                    />
+                )}
             </div>
         </ModalShell>
     );
