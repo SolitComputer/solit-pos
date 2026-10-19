@@ -4,7 +4,9 @@ import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { canViewTransactions } from "@/lib/permissions";
 
 function splitSerials(raw: any): string[] {
-  if (Array.isArray(raw)) return raw.filter(Boolean).map((s: string) => String(s).trim()).filter(Boolean);
+  // ✅ Array bisa berisi elemen yang sendirinya comma-joined ("MIN-1, MIN-2"),
+  // jadi tiap elemen ikut dipecah lewat rekursi — bukan cuma di-trim.
+  if (Array.isArray(raw)) return raw.flatMap((s) => splitSerials(s));
   if (typeof raw === "string" && raw.trim()) {
     return raw.split(",").map((s) => s.trim()).filter(Boolean);
   }
@@ -488,7 +490,7 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
           ram: specs?.ram ?? trx.ram,
           storage: specs?.storage ?? trx.storage,
           vga: specs?.vga ?? trx.vga,
-          serial_numbers: trx.serial_number ? [trx.serial_number] : [],
+          serial_numbers: splitSerials(trx.serial_number),
           restored_serial_numbers: [], // ✅ transaksi legacy tidak punya konsep restore-sebagian
           purchase_price_total: Number(trx.inventory_price ?? 0),
           selling_price_total: Number(trx.deal_price ?? trx.amount ?? 0),
@@ -554,9 +556,14 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         gpu: trx.gpu || laptopSpecs?.vga || undefined,
         laptop_name: trx.laptop_name || laptopSpecs?.name || undefined,
         serial_numbers: (() => {
-          const stored: string[] = Array.isArray(trx.serial_numbers) && trx.serial_numbers.length > 0
-            ? trx.serial_numbers.filter(Boolean)
-            : trx.serial_number ? [trx.serial_number] : [];
+          // ✅ FIX: stored SN kadang comma-joined (1 string "MIN-065, MIN-034, ...")
+          // atau array 1-elemen comma-joined. Dulu dipakai mentah → UI merender
+          // 1 badge panjang nowrap yang meluber ke samping. splitSerials memecahnya
+          // jadi SN individual, jadi SerialNumberList bisa stack + batasi maxVisible.
+          const stored: string[] = [
+            ...splitSerials(trx.serial_numbers),
+            ...splitSerials(trx.serial_number),
+          ];
           const merged = [...allSerialNumbers];
           for (const sn of stored) {
             if (sn && !merged.includes(sn)) merged.push(sn);
