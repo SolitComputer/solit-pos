@@ -1147,8 +1147,8 @@ function DesktopSkeletonTable({ canSeeModal }: { canSeeModal: boolean }) {
   );
 }
 
-function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm", emptyDash = true, restoredSerials = [] }: {
-  serials: string[]; maxVisible?: number; align?: "start" | "end"; size?: "sm" | "md"; emptyDash?: boolean; restoredSerials?: string[];
+function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm", emptyDash = true, restoredSerials = [], stack = false }: {
+  serials: string[]; maxVisible?: number; align?: "start" | "end"; size?: "sm" | "md"; emptyDash?: boolean; restoredSerials?: string[]; stack?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (serials.length === 0) return emptyDash ? <span className="text-[10px] text-gray-300">—</span> : null;
@@ -1161,7 +1161,7 @@ function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm
     : "text-[9px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded whitespace-nowrap";
 
   return (
-    <div className={`flex flex-row flex-wrap gap-1 ${align === "end" ? "justify-end" : ""}`}>
+    <div className={`flex gap-1 ${stack ? `flex-col ${align === "end" ? "items-end" : "items-start"}` : `flex-row flex-wrap ${align === "end" ? "justify-end" : ""}`}`}>
       {visible.map((sn, i) => {
         const isRestored = restoredSet.has(sn);
         return (
@@ -1603,7 +1603,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
               <SortableTh label="Sales" sortKey="sales" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[125px]`} />
               <SortableTh label="Laptop" sortKey="laptop" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[195px]`} />
               <SortableTh label="CPU" sortKey="cpu" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[155px]`} />
-              <SortableTh label="SN" sortKey="sn" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[165px]`} />
+              <SortableTh label="SN" sortKey="sn" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[120px]`} />
               <SortableTh label="Harga Jual" sortKey="price" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="right" className={`${HEAD} text-right w-[135px]`} />
               {/* ── REVISI: Kolom Margin hanya render jika canSeeModal true ── */}
               {canSeeModal && (
@@ -1806,14 +1806,14 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
                 <div className="space-y-1.5">
                   {grouped.map((g: any, idx: number) => (
                     <div key={idx}>
-                      {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} restoredSerials={g.restored_serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}
+                      {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} restoredSerials={g.restored_serial_numbers} maxVisible={2} size="sm" stack /> : <span className="text-[9px] text-gray-300">—</span>}
                     </div>
                   ))}
                 </div>
               );
             }
             const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
-            return <SerialNumberList serials={sns} maxVisible={3} size="sm" />;
+            return <SerialNumberList serials={sns} maxVisible={3} size="sm" stack />;
           })()}
         </td>
         <td className="px-4 py-3.5 text-right">

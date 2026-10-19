@@ -1350,7 +1350,7 @@ function SoHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose
                     ) : history.length === 0 ? (
                         <p className="text-sm text-gray-400 text-center py-8">Belum ada riwayat SO untuk unit ini</p>
                     ) : (
-                        <ol className="space-y-2">
+                        <ol className="space-y-2">  
                             {history.map(h => (
                                 <li key={h.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
                                     <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">
