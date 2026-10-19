@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, use } from "react";
-import { notFound } from "next/navigation";
-import {
+import { notFound, useRouter, useSearchParams } from "next/navigation";import {
   Plus,
   X,
   Pencil,
@@ -92,8 +91,14 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
 
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [rows, setRows] = useState<LeadRow[]>([]);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  // Baca halaman dari URL (?page=) supaya posisi pagination tidak hilang
+  // kalau komponen ke-remount atau data di-refetch.
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get("page"));
+    return Number.isInteger(p) && p >= 1 ? p : 1;
+  });  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingRow, setEditingRow] = useState<LeadRow | null>(null);
@@ -128,11 +133,20 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
     });
   }, []);
 
-  useEffect(() => { fetchRows(); setPage(1); }, [fetchRows]);
+  useEffect(() => { fetchRows(); }, [fetchRows]);
 
   // Reset ke halaman 1 setiap kali filter audit diganti, supaya tidak
   // nyangkut di halaman kosong kalau hasil filter lebih sedikit.
   useEffect(() => { setPage(1); }, [auditFilter]);
+
+  // Tulis halaman aktif ke URL (?page=). Kalau komponen remount / refetch,
+  // posisi pagination tetap terbaca dari URL, tidak balik ke 1.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", String(page));
+    router.replace(`?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const filteredRows = useMemo(() => {
     if (auditFilter === "audited") return rows.filter((r) => r.audited);
@@ -346,7 +360,7 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {loading && rows.length === 0 ? (
                   [1, 2, 3].map((i) => (
                     <tr key={i} className="border-b border-gray-50 last:border-0">
                       <td colSpan={10} className="px-4 py-3.5">                        <div className="flex items-center gap-3 animate-pulse">
@@ -475,7 +489,7 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
 
           {/* Kartu — mobile & tablet kecil (di bawah md) */}
           <div className="md:hidden divide-y divide-gray-50">
-            {loading ? (
+            {loading && rows.length === 0 ? (
               <div className="p-4 space-y-3">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="flex items-center gap-3 animate-pulse">
