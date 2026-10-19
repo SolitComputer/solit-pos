@@ -173,8 +173,24 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     });
 }
 
+// Supabase/PostgREST membatasi hasil ~1000 baris per request. Helper ini narik
+// SEMUA baris lewat paginasi .range() biar nggak ada log yang kepotong diam-diam.
+// makeQuery HARUS bikin builder BARU tiap halaman (builder Supabase sekali pakai).
+async function fetchAll<T = any>(makeQuery: () => any): Promise<T[]> {
+    const PAGE = 1000;
+    const out: T[] = [];
+    for (let from = 0; ; from += PAGE) {
+        const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+        if (error) throw new Error(error.message);
+        const batch = (data ?? []) as T[];
+        out.push(...batch);
+        if (batch.length < PAGE) break;
+    }
+    return out;
+}
+
 // POST { year, month } — hitung poin LANGSUNG dari activity_logs (server-side),
-// lalu upsert snapshot bulanan ke pengelola_barang_scores.
+// // lalu upsert snapshot bulanan ke pengelola_barang_scores.
 async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     const body = await req.json();
     const year: number = body.year;
@@ -189,26 +205,31 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}T23:59:59+07:00`;
 
     // ⚠️ ASUMSI: kolom timestamp di activity_logs bernama `created_at`.
-    const [{ data: createLogs, error: createErr }, { data: solvedLogs, error: solvedErr }, { data: soLogs, error: soErr }, { data: condLogs, error: condErr }] = await Promise.all([
-        supabase.from("activity_logs").select("user_id, created_at")
-            .eq("entity", "unit").eq("action", "CREATE")
-            .gte("created_at", startDate).lte("created_at", endDate),
-        supabase.from("activity_logs").select("user_id, created_at")
-            .eq("entity", "unit").eq("action", "MINUS_FIXED")
-            .gte("created_at", startDate).lte("created_at", endDate),
-        supabase.from("activity_logs").select("user_id, entity_id, created_at")
-            .eq("entity", "laptop").eq("action", "SO")
-            .gte("created_at", startDate).lte("created_at", endDate),
-        // Tes Kondisi: endpoint condition-checks selalu nulis label "... — tes kondisi"
-        // (entity bisa laptop ATAU unit) → itu penanda uniknya. entity_id dipakai buat dedupe.
-        supabase.from("activity_logs").select("user_id, entity_id, created_at")
-            .eq("action", "EDIT").ilike("entity_label", "%tes kondisi%")
-            .gte("created_at", startDate).lte("created_at", endDate),
-    ]);
-
-    const firstError = createErr || solvedErr || soErr || condErr;
-        if (firstError) {
-        return NextResponse.json({ success: false, message: firstError.message }, { status: 500 });
+    // Pakai fetchAll (paginasi) — tanpa ini, bulan ramai yang lognya >1000
+    // bikin sebagian orang kepotong & poinnya jadi 0 walau log-nya ada.
+    let createLogs: { user_id: string; created_at: string }[];
+    let solvedLogs: { user_id: string; created_at: string }[];
+    let soLogs: { user_id: string; entity_id: string; created_at: string }[];
+    let condLogs: { user_id: string; entity_id: string; created_at: string }[];
+    try {
+        [createLogs, solvedLogs, soLogs, condLogs] = await Promise.all([
+            fetchAll(() => supabase.from("activity_logs").select("user_id, created_at")
+                .eq("entity", "unit").eq("action", "CREATE")
+                .gte("created_at", startDate).lte("created_at", endDate)),
+            fetchAll(() => supabase.from("activity_logs").select("user_id, created_at")
+                .eq("entity", "unit").eq("action", "MINUS_FIXED")
+                .gte("created_at", startDate).lte("created_at", endDate)),
+            fetchAll(() => supabase.from("activity_logs").select("user_id, entity_id, created_at")
+                .eq("entity", "laptop").eq("action", "SO")
+                .gte("created_at", startDate).lte("created_at", endDate)),
+            // Tes Kondisi: endpoint condition-checks selalu nulis label "... — tes kondisi"
+            // (entity bisa laptop ATAU unit) → itu penanda uniknya. entity_id dipakai buat dedupe.
+            fetchAll(() => supabase.from("activity_logs").select("user_id, entity_id, created_at")
+                .eq("action", "EDIT").ilike("entity_label", "%tes kondisi%")
+                .gte("created_at", startDate).lte("created_at", endDate)),
+        ]);
+    } catch (err: any) {
+        return NextResponse.json({ success: false, message: err?.message ?? "Gagal ambil activity_logs" }, { status: 500 });
     }
 
     const totals = new Map<string, { added: number; solved: number; so: number; cond: number }>();
