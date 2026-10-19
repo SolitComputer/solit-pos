@@ -165,6 +165,7 @@ interface SalesReportEntry {
   keterangan: string | null;
   sumber: string | null;
   purchased: boolean;
+  ads: boolean;
   filled_by: string;
   filled_by_name: string;
   audited: boolean;
@@ -278,6 +279,7 @@ export default function LaporanHarianSalesPage() {
   const [keterangan, setKeterangan] = useState("");
   const [sumber, setSumber] = useState("");
   const [purchased, setPurchased] = useState(false);
+  const [ads, setAds] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -417,6 +419,8 @@ export default function LaporanHarianSalesPage() {
     setKeterangan("");
     setSumber("");
     setPurchased(false);
+    setFormError("");    setSumber("");
+    setPurchased(false);
     setFormError("");
   };
 
@@ -436,6 +440,7 @@ export default function LaporanHarianSalesPage() {
     setKeterangan(entry.keterangan ?? "");
     setSumber(entry.sumber ?? "");
     setPurchased(entry.purchased);
+    setAds(entry.ads ?? false); // ?? false biar baris lama (ads null) aman
     setShowModal(true);
   };
 
@@ -482,6 +487,7 @@ export default function LaporanHarianSalesPage() {
             keterangan: keterangan.trim(),
             sumber: sumber.trim(),
             purchased,
+            ads,
           }),
         }
       );
@@ -825,6 +831,28 @@ export default function LaporanHarianSalesPage() {
                         }`}
                     >
                       <XCircle className="w-3.5 h-3.5" /> Tidak
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sumber traffic — tandai leads ini datang dari iklan (Ads) atau organik.
+                    Nilainya ikut mengalir ke halaman Audit Marketing. */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1.5 block">Sumber Traffic</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAds(true)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${ads ? "bg-violet-600 border-violet-600 text-white shadow-sm shadow-violet-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"}`}
+                    >
+                      <Megaphone className="w-3.5 h-3.5" /> Ads
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAds(false)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/30 ${!ads ? "bg-gray-800 border-gray-800 text-white shadow-sm shadow-gray-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"}`}
+                    >
+                      Organik
                     </button>
                   </div>
                 </div>

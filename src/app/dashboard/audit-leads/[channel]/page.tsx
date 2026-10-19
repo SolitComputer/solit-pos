@@ -403,11 +403,7 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                         <TransaksiBadge value={row.transaksi} />
                       </td>
                       <td className="border border-gray-200 px-4 py-3.5 text-center hidden lg:table-cell">
-                        {row.source === "sales_report" ? (
-                          <span className="text-xs text-gray-300">—</span>
-                        ) : (
-                          <AdsBadge value={row.ads} />
-                        )}
+                        <AdsBadge value={row.ads} />
                       </td>
                       <td className="border border-gray-200 px-4 py-3.5 text-center">
                         {row.audited ? (
@@ -527,7 +523,7 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {row.source !== "sales_report" && <AdsBadge value={row.ads} />}
+                    <AdsBadge value={row.ads} />
                     {row.audited ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600">
                         <ShieldCheck className="w-2.5 h-2.5" /> {row.audited_by_name}

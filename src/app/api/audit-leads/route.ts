@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     keterangan: r.keterangan,
     sumber: r.sumber ?? null,
     transaksi: r.purchased,
-    ads: false,
+    ads: r.ads ?? false, // dulu di-hardcode false — ini penyebab ADS selalu kosong utk Laporan Sales
     audited: r.audited,
     audited_by_name: r.audited_by_name,
     created_by: r.filled_by,
