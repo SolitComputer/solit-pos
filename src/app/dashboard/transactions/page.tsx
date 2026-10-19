@@ -1798,15 +1798,15 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
         </td>
         <td className="px-4 py-3.5">{renderLaptopCell()}</td>
         <td className="px-4 py-3.5">{renderCpuCell()}</td>
-        <td className="px-4 py-3.5 align-top">
-          <div className="w-[120px] max-w-[120px] break-words">
+        <td className="px-4 py-3.5 align-top w-[120px]">
+          <div className="flex flex-col items-start gap-1 w-[120px] max-w-[120px]">
           {(() => {
             const grouped: any[] = item.grouped_items ?? [];
             if (grouped.length > 1) {
               return (
-                <div className="space-y-1.5">
+                <div className="flex flex-col gap-1.5 w-full">
                   {grouped.map((g: any, idx: number) => (
-                    <div key={idx}>
+                    <div key={idx} className="w-full">
                       {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} restoredSerials={g.restored_serial_numbers} maxVisible={2} size="sm" stack /> : <span className="text-[9px] text-gray-300">—</span>}
                     </div>
                   ))}
@@ -1897,8 +1897,8 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
         {canSeeModal && (
           <td className="px-4 py-3.5 text-right">
             {item.modal_missing ? (
-              <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-200 whitespace-nowrap">
-                <AlertTriangle className="inline w-3.5 h-3.5 mr-1" /> Harga modal belum diinput
+              <span className="inline-flex items-start text-left text-[9px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-200 whitespace-normal leading-tight max-w-full">
+                <AlertTriangle className="inline w-3 h-3 mr-1 mt-px shrink-0" /> Modal belum diinput
               </span>
             ) : item.other !== undefined && item.other !== null ? (
               <span className={`text-sm font-bold font-mono tabular-nums whitespace-nowrap ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-500" : "text-gray-300"}`}>
