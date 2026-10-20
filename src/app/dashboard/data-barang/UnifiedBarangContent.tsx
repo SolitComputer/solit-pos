@@ -2301,7 +2301,7 @@ export default function UnifiedBarangContent() {
                                                             <td className="px-3 py-3">
                                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
                                                                     {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
-                                                                    {row.kategori || (row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris")}
+                                                                    {row.kategori || "Tanpa Kategori"}
                                                                 </span>
                                                             </td>
                                                             <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 ${rowBg}`} title={row.nama}>{row.nama}</td>
