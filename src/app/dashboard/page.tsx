@@ -581,8 +581,12 @@ export default function Page() {
       {/* Detail Modals */}
       <RevenueDetailModal isOpen={showRevenueModal} onClose={() => setShowRevenueModal(false)} />
       <InventoryDetailModal isOpen={showInventoryModal} onClose={() => setShowInventoryModal(false)} />
-      <SalesDetailModal isOpen={showSalesModal} onClose={() => setShowSalesModal(false)} />
-      <LaptopDetailModal isOpen={showLaptopModal} onClose={() => setShowLaptopModal(false)} />
+      <SalesDetailModal
+        isOpen={showSalesModal}
+        onClose={() => setShowSalesModal(false)}
+        userRoles={userRole ? [userRole] : []}
+      />
+            <LaptopDetailModal isOpen={showLaptopModal} onClose={() => setShowLaptopModal(false)} />
       <GrossProfitDetailModal isOpen={showGrossProfitModal} onClose={() => setShowGrossProfitModal(false)} />
       <TransactionDetailModal
         isOpen={showTransactionModal}
