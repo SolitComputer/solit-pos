@@ -199,7 +199,10 @@ function buildJurnalUmumSheet(sheet: ExcelJS.Worksheet, entries: JournalEntryFul
       if (kredit) totalKredit += kredit;
 
       const row = sheet.addRow([
-        i === 0 ? new Date(`${entry.tanggal}T00:00:00`) : null,
+        // Tempel offset WIB (+07:00) supaya tidak digeser mundur 1 hari saat
+        // server berjalan di UTC. Tanpa offset, "2026-10-20T00:00:00" dibaca
+        // sebagai tengah malam UTC lalu ter-render jadi 19/10 di Excel.
+        i === 0 ? new Date(`${entry.tanggal}T00:00:00+07:00`) : null,
         i === 0 ? (SOURCE_LABEL[entry.source_type] ?? entry.source_type) : null,
         i === 0 ? entry.keterangan : null,
         // Ref = kode akun (post reference); ref asli entry ditempel di baris pertama saja.
@@ -297,7 +300,9 @@ function buildAccountTypeSheetHorizontal(
     } else {
       rows.forEach((line, idx) => {
         const r = DATA_START_ROW + idx;
-        sheet.getCell(r, startCol).value = new Date(`${line.tanggal}T00:00:00`);
+        // Offset WIB (+07:00) — lihat catatan di buildJurnalUmumSheet. Tanpa ini
+        // tanggal mutasi Buku Besar ikut mundur 1 hari di server UTC.
+        sheet.getCell(r, startCol).value = new Date(`${line.tanggal}T00:00:00+07:00`);
         sheet.getCell(r, startCol).numFmt = "dd/mm/yy";
         sheet.getCell(r, startCol + 1).value = line.keterangan;
         sheet.getCell(r, startCol + 2).value = line.ref || "—";
