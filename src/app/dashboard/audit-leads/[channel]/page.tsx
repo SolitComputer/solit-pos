@@ -226,6 +226,10 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
           @keyframes alBlobFloat { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(10px, -14px) scale(1.05); } }
           .al-blob { animation: alBlobFloat 10s ease-in-out infinite; }
           @media (prefers-reduced-motion: reduce) { .al-blob { animation: none; } }
+
+          /* Grid garis penuh ala Excel — diatur sekali di sini, berlaku ke semua sel. */
+          .al-grid th { border: 1px solid #ddd6fe; }  /* violet-200 — garis header, nyambung ke tema */
+          .al-grid td { border: 1px solid #e5e7eb; }  /* gray-200 — garis antar sel, seragam */
         `}</style>
 
         {/* Hero header */}
@@ -342,7 +346,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
               (lebih bersih), header diberi garis bawah, kolom angka rata
               tengah lewat helper class. Warna tidak diubah. */}
           <div className="overflow-x-auto hidden md:block">
-            <table className="w-full text-sm border-collapse">
+            <table className="al-grid w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-violet-50 via-fuchsia-50/60 to-violet-50 border-b border-violet-100">
                   <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider w-14">No</th>
@@ -433,7 +437,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                       <td className="px-4 py-3.5 text-center align-middle">
                         <TransaksiBadge value={row.transaksi} />
                       </td>
-                      <td className="border border-gray-200 px-4 py-3.5 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.ads || undefined}>
+                      <td className="px-4 py-3.5 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.ads || undefined}>
                         {row.ads || "—"}
                       </td>
                       <td className="px-4 py-3.5 text-center align-middle">
