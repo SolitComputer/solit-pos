@@ -401,6 +401,7 @@ interface BarangFilterState {
     statusAuditSoFilter: "ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE";
     sortBy: "NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST";
     search: string;
+    onlyUncategorized: boolean;
 }
 
 function readBarangFilter(): Partial<BarangFilterState> | null {
@@ -809,6 +810,9 @@ export default function UnifiedBarangContent() {
     const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS" | "MINUS_SIAP_JUAL">(() => bootFilter?.stokFilter ?? "ALL"); const [minPrice, setMinPrice] = useState(() => bootFilter?.minPrice ?? "");
     const [maxPrice, setMaxPrice] = useState(() => bootFilter?.maxPrice ?? "");
     const [statusAuditSoFilter, setStatusAuditSoFilter] = useState<"ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE">(() => bootFilter?.statusAuditSoFilter ?? "ALL");
+    // Filter "Tanpa Kategori": true = hanya tampilkan barang yang BELUM punya kategori
+    // (category_id null utk laptop / field category kosong utk aksesoris).
+    const [onlyUncategorized, setOnlyUncategorized] = useState<boolean>(() => bootFilter?.onlyUncategorized ?? false);
     const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST">(() => bootFilter?.sortBy ?? "NAMA_ASC");
     const [search, setSearch] = useState(() => bootFilter?.search ?? "");
     // Input tetap responsif karena `search` langsung update, tapi proses filter
@@ -971,9 +975,9 @@ export default function UnifiedBarangContent() {
     useEffect(() => {
         writeBarangFilter({
             tipeFilter, kategoriFilter, brandFilter, stokFilter,
-            minPrice, maxPrice, statusAuditSoFilter, sortBy, search,
+            minPrice, maxPrice, statusAuditSoFilter, sortBy, search, onlyUncategorized,
         });
-    }, [tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, sortBy, search]);
+    }, [tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, sortBy, search, onlyUncategorized]);
 
     useEffect(() => {
         const t = new URLSearchParams(window.location.search).get("tipe");
@@ -1046,6 +1050,13 @@ export default function UnifiedBarangContent() {
                 if (r.tipe === "LAPTOP") return r.kategori_id != null && selectedIds.has(r.kategori_id);
                 return selectedNames.has((r.kategori || "").toUpperCase());
             });
+        }
+
+        // Filter "Tanpa Kategori" — barang yang belum di-assign kategori sama sekali.
+        // Laptop: category_name/category_id null → r.kategori null. Aksesoris: field
+        // category kosong → r.kategori null/"". Dicek seragam lewat r.kategori.
+        if (onlyUncategorized) {
+            list = list.filter(r => !r.kategori || !r.kategori.trim());
         }
 
         if (brandFilter) {
@@ -1141,7 +1152,7 @@ export default function UnifiedBarangContent() {
             }
             return 0;
         });
-    }, [rows, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, deferredSearch, categories, sortBy]);
+    }, [rows, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, deferredSearch, categories, sortBy, onlyUncategorized]);
 
     const visibleRows = filteredRows;
 
@@ -1698,6 +1709,7 @@ export default function UnifiedBarangContent() {
     const activeFilterCount = [
         tipeFilter !== "ALL",
         kategoriFilter.length > 0,
+        onlyUncategorized,
         !!brandFilter,
         stokFilter !== "ALL",
         !!minPrice.trim(),
@@ -1719,6 +1731,7 @@ export default function UnifiedBarangContent() {
         setStatusAuditSoFilter("ALL");
         setSortBy("NAMA_ASC");
         setSearch("");
+        setOnlyUncategorized(false);
     };
 
     return (
@@ -1783,15 +1796,20 @@ export default function UnifiedBarangContent() {
                         </div>
                         <div className="flex gap-2 overflow-x-auto pills-scroll -mx-1 px-1 pb-0.5 sm:flex-wrap sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
                             <button
-                                onClick={() => setKategoriFilter([])}
-                                className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${kategoriFilter.length === 0 ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                onClick={() => { setKategoriFilter([]); setOnlyUncategorized(false); }}
+                                className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${kategoriFilter.length === 0 && !onlyUncategorized ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
                                 Semua Kategori
+                            </button>
+                            <button
+                                onClick={() => { setOnlyUncategorized(true); setKategoriFilter([]); }}
+                                className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${onlyUncategorized ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                Tanpa Kategori
                             </button>
                             {filterCategories.map(c => (
                                 <button
                                     key={c.id}
-                                    onClick={() => setKategoriFilter(prev => (prev.length === 1 && prev[0] === c.id) ? [] : [c.id])}
-                                    className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${kategoriFilter.length === 1 && kategoriFilter[0] === c.id ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                    onClick={() => { setOnlyUncategorized(false); setKategoriFilter(prev => (prev.length === 1 && prev[0] === c.id) ? [] : [c.id]); }}
+                                    className={`h-9 px-4 flex-shrink-0 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${!onlyUncategorized && kategoriFilter.length === 1 && kategoriFilter[0] === c.id ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
                                     {c.name}
                                 </button>
                             ))}
@@ -1820,7 +1838,7 @@ export default function UnifiedBarangContent() {
                                 <CategoryChecklistDropdown
                                     categories={filterCategories}
                                     selected={kategoriFilter}
-                                    onChange={setKategoriFilter}
+                                    onChange={(ids) => { setKategoriFilter(ids); if (ids.length > 0) setOnlyUncategorized(false); }}
                                 />
                             </div>
 
@@ -1954,6 +1972,12 @@ export default function UnifiedBarangContent() {
                                                 : `${kategoriFilter.length} dipilih`}
                                         </span>
                                         <button onClick={() => setKategoriFilter([])} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                                    </span>
+                                )}
+                                {onlyUncategorized && (
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium max-w-full">
+                                        <span className="truncate">Tanpa Kategori</span>
+                                        <button onClick={() => setOnlyUncategorized(false)} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
                                     </span>
                                 )}
                                 {brandFilter && (
