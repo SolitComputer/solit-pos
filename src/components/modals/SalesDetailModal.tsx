@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRegisterOverlay } from "@/contexts/OverlayContext";
+import { SALES_DETAIL_HIDE_REVENUE_ROLES, hasAnyRole } from "@/lib/permissions";
 
 interface SalesDetail {
   today: { count: number; revenue: number; profit: number };
@@ -25,8 +26,17 @@ const fmtShort = (n: number): string => {
   return `Rp ${n}`;
 };
 
-export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export function SalesDetailModal({
+  isOpen,
+  onClose,
+  userRoles = [],
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  userRoles?: string[];
+}) {
   useRegisterOverlay(isOpen);
+  const hideRevenue = hasAnyRole(userRoles, SALES_DETAIL_HIDE_REVENUE_ROLES);
   const [data, setData] = useState<SalesDetail | null>(null);
   const [isMemuat, setIsMemuat] = useState(false);
   const [expandedSales, setExpandedSales] = useState<string | null>(null);
@@ -255,8 +265,12 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
                                   <p className="text-sm font-semibold truncate" style={{ color: "#0f172a" }}>{sales.name}</p>
                                   <div className="flex items-center gap-2 mt-0.5">
                                     <span className="text-[10px] font-medium" style={{ color: "#A1A1AA" }}>{sales.total} transaksi</span>
-                                    <span className="w-1 h-1 rounded-full" style={{ background: "#E4E4E7" }} />
-                                    <span className="text-[10px] font-semibold" style={{ color: "#0f172a" }}>{fmtShort(sales.revenue)}</span>
+                                    {!hideRevenue && (
+                                      <>
+                                        <span className="w-1 h-1 rounded-full" style={{ background: "#E4E4E7" }} />
+                                        <span className="text-[10px] font-semibold" style={{ color: "#0f172a" }}>{fmtShort(sales.revenue)}</span>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               </div>
