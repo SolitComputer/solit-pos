@@ -903,6 +903,7 @@ export const DASHBOARD_FULL_ROLES: UserRole[] = [...FULL_ACCESS];
 export const SALES_DETAIL_HIDE_REVENUE_ROLES: UserRole[] = [
   "CREW_SALES",
   "KEPALA_SALES",
+  "PKL_SALES",
 ];
 
 export function isDashboardLimited(role: string | null | undefined): boolean {
