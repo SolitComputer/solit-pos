@@ -3443,6 +3443,7 @@ function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSa
 }
 
 // ⬅️ BARU — Tab Kasbon & Cicilan
+// ⬅️ Tab Kasbon & Cicilan
 function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpening, onOpenDetail, onExport }: {
     data: any[];
     loading: boolean;
@@ -3451,14 +3452,14 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
     isAdmin: boolean;
     onEditOpening: (u: { userId: string; userName: string; kasbon: number; cicilan: number }) => void;
     onOpenDetail: (u: { userId: string; userName: string }) => void;
-    onExport: () => void; // ⬅️ BARU
+    onExport: () => void;
 }) {
     const cell = (n: number, color = "text-gray-700") =>
         n && n !== 0
             ? <span className={`font-mono font-semibold ${color}`}>{formatRupiah(n)}</span>
             : <span className="text-gray-300 font-bold">—</span>;
 
-    const [search, setSearch] = useState(""); // ⬅️ BARU — cari nama karyawan
+    const [search, setSearch] = useState("");
     const filteredData = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return data;
@@ -3472,6 +3473,12 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
         acc.sisaCicilan += r.sisa_cicilan || 0;
         return acc;
     }, { totalKasbon: 0, totalCicilan: 0, sisaKasbon: 0, sisaCicilan: 0 }), [filteredData]);
+
+    // ── Kelas grid konsisten + pemisah kolom beku ──
+    const th = "border border-gray-300 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest";
+    const td = "border border-gray-300 px-3 py-2";
+    const tf = "border border-gray-300 px-3 py-2.5";
+    const freezeShadow = "shadow-[2px_0_5px_-2px_rgba(0,0,0,0.25)]"; // garis bayangan kolom beku
 
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -3506,24 +3513,24 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
             {loading ? (
                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
             ) : (
-                <div className="overflow-auto max-h-[70vh] p-4 pt-0">
+                <div className="overflow-auto max-h-[70vh]">
                     <table className="w-full text-sm border-separate border-spacing-0 min-w-[1200px]">
                         <thead>
                             <tr>
-                                <th className="sticky top-0 left-0 z-40 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest w-11 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">No</th>
-                                <th className="sticky top-0 left-[44px] z-40 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">Nama</th>
-                                <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Sebelumnya</th>
-                                <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Sebelumnya</th>
+                                <th className={`sticky top-0 left-0 z-30 w-11 text-center bg-sky-200 text-gray-800 ${th}`}>No</th>
+                                <th className={`sticky top-0 left-[44px] z-30 text-left bg-sky-200 text-gray-800 ${th} ${freezeShadow}`}>Nama</th>
+                                <th className={`sticky top-0 z-20 text-right bg-sky-200 text-gray-800 ${th}`}>Kasbon Sebelumnya</th>
+                                <th className={`sticky top-0 z-20 text-right bg-sky-200 text-gray-800 ${th}`}>Cicilan Sebelumnya</th>
                                 {[1, 2, 3, 4, 5].map(w => (
-                                    <th key={w} className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Minggu {w}</th>
+                                    <th key={w} className={`sticky top-0 z-20 text-right bg-sky-200 text-gray-800 ${th}`}>Minggu {w}</th>
                                 ))}
-                                <th className="sticky top-0 z-20 border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Kasbon</th>
-                                <th className="sticky top-0 z-20 border border-gray-300 bg-emerald-100 text-emerald-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Total Cicilan</th>
-                                <th className="sticky top-0 z-20 border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Dibayar</th>
-                                <th className="sticky top-0 z-20 border border-gray-300 bg-blue-100 text-blue-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Dibayar</th>
-                                <th className="sticky top-0 z-20 border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Kasbon</th>
-                                <th className="sticky top-0 z-20 border border-gray-300 bg-red-100 text-red-700 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Sisa Cicilan</th>
-                                {isAdmin && <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest">Saldo Awal</th>}
+                                <th className={`sticky top-0 z-20 text-right bg-emerald-100 text-emerald-700 ${th}`}>Total Kasbon</th>
+                                <th className={`sticky top-0 z-20 text-right bg-emerald-100 text-emerald-700 ${th}`}>Total Cicilan</th>
+                                <th className={`sticky top-0 z-20 text-right bg-blue-100 text-blue-700 ${th}`}>Kasbon Dibayar</th>
+                                <th className={`sticky top-0 z-20 text-right bg-blue-100 text-blue-700 ${th}`}>Cicilan Dibayar</th>
+                                <th className={`sticky top-0 z-20 text-right bg-red-100 text-red-700 ${th}`}>Sisa Kasbon</th>
+                                <th className={`sticky top-0 z-20 text-right bg-red-100 text-red-700 ${th}`}>Sisa Cicilan</th>
+                                {isAdmin && <th className={`sticky top-0 z-20 text-center bg-sky-200 text-gray-800 ${th}`}>Saldo Awal</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -3531,8 +3538,8 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                 <tr><td colSpan={isAdmin ? 16 : 15} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
                             ) : filteredData.map((r, i) => (
                                 <tr key={r.user_id} className="hover:bg-sky-50/40 group">
-                                    <td className="sticky left-0 z-20 px-3 py-2 text-center text-[11px] text-gray-400 font-black bg-white group-hover:bg-sky-50 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">{i + 1}</td>
-<td className="sticky left-[44px] z-20 px-3 py-2 bg-white group-hover:bg-sky-50 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">
+                                    <td className={`sticky left-0 z-10 text-center text-[11px] text-gray-400 font-black bg-white group-hover:bg-sky-50 ${td}`}>{i + 1}</td>
+                                    <td className={`sticky left-[44px] z-10 bg-white group-hover:bg-sky-50 ${td} ${freezeShadow}`}>
                                         <button
                                             onClick={() => onOpenDetail({ userId: r.user_id, userName: r.name })}
                                             className="flex items-center gap-2.5 text-left hover:opacity-80 transition-opacity group"
@@ -3548,19 +3555,19 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                             </div>
                                         </button>
                                     </td>
-                                    <td className="border border-gray-300 px-3 py-2 text-right">{cell(r.kasbon_sebelumnya)}</td>
-                                    <td className="border border-gray-300 px-3 py-2 text-right">{cell(r.cicilan_sebelumnya)}</td>
+                                    <td className={`${td} text-right`}>{cell(r.kasbon_sebelumnya)}</td>
+                                    <td className={`${td} text-right`}>{cell(r.cicilan_sebelumnya)}</td>
                                     {(r.minggu ?? [0, 0, 0, 0, 0]).map((w: number, idx: number) => (
-                                        <td key={idx} className="border border-gray-300 px-3 py-2 text-right">{cell(w)}</td>
+                                        <td key={idx} className={`${td} text-right`}>{cell(w)}</td>
                                     ))}
-                                    <td className="border border-gray-300 px-3 py-2 text-right bg-emerald-50/40">{cell(r.total_kasbon, "text-emerald-700")}</td>
-                                    <td className="border border-gray-300 px-3 py-2 text-right bg-emerald-50/40">{cell(r.total_cicilan, "text-emerald-700")}</td>
-                                    <td className="border border-gray-300 px-3 py-2 text-right bg-blue-50/40">{cell(r.kasbon_dibayar, "text-blue-600")}</td>
-                                    <td className="border border-gray-300 px-3 py-2 text-right bg-blue-50/40">{cell(r.cicilan_dibayar, "text-blue-600")}</td>
-                                    <td className="border border-gray-300 px-3 py-2 text-right bg-red-50/40">{cell(r.sisa_kasbon, "text-red-600")}</td>
-                                    <td className="border border-gray-300 px-3 py-2 text-right bg-red-50/40">{cell(r.sisa_cicilan, "text-red-600")}</td>
+                                    <td className={`${td} text-right bg-emerald-50/40`}>{cell(r.total_kasbon, "text-emerald-700")}</td>
+                                    <td className={`${td} text-right bg-emerald-50/40`}>{cell(r.total_cicilan, "text-emerald-700")}</td>
+                                    <td className={`${td} text-right bg-blue-50/40`}>{cell(r.kasbon_dibayar, "text-blue-600")}</td>
+                                    <td className={`${td} text-right bg-blue-50/40`}>{cell(r.cicilan_dibayar, "text-blue-600")}</td>
+                                    <td className={`${td} text-right bg-red-50/40`}>{cell(r.sisa_kasbon, "text-red-600")}</td>
+                                    <td className={`${td} text-right bg-red-50/40`}>{cell(r.sisa_cicilan, "text-red-600")}</td>
                                     {isAdmin && (
-                                        <td className="border border-gray-300 px-3 py-2 text-center bg-white">
+                                        <td className={`${td} text-center bg-white`}>
                                             <button
                                                 onClick={() => onEditOpening({ userId: r.user_id, userName: r.name, kasbon: r.kasbon_opening ?? 0, cicilan: r.cicilan_opening ?? 0 })}
                                                 className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-all whitespace-nowrap"
@@ -3575,13 +3582,14 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                         {filteredData.length > 0 && (
                             <tfoot>
                                 <tr>
-                                    <td colSpan={9} className="sticky left-0 z-20 px-3 py-2.5 text-sm font-black text-gray-700 bg-gray-100 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">TOTAL</td>
-                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalKasbon)}</span></td>
-                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalCicilan)}</span></td>
-                                    <td colSpan={2} className="border border-gray-300 bg-gray-100"></td>
-                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaKasbon)}</span></td>
-                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaCicilan)}</span></td>
-                                    {isAdmin && <td className="border border-gray-300 bg-gray-100"></td>}
+                                    <td colSpan={2} className={`sticky left-0 z-10 text-sm font-black text-gray-700 bg-gray-100 ${tf} ${freezeShadow}`}>TOTAL</td>
+                                    <td colSpan={7} className={`${tf} bg-gray-100`}></td>
+                                    <td className={`${tf} text-right bg-gray-100`}><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalKasbon)}</span></td>
+                                    <td className={`${tf} text-right bg-gray-100`}><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalCicilan)}</span></td>
+                                    <td colSpan={2} className={`${tf} bg-gray-100`}></td>
+                                    <td className={`${tf} text-right bg-gray-100`}><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaKasbon)}</span></td>
+                                    <td className={`${tf} text-right bg-gray-100`}><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaCicilan)}</span></td>
+                                    {isAdmin && <td className={`${tf} bg-gray-100`}></td>}
                                 </tr>
                             </tfoot>
                         )}
@@ -3834,15 +3842,16 @@ function KasbonDetailModal({ userId, userName, calYear, calMonth, canEdit, onClo
 }
 
 // ⬅️ BARU — Tab Dana Pensiun (tabel 12 bulan, gaya Excel dengan garis)
+// ⬅️ Tab Dana Pensiun (tabel 12 bulan, gaya Excel dengan garis)
 function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }: {
     data: any[];
     loading: boolean;
     calYear: number;
     isAdmin: boolean;
     onManual: () => void;
-    onExport: () => void; // ⬅️ BARU
+    onExport: () => void;
 }) {
-    const [search, setSearch] = useState(""); // ⬅️ BARU — cari nama karyawan
+    const [search, setSearch] = useState("");
     const filteredData = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return data;
@@ -3860,6 +3869,12 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
         n && n !== 0
             ? <span className="font-mono font-semibold text-gray-700">{formatRupiah(n)}</span>
             : <span className="text-gray-300">—</span>;
+
+    // ── Kelas grid konsisten + pemisah kolom beku ──
+    const th = "border border-gray-300 px-3 py-2.5 text-xs font-bold whitespace-nowrap";
+    const td = "border border-gray-300 px-3 py-2";
+    const tf = "border border-gray-300 px-3 py-2.5";
+    const freezeShadow = "shadow-[2px_0_5px_-2px_rgba(0,0,0,0.25)]";
 
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -3900,15 +3915,15 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
             {loading ? (
                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-12 bg-gray-50 rounded-xl animate-pulse" />)}</div>
             ) : (
-                <div className="overflow-auto max-h-[70vh] p-4 pt-0">
+                <div className="overflow-auto max-h-[70vh]">
                     <table className="w-full text-sm border-separate border-spacing-0 min-w-[1400px]">
                         <thead>
                             <tr>
-                               <th className="sticky top-0 left-0 z-40 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-xs font-bold whitespace-nowrap after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">Nama</th>
+                                <th className={`sticky top-0 left-0 z-30 text-left bg-sky-200 text-gray-800 ${th} ${freezeShadow}`}>Nama</th>
                                 {MONTH_NAMES.map(m => (
-                                    <th key={m} className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">{m}</th>
+                                    <th key={m} className={`sticky top-0 z-20 text-center bg-sky-200 text-gray-800 ${th}`}>{m}</th>
                                 ))}
-                                <th className="sticky top-0 z-20 border border-gray-300 bg-sky-300 text-gray-800 px-3 py-2.5 text-center text-xs font-bold">Total</th>
+                                <th className={`sticky top-0 z-20 text-center bg-sky-300 text-gray-800 ${th}`}>Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -3916,22 +3931,22 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
                                 <tr><td colSpan={14} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
                             ) : filteredData.map(r => (
                                 <tr key={r.user_id} className="hover:bg-sky-50/40 group">
-                                    <td className="sticky left-0 z-20 px-3 py-2 font-semibold text-gray-800 whitespace-nowrap bg-white group-hover:bg-sky-50 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">{r.name}</td>
+                                    <td className={`sticky left-0 z-10 font-semibold text-gray-800 whitespace-nowrap bg-white group-hover:bg-sky-50 ${td} ${freezeShadow}`}>{r.name}</td>
                                     {(r.months ?? new Array(12).fill(0)).map((v: number, i: number) => (
-                                        <td key={i} className="border border-gray-300 px-3 py-2 text-right">{cell(v)}</td>
+                                        <td key={i} className={`${td} text-right`}>{cell(v)}</td>
                                     ))}
-                                    <td className="border border-gray-300 px-3 py-2 text-right bg-sky-50 font-mono font-black text-gray-800">{formatRupiah(r.total || 0)}</td>
+                                    <td className={`${td} text-right bg-sky-50 font-mono font-black text-gray-800`}>{formatRupiah(r.total || 0)}</td>
                                 </tr>
                             ))}
                         </tbody>
                         {filteredData.length > 0 && (
                             <tfoot>
                                 <tr>
-                                   <td className="sticky left-0 z-20 px-3 py-2.5 font-black text-gray-800 bg-gray-100 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">TOTAL</td>
+                                    <td className={`sticky left-0 z-10 font-black text-gray-800 bg-gray-100 ${tf} ${freezeShadow}`}>TOTAL</td>
                                     {monthTotals.map((v, i) => (
-                                        <td key={i} className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100 font-mono font-bold text-gray-700 text-xs">{v ? formatRupiah(v) : "—"}</td>
+                                        <td key={i} className={`${tf} text-right bg-gray-100 font-mono font-bold text-gray-700 text-xs`}>{v ? formatRupiah(v) : "—"}</td>
                                     ))}
-                                    <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-200 font-mono font-black text-gray-900 text-xs">{formatRupiah(grandTotal)}</td>
+                                    <td className={`${tf} text-right bg-gray-200 font-mono font-black text-gray-900 text-xs`}>{formatRupiah(grandTotal)}</td>
                                 </tr>
                             </tfoot>
                         )}
