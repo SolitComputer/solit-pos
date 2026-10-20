@@ -1421,11 +1421,3 @@ export const ACCESSORY_DELETE_ROLES: UserRole[] = [
 ];
 export const ACCESSORY_AUDIT_ROLES: UserRole[] = ["ADMIN", "ACCOUNTING"];
 
-// ─── Detail Top Sales: sembunyikan nominal Rupiah di samping jumlah transaksi ──
-// Role di bawah ini di modal "Detail Top Sales" hanya lihat JUMLAH transaksi —
-// nominal revenue (Rp ...) di samping "x transaksi" disembunyikan.
-// Tambah role lain di sini kalau perlu perlakuan sama (mis. PKL_SALES).
-export const SALES_DETAIL_HIDE_REVENUE_ROLES: UserRole[] = [
-  "CREW_SALES",
-  "KEPALA_SALES",
-];
