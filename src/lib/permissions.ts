@@ -53,7 +53,7 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   KEPALA_TEKNISI: "/dashboard/service/antrian",
   PENGANTARAN: "/dashboard/preparation/pengantaran",
   PKL_CUSTOMER_SERVICE: "/dashboard/service/antrian",
-  PKL_PENGELOLA_BARANG: "/dashboard/laptops",
+  PKL_PENGELOLA_BARANG: "/dashboard/data-barang",
   MARKETING: "/dashboard/laptops",
   KEBERSIHAN: "/dashboard",
   KEPALA_MARKETING: "/dashboard",
