@@ -1350,7 +1350,7 @@ function SoHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose
                     ) : history.length === 0 ? (
                         <p className="text-sm text-gray-400 text-center py-8">Belum ada riwayat SO untuk unit ini</p>
                     ) : (
-                        <ol className="space-y-2">
+                        <ol className="space-y-2">  
                             {history.map(h => (
                                 <li key={h.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
                                     <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">
@@ -1550,9 +1550,6 @@ export default function AccessoryUnitsPage() {
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
-    // Audit DIPISAH dari SO. SO = SO_ROLES (tim gudang). Audit = BARANG_PRIVATE_VIEW_ROLES
-    // (termasuk ACCOUNTING) — disamakan dgn halaman Kelola Unit Laptop.
-    const canAuditUnits = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
     // Unit yang barcodenya sedang dibuka (null = tidak ada). Simpan objeknya
     // di state supaya referensinya stabil untuk BarcodeModal.
@@ -1851,7 +1848,7 @@ export default function AccessoryUnitsPage() {
     // Belum teraudit → buka modal catatan dulu. Sudah teraudit → langsung batal
     // (tanpa modal, sesuai keputusan). Eksekusi sebenarnya di runAudit().
     const onAuditClick = (unit: AccessoryUnit) => {
-        if (!canAuditUnits) return;
+        if (!canManageSo) return;
         if (isAuditActive(unit.audited_at)) {
             runAudit(unit, ""); // batalkan langsung, tanpa catatan
         } else {
@@ -1862,7 +1859,7 @@ export default function AccessoryUnitsPage() {
 
     // Eksekusi audit 1 unit (kirim notes ke endpoint — tersimpan ke riwayat).
     const runAudit = async (unit: AccessoryUnit, note: string) => {
-        if (!canAuditUnits) return;
+        if (!canManageSo) return;
         setAuditingId(unit.id);
         try {
             const res = await fetch(`/api/accessory-units/${unit.id}/audit`, {
@@ -2136,7 +2133,7 @@ export default function AccessoryUnitsPage() {
                                 )}
                                 {/* Audit Terpilih — tandai teraudit semua unit tercentang.
                                     Yang sudah teraudit di-skip (tidak dibatalkan). */}
-                                {canAuditUnits && (
+                                {canManageSo && (
                                     <button onClick={onBulkAuditClick} disabled={bulkDeleting || bulkAuditing}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
                                         {bulkAuditing ? (
@@ -2309,7 +2306,7 @@ export default function AccessoryUnitsPage() {
                                                     <td className="px-4 py-3 text-center whitespace-nowrap">
                                                         {unit.status !== "TERJUAL" ? (
                                                             <div className="flex items-center justify-center gap-1">
-                                                                {canAuditUnits ? (
+                                                                {canManageSo ? (
                                                                     <button onClick={() => onAuditClick(unit)} disabled={auditingId === unit.id}
                                                                         title={isAuditActive(unit.audited_at) ? `Diaudit oleh ${unit.audited_by ?? "—"} · klik untuk batalkan` : "Tandai sudah diaudit"}
                                                                         className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isAuditActive(unit.audited_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}>

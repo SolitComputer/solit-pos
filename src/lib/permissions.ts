@@ -1420,3 +1420,14 @@ export const ACCESSORY_DELETE_ROLES: UserRole[] = [
   "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI",
 ];
 export const ACCESSORY_AUDIT_ROLES: UserRole[] = ["ADMIN", "ACCOUNTING"];
+
+// ── Audit per-UNIT Aksesoris (Kelola Unit Aksesoris) ─────────────────────────
+// Dulu audit per-unit aksesoris ikut whitelist SO (SO_ROLES) saja. Supaya role
+// yang memang bertugas audit (ACCESSORY_AUDIT_ROLES → ADMIN, ACCOUNTING) juga
+// bisa menandai audit di halaman Kelola Unit, gabungkan keduanya di sini —
+// PENGELOLA_BARANG dkk yang sudah bisa (lewat SO_ROLES) TIDAK hilang.
+// SO sengaja TIDAK ikut diubah: Accounting cuma nambah akses AUDIT, bukan SO.
+export const ACCESSORY_UNIT_AUDIT_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...SO_ROLES,
+  ...ACCESSORY_AUDIT_ROLES,
+]));
