@@ -896,6 +896,15 @@ export function hasPermission(
 // Laptop Terlaris.
 export const DASHBOARD_FULL_ROLES: UserRole[] = [...FULL_ACCESS];
 
+// ─── Detail Top Sales: sembunyikan nominal Rupiah di samping jumlah transaksi ──
+// Role di bawah ini di modal "Detail Top Sales" hanya lihat JUMLAH transaksi —
+// nominal revenue (Rp ...) di samping "x transaksi" disembunyikan.
+// Tambah role lain di sini kalau perlu perlakuan sama (mis. PKL_SALES).
+export const SALES_DETAIL_HIDE_REVENUE_ROLES: UserRole[] = [
+  "CREW_SALES",
+  "KEPALA_SALES",
+];
+
 export function isDashboardLimited(role: string | null | undefined): boolean {
   if (!role) return false;
   return !(DASHBOARD_FULL_ROLES as string[]).includes(role);
