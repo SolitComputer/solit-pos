@@ -19,8 +19,7 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
 
 // Poin 9: dipanggil berkala oleh hooks/useOvertimeNotify.ts untuk badge + suara
 // di sidebar kepala divisi (atau Admin, kalau yang lembur adalah kepala divisi).
-export async function GET() {
-  try {
+export async function GET(request: Request) {  try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
@@ -74,8 +73,13 @@ export async function GET() {
       query = query.in("user_id", allowedUserIds);
     }
 
-    const { data, error } = await query.abortSignal(AbortSignal.timeout(8000));
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(8000)]);
+    const { data, error } = await query.abortSignal(signal);
     if (error) {
+      // Client (hook polling) udah disconnect → bukan error beneran, jangan log/500.
+      if (request.signal.aborted) {
+        return NextResponse.json({ success: false, aborted: true }, { status: 499 });
+      }
       console.error("[pending-acc] query overtime_requests error:", error.message);
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
@@ -102,6 +106,10 @@ export async function GET() {
     res.headers.set("Cache-Control", "private, max-age=30");
     return res;
   } catch (err: any) {
+    // Abort (client putus / timeout 8s) itu normal buat endpoint polling — bukan crash.
+    if (err?.name === "AbortError" || request.signal.aborted) {
+      return NextResponse.json({ success: false, aborted: true }, { status: 499 });
+    }
     console.error("[pending-acc] exception:", err);
     return NextResponse.json({ success: false, message: err?.message ?? "Server error" }, { status: 500 });
   }

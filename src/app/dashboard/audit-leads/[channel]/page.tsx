@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, use } from "react";
-import { notFound, useRouter, useSearchParams } from "next/navigation";import {
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import {
   Plus,
   X,
   Pencil,
@@ -26,7 +27,7 @@ import { notFound, useRouter, useSearchParams } from "next/navigation";import {
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
-import { AUDIT_LEADS_INPUT_ROLES, AUDIT_LEADS_AUDIT_ROLES, SALES_REPORT_SOFT_DELETE_ROLES, hasAnyRole }from "@/lib/permissions";
+import { AUDIT_LEADS_INPUT_ROLES, AUDIT_LEADS_AUDIT_ROLES, SALES_REPORT_SOFT_DELETE_ROLES, hasAnyRole } from "@/lib/permissions";
 
 type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "TOKOPEDIA" | "SHOPEE" | "THREADS" | "MITRA" | "RESELLER";
 
@@ -98,7 +99,8 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   const [page, setPage] = useState(() => {
     const p = Number(searchParams.get("page"));
     return Number.isInteger(p) && p >= 1 ? p : 1;
-  });  const [loading, setLoading] = useState(true);
+  });
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingRow, setEditingRow] = useState<LeadRow | null>(null);
@@ -167,10 +169,10 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
     return { total, transaksi, audited, convRate };
   }, [rows]);
 
-    async function handleAudit(id: string) {
+  async function handleAudit(id: string) {
     try {
       const target = rows.find((r) => r.id === id);
-const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" : "/api/audit-leads/audit";
+      const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" : "/api/audit-leads/audit";
       const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
       });
@@ -250,7 +252,8 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
                 Refresh
               </button>
-            </div>          </div>
+            </div>
+          </div>
 
           {/* Ringkasan kaca — angka murni dari data yang sudah dimuat */}
           <div className="relative grid grid-cols-3 gap-2.5 sm:gap-3 mt-5">
@@ -324,37 +327,40 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {/* Tabel — laptop/tablet (md ke atas). Keterangan & Ads baru tampil
-              mulai lg supaya tidak sesak di layar medium. */}
+              mulai lg supaya tidak sesak di layar medium.
+              Catatan desain: grid per-sel diganti pemisah antar-baris saja
+              (lebih bersih), header diberi garis bawah, kolom angka rata
+              tengah lewat helper class. Warna tidak diubah. */}
           <div className="overflow-x-auto hidden md:block">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-gradient-to-r from-violet-50 via-fuchsia-50/60 to-violet-50">
-                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider w-12">No</th>
-                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                <tr className="bg-gradient-to-r from-violet-50 via-fuchsia-50/60 to-violet-50 border-b border-violet-100">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider w-14">No</th>
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><User className="w-3 h-3" /> Nama/No Telpon</span>
                   </th>
-                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><Tag className="w-3 h-3" /> Minat</span>
                   </th>
-                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><MessageSquare className="w-3 h-3" /> Keterangan</span>
                   </th>
-                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><Link2 className="w-3 h-3" /> Sumber</span>
                   </th>
-                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><ShoppingBag className="w-3 h-3" /> Transaksi</span>
                   </th>
-                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><Megaphone className="w-3 h-3" /> Ads</span>
                   </th>
-                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><ShieldCheck className="w-3 h-3" /> Audit</span>
                   </th>
-                  <th className="border border-gray-200 px-4 py-3 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><UserCircle2 className="w-3 h-3" /> Diinput Oleh</span>
                   </th>
-                  <th className="border border-gray-200 px-4 py-3 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><Pencil className="w-3 h-3" /> Aksi</span>
                   </th>
                 </tr>
@@ -363,7 +369,8 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                 {loading && rows.length === 0 ? (
                   [1, 2, 3].map((i) => (
                     <tr key={i} className="border-b border-gray-50 last:border-0">
-                      <td colSpan={10} className="px-4 py-3.5">                        <div className="flex items-center gap-3 animate-pulse">
+                      <td colSpan={10} className="px-4 py-3.5">
+                        <div className="flex items-center gap-3 animate-pulse">
                           <div className="h-3 w-5 bg-gray-100 rounded-full" />
                           <div className="h-3 flex-1 max-w-[160px] bg-gray-100 rounded-full" />
                           <div className="h-3 flex-1 max-w-[100px] bg-gray-100 rounded-full" />
@@ -389,41 +396,41 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                     </td>
                   </tr>
                 ) : (
-                   paginated.map((row, i) => (
+                  paginated.map((row, i) => (
                     <tr
                       key={row.id}
-                      className={`group transition-colors duration-150 ${
+                      className={`group border-b border-gray-100 last:border-0 transition-colors duration-150 ${
                         i % 2 === 0 ? "bg-white" : "bg-gray-50/40"
                       } hover:bg-violet-50/50`}
                     >
-                      <td className="border border-gray-200 px-4 py-3.5 text-center">
+                      <td className="px-4 py-3.5 text-center align-middle">
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold tabular-nums group-hover:bg-violet-100 group-hover:text-violet-600 transition-colors">
                           {(page - 1) * PAGE_SIZE + i + 1}
                         </span>
                       </td>
-                      <td className="border border-gray-200 px-4 py-3.5">
-                        <p className="font-medium text-gray-900">{row.nama}</p>
+                      <td className="px-4 py-3.5 align-top">
+                        <p className="font-medium text-gray-900 leading-snug">{row.nama}</p>
                         <div className="text-[10px] font-normal text-gray-400 mt-0.5">
                           {new Date(row.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })} · {new Date(row.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                         </div>
-                        <span className={`inline-flex mt-1 items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${sourceBadge[row.source].className}`}>
+                        <span className={`inline-flex mt-1.5 items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${sourceBadge[row.source].className}`}>
                           {sourceBadge[row.source].label}
                         </span>
                       </td>
-                      <td className="border border-gray-200 px-4 py-3.5 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={row.minat}>{row.minat}</td>
-                      <td className="border border-gray-200 px-4 py-3.5 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
-                      <td className="border border-gray-200 px-4 py-3.5 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
-                      <td className="border border-gray-200 px-4 py-3.5 text-center">
+                      <td className="px-4 py-3.5 align-top text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words leading-snug" title={row.minat}>{row.minat}</td>
+                      <td className="px-4 py-3.5 align-top text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words leading-snug hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
+                      <td className="px-4 py-3.5 align-top text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
+                      <td className="px-4 py-3.5 text-center align-middle">
                         <TransaksiBadge value={row.transaksi} />
                       </td>
-                      <td className="border border-gray-200 px-4 py-3.5 text-center hidden lg:table-cell">
+                      <td className="px-4 py-3.5 text-center align-middle hidden lg:table-cell">
                         {row.source === "sales_report" ? (
                           <span className="text-xs text-gray-300">—</span>
                         ) : (
                           <AdsBadge value={row.ads} />
                         )}
                       </td>
-                      <td className="border border-gray-200 px-4 py-3.5 text-center">
+                      <td className="px-4 py-3.5 text-center align-middle">
                         {row.audited ? (
                           <span
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600"
@@ -442,7 +449,7 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                           <span className="text-[11px] text-gray-300 font-medium">Belum</span>
                         )}
                       </td>
-                      <td className="border border-gray-200 px-4 py-3.5 whitespace-nowrap hidden lg:table-cell">
+                      <td className="px-4 py-3.5 align-middle whitespace-nowrap hidden lg:table-cell">
                         <div className="flex items-center gap-2">
                           <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 ${avatarStyle(row.created_by_name)}`}>
                             {initials(row.created_by_name)}
@@ -450,7 +457,7 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                           <span className="text-gray-600">{row.created_by_name}</span>
                         </div>
                       </td>
-                      <td className="border border-gray-200 px-4 py-3.5 text-center whitespace-nowrap">
+                      <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
                         {row.source === "sales_report" ? (
                           canDeleteSalesReport ? (
                             <button
@@ -492,7 +499,7 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
           </div>
 
           {/* Kartu — mobile & tablet kecil (di bawah md) */}
-          <div className="md:hidden divide-y divide-gray-50">
+          <div className="md:hidden divide-y divide-gray-100">
             {loading && rows.length === 0 ? (
               <div className="p-4 space-y-3">
                 {[1, 2, 3].map((i) => (
@@ -518,19 +525,24 @@ const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" 
                 </p>
               </div>
             ) : (
-              paginated.map((row) => (
+              paginated.map((row, i) => (
                 <div key={row.id} className="p-4 space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{row.nama}</p>
-                      <span className={`inline-flex mt-1 items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${sourceBadge[row.source].className}`}>
-                        {sourceBadge[row.source].label}
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <span className="inline-flex items-center justify-center w-6 h-6 mt-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold tabular-nums shrink-0">
+                        {(page - 1) * PAGE_SIZE + i + 1}
                       </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{row.nama}</p>
+                        <span className={`inline-flex mt-1 items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${sourceBadge[row.source].className}`}>
+                          {sourceBadge[row.source].label}
+                        </span>
+                      </div>
                     </div>
-                    <TransaksiBadge value={row.transaksi} /> 
+                    <TransaksiBadge value={row.transaksi} />
                   </div>
-                  <p className="text-xs text-gray-600">{row.minat}</p>
-                  {row.keterangan && <p className="text-[11px] text-gray-400">{row.keterangan}</p>}
+                  <p className="text-xs text-gray-600 leading-relaxed">{row.minat}</p>
+                  {row.keterangan && <p className="text-[11px] text-gray-400 leading-relaxed">{row.keterangan}</p>}
                   {row.sumber && <p className="text-[11px] text-gray-400">Sumber: {row.sumber}</p>}
                   <div className="flex items-center gap-2 pt-0.5">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 ${avatarStyle(row.created_by_name)}`}>
