@@ -159,7 +159,7 @@ export function SalesDetailModal({
               <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round">
-                  <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                  <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
               <div>
@@ -169,7 +169,7 @@ export function SalesDetailModal({
             </div>
             <button onClick={onClose} className="sdm-close w-8 h-8 rounded-xl flex items-center justify-center">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
@@ -178,8 +178,8 @@ export function SalesDetailModal({
           <div className="sdm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
             {isMemuat ? (
               <div className="p-5 space-y-3">
-                <div className="grid grid-cols-2 gap-3">{[1,2].map(i=><div key={i} className="sdm-shimmer h-28"/>)}</div>
-                <div className="space-y-2 pt-2">{[1,2,3].map(i=><div key={i} className="sdm-shimmer h-16"/>)}</div>
+                <div className="grid grid-cols-2 gap-3">{[1, 2].map(i => <div key={i} className="sdm-shimmer h-28" />)}</div>
+                <div className="space-y-2 pt-2">{[1, 2, 3].map(i => <div key={i} className="sdm-shimmer h-16" />)}</div>
               </div>
             ) : data ? (
               <div className="p-5 space-y-5">
@@ -191,16 +191,18 @@ export function SalesDetailModal({
                     <div className="p-4">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
-                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                         </svg>
                       </div>
                       <p className="sdm-section-label">Hari Ini</p>
                       <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.today.count}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>transaksi</p>
-                      <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #F4F4F5" }}>
-                        <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>Revenue: {fmtShort(data.today.revenue)}</p>
-                        <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Profit: +{fmtShort(data.today.profit)}</p>
-                      </div>
+                      {!hideRevenue && (
+                        <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #F4F4F5" }}>
+                          <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>Revenue: {fmtShort(data.today.revenue)}</p>
+                          <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Profit: +{fmtShort(data.today.profit)}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="sdm-stat rounded-2xl overflow-hidden">
@@ -208,16 +210,18 @@ export function SalesDetailModal({
                     <div className="p-4">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
-                          <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                          <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                       </div>
                       <p className="sdm-section-label">Bulan Ini</p>
                       <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.monthly.count}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>transaksi</p>
-                      <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #F4F4F5" }}>
-                        <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>Revenue: {fmtShort(data.monthly.revenue)}</p>
-                        <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Profit: +{fmtShort(data.monthly.profit)}</p>
-                      </div>
+                      {!hideRevenue && (
+                        <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #F4F4F5" }}>
+                          <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>Revenue: {fmtShort(data.monthly.revenue)}</p>
+                          <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Profit: +{fmtShort(data.monthly.profit)}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -235,7 +239,7 @@ export function SalesDetailModal({
                     <div className="text-center py-14 bg-white rounded-2xl border border-dashed" style={{ borderColor: "#E4E4E7" }}>
                       <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#F4F4F5" }}>
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4D4D8" strokeWidth="1.8">
-                          <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                          <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                       </div>
                       <p className="text-sm font-semibold" style={{ color: "#A1A1AA" }}>Belum ada data</p>
@@ -249,7 +253,11 @@ export function SalesDetailModal({
                           <div key={sales.name} className="sdm-sales-card rounded-2xl overflow-hidden">
                             <button
                               className="sdm-expand-btn w-full px-4 py-3.5 flex items-center justify-between gap-3 transition-colors"
-                              onClick={() => setExpandedSales(isExpanded ? null : sales.name)}
+                              onClick={() => {
+                                if (hideRevenue) return; // role sales: Daily Performance dikunci
+                                setExpandedSales(isExpanded ? null : sales.name);
+                              }}
+                              style={hideRevenue ? { cursor: "default" } : undefined}
                             >
                               <div className="flex items-center gap-3 flex-1 min-w-0">
                                 <div
@@ -275,24 +283,28 @@ export function SalesDetailModal({
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
-                                <div className="hidden sm:block text-right">
-                                  <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>profit</p>
-                                  <p className="text-xs font-bold" style={{ color: "#0f172a" }}>+{fmtShort(sales.profit)}</p>
-                                </div>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2"
-                                  className={`flex-shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}>
-                                  <polyline points="6 9 12 15 18 9"/>
-                                </svg>
+                                {!hideRevenue && (
+                                  <div className="hidden sm:block text-right">
+                                    <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>profit</p>
+                                    <p className="text-xs font-bold" style={{ color: "#0f172a" }}>+{fmtShort(sales.profit)}</p>
+                                  </div>
+                                )}
+                                {!hideRevenue && (
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2"
+                                    className={`flex-shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}>
+                                    <polyline points="6 9 12 15 18 9" />
+                                  </svg>
+                                )}
                               </div>
                             </button>
 
-                            {isExpanded && (
+                            {isExpanded && !hideRevenue && (
                               <div className="border-t" style={{ borderColor: "#F4F4F5", background: "#FAFAFA" }}>
                                 <div className="px-4 py-3">
                                   <div className="flex items-center gap-2 mb-3">
                                     <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "#F4F4F5" }}>
                                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5">
-                                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                                        <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                                       </svg>
                                     </div>
                                     <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#A1A1AA" }}>Daily Performance</p>
@@ -343,7 +355,7 @@ export function SalesDetailModal({
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
                 <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
