@@ -3510,8 +3510,8 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                     <table className="w-full text-sm border-separate border-spacing-0 min-w-[1200px]">
                         <thead>
                             <tr>
-                                <th className="sticky top-0 left-0 z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest w-11">#</th>
-                                <th className="sticky top-0 left-[44px] z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest">Nama</th>
+                                <th className="sticky top-0 left-0 z-40 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest w-11 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">No</th>
+                                <th className="sticky top-0 left-[44px] z-40 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-widest after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">Nama</th>
                                 <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Kasbon Sebelumnya</th>
                                 <th className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-widest">Cicilan Sebelumnya</th>
                                 {[1, 2, 3, 4, 5].map(w => (
@@ -3531,8 +3531,8 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                 <tr><td colSpan={isAdmin ? 16 : 15} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
                             ) : filteredData.map((r, i) => (
                                 <tr key={r.user_id} className="hover:bg-sky-50/40 group">
-                                    <td className="sticky left-0 z-10 border border-gray-300 px-3 py-2 text-center text-[11px] text-gray-400 font-black bg-white group-hover:bg-sky-50">{i + 1}</td>
-                                    <td className="sticky left-[44px] z-10 border border-gray-300 px-3 py-2 bg-white group-hover:bg-sky-50">
+                                    <td className="sticky left-0 z-20 px-3 py-2 text-center text-[11px] text-gray-400 font-black bg-white group-hover:bg-sky-50 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">{i + 1}</td>
+<td className="sticky left-[44px] z-20 px-3 py-2 bg-white group-hover:bg-sky-50 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">
                                         <button
                                             onClick={() => onOpenDetail({ userId: r.user_id, userName: r.name })}
                                             className="flex items-center gap-2.5 text-left hover:opacity-80 transition-opacity group"
@@ -3575,7 +3575,7 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                         {filteredData.length > 0 && (
                             <tfoot>
                                 <tr>
-                                    <td colSpan={9} className="sticky left-0 z-10 border border-gray-300 px-3 py-2.5 text-sm font-black text-gray-700 bg-gray-100">TOTAL</td>
+                                    <td colSpan={9} className="sticky left-0 z-20 px-3 py-2.5 text-sm font-black text-gray-700 bg-gray-100 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">TOTAL</td>
                                     <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalKasbon)}</span></td>
                                     <td className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100"><span className="font-mono font-black text-emerald-700 text-xs">{formatRupiah(totals.totalCicilan)}</span></td>
                                     <td colSpan={2} className="border border-gray-300 bg-gray-100"></td>
@@ -3904,7 +3904,7 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
                     <table className="w-full text-sm border-separate border-spacing-0 min-w-[1400px]">
                         <thead>
                             <tr>
-                                <th className="sticky top-0 left-0 z-30 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-xs font-bold whitespace-nowrap">Nama</th>
+                               <th className="sticky top-0 left-0 z-40 bg-sky-200 text-gray-800 px-3 py-2.5 text-left text-xs font-bold whitespace-nowrap after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">Nama</th>
                                 {MONTH_NAMES.map(m => (
                                     <th key={m} className="sticky top-0 z-20 border border-gray-300 bg-sky-200 text-gray-800 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">{m}</th>
                                 ))}
@@ -3916,7 +3916,7 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
                                 <tr><td colSpan={14} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
                             ) : filteredData.map(r => (
                                 <tr key={r.user_id} className="hover:bg-sky-50/40 group">
-                                    <td className="sticky left-0 z-10 border border-gray-300 px-3 py-2 font-semibold text-gray-800 whitespace-nowrap bg-white group-hover:bg-sky-50">{r.name}</td>
+                                    <td className="sticky left-0 z-20 px-3 py-2 font-semibold text-gray-800 whitespace-nowrap bg-white group-hover:bg-sky-50 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">{r.name}</td>
                                     {(r.months ?? new Array(12).fill(0)).map((v: number, i: number) => (
                                         <td key={i} className="border border-gray-300 px-3 py-2 text-right">{cell(v)}</td>
                                     ))}
@@ -3927,7 +3927,7 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
                         {filteredData.length > 0 && (
                             <tfoot>
                                 <tr>
-                                    <td className="sticky left-0 z-10 border border-gray-300 px-3 py-2.5 font-black text-gray-800 bg-gray-100">TOTAL</td>
+                                   <td className="sticky left-0 z-20 px-3 py-2.5 font-black text-gray-800 bg-gray-100 after:absolute after:inset-0 after:border after:border-gray-300 after:pointer-events-none">TOTAL</td>
                                     {monthTotals.map((v, i) => (
                                         <td key={i} className="border border-gray-300 px-3 py-2.5 text-right bg-gray-100 font-mono font-bold text-gray-700 text-xs">{v ? formatRupiah(v) : "—"}</td>
                                     ))}
