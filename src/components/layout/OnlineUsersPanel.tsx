@@ -12,7 +12,7 @@ import {
   FileText, CreditCard, Camera, Smartphone,
 } from "lucide-react";
 
-const ONLINE_THRESHOLD_MS = 35 * 1000;
+const ONLINE_THRESHOLD_MS = 90 * 1000; // samakan dgn server (route.ts) & harus > HEARTBEAT_INTERVAL 45s di usePresence.ts
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 const KEPALA_ROLES = [
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
@@ -409,9 +409,13 @@ export function OnlineUsersPanel() {
 
     channelRef.current = channel;
     const ticker = setInterval(() => setPresence(prev => recalculate(prev)), 5_000);
+    // Polling fallback: refetch presence tiap 15s supaya status tetap update
+    // walau Supabase Realtime (self-hosted) tidak mengirim event postgres_changes.
+    const poller = setInterval(() => { fetchPresence(); }, 15_000);
 
     return () => {
       clearInterval(ticker);
+      clearInterval(poller);
       if (channelRef.current) {
         supabaseRef.current.removeChannel(channelRef.current);
         channelRef.current = null;

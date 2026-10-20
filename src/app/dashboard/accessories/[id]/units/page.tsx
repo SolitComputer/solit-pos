@@ -2511,7 +2511,6 @@ export default function AccessoryUnitsPage() {
                     </div>
                 </div>
             )}
-
             {/* ── Bulk Add Modal ── */}
             {showBulkModal && (
                 <BulkAddModal
@@ -2519,6 +2518,15 @@ export default function AccessoryUnitsPage() {
                     defaultSellingPrice={accessory?.sell_price ?? 0}
                     onClose={() => setShowBulkModal(false)}
                     onSuccess={fetchData}
+                />
+            )}
+
+            {/* ── Bulk Edit SN Modal (isi SN placeholder "ISI-SN-...") ── */}
+            {showBulkEditModal && (
+                <BulkEditSNModal
+                    units={units}
+                    onClose={() => setShowBulkEditModal(false)}
+                    onSuccess={() => { setShowBulkEditModal(false); fetchData(); }}
                 />
             )}
 
