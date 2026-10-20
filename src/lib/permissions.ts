@@ -896,6 +896,15 @@ export function hasPermission(
 // Laptop Terlaris.
 export const DASHBOARD_FULL_ROLES: UserRole[] = [...FULL_ACCESS];
 
+// ─── Detail Top Sales: sembunyikan nominal Rupiah di samping jumlah transaksi ──
+// Role di bawah ini di modal "Detail Top Sales" hanya lihat JUMLAH transaksi —
+// nominal revenue (Rp ...) di samping "x transaksi" disembunyikan.
+// Tambah role lain di sini kalau perlu perlakuan sama (mis. PKL_SALES).
+export const SALES_DETAIL_HIDE_REVENUE_ROLES: UserRole[] = [
+  "CREW_SALES",
+  "KEPALA_SALES",
+];
+
 export function isDashboardLimited(role: string | null | undefined): boolean {
   if (!role) return false;
   return !(DASHBOARD_FULL_ROLES as string[]).includes(role);
@@ -1421,11 +1430,13 @@ export const ACCESSORY_DELETE_ROLES: UserRole[] = [
 ];
 export const ACCESSORY_AUDIT_ROLES: UserRole[] = ["ADMIN", "ACCOUNTING"];
 
-// ─── Detail Top Sales: sembunyikan nominal Rupiah di samping jumlah transaksi ──
-// Role di bawah ini di modal "Detail Top Sales" hanya lihat JUMLAH transaksi —
-// nominal revenue (Rp ...) di samping "x transaksi" disembunyikan.
-// Tambah role lain di sini kalau perlu perlakuan sama (mis. PKL_SALES).
-export const SALES_DETAIL_HIDE_REVENUE_ROLES: UserRole[] = [
-  "CREW_SALES",
-  "KEPALA_SALES",
-];
+// ── Audit per-UNIT Aksesoris (Kelola Unit Aksesoris) ─────────────────────────
+// Dulu audit per-unit aksesoris ikut whitelist SO (SO_ROLES) saja. Supaya role
+// yang memang bertugas audit (ACCESSORY_AUDIT_ROLES → ADMIN, ACCOUNTING) juga
+// bisa menandai audit di halaman Kelola Unit, gabungkan keduanya di sini —
+// PENGELOLA_BARANG dkk yang sudah bisa (lewat SO_ROLES) TIDAK hilang.
+// SO sengaja TIDAK ikut diubah: Accounting cuma nambah akses AUDIT, bukan SO.
+export const ACCESSORY_UNIT_AUDIT_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...SO_ROLES,
+  ...ACCESSORY_AUDIT_ROLES,
+]));
