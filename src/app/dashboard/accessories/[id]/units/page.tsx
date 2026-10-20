@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import BarcodeModal from "@/components/ui/BarcodeModal";
-import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS } from "@/lib/permissions";
+import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, ACCESSORY_UNIT_AUDIT_ROLES } from "@/lib/permissions";
 import {
     HardDrive, MemoryStick, Plug, BatteryFull, Keyboard, Monitor,
     Package, CircuitBoard, Cpu, Gamepad2, Fan, Droplet, Cable, Wrench,
@@ -1550,6 +1550,9 @@ export default function AccessoryUnitsPage() {
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
+    // Audit per-unit aksesoris DIPISAH dari SO: Accounting (lewat
+    // ACCESSORY_UNIT_AUDIT_ROLES) boleh audit walau tidak boleh SO.
+    const canAuditUnit = hasAnyRole(userRoles, ACCESSORY_UNIT_AUDIT_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
     // Unit yang barcodenya sedang dibuka (null = tidak ada). Simpan objeknya
     // di state supaya referensinya stabil untuk BarcodeModal.
@@ -1848,7 +1851,7 @@ export default function AccessoryUnitsPage() {
     // Belum teraudit → buka modal catatan dulu. Sudah teraudit → langsung batal
     // (tanpa modal, sesuai keputusan). Eksekusi sebenarnya di runAudit().
     const onAuditClick = (unit: AccessoryUnit) => {
-        if (!canManageSo) return;
+        if (!canAuditUnit) return;
         if (isAuditActive(unit.audited_at)) {
             runAudit(unit, ""); // batalkan langsung, tanpa catatan
         } else {
@@ -1859,7 +1862,7 @@ export default function AccessoryUnitsPage() {
 
     // Eksekusi audit 1 unit (kirim notes ke endpoint — tersimpan ke riwayat).
     const runAudit = async (unit: AccessoryUnit, note: string) => {
-        if (!canManageSo) return;
+        if (!canAuditUnit) return;
         setAuditingId(unit.id);
         try {
             const res = await fetch(`/api/accessory-units/${unit.id}/audit`, {
@@ -2133,7 +2136,7 @@ export default function AccessoryUnitsPage() {
                                 )}
                                 {/* Audit Terpilih — tandai teraudit semua unit tercentang.
                                     Yang sudah teraudit di-skip (tidak dibatalkan). */}
-                                {canManageSo && (
+                                {canAuditUnit && (
                                     <button onClick={onBulkAuditClick} disabled={bulkDeleting || bulkAuditing}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
                                         {bulkAuditing ? (
@@ -2306,7 +2309,7 @@ export default function AccessoryUnitsPage() {
                                                     <td className="px-4 py-3 text-center whitespace-nowrap">
                                                         {unit.status !== "TERJUAL" ? (
                                                             <div className="flex items-center justify-center gap-1">
-                                                                {canManageSo ? (
+                                                                {canAuditUnit ? (
                                                                     <button onClick={() => onAuditClick(unit)} disabled={auditingId === unit.id}
                                                                         title={isAuditActive(unit.audited_at) ? `Diaudit oleh ${unit.audited_by ?? "—"} · klik untuk batalkan` : "Tandai sudah diaudit"}
                                                                         className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isAuditActive(unit.audited_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}>

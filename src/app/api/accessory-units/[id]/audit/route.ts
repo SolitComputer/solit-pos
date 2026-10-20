@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
-import { SO_ROLES, SO_LIMITED_USER_IDS, hasAnyRole } from "@/lib/permissions";
+import { SO_LIMITED_USER_IDS, hasAnyRole, ACCESSORY_UNIT_AUDIT_ROLES } from "@/lib/permissions";
 
 // Reset otomatis audit aksesoris per-unit: 3 hari (disamakan dengan
 // ACCESSORY_AUDIT_TTL_MS di UnifiedBarangContent.tsx & audit model-level).
@@ -48,7 +48,7 @@ export const GET = withAuth(async (_req: NextRequest, ctx: { params: Promise<{ i
 export const PATCH = withAuth(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }, user: AuthUser) => {
     // Role sama dengan SO aksesoris (keputusan: samakan dengan SO).
     const roles = user.roles ?? [user.role];
-    const canManage = hasAnyRole(roles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(user.id ?? "");
+    const canManage = hasAnyRole(roles, ACCESSORY_UNIT_AUDIT_ROLES) || SO_LIMITED_USER_IDS.includes(user.id ?? "");
     if (!canManage) {
         return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
