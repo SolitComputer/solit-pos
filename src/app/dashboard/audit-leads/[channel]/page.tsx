@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, use } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, use } from "react";
 import { notFound, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -139,7 +139,17 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
 
   // Reset ke halaman 1 setiap kali filter audit diganti, supaya tidak
   // nyangkut di halaman kosong kalau hasil filter lebih sedikit.
-  useEffect(() => { setPage(1); }, [auditFilter]);
+  // PENTING: lewati run pertama (mount). Kalau tidak, halaman yang
+  // direstore dari URL (?page=) akan langsung ketimpa jadi 1 tiap kali
+  // komponen remount — inilah penyebab tiba-tiba balik ke halaman 1.
+  const didMountAuditFilter = useRef(false);
+  useEffect(() => {
+    if (!didMountAuditFilter.current) {
+      didMountAuditFilter.current = true;
+      return;
+    }
+    setPage(1);
+  }, [auditFilter]);
 
   // Tulis halaman aktif ke URL (?page=). Kalau komponen remount / refetch,
   // posisi pagination tetap terbaca dari URL, tidak balik ke 1.
