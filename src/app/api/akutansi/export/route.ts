@@ -554,8 +554,7 @@ export const GET = withAuth(async (req) => {
           mutasiSebelumMap.set(l.account_code, (mutasiSebelumMap.get(l.account_code) ?? 0) + signed);
         }
 
-        if (page.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
+        from += page.length; // maju sesuai baris diterima (lihat catatan di loop entry)
       }
     }
 
@@ -582,8 +581,11 @@ export const GET = withAuth(async (req) => {
 
         periodEntriesRaw.push(...page);
 
-        if (page.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
+        // Maju sesuai jumlah baris yang BENAR-BENAR diterima, bukan PAGE_SIZE.
+        // Server self-hosted bisa memotong < PAGE_SIZE (db-max-rows), jadi
+        // page.length < PAGE_SIZE TIDAK berarti data sudah habis. Berhenti
+        // hanya saat halaman benar-benar kosong (dicek di atas).
+        from += page.length;
       }
     }
 

@@ -61,8 +61,9 @@ export async function computeNeraca(supabase: SupabaseClient, period: string): P
       if (entryErr) throw entryErr;
       if (!page || page.length === 0) break;
       entriesWithLines.push(...page);
-      if (page.length < PAGE_SIZE) break;
-      from += PAGE_SIZE;
+      // Jangan pakai page.length < PAGE_SIZE sbg tanda habis — server bisa
+      // memotong < PAGE_SIZE (db-max-rows). Berhenti hanya saat kosong.
+      from += page.length;
     }
   }
 
@@ -250,8 +251,7 @@ export async function computeLabaRugi(supabase: SupabaseClient, period: string):
         }
       }
 
-      if (page.length < PAGE_SIZE) break;
-      from += PAGE_SIZE;
+      from += page.length; // maju sesuai baris diterima (hindari putus dini saat db-max-rows < PAGE_SIZE)
     }
   }
 
