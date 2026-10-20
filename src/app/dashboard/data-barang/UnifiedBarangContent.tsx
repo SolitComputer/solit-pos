@@ -893,6 +893,12 @@ export default function UnifiedBarangContent() {
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
     const canAddUnit = hasAnyRole(userRoles, PERMISSIONS.CREATE_UNITS);
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
+    // PKL Pengelola Barang: mode lihat-saja — cuma daftar barang + filter
+    // kategori. Tombol Export & Tambah Barang disembunyikan untuk role ini.
+    // Kalau user juga punya role Full Access Barang (dobel role), privilege
+    // lebih tinggi menang → tombol tetap tampil seperti biasa.
+    const isPklPengelolaViewOnly =
+        hasAnyRole(userRoles, ["PKL_PENGELOLA_BARANG"] as UserRole[]) && !canFullAccessBarang;
     const canEditChecklist = canEditConditionChecks(userId, userRoles);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     const canDoSo = (row: UnifiedRow) => {
@@ -1772,19 +1778,19 @@ export default function UnifiedBarangContent() {
                                 >
                                     {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
-                                {!canOnlyViewBasic && (
+                                {!canOnlyViewBasic && !isPklPengelolaViewOnly && (
                                     <button onClick={handleExportRingkas} disabled={filteredRows.length === 0}
                                         className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition whitespace-nowrap">
                                         Export Ringkas
                                     </button>
                                 )}
-                                {!canOnlyViewBasic && (
+                                {!canOnlyViewBasic && !isPklPengelolaViewOnly && (
                                     <button onClick={handleExportPerSn} disabled={filteredRows.length === 0}
                                         className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 disabled:opacity-40 transition whitespace-nowrap">
                                         Export per-SN
                                     </button>
                                 )}
-                                {!canOnlyViewBasic && (canCreateLaptop || canCreateAcc) && (
+                                {!canOnlyViewBasic && !isPklPengelolaViewOnly && (canCreateLaptop || canCreateAcc) && (
                                     <button
                                         onClick={openCreate}
                                         className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition whitespace-nowrap"

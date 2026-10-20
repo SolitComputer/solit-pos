@@ -630,6 +630,22 @@ export function LaptopsContent() {
         }
     };
 
+    // Dipindah ke ATAS filteredLaptops: useMemo filteredLaptops memakai
+    // filterCategoryOptions di dalam filter kategori, jadi harus sudah
+    // ter-deklarasi sebelum dipakai. Dulu dideklarasi SETELAH filteredLaptops
+    // → "Cannot access 'ab' before initialization" saat filter kategori jalan.
+    const filterCategoryOptions = useMemo(() => {
+        const known = new Map(categories.map(c => [c.id, c.name]));
+        laptops.forEach(l => {
+            if (l.category_id && !known.has(l.category_id)) {
+                known.set(l.category_id, l.category_name || "Tanpa Nama");
+            }
+        });
+        return Array.from(known.entries())
+            .map(([id, name]) => ({ id, name }))
+            .sort((a, b) => a.name.localeCompare(b.name, "id"));
+    }, [categories, laptops]);
+
     const filteredLaptops = useMemo(() => {
         let list = [...laptops];
         if (search.trim()) {
@@ -749,18 +765,6 @@ export function LaptopsContent() {
         const b = new Set(laptops.map(x => x.brand).filter(Boolean));
         return ["ALL", ...Array.from(b)];
     }, [laptops]);
-
-    const filterCategoryOptions = useMemo(() => {
-        const known = new Map(categories.map(c => [c.id, c.name]));
-        laptops.forEach(l => {
-            if (l.category_id && !known.has(l.category_id)) {
-                known.set(l.category_id, l.category_name || "Tanpa Nama");
-            }
-        });
-        return Array.from(known.entries())
-            .map(([id, name]) => ({ id, name }))
-            .sort((a, b) => a.name.localeCompare(b.name, "id"));
-    }, [categories, laptops]);
 
     const openCreate = () => { setFormData({ ...EMPTY_FORM }); setModalMode("create"); };
 
