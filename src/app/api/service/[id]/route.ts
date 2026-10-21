@@ -210,6 +210,7 @@ export async function PATCH(
     payment_proof_url, //  NEW — url foto bukti transfer
     sparepart_mode,    //  NEW — "stock" | "manual"
     sparepart_modal,   //  NEW — modal input manual
+    sparepart_entry,   //  NEW — baris siap-tampil "label§harga" utk kolom Sparepart
   } = body as {
     action: string;
     alasan?: string;
@@ -225,6 +226,7 @@ export async function PATCH(
     payment_proof_url?: string; //  NEW — wajib untuk action "bayar_dimuka"
     sparepart_mode?: "stock" | "manual"; //  NEW
     sparepart_modal?: number; //  NEW
+    sparepart_entry?: string; //  NEW
   };
 
   const supabase = getAdmin();
@@ -275,9 +277,10 @@ export async function PATCH(
 
       const ketServis = (alasan ?? "").trim() || "Sparepart";
 
-      //  NEW — gabung ke daftar sparepart (nama part stok / keterangan manual) untuk kolom "Sparepart"
+      //  NEW — entri kolom "Sparepart": pakai sparepart_entry (label§harga) kalau ada, fallback ke keterangan
+      const entryText = (sparepart_entry ?? "").toString().trim() || ketServis;
       const prevSpareItems = (current.sparepart_items ?? "").toString().trim();
-      const mergedSpareItems = prevSpareItems ? `${prevSpareItems}\n${ketServis}` : ketServis;
+      const mergedSpareItems = prevSpareItems ? `${prevSpareItems}\n${entryText}` : entryText;
 
       if (accessories_used && accessories_used.length > 0) {
         // ── DARI STOK AKSESORIS → cuma catat keluarnya stok + tandai alasan.
@@ -580,7 +583,7 @@ export async function PATCH(
         });
       }
 
-      newStatus = "SUDAH_DIAMBIL";
+      newStatus = oldStatus; //  CHANGED — garansi tidak langsung diambil; tombol "Diambil" muncul setelah ini
       updatePayload = {
         payment_amount: 0,
         payment_status: "LUNAS",
@@ -589,10 +592,8 @@ export async function PATCH(
         payment_note: "Klaim Garansi",
         payment_by: user.id,
         payment_confirmed_at: new Date().toISOString(),
-        diambil_by: user.id,
-        tanggal_diambil: new Date().toISOString(),
       };
-      logCatatan = "Klaim garansi · laptop diambil (gratis)";
+      logCatatan = "Klaim garansi (Rp 0) · menunggu diambil";
       break;
     }
 

@@ -20,10 +20,11 @@ interface ServiceSparepartDialogProps {
   onConfirm: (payload: {
     mode: "stock" | "manual";
     reason: string;
-    price?: number;          // manual saja (modal yang diketik)
+    price?: number;          // manual = modal diketik · stok = buy_price unit
     accessory_id?: string;   // stok
     unit_id?: string;        // stok
     serial_number?: string;  // stok
+    accessory_name?: string; //  NEW — stok, utk label kolom Sparepart
   }) => Promise<void>;
 }
 
@@ -152,6 +153,8 @@ export default function ServiceSparepartDialog({
           accessory_id: selected.accessory_id,
           unit_id: selected.unit_id,
           serial_number: selected.serial_number,
+          accessory_name: selected.accessory_name, //  NEW
+          price: selected.buy_price,               //  NEW — modal unit, utk tampilan admin
         });
       } else {
         await onConfirm({

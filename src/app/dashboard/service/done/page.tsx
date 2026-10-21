@@ -9,6 +9,7 @@ import ServiceCicilanModal from "@/components/service/ServiceCicilanModal";
 import ServiceSparepartDialog from "@/components/service/ServiceSparepartDialog"; //  NEW
 import ServicePriceDialog from "@/components/service/ServicePriceDialog"; //  NEW — dipakai tombol Estimasi
 import ServicePrepaymentModal from "@/components/service/ServicePrepaymentModal"; //  NEW — Bayar di muka
+import { useAuthUser } from "@/hooks/useAuthUser"; //  NEW — cek role admin utk nominal sparepart
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
@@ -308,7 +309,7 @@ function ActionGroup({
 function PaymentValue({ order, align = "left" }: { order: ServiceOrder; align?: "left" | "right" }) {
   const alignCls = align === "right" ? "items-end text-right" : "";
 
-  if (order.payment_status === "DP") { //  NEW — tampilkan progress DP
+  if (order.payment_status === "DP") {
     const total = Number(order.total_tagihan ?? 0);
     const paid = Number(order.payment_amount ?? 0);
     const sisa = Math.max(total - paid, 0);
@@ -324,6 +325,15 @@ function PaymentValue({ order, align = "left" }: { order: ServiceOrder; align?: 
     );
   }
 
+  //  NEW — klaim garansi (lunas Rp 0)
+  if (order.payment_status === "LUNAS" && order.payment_confirmed_at && !order.payment_amount) {
+    return (
+      <div className={`flex flex-col ${alignCls}`}>
+        <p className="text-xs font-black tabular-nums text-amber-600">Klaim Garansi · Rp 0</p>
+      </div>
+    );
+  }
+
   if (order.payment_amount) {
     return (
       <div className={`flex flex-col ${alignCls}`}>
@@ -335,36 +345,46 @@ function PaymentValue({ order, align = "left" }: { order: ServiceOrder; align?: 
     );
   }
 
-  if (order.status === "GAGAL_DIPERBAIKI") {
-    return <span className="text-xs font-medium text-gray-300">—</span>;
-  }
-
-  const sp = Number(order.biaya_sparepart ?? 0); //  FIX — cuma tampilkan biaya sparepart, gak dijumlah sama estimasi_harga
-
-  if (sp > 0) {
+  //  NEW — belum dibayar: tampilkan estimasi kalau sudah diisi
+  const est = Number(order.estimasi_harga ?? 0);
+  if (est > 0) {
     return (
       <div className={`flex flex-col ${alignCls}`}>
-        <p className="text-xs font-black tabular-nums text-indigo-600">{fmtRupiah(sp)}</p>
-        <p className="mt-0.5 text-[10px] font-medium text-amber-500">sparepart · belum dibayar</p>
+        <p className="text-xs font-black tabular-nums text-slate-700">{fmtRupiah(est)}</p>
+        <p className="mt-0.5 text-[10px] font-medium text-gray-400">estimasi · belum dibayar</p>
       </div>
     );
+  }
+
+  if (order.status === "GAGAL_DIPERBAIKI") {
+    return <span className="text-xs font-medium text-gray-300">—</span>;
   }
 
   return <span className="text-xs font-medium text-amber-500">Konfirmasi saat diambil</span>;
 }
 
-//  NEW — daftar sparepart yang sudah dimasukkan ke order
-function SparepartCell({ order }: { order: ServiceOrder }) {
-  const items = (order.sparepart_items ?? "").split("\n").map(s => s.trim()).filter(Boolean);
-  if (items.length === 0) return <span className="text-xs font-medium text-gray-300">—</span>;
+//  daftar sparepart yang sudah dimasukkan. Format tiap baris: "label§harga".
+//  Non-admin: hanya keterangan + SN. Admin: + harga/modal per item.
+function SparepartCell({ order, showNominal = false }: { order: ServiceOrder; showNominal?: boolean }) {
+  const lines = (order.sparepart_items ?? "").split("\n").map(s => s.trim()).filter(Boolean);
+  if (lines.length === 0) return <span className="text-xs font-medium text-gray-300">—</span>;
   return (
     <div className="flex flex-col gap-1">
-      {items.map((it, i) => (
-        <span key={i} className="inline-flex w-fit items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
-          <IconPart />
-          <span className="max-w-[180px] truncate">{it}</span>
-        </span>
-      ))}
+      {lines.map((ln, i) => {
+        const [label, hargaRaw] = ln.split("§"); //  NEW
+        const harga = Number(hargaRaw ?? 0);
+        return (
+          <span key={i} className="inline-flex w-fit items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+            <IconPart />
+            <span className="max-w-[220px] truncate">
+              {label}
+              {showNominal && harga > 0 && (
+                <span className="ml-1 font-bold text-gray-600">· {fmtRupiah(harga)}</span>
+              )}
+            </span>
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -373,7 +393,7 @@ function SparepartCell({ order }: { order: ServiceOrder }) {
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-50">
-      {[28, 110, 130, 130, 80, 100, 120, 100, 80, 190].map((w, i) => (
+      {[28, 110, 130, 90, 130, 80, 100, 120, 100, 80, 190].map((w, i) => (
         <td key={i} className="px-4 py-4 first:pl-5 last:pr-5">
           <div
             className="h-3 animate-pulse rounded-full bg-gradient-to-r from-gray-100 to-gray-50"
@@ -407,6 +427,9 @@ function SkeletonCard() {
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function DonePage() {
   const { orders, loading, connected, refresh } = useDoneRealtime();
+  const { user } = useAuthUser(); //  NEW
+  const userRoles = user?.roles ?? (user?.role ? [user.role] : []); //  NEW
+  const isAdmin = userRoles.some(r => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r)); //  NEW
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<ServiceOrder | null>(null);
@@ -425,14 +448,13 @@ export default function DonePage() {
   };
 
   const handleDiambilClick = (order: ServiceOrder) => {
-    if (order.payment_status === "LUNAS" && order.payment_amount) { //  FIX — payment_status bisa default "LUNAS" walau belum ada duit masuk sama sekali
-      //  NEW — sudah lunas dari pembayaran di muka, tinggal konfirmasi pengambilan fisik (gak perlu bayar lagi)
+    if (order.payment_status === "LUNAS" && order.payment_confirmed_at) { //  CHANGED — sudah settled (lunas penuh / garansi Rp0)
       setDialog({
         open: true,
         orderId: order.id,
         action: "diambil_langsung",
         title: "Konfirmasi Laptop Diambil",
-        description: `Laptop "${order.nama} — ${order.type_laptop}" sudah lunas dibayar di muka. Konfirmasi laptop sudah diambil pelanggan?`,
+        description: `Konfirmasi laptop "${order.nama} — ${order.type_laptop}" sudah diambil pelanggan? Order akan masuk ke Riwayat.`,
         confirmLabel: "Ya, Sudah Diambil",
         confirmClass: "bg-emerald-600 hover:bg-emerald-700",
       });
@@ -479,7 +501,7 @@ export default function DonePage() {
       dialog.action === "diambil_langsung" || dialog.action === "batal_diambil"
         ? " Laptop berhasil ditandai sudah diambil."
         : dialog.action === "klaim_garansi"
-          ? " Klaim garansi — laptop sudah diambil."
+          ? " Klaim garansi dicatat — tombol Diambil sudah muncul."
           : dialog.action === "bayar_lunas"
             ? " Pelunasan berhasil dicatat." //  CHANGED — lunas tidak lagi auto-diambil (2 langkah)
             : dialog.action === "batal_service"
@@ -536,14 +558,23 @@ export default function DonePage() {
     accessory_id?: string;
     unit_id?: string;
     serial_number?: string;
+    accessory_name?: string; //  NEW
   }) => {
     if (!sparepartOrder) return;
+
+    //  NEW — bentuk entri kolom Sparepart: "label§harga". §harga cuma dirender utk admin.
+    const label = payload.mode === "stock"
+      ? `${payload.accessory_name ?? "Aksesoris"} (SN ${payload.serial_number ?? "-"})`
+      : payload.reason;
+    const sparepart_entry = `${label}§${Math.round(Number(payload.price ?? 0))}`;
+
     const res = await fetch(`/api/service/${sparepartOrder.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "sparepart",
         alasan: payload.reason,
+        sparepart_entry, //  NEW
         sparepart_mode: payload.mode,
         sparepart_modal: payload.mode === "manual" ? payload.price : undefined,
         accessories_used:
@@ -630,8 +661,8 @@ export default function DonePage() {
       orderId: order.id,
       action: "klaim_garansi",
       title: "Klaim Garansi",
-      description: `Klaim garansi untuk "${order.nama} — ${order.type_laptop}". Nominal Rp 0 (gratis). Konfirmasi laptop sudah diambil pelanggan?`,
-      confirmLabel: "Diambil",
+      description: `Catat klaim garansi (Rp 0) untuk "${order.nama} — ${order.type_laptop}"? Setelah dicatat, tombol "Diambil" akan muncul untuk konfirmasi pengambilan.`,
+      confirmLabel: "Catat Klaim Garansi",
       confirmClass: "bg-amber-500 hover:bg-amber-600",
     });
   };
@@ -641,7 +672,7 @@ export default function DonePage() {
    * Tools (Sparepart/Estimasi) selalu ada; lifecycle pembayaran & pengambilan menyesuaikan state.
    */
   const getActions = (o: ServiceOrder): ActionItem[] => {
-    //  Order sudah dibatalkan → tinggal konfirmasi diambil (langkah 2)
+    // Order dibatalkan → tinggal konfirmasi diambil
     if (o.status === "DIBATALKAN") {
       return [
         { key: "batal_diambil", label: "Diambil", color: "emerald", icon: <IconCheck />, onClick: () => handleBatalDiambilClick(o) },
@@ -654,25 +685,22 @@ export default function DonePage() {
       { key: "estimasi", label: "Estimasi", color: "slate", icon: <IconDollar />, onClick: () => setEstimasiChoice(o) },
     ];
 
+    //  Tombol "Diambil" cuma muncul kalau sudah ada pembayaran settled (Lunas penuh / Garansi Rp0)
+    const sudahBayar = o.payment_status === "LUNAS" && !!o.payment_confirmed_at;
+
     if (o.payment_status === "DP") {
-      // Masih ada sisa → lunasi / cicil
       actions.push(
         { key: "lunas", label: "Lunas", color: "emerald", icon: <IconCheckLg />, onClick: () => handleLunasClick(o) },
         { key: "cicil", label: "Cicil", color: "amber", icon: <IconDollar />, onClick: () => handleCicilClick(o) },
       );
-    } else if (o.payment_status === "LUNAS" && o.payment_amount) {
-      // Sudah lunas → kalau servis sudah kelar, boleh diambil
-      if (o.status === "DONE" || o.status === "GAGAL_DIPERBAIKI") {
-        actions.push({ key: "diambil", label: "Diambil", color: "emerald", icon: <IconCheck />, onClick: () => handleDiambilClick(o) });
-      }
+    } else if (sudahBayar) {
+      actions.push({ key: "diambil", label: "Diambil", color: "emerald", icon: <IconCheck />, onClick: () => handleDiambilClick(o) });
     } else {
-      // Belum ada pembayaran → Bayar (di muka). Yg masih proses bisa Batal, yg sudah kelar bisa Diambil.
-      actions.push({ key: "bayar", label: "Bayar", color: "emerald", icon: <IconDollar />, onClick: () => setPrepaymentOrder(o) });
-      if (o.status === "DONE" || o.status === "GAGAL_DIPERBAIKI") {
-        actions.push({ key: "diambil", label: "Diambil", color: "emerald", icon: <IconCheck />, onClick: () => handleDiambilClick(o) });
-      } else {
-        actions.push({ key: "batal", label: "Batal", color: "rose", icon: <IconBan />, onClick: () => openBatalDialog(o) });
-      }
+      // Belum ada pembayaran → Bayar + Batal. "Diambil" sengaja BELUM muncul.
+      actions.push(
+        { key: "bayar", label: "Bayar", color: "emerald", icon: <IconDollar />, onClick: () => setPrepaymentOrder(o) },
+        { key: "batal", label: "Batal", color: "rose", icon: <IconBan />, onClick: () => openBatalDialog(o) },
+      );
     }
 
     return actions;
@@ -901,6 +929,11 @@ export default function DonePage() {
                             </p>
                           </td>
 
+                          {/* Masuk */}
+                          <td className="whitespace-nowrap px-4 py-4 align-middle">
+                            <span className="text-xs font-medium text-gray-400">{formatDate(o.tanggal_masuk)}</span>
+                          </td>
+
                           {/* Selesai */}
                           <td className="whitespace-nowrap px-4 py-4 align-middle">
                             <span className="text-xs font-medium text-gray-400">{formatDate(o.tanggal_selesai)}</span>
@@ -936,7 +969,7 @@ export default function DonePage() {
 
                           {/* Sparepart — daftar part yang dimasukkan */}
                           <td className="min-w-[150px] max-w-[220px] px-4 py-4 align-middle">
-                            <SparepartCell order={o} />
+                            <SparepartCell order={o} showNominal={isAdmin} />
                           </td>
 
                           {/* Payment — kalau belum dibayar, tampilkan ekspektasi (estimasi + sparepart) */}
@@ -1040,7 +1073,7 @@ export default function DonePage() {
                     {(o.sparepart_items ?? "").trim() && (
                       <div className="mt-3 border-t border-gray-50 px-4 pt-3">
                         <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Sparepart</span>
-                        <div className="mt-1.5"><SparepartCell order={o} /></div>
+                        <div className="mt-1.5"><SparepartCell order={o} showNominal={isAdmin} /></div>
                       </div>
                     )}
 
