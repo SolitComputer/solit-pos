@@ -9,7 +9,7 @@ import { UserRole, hasAnyRole, ITEM_LOAN_APPROVE_ROLES } from "@/lib/permissions
 
 interface SnResult {
     item_type: "LAPTOP" | "AKSESORIS";
-    item_id: string; unit_id: string; serial_number: string; item_name: string; status: string;
+    item_id: string; unit_id: string | null; serial_number: string | null; item_name: string; status: string;
 }
 interface LoanRow {
     id: string; item_type: "LAPTOP" | "AKSESORIS"; item_id: string;
@@ -89,7 +89,9 @@ export default function ItemLoansPage() {
     }, []);
 
     const pickSn = (r: SnResult) => {
-        setSelected(r); setSnQuery(`${r.item_name} — ${r.serial_number}`); setSnOpen(false);
+        setSelected(r);
+        setSnQuery(r.serial_number ? `${r.item_name} — ${r.serial_number}` : r.item_name);
+        setSnOpen(false);
     };
     const resetForm = () => { setSelected(null); setSnQuery(""); setNotes(""); setSnResults([]); };
 
@@ -178,11 +180,13 @@ export default function ItemLoansPage() {
                                 {snOpen && snResults.length > 0 && (
                                     <div className="absolute z-30 mt-1.5 w-full bg-white border border-zinc-200 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto">
                                         {snResults.map(r => (
-                                            <button key={r.unit_id} onClick={() => pickSn(r)}
+                                            <button key={`${r.item_type}-${r.item_id}-${r.unit_id ?? "parent"}`} onClick={() => pickSn(r)}
                                                 className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 text-left">
                                                 {r.item_type === "LAPTOP" ? <LaptopIcon size={13} className="text-zinc-500 flex-shrink-0" /> : <Wrench size={13} className="text-zinc-500 flex-shrink-0" />}
                                                 <span className="text-xs text-zinc-700 truncate flex-1">{r.item_name}</span>
-                                                <span className="text-[11px] font-mono text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{r.serial_number}</span>
+                                                {r.serial_number
+                                                    ? <span className="text-[11px] font-mono text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{r.serial_number}</span>
+                                                    : <span className="text-[10px] font-semibold text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">tanpa SN</span>}
                                             </button>
                                         ))}
                                     </div>
