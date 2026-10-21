@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { ITEM_LOAN_VIEW_ROLES } from "@/lib/permissions";
 
@@ -9,7 +9,7 @@ import { ITEM_LOAN_VIEW_ROLES } from "@/lib/permissions";
 // saja, TIDAK memblokir penjualan (seperti SO/Audit).
 async function handler(_req: NextRequest, _ctx: unknown, _user: AuthUser) {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("item_loans")
       .select("unit_id")
       .eq("status", "APPROVED")

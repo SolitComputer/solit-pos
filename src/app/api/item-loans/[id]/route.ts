@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { hasAnyRole, ITEM_LOAN_APPROVE_ROLES } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
@@ -14,7 +14,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { id } = await props.params;
     const { action } = await req.json();
 
-    const { data: loan } = await supabase.from("item_loans").select("*").eq("id", id).single();
+    const { data: loan } = await supabaseAdmin.from("item_loans").select("*").eq("id", id).single();
     if (!loan) return NextResponse.json({ success: false, message: "Data pinjaman tidak ditemukan" }, { status: 404 });
 
     let updates: Record<string, unknown>;
@@ -34,7 +34,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       return NextResponse.json({ success: false, message: "Aksi tidak dikenal" }, { status: 400 });
     }
 
-    const { data, error } = await supabase.from("item_loans").update(updates).eq("id", id).select().single();
+    const { data, error } = await supabaseAdmin.from("item_loans").update(updates).eq("id", id).select().single();
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
 
     try {

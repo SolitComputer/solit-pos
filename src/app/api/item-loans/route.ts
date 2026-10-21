@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { ITEM_LOAN_VIEW_ROLES } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
@@ -9,7 +9,7 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
-    let q = supabase.from("item_loans").select("*").order("created_at", { ascending: false });
+    let q = supabaseAdmin.from("item_loans").select("*").order("created_at", { ascending: false });
     if (status) q = q.eq("status", status);
 
     const { data, error } = await q;
@@ -31,7 +31,7 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
     if (!item_name) return NextResponse.json({ success: false, message: "Nama barang kosong" }, { status: 400 });
 
     if (unit_id) {
-      const { data: existing } = await supabase
+      const { data: existing } = await supabaseAdmin
         .from("item_loans")
         .select("id")
         .eq("unit_id", unit_id)
@@ -45,7 +45,7 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("item_loans")
       .insert({
         item_type,
