@@ -741,8 +741,8 @@ export default function DonePage() {
       o.keluhan.toLowerCase().includes(q))
     : orders;
 
-  const COLUMNS = ["No", "Pelanggan", "Laptop", "Selesai", "Total Waktu", "Teknisi", "Sparepart", "Payment", "Status", "Aksi"];
-
+  const COLUMNS = ["No", "Pelanggan", "Laptop", "Masuk", "Selesai", "Total Waktu", "Teknisi", "Sparepart", "Payment", "Status", "Aksi"];
+  
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
