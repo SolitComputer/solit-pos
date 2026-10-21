@@ -41,6 +41,7 @@ export interface ServiceOrder {
   // Payment  NEW
   estimasi_harga?: number | null;
   biaya_sparepart?: number | null;
+  sparepart_items?: string | null; //  NEW — daftar sparepart (nama part / keterangan), tiap item dipisah baris baru
 
   payment_amount?: number;
   payment_note?: string;

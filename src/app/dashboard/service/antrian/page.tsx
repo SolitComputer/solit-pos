@@ -36,11 +36,6 @@ function formatDate(iso?: string) {
   });
 }
 
-function fmtRupiah(n?: number | null) {
-  const num = Number(n ?? 0);
-  if (!num) return null;
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num);
-}
 
 type DialogState = {
   open: boolean;
@@ -298,7 +293,7 @@ function ActionGroup({
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-50">
-      {[28, 110, 130, 170, 90, 60, 100, 90, 80, 150].map((w, i) => (
+      {[28, 110, 130, 170, 90, 60, 100, 80, 150].map((w, i) => (
         <td key={i} className="px-4 py-4 first:pl-5 last:pr-5">
           <div className="h-3 rounded-full bg-gray-100 animate-pulse" style={{ width: w }} />
         </td>
@@ -326,56 +321,6 @@ function SkeletonCard() {
   );
 }
 
-// ── Estimasi cell (dipakai tabel & card) ──────────────────────────────────────
-function EstimasiValue({ order, align = "left" }: { order: ServiceOrder; align?: "left" | "right" }) {
-  const alignCls = align === "right" ? "items-end text-right" : "";
-
-  //  NEW — kalau sudah ada pembayaran di muka (DP), tampilkan progresnya duluan
-  if (order.payment_status === "DP" && order.payment_amount) { //  FIX
-    const total = Number(order.total_tagihan ?? 0);
-    const paid = Number(order.payment_amount ?? 0);
-    const sisa = Math.max(total - paid, 0);
-    return (
-      <div className={`flex flex-col ${alignCls}`}>
-        <p className="text-xs font-black tabular-nums text-amber-600">
-          {fmtRupiah(paid)} / {fmtRupiah(total)}
-        </p>
-        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-500">
-          DP di muka · sisa {fmtRupiah(sisa)}
-        </p>
-      </div>
-    );
-  }
-
-  //  NEW — kalau sudah lunas dibayar di muka
-  if (order.payment_status === "LUNAS" && order.payment_amount) { //  FIX
-    return (
-      <div className={`flex flex-col ${alignCls}`}>
-        <p className="text-xs font-black tabular-nums text-emerald-600">{fmtRupiah(order.payment_amount)}</p>
-        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-500">
-          Lunas di muka
-        </p>
-      </div>
-    );
-  }
-
-  const est = Number(order.estimasi_harga ?? 0);
-  const sp = Number(order.biaya_sparepart ?? 0);
-  const total = est + sp;
-
-  if (total <= 0) return <span className="text-xs font-medium text-gray-300">—</span>;
-
-  return (
-    <div className={`flex flex-col ${alignCls}`}>
-      <span className="text-xs font-black tabular-nums text-zinc-900">{fmtRupiah(total)}</span>
-      {sp > 0 && (
-        <span className="mt-0.5 text-[10px] font-medium text-gray-400">
-          jasa {fmtRupiah(est) ?? "Rp 0"} + part {fmtRupiah(sp)}
-        </span>
-      )}
-    </div>
-  );
-}
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AntrianPage() {
@@ -384,6 +329,7 @@ export default function AntrianPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [search, setSearch] = useState(""); //  NEW
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const userRoles = user?.roles ?? (user?.role ? [user.role] : []);
@@ -488,10 +434,20 @@ export default function AntrianPage() {
     MENUNGGU_SPAREPART: orders.filter(o => o.status === "MENUNGGU_SPAREPART"),
   };
 
-  const queue = [...orders].sort(
+  //  NEW — filter pencarian
+  const q = search.trim().toLowerCase();
+  const filteredOrders = q
+    ? orders.filter(o =>
+      o.nama.toLowerCase().includes(q) ||
+      o.no_hp.includes(q) ||
+      o.type_laptop.toLowerCase().includes(q) ||
+      o.keluhan.toLowerCase().includes(q))
+    : orders;
+
+  const queue = [...filteredOrders].sort(
     (a, b) => new Date(a.tanggal_masuk).getTime() - new Date(b.tanggal_masuk).getTime()
   );
-  const COLUMNS = ["No", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Durasi", "Teknisi", "Estimasi / Bayar", "Status", "Aksi"];
+  const COLUMNS = ["No", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Durasi", "Teknisi", "Status", "Aksi"]; //  CHANGED — buang "Estimasi / Bayar"
 
   return (
     <DashboardLayout>
@@ -559,6 +515,24 @@ export default function AntrianPage() {
         </div>
 
         <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
+
+          {/*  NEW — Search */}
+          <div className="relative max-w-md">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-300">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            </span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Cari nama, no HP, laptop, keluhan..."
+              className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-9 pr-9 text-sm outline-none transition placeholder:text-gray-300 focus:border-[#1a1a2e]/30 focus:ring-2 focus:ring-[#1a1a2e]/10"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} aria-label="Hapus pencarian" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            )}
+          </div>
 
           {/* ── Stat Cards ──────────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -733,10 +707,6 @@ export default function AntrianPage() {
                               )}
                             </td>
 
-                            {/* Estimasi = estimasi_harga + biaya_sparepart */}
-                            <td className="min-w-[130px] whitespace-nowrap px-4 py-4 align-middle">
-                              <EstimasiValue order={o} />
-                            </td>
 
                             {/* Status */}
                             <td className="whitespace-nowrap px-4 py-4 align-middle">
@@ -821,13 +791,6 @@ export default function AntrianPage() {
                         )}
                       </div>
 
-                      {/* Estimasi */}
-                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-50 px-4 pt-3">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                          Estimasi
-                        </span>
-                        <EstimasiValue order={o} align="right" />
-                      </div>
 
                       {/* Aksi — grid full-width, tinggi seragam, mudah dipencet */}
                       {actions.length > 0 && (

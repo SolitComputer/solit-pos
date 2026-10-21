@@ -275,6 +275,10 @@ export async function PATCH(
 
       const ketServis = (alasan ?? "").trim() || "Sparepart";
 
+      //  NEW — gabung ke daftar sparepart (nama part stok / keterangan manual) untuk kolom "Sparepart"
+      const prevSpareItems = (current.sparepart_items ?? "").toString().trim();
+      const mergedSpareItems = prevSpareItems ? `${prevSpareItems}\n${ketServis}` : ketServis;
+
       if (accessories_used && accessories_used.length > 0) {
         // ── DARI STOK AKSESORIS → cuma catat keluarnya stok + tandai alasan.
         // JURNAL-nya DITUNDA sampai status Selesai/Gagal (lihat case done &
@@ -309,6 +313,7 @@ export async function PATCH(
       } else {
         updatePayload = {};
       }
+      updatePayload = { ...updatePayload, sparepart_items: mergedSpareItems }; //  NEW — simpan daftar sparepart
       break;
     }
 
@@ -553,6 +558,41 @@ export async function PATCH(
         tanggal_diambil: new Date().toISOString(),
       };
       logCatatan = "Laptop (dibatalkan) sudah diambil pelanggan";
+      break;
+    }
+
+    //  NEW — Klaim Garansi: nominal 0, laptop langsung diambil → masuk Riwayat (SUDAH_DIAMBIL)
+    case "klaim_garansi": {
+      if (!hasAnyRole(getEffectiveRoles(user), [...SERVICE_TEKNISI_ROLES, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE"]))
+        return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+      if (!isOrderAktif && oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI")
+        return NextResponse.json({ success: false, message: "Order sudah tidak aktif" }, { status: 400 });
+      if (current.payment_amount)
+        return NextResponse.json({ success: false, message: "Order sudah ada pembayaran, tidak bisa klaim garansi" }, { status: 400 });
+
+      //  Kalau garansi diklaim saat order masih aktif (belum pernah lewat done/gagal),
+      //  modal sparepart yg terlanjur keluar tetap dijurnal. Order DONE/GAGAL sudah dijurnal → skip (hindari dobel).
+      if (isOrderAktif) {
+        await journalSparepartOnCompletion(supabase, {
+          serviceId: id,
+          nama: current.nama ?? null,
+          userId: user.id,
+        });
+      }
+
+      newStatus = "SUDAH_DIAMBIL";
+      updatePayload = {
+        payment_amount: 0,
+        payment_status: "LUNAS",
+        total_tagihan: 0,
+        payment_method: "CASH",
+        payment_note: "Klaim Garansi",
+        payment_by: user.id,
+        payment_confirmed_at: new Date().toISOString(),
+        diambil_by: user.id,
+        tanggal_diambil: new Date().toISOString(),
+      };
+      logCatatan = "Klaim garansi · laptop diambil (gratis)";
       break;
     }
 

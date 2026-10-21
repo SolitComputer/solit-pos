@@ -42,7 +42,7 @@ function fmtRupiah(n?: number) {
 type DialogState = {
   open: boolean;
   orderId: string;
-  action: "tidak_jadi" | "diambil_langsung" | "bayar_lunas" | "batal_service" | "batal_diambil" | ""; //  CHANGED
+  action: "tidak_jadi" | "diambil_langsung" | "bayar_lunas" | "batal_service" | "batal_diambil" | "klaim_garansi" | ""; //  CHANGED
   title: string;
   description: string;
   confirmLabel: string;
@@ -353,11 +353,27 @@ function PaymentValue({ order, align = "left" }: { order: ServiceOrder; align?: 
   return <span className="text-xs font-medium text-amber-500">Konfirmasi saat diambil</span>;
 }
 
+//  NEW — daftar sparepart yang sudah dimasukkan ke order
+function SparepartCell({ order }: { order: ServiceOrder }) {
+  const items = (order.sparepart_items ?? "").split("\n").map(s => s.trim()).filter(Boolean);
+  if (items.length === 0) return <span className="text-xs font-medium text-gray-300">—</span>;
+  return (
+    <div className="flex flex-col gap-1">
+      {items.map((it, i) => (
+        <span key={i} className="inline-flex w-fit items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+          <IconPart />
+          <span className="max-w-[180px] truncate">{it}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ── Skeletons ──────────────────────────────────────────────────────────────────
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-50">
-      {[28, 110, 130, 130, 80, 100, 100, 80, 190].map((w, i) => (
+      {[28, 110, 130, 130, 80, 100, 120, 100, 80, 190].map((w, i) => (
         <td key={i} className="px-4 py-4 first:pl-5 last:pr-5">
           <div
             className="h-3 animate-pulse rounded-full bg-gradient-to-r from-gray-100 to-gray-50"
@@ -398,7 +414,9 @@ export default function DonePage() {
   const [sparepartOrder, setSparepartOrder] = useState<ServiceOrder | null>(null); //  NEW — popup Sparepart
   const [estimasiOrder, setEstimasiOrder] = useState<ServiceOrder | null>(null); //  NEW — popup Estimasi
   const [prepaymentOrder, setPrepaymentOrder] = useState<ServiceOrder | null>(null); //  NEW — popup Bayar di muka
+  const [estimasiChoice, setEstimasiChoice] = useState<ServiceOrder | null>(null); //  NEW — popup pilih Estimasi / Garansi
   const [pickupChoice, setPickupChoice] = useState<PickupChoiceState>({ open: false, order: null });
+  const [search, setSearch] = useState(""); //  NEW — searchbar
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
@@ -460,11 +478,13 @@ export default function DonePage() {
     showToast(
       dialog.action === "diambil_langsung" || dialog.action === "batal_diambil"
         ? " Laptop berhasil ditandai sudah diambil."
-        : dialog.action === "bayar_lunas"
-        ? " Pelunasan berhasil dicatat." //  CHANGED — lunas tidak lagi auto-diambil (2 langkah)
-        : dialog.action === "batal_service"
-        ? " Servis dibatalkan — menunggu diambil pelanggan."
-        : " Order ditandai tidak jadi."
+        : dialog.action === "klaim_garansi"
+          ? " Klaim garansi — laptop sudah diambil."
+          : dialog.action === "bayar_lunas"
+            ? " Pelunasan berhasil dicatat." //  CHANGED — lunas tidak lagi auto-diambil (2 langkah)
+            : dialog.action === "batal_service"
+              ? " Servis dibatalkan — menunggu diambil pelanggan."
+              : " Order ditandai tidak jadi."
     );
     refresh();
   };
@@ -603,6 +623,19 @@ export default function DonePage() {
     });
   };
 
+  //  NEW — Klaim Garansi: nominal 0, konfirmasi → laptop diambil → masuk Riwayat
+  const openGaransiDialog = (order: ServiceOrder) => {
+    setDialog({
+      open: true,
+      orderId: order.id,
+      action: "klaim_garansi",
+      title: "Klaim Garansi",
+      description: `Klaim garansi untuk "${order.nama} — ${order.type_laptop}". Nominal Rp 0 (gratis). Konfirmasi laptop sudah diambil pelanggan?`,
+      confirmLabel: "Diambil",
+      confirmClass: "bg-amber-500 hover:bg-amber-600",
+    });
+  };
+
   /**
    * Sumber tunggal daftar tombol aksi per order (Data Services).
    * Tools (Sparepart/Estimasi) selalu ada; lifecycle pembayaran & pengambilan menyesuaikan state.
@@ -618,7 +651,7 @@ export default function DonePage() {
     // Tools CS — selalu tersedia, tidak mengubah status
     const actions: ActionItem[] = [
       { key: "sparepart", label: "Sparepart", color: "indigo", icon: <IconPart />, onClick: () => setSparepartOrder(o) },
-      { key: "estimasi", label: "Estimasi", color: "slate", icon: <IconDollar />, onClick: () => setEstimasiOrder(o) },
+      { key: "estimasi", label: "Estimasi", color: "slate", icon: <IconDollar />, onClick: () => setEstimasiChoice(o) },
     ];
 
     if (o.payment_status === "DP") {
@@ -670,7 +703,17 @@ export default function DonePage() {
   const doneOrders = orders.filter(o => o.status === "DONE");
   const gagalOrders = orders.filter(o => o.status === "GAGAL_DIPERBAIKI");
 
-  const COLUMNS = ["No", "Pelanggan", "Laptop", "Selesai", "Total Waktu", "Teknisi", "Payment", "Status", "Aksi"];
+  //  NEW — filter pencarian (dipakai di tabel & card)
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? orders.filter(o =>
+      o.nama.toLowerCase().includes(q) ||
+      o.no_hp.includes(q) ||
+      o.type_laptop.toLowerCase().includes(q) ||
+      o.keluhan.toLowerCase().includes(q))
+    : orders;
+
+  const COLUMNS = ["No", "Pelanggan", "Laptop", "Selesai", "Total Waktu", "Teknisi", "Sparepart", "Payment", "Status", "Aksi"];
 
   return (
     <DashboardLayout>
@@ -724,6 +767,24 @@ export default function DonePage() {
         </div>
 
         <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
+
+          {/*  NEW — Search */}
+          <div className="relative max-w-md">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-300">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            </span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Cari nama, no HP, laptop, keluhan..."
+              className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-9 pr-9 text-sm outline-none transition placeholder:text-gray-300 focus:border-[#1a1a2e]/30 focus:ring-2 focus:ring-[#1a1a2e]/10"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} aria-label="Hapus pencarian" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            )}
+          </div>
 
           {/* ── Stat Cards ──────────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -813,7 +874,7 @@ export default function DonePage() {
                     </thead>
 
                     <tbody className="divide-y divide-gray-50">
-                      {orders.map((o, idx) => (
+                      {filtered.map((o, idx) => (
                         <tr
                           key={o.id}
                           className="group cursor-pointer transition-colors duration-150 hover:bg-indigo-50/30"
@@ -873,6 +934,11 @@ export default function DonePage() {
                             )}
                           </td>
 
+                          {/* Sparepart — daftar part yang dimasukkan */}
+                          <td className="min-w-[150px] max-w-[220px] px-4 py-4 align-middle">
+                            <SparepartCell order={o} />
+                          </td>
+
                           {/* Payment — kalau belum dibayar, tampilkan ekspektasi (estimasi + sparepart) */}
                           <td className="min-w-[140px] px-4 py-4 align-middle">
                             <PaymentValue order={o} />
@@ -909,7 +975,7 @@ export default function DonePage() {
 
               {/* ── Mobile / Tablet: Card List ──────────────────────────────── */}
               <div className="space-y-3 lg:hidden">
-                {orders.map((o, idx) => (
+                {filtered.map((o, idx) => (
                   <div
                     key={o.id}
                     onClick={() => setDetailId(o.id)}
@@ -969,6 +1035,14 @@ export default function DonePage() {
                       </span>
                       <PaymentValue order={o} align="right" />
                     </div>
+
+                    {/*  NEW — Sparepart */}
+                    {(o.sparepart_items ?? "").trim() && (
+                      <div className="mt-3 border-t border-gray-50 px-4 pt-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Sparepart</span>
+                        <div className="mt-1.5"><SparepartCell order={o} /></div>
+                      </div>
+                    )}
 
                     {/* Aksi — grid full-width, tinggi seragam */}
                     <div
@@ -1054,6 +1128,53 @@ export default function DonePage() {
           onClose={() => setPrepaymentOrder(null)}
           onConfirm={handlePrepaymentConfirm}
         />
+
+        {/*  NEW — Chooser: Estimasi Bayar / Klaim Garansi */}
+        {estimasiChoice && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEstimasiChoice(null)} />
+            <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="border-b border-gray-100 bg-gradient-to-r from-slate-50/80 to-white px-6 py-5">
+                <h2 className="text-base font-black tracking-tight text-slate-800">Estimasi / Garansi</h2>
+                <p className="mt-0.5 truncate text-xs font-medium text-gray-400">
+                  {estimasiChoice.nama} · {estimasiChoice.type_laptop}
+                </p>
+              </div>
+              <div className="space-y-3 px-6 py-6">
+                <button
+                  type="button"
+                  onClick={() => { setEstimasiOrder(estimasiChoice); setEstimasiChoice(null); }}
+                  className="group flex w-full items-center gap-3 rounded-xl border-2 border-gray-200 px-4 py-3.5 text-left outline-none transition-all hover:border-[#1a1a2e]/40 hover:bg-[#1a1a2e]/5 active:scale-[0.99]"
+                >
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1a1a2e] text-white"><IconDollar /></div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-slate-800">Estimasi Bayar</p>
+                    <p className="mt-0.5 text-xs text-gray-400">Isi perkiraan biaya servis (tidak masuk cashflow)</p>
+                  </div>
+                </button>
+
+                {!estimasiChoice.payment_amount && (
+                  <button
+                    type="button"
+                    onClick={() => { openGaransiDialog(estimasiChoice); setEstimasiChoice(null); }}
+                    className="group flex w-full items-center gap-3 rounded-xl border-2 border-gray-200 px-4 py-3.5 text-left outline-none transition-all hover:border-amber-300 hover:bg-amber-50/50 active:scale-[0.99]"
+                  >
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-slate-800">Klaim Garansi</p>
+                      <p className="mt-0.5 text-xs text-gray-400">Nominal Rp 0 — konfirmasi laptop langsung diambil</p>
+                    </div>
+                  </button>
+                )}
+              </div>
+              <div className="px-6 pb-6">
+                <button type="button" onClick={() => setEstimasiChoice(null)} className="h-10 w-full rounded-xl text-sm font-bold text-gray-400 transition hover:bg-gray-50 hover:text-gray-600">Batal</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Pickup Choice Modal (GAGAL_DIPERBAIKI) ────────────────────────── */}
         {pickupChoice.open && pickupChoice.order && (
