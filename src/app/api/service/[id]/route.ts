@@ -384,7 +384,7 @@ export async function PATCH(
         return NextResponse.json({ success: false, message: "Alasan wajib diisi" }, { status: 400 });
       newStatus = "GAGAL_DIPERBAIKI";
       updatePayload = {
-      dikerjakan_by: user.id,
+        dikerjakan_by: user.id,
         tanggal_selesai: new Date().toISOString(),
         alasan_tidak_jadi: alasan.trim(),
       };
@@ -495,8 +495,9 @@ export async function PATCH(
 
     //  NEW — bayar di muka: servis masih ANTRIAN/dikerjakan, tapi uangnya sudah masuk (lunas atau DP)
     case "bayar_dimuka": {
-      if (!isOrderAktif)
-        return NextResponse.json({ success: false, message: "Bayar di muka hanya untuk order yang masih dalam antrian/dikerjakan" }, { status: 400 });
+      //  CHANGED — izinkan juga order yg sudah DONE/GAGAL tapi belum dibayar (tombol Bayar muncul utk mereka juga)
+      if (!isOrderAktif && oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI")
+        return NextResponse.json({ success: false, message: "Order sudah tidak aktif, tidak bisa dibayar" }, { status: 400 });
       if (current.payment_amount) //  FIX — payment_status bisa default "LUNAS" di DB walau belum ada duit masuk sama sekali
         return NextResponse.json({ success: false, message: "Order ini sudah punya catatan pembayaran. Gunakan tombol Lunas/Cicil." }, { status: 400 });
       if (!payment_amount || payment_amount <= 0)
