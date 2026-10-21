@@ -529,7 +529,7 @@ export async function PATCH(
     case "batal_service": {
       if (!hasAnyRole(getEffectiveRoles(user), [...SERVICE_TEKNISI_ROLES, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE"]))
         return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
-      if (!isOrderAktif) //  CHANGED — batal hanya untuk order yang masih aktif (sesuai UI; cegah dobel-jurnal order DONE)
+      if (!isOrderAktif && oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI") //  CHANGED — izinkan juga Batal utk order DONE/GAGAL yg belum dibayar
         return NextResponse.json({ success: false, message: "Order sudah tidak aktif" }, { status: 400 });
       if (current.payment_amount)
         return NextResponse.json({ success: false, message: "Order sudah ada pembayaran, tidak bisa dibatalkan" }, { status: 400 });
