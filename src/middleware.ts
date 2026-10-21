@@ -89,6 +89,14 @@ function isSoOnlyRestrictedPath(pathname: string): boolean {
   if (/^\/api\/laptops\/[^/]+$/.test(pathname) && pathname !== "/api/laptops/create" && pathname !== "/api/laptops/minus") return false;
   if (/^\/api\/units\/[^/]+\/so$/.test(pathname)) return false;
 
+  // ── Aksesoris: izinkan BACA daftar + SO per-unit (padanan laptop di atas).
+  // Data Barang Raffi butuh GET /api/accessories supaya baris aksesoris tampil,
+  // dan SO aksesoris lewat /api/accessories/[id]/so + /api/accessory-units/[id]/so.
+  if (pathname === "/api/accessories") return false;
+  if (/^\/api\/accessories\/[^/]+\/so$/.test(pathname)) return false;
+  if (/^\/api\/accessory-units\/[^/]+\/so$/.test(pathname)) return false;
+  if (pathname === "/api/accessory-units" || /^\/api\/accessory-units\/[^/]+$/.test(pathname)) return false;
+
   return true; 
 }
 
