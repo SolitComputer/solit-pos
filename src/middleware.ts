@@ -398,6 +398,14 @@ export async function middleware(request: NextRequest) {
     return clearSessionAndRedirect(new URL("/login", request.url));
   }
 
+  // ── Halaman "Data Laptop" lama (/dashboard/laptops) dipensiunkan →
+  // semua akses dialihkan ke "Data Barang". Hanya halaman persis-nya
+  // (bukan sub-route /dashboard/laptops/ready, /units, dll yang masih dipakai),
+  // dan hanya untuk PAGE (bukan /api/laptops).
+  if (pathname === "/dashboard/laptops") {
+    return NextResponse.redirect(new URL("/dashboard/data-barang", request.url));
+  }
+
   const userRoles: string[] = user.roles ?? [user.role];
   //  Expand: PKL_SALES → ["PKL_SALES", "CREW_SALES"], dst.
   const effectiveRoles = expandRolesWithParents(userRoles);
