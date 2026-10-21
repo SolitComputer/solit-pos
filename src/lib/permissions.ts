@@ -54,7 +54,7 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   PENGANTARAN: "/dashboard/preparation/pengantaran",
   PKL_CUSTOMER_SERVICE: "/dashboard/service/antrian",
   PKL_PENGELOLA_BARANG: "/dashboard/data-barang",
-  MARKETING: "/dashboard/laptops",
+  MARKETING: "/dashboard/data-barang",
   KEBERSIHAN: "/dashboard",
   KEPALA_MARKETING: "/dashboard",
   SOTECH: "/dashboard",
