@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { createClient } from "@supabase/supabase-js";
 import { ROLE_DEFAULT_REDIRECT, UserRole, buildTokenPayload, getJwtSecret, signAttendanceCookie } from "@/lib/auth";
+import { getEffectivePrimaryRole } from "@/lib/permissions";
 
 // ── Satu instance supabaseAdmin — dipakai di seluruh handler ─────────────────
 // Dipindah ke atas agar bisa dipakai untuk clear force_logout_at setelah login
@@ -359,8 +360,12 @@ export async function POST(request: Request) {
         const alreadyAttendedToday = Boolean(todaySuccess);
         const isTodayDayOff = Boolean(weeklyOff) || Boolean(specificOff);
 
-        // Redirect berdasarkan primary role (roles[0])
-        const primaryRole = (userRolesArray[0] ?? user.role) as UserRole;
+        // Redirect berdasarkan EFFECTIVE primary role — PKL variant di-map ke
+        // parent-nya (PKL_PENGELOLA_BARANG → PENGELOLA_BARANG), SAMA seperti
+        // middleware (getEffectivePrimaryRole). Sebelumnya dipakai roles[0]
+        // mentah, jadi akun dobel-role (mis. + MARKETING) ketarik ke redirect
+        // role lain (/dashboard/laptops), bukan ke redirect Pengelola Barang.
+        const primaryRole = getEffectivePrimaryRole(userRolesArray) as UserRole;
         const redirect = ROLE_DEFAULT_REDIRECT[primaryRole] ?? "/dashboard";
 
         // ── Build response ────────────────────────────────────────────────────────
