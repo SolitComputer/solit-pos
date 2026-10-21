@@ -1437,17 +1437,9 @@ async function buildServiceDrafts(
       { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: delta },
     ];
 
-    // modalByService sudah di-filter < cutoff → yang masuk sini HANYA modal
-    // sparepart lama. Sparepart baru sudah dijurnal instan, jadi tidak dobel.
-    let sparepart = 0;
-    if (isCompletion) {
-      sparepart = modalByService.get(idStr) ?? 0;
-      if (sparepart > 0) {
-        //  CHANGED — modal sparepart STOK = D450/K170 (barang dari stok Aksesoris), konsisten dgn jurnal instan
-        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: sparepart });
-        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: sparepart });
-      }
-    }
+    //  CHANGED — sparepart TIDAK digabung ke draft jasa lagi; dibikin draft PENDING terpisah
+    //  (buildSparepartDrafts) biar muncul begitu ditambahkan, bukan nunggu jasa dibayar.
+    const sparepart = 0;
 
     const merged = mergeLines(lines);
     const sortTs = refDate || `${tanggal}T00:00:00+07:00`;
@@ -1823,6 +1815,114 @@ async function buildItemOutflowKebutuhanReversalDrafts(
   return drafts;
 }
 
+// Modal sparepart service dibukukan lewat DRAFT PENDING (stok D450/K170, manual D460/K171),
+// 1 sparepart = 1 draft. Sparepart SEBELUM cutoff ini sudah terjurnal lewat jalur lama → di-skip.
+// ⚠️ Set ke jam DEPLOY sebenarnya.
+const SPAREPART_DRAFT_START_ISO = "2026-10-21T16:00:00+07:00";
+
+async function buildSparepartDrafts(
+  supabase: SupabaseClient,
+  period: string
+): Promise<JournalDraft[]> {
+  const { startISO, endISO } = periodRange(period);
+  const drafts: JournalDraft[] = [];
+
+  const effStartISO = startISO > SPAREPART_DRAFT_START_ISO ? startISO : SPAREPART_DRAFT_START_ISO;
+  const cutoffDate = jakartaDate(SPAREPART_DRAFT_START_ISO);
+
+  // ── 1) STOK → D450/K170, 1 outflow = 1 draft ──
+  const { data: outflows } = await supabase
+    .from("accessory_outflows")
+    .select("id, service_id, accessory_id, unit_id, qty, created_at")
+    .eq("source_type", "service")
+    .eq("status", "active")
+    .gte("created_at", effStartISO)
+    .lt("created_at", endISO);
+
+  const outflowRows = (outflows ?? []) as any[];
+  if (outflowRows.length > 0) {
+    const unitIds = [...new Set(outflowRows.map((o) => o.unit_id).filter(Boolean))] as string[];
+    const accIds = [...new Set(outflowRows.map((o) => o.accessory_id).filter(Boolean))] as string[];
+    const svcIds = [...new Set(outflowRows.map((o) => o.service_id).filter(Boolean))] as string[];
+
+    const unitMap = new Map<string, { sn?: string; buy: number }>();
+    for (const batch of chunkArray(unitIds, 150)) {
+      const { data } = await supabase.from("accessory_units").select("id, serial_number, buy_price").in("id", batch);
+      for (const u of data ?? []) unitMap.set(u.id as string, { sn: (u.serial_number as string) ?? undefined, buy: Math.round(Number(u.buy_price ?? 0)) });
+    }
+    const accBuyMap = new Map<string, number>();
+    for (const batch of chunkArray(accIds, 150)) {
+      const { data } = await supabase.from("accessories").select("id, buy_price").in("id", batch);
+      for (const a of data ?? []) accBuyMap.set(a.id as string, Math.round(Number(a.buy_price ?? 0)));
+    }
+    const svcNameMap = new Map<string, string>();
+    for (const batch of chunkArray(svcIds, 150)) {
+      const { data } = await supabase.from("service_orders").select("id, nama, type_laptop").in("id", batch);
+      for (const s of data ?? []) svcNameMap.set(s.id as string, `${s.type_laptop ?? "—"} - ${s.nama ?? "—"}`);
+    }
+
+    for (const o of outflowRows) {
+      const unit = o.unit_id ? unitMap.get(o.unit_id) : undefined;
+      const buy = (unit?.buy ?? 0) > 0 ? (unit as { buy: number }).buy : (accBuyMap.get(o.accessory_id) ?? 0);
+      const modal = buy * Number(o.qty || 1);
+      if (modal <= 0) continue;
+
+      const tanggal = jakartaDate(o.created_at as string);
+      const snText = unit?.sn ? ` (SN ${unit.sn})` : "";
+      const lines = mergeLines([
+        { account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal }, // 450
+        { account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal },        // 170
+      ]);
+      drafts.push({
+        source_type: "SERVICE",
+        source_id: `${o.service_id}__SPTOK_${o.id}`,
+        source_category: "SPAREPART_SERVICE",
+        tanggal,
+        sort_ts: (o.created_at as string) || `${tanggal}T00:00:00+07:00`,
+        keterangan: `Sparepart · ${svcNameMap.get(o.service_id) ?? "—"}${snText}`,
+        ref: (o.service_id as string) ?? null,
+        lines,
+        total: totalOf(lines),
+        meta: { modal_missing: false, sparepart_mode: "stock" },
+      });
+    }
+  }
+
+  // ── 2) MANUAL (biaya_sparepart) → D460/K171, 1 service = 1 draft ──
+  const { data: svcManual } = await supabase
+    .from("service_orders")
+    .select("id, nama, type_laptop, biaya_sparepart, tanggal_masuk, tanggal_selesai")
+    .gt("biaya_sparepart", 0)
+    .gte("tanggal_masuk", cutoffDate);
+
+  for (const s of (svcManual ?? []) as any[]) {
+    const modal = Math.round(Number(s.biaya_sparepart ?? 0));
+    if (modal <= 0) continue;
+    const refDate = (s.tanggal_selesai || s.tanggal_masuk) as string;
+    if (!refDate || periodFromDate(jakartaDate(refDate)) !== period) continue;
+
+    const tanggal = jakartaDate(refDate);
+    const lines = mergeLines([
+      { account_code: AKUN.MODAL_SERVICE_KELUAR, side: "DEBIT", nominal: modal }, // 460
+      { account_code: AKUN.AKSESORIS_SERVICE, side: "KREDIT", nominal: modal },     // 171
+    ]);
+    drafts.push({
+      source_type: "SERVICE",
+      source_id: `${s.id}__SPMANUAL`,
+      source_category: "SPAREPART_SERVICE",
+      tanggal,
+      sort_ts: `${tanggal}T00:00:00+07:00`,
+      keterangan: `Sparepart (manual) · ${s.type_laptop ?? "—"} - ${s.nama ?? "—"}`,
+      ref: String(s.id),
+      lines,
+      total: totalOf(lines),
+      meta: { modal_missing: false, sparepart_mode: "manual" },
+    });
+  }
+
+  return drafts;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 export async function buildDraftsForPeriod(
   supabase: SupabaseClient,
@@ -1830,7 +1930,7 @@ export async function buildDraftsForPeriod(
 ): Promise<JournalDraft[]> {
   const { startISO, endISO, startDate, endDateExclusive } = periodRange(period);
 
-   const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal] = await Promise.all([
+   const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal, sparepart] = await Promise.all([
     buildTransactionDrafts(supabase, startISO, endISO),
     buildTransactionAccrualDrafts(supabase, startISO, endISO),
     buildTransactionPaymentDrafts(supabase, startISO, endISO),
@@ -1839,9 +1939,10 @@ export async function buildDraftsForPeriod(
     buildTransactionReversalDrafts(supabase, startISO, endISO),
     buildItemOutflowKebutuhanDrafts(supabase, startISO, endISO),
     buildItemOutflowKebutuhanReversalDrafts(supabase, startISO, endISO),
+    buildSparepartDrafts(supabase, period), //  NEW
   ]);
 
-  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan, ...kebutuhanReversal].sort((a, b) => {
+  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan, ...kebutuhanReversal, ...sparepart].sort((a, b) => {
     if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
     return a.sort_ts.localeCompare(b.sort_ts);
   });

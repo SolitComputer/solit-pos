@@ -282,11 +282,9 @@ export async function PATCH(
       const prevSpareItems = (current.sparepart_items ?? "").toString().trim();
       const mergedSpareItems = prevSpareItems ? `${prevSpareItems}\n${entryText}` : entryText;
 
-      //  NEW — label bersih (buang §harga) buat keterangan jurnal
-      const spareLabel = entryText.split("§")[0]?.trim() || ketServis;
-
       if (accessories_used && accessories_used.length > 0) {
-        // ── DARI STOK AKSESORIS → catat keluarnya stok + LANGSUNG jurnal (D450/K170).
+        // ── DARI STOK → cuma catat keluarnya stok. Jurnal muncul sbg DRAFT PENDING
+        //    (buildSparepartDrafts) utk dikonfirmasi — bukan jurnal instan.
         for (const acc of accessories_used) {
           if (acc.unit_id) {
             await supabase.from("accessory_units").update({ status: "KELUAR" }).eq("id", acc.unit_id);
@@ -306,48 +304,10 @@ export async function PATCH(
             p_qty: acc.qty,
           });
         }
-
-        //  NEW — jurnal modal STOK SEKARANG (D450 Biaya Printilan / K170 Aksesoris)
-        const unitIds = accessories_used.map((a) => a.unit_id).filter(Boolean) as string[];
-        const accIds = [...new Set(accessories_used.map((a) => a.accessory_id).filter(Boolean))] as string[];
-        const [{ data: unitRows }, { data: accRows }] = await Promise.all([
-          unitIds.length
-            ? supabase.from("accessory_units").select("id, buy_price").in("id", unitIds)
-            : Promise.resolve({ data: [] as any[] }),
-          accIds.length
-            ? supabase.from("accessories").select("id, buy_price").in("id", accIds)
-            : Promise.resolve({ data: [] as any[] }),
-        ]);
-        const unitBuyMap = new Map((unitRows ?? []).map((u: any) => [u.id, Math.round(Number(u.buy_price ?? 0))]));
-        const accBuyMap = new Map((accRows ?? []).map((a: any) => [a.id, Math.round(Number(a.buy_price ?? 0))]));
-
-        let modalStok = 0;
-        for (const acc of accessories_used) {
-          const unitBuy = acc.unit_id ? (unitBuyMap.get(acc.unit_id) ?? 0) : 0;
-          const buy = unitBuy > 0 ? unitBuy : (accBuyMap.get(acc.accessory_id) ?? 0);
-          modalStok += buy * Number(acc.qty || 1);
-        }
-        if (modalStok > 0) {
-          await insertSparepartJournal(supabase, {
-            nominal: modalStok,
-            debit: AKUN.BIAYA_PRINTILAN, // 450
-            kredit: AKUN.AKSESORIS,       // 170
-            keterangan: `Sparepart · ${current.nama ?? "—"} · ${spareLabel}`,
-            userId: user.id,
-          });
-        }
         updatePayload = {};
       } else if (sparepart_mode === "manual" && Number(sparepart_modal) > 0) {
-        // ── INPUT MANUAL → simpan modal + LANGSUNG jurnal (D460/K171).
-        const modalManual = Math.round(Number(sparepart_modal));
-        await insertSparepartJournal(supabase, {
-          nominal: modalManual,
-          debit: AKUN.MODAL_SERVICE_KELUAR, // 460
-          kredit: AKUN.AKSESORIS_SERVICE,    // 171
-          keterangan: `Sparepart · ${current.nama ?? "—"} · ${spareLabel}`,
-          userId: user.id,
-        });
-        updatePayload = { biaya_sparepart: modalManual }; // disimpan utk catatan (tidak lagi dipakai jurnal)
+        // ── MANUAL → simpan modal di biaya_sparepart. Draft pending yang jurnalkan.
+        updatePayload = { biaya_sparepart: Math.round(Number(sparepart_modal)) };
       } else {
         updatePayload = {};
       }
