@@ -7,7 +7,8 @@ export type ServiceStatus =
   | "DONE"
   | "SUDAH_DIAMBIL"
   | "TIDAK_JADI"
-  | "GAGAL_DIPERBAIKI"; //  NEW
+  | "GAGAL_DIPERBAIKI"
+  | "DIBATALKAN"; //  NEW — batal servis (laptop masih di toko, nunggu diambil)
 
 export interface ServiceOrder {
   id: string;
@@ -83,7 +84,8 @@ export const STATUS_LABEL: Record<ServiceStatus, string> = {
   DONE: "Selesai",
   SUDAH_DIAMBIL: "Sudah Diambil",
   TIDAK_JADI: "Tidak Jadi",
-  GAGAL_DIPERBAIKI: "Gagal Diperbaiki", // 
+  GAGAL_DIPERBAIKI: "Gagal Diperbaiki",
+  DIBATALKAN: "Dibatalkan", //  NEW
 };
 
 export const STATUS_COLOR: Record<ServiceStatus, string> = {
@@ -93,5 +95,6 @@ export const STATUS_COLOR: Record<ServiceStatus, string> = {
   DONE: "bg-green-100 text-green-800 border-green-200",
   SUDAH_DIAMBIL: "bg-gray-100 text-gray-600 border-gray-200",
   TIDAK_JADI: "bg-red-100 text-red-700 border-red-200",
-  GAGAL_DIPERBAIKI: "bg-rose-100 text-rose-700 border-rose-200", // 
+  GAGAL_DIPERBAIKI: "bg-rose-100 text-rose-700 border-rose-200",
+  DIBATALKAN: "bg-zinc-100 text-zinc-600 border-zinc-200", //  NEW
 };

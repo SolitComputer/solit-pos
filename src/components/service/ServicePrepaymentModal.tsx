@@ -1,7 +1,7 @@
 "use client";
 // src/components/service/ServicePrepaymentModal.tsx
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Banknote, Landmark, QrCode, Check, Upload, X, Loader2 } from "lucide-react";
 import type { ServiceOrder } from "@/types/service";
 import { compressImage } from "@/lib/imageCompression";
@@ -49,6 +49,14 @@ export default function ServicePrepaymentModal({ open, order, onClose, onConfirm
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  //  NEW — prefill nominal dari estimasi yang sudah diisi (Bayar auto-terisi dari Estimasi)
+  useEffect(() => {
+    if (open && order) {
+      const est = Number(order.estimasi_harga ?? 0);
+      setAmount(est > 0 ? fmtRupiah(est) : "");
+    }
+  }, [open, order]);
+
   if (!open || !order) return null;
 
   const amountNum = parseRupiah(amount);
@@ -76,7 +84,7 @@ export default function ServicePrepaymentModal({ open, order, onClose, onConfirm
     setAmount(digits ? fmtRupiah(parseInt(digits)) : "");
   };
 
-   const handleFileSelect = async (file: File | null) => {
+  const handleFileSelect = async (file: File | null) => {
     if (!file) return;
     setError("");
 
@@ -137,7 +145,7 @@ export default function ServicePrepaymentModal({ open, order, onClose, onConfirm
       await onConfirm({
         payment_amount: amountNum,
         payment_status: status,
-        total_tagihan: status === "DP" ? amountNum : undefined,
+        total_tagihan: status === "DP" ? (Number(order.estimasi_harga ?? 0) || amountNum) : undefined, //  CHANGED — total DP = estimasi
         payment_method: method,
         payment_note: note.trim() || undefined,
         payment_proof_url: proofUrl,
@@ -181,18 +189,16 @@ export default function ServicePrepaymentModal({ open, order, onClose, onConfirm
               <button
                 type="button"
                 onClick={() => setStatus("LUNAS")}
-                className={`py-2.5 rounded-xl border-2 text-sm font-bold transition ${
-                  status === "LUNAS" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-500"
-                }`}
+                className={`py-2.5 rounded-xl border-2 text-sm font-bold transition ${status === "LUNAS" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-500"
+                  }`}
               >
                 Lunas
               </button>
               <button
                 type="button"
                 onClick={() => setStatus("DP")}
-                className={`py-2.5 rounded-xl border-2 text-sm font-bold transition ${
-                  status === "DP" ? "border-amber-500 bg-amber-50 text-amber-700" : "border-gray-200 text-gray-500"
-                }`}
+                className={`py-2.5 rounded-xl border-2 text-sm font-bold transition ${status === "DP" ? "border-amber-500 bg-amber-50 text-amber-700" : "border-gray-200 text-gray-500"
+                  }`}
               >
                 DP (Cicil)
               </button>
@@ -227,9 +233,8 @@ export default function ServicePrepaymentModal({ open, order, onClose, onConfirm
                     key={m.value}
                     type="button"
                     onClick={() => setMethod(m.value)}
-                    className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-semibold transition ${
-                      method === m.value ? "border-[#1a1a2e] bg-[#1a1a2e]/5 text-[#1a1a2e]" : "border-gray-200 text-gray-500 hover:border-gray-300"
-                    }`}
+                    className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-semibold transition ${method === m.value ? "border-[#1a1a2e] bg-[#1a1a2e]/5 text-[#1a1a2e]" : "border-gray-200 text-gray-500 hover:border-gray-300"
+                      }`}
                   >
                     <Icon className="w-5 h-5" />
                     {m.label}

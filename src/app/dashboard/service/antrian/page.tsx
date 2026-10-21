@@ -4,12 +4,8 @@
 import { useState, useEffect, useRef } from "react";
 import ServiceFormModal from "@/components/service/ServiceFormModal";
 import ServiceConfirmDialog from "@/components/service/ServiceConfirmDialog";
-import ServicePriceDialog from "@/components/service/ServicePriceDialog";
-import ServiceSparepartDialog from "@/components/service/ServiceSparepartDialog";
 import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import ServiceDetailModal from "@/components/service/ServiceDetailModal";
-import ServicePrepaymentModal from "@/components/service/ServicePrepaymentModal"; //  NEW — bayar di muka
-import ServiceCicilanModal from "@/components/service/ServiceCicilanModal"; //  NEW — cicil DP di muka
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { SERVICE_CREATE_ROLES, SERVICE_TEKNISI_ROLES, hasPermission } from "@/lib/permissions";
@@ -61,36 +57,6 @@ type DialogState = {
 
 const DIALOG_CLOSED: DialogState = { open: false, orderId: "", action: "", title: "", description: "", confirmLabel: "" };
 
-type PriceDialogState = {
-  open: boolean;
-  orderId: string;
-  action: "mulai" | "sparepart" | "";
-  title: string;
-  description: string;
-  confirmLabel: string;
-  confirmClass?: string;
-  priceLabel: string;
-  defaultPrice: number;
-  withReason: boolean;
-  reasonLabel?: string;
-  reasonPlaceholder?: string;
-  reasonRequired?: boolean;
-};
-const PRICE_DIALOG_CLOSED: PriceDialogState = {
-  open: false, orderId: "", action: "", title: "", description: "",
-  confirmLabel: "", priceLabel: "", defaultPrice: 0, withReason: false,
-};
-
-type SparepartDialogState = {
-  open: boolean;
-  orderId: string;
-  orderName: string;
-  orderType: string;
-  defaultPrice: number;
-};
-const SPAREPART_DIALOG_CLOSED: SparepartDialogState = {
-  open: false, orderId: "", orderName: "", orderType: "", defaultPrice: 0
-};
 
 function useAntrianRealtime() {
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
@@ -417,11 +383,7 @@ export default function AntrianPage() {
   const { orders, loading, connected, refresh } = useAntrianRealtime();
   const [formOpen, setFormOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
-  const [priceDialog, setPriceDialog] = useState<PriceDialogState>(PRICE_DIALOG_CLOSED);
-  const [sparepartDialog, setSparepartDialog] = useState<SparepartDialogState>(SPAREPART_DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [prepaymentOrder, setPrepaymentOrder] = useState<ServiceOrder | null>(null); //  NEW — order yang lagi dibuka popup bayar di muka
-  const [cicilanOrder, setCicilanOrder] = useState<ServiceOrder | null>(null); //  NEW — order yang lagi dibuka popup cicil
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const userRoles = user?.roles ?? (user?.role ? [user.role] : []);
@@ -470,99 +432,6 @@ export default function AntrianPage() {
     setDialog({ open: true, orderId: order.id, action, ...configs[action] });
   };
 
-  const openPriceDialog = (order: ServiceOrder, action: "mulai" | "sparepart") => {
-    if (action === "mulai") {
-      setPriceDialog({
-        open: true,
-        orderId: order.id,
-        action: "mulai",
-        title: "Mulai Pengerjaan",
-        description: `Masukkan estimasi / kisaran biaya servis untuk "${order.nama} — ${order.type_laptop}". Nilai ini masih bisa diubah saat pelanggan mengambil.`,
-        confirmLabel: "Mulai Kerjakan",
-        confirmClass: "bg-blue-600 hover:bg-blue-700",
-        priceLabel: "Estimasi Biaya Servis",
-        defaultPrice: Number(order.estimasi_harga ?? 0),
-        withReason: false,
-      });
-    } else {
-      setSparepartDialog({
-        open: true,
-        orderId: order.id,
-        orderName: order.nama,
-        orderType: order.type_laptop,
-        defaultPrice: Number(order.biaya_sparepart ?? 0)
-      });
-    }
-  };
-
-  //  NEW — buka popup input pembayaran di muka (order belum punya payment_status sama sekali)
-  const handleBayarClick = (order: ServiceOrder) => {
-    setPrepaymentOrder(order);
-  };
-
-  //  NEW — submit pembayaran di muka dari ServicePrepaymentModal
-  const handlePrepaymentConfirm = async (payload: {
-    payment_amount: number;
-    payment_status: "LUNAS" | "DP";
-    total_tagihan?: number;
-    payment_method: "CASH" | "TRANSFER" | "QRIS";
-    payment_note?: string;
-    payment_proof_url: string; //  NEW — wajib, dari upload bukti di modal
-  }) => {
-    if (!prepaymentOrder) return;
-    const res = await fetch(`/api/service/${prepaymentOrder.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "bayar_dimuka", ...payload }),
-    });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message || "Gagal");
-    setPrepaymentOrder(null);
-    showToast(
-      payload.payment_status === "LUNAS"
-        ? " Pembayaran lunas di muka berhasil dicatat!"
-        : " DP di muka berhasil dicatat."
-    );
-    refresh();
-  };
-
-  //  NEW — klik "Lunas" (pelunasan sisa DP yang dibayar di muka, servis masih jalan)
-  const handleLunasDimukaClick = (order: ServiceOrder) => {
-    const sisa = Number(order.total_tagihan ?? 0) - Number(order.payment_amount ?? 0);
-    setDialog({
-      open: true,
-      orderId: order.id,
-      action: "bayar_lunas",
-      title: "Konfirmasi Pelunasan",
-      description: `Lunasi sisa tagihan "${order.nama} — ${order.type_laptop}" sebesar ${fmtRupiah(sisa) ?? "Rp 0"}? Servis akan tetap lanjut seperti biasa.`,
-      confirmLabel: "Ya, Lunas",
-      confirmClass: "bg-emerald-600 hover:bg-emerald-700",
-    });
-  };
-
-  //  NEW — klik "Cicil" (buka popup input nominal cicilan, reuse komponen dari halaman Selesai)
-  const handleCicilDimukaClick = (order: ServiceOrder) => {
-    setCicilanOrder(order);
-  };
-
-  //  NEW — submit nominal cicilan dari ServiceCicilanModal
-  const handleCicilanConfirm = async (cicilanAmount: number) => {
-    if (!cicilanOrder) return;
-    const res = await fetch(`/api/service/${cicilanOrder.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "bayar_cicilan", cicilan_amount: cicilanAmount }),
-    });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message || "Gagal");
-    setCicilanOrder(null);
-    showToast(
-      json.data?.payment_status === "LUNAS"
-        ? " Cicilan diterima, pembayaran lunas!"
-        : " Cicilan diterima, sisa tagihan diperbarui."
-    );
-    refresh();
-  };
 
   /**
    * Sumber tunggal daftar tombol aksi per status.
@@ -572,93 +441,27 @@ export default function AntrianPage() {
   const getActions = (o: ServiceOrder): ActionItem[] => {
     const actions: ActionItem[] = [];
 
-    // Aksi pengerjaan servis — khusus teknisi
-    if (canAction) {
-      switch (o.status) {
-        case "ANTRIAN":
-          actions.push(
-            { label: "Mulai", color: "blue", onClick: () => openPriceDialog(o, "mulai") },
-            { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
-          );
-          break;
-        case "SEDANG_DIKERJAKAN":
-          actions.push(
-            { label: "Sparepart", color: "orange", onClick: () => openPriceDialog(o, "sparepart") },
-            { label: "Selesai", color: "green", onClick: () => openDialog(o, "done") },
-            { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
-          );
-          break;
-        case "MENUNGGU_SPAREPART":
-          actions.push(
-            { label: "Lanjut", color: "purple", onClick: () => openPriceDialog(o, "mulai") },
-            { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
-          );
-          break;
-      }
-    }
+    //  CHANGED — Antrian HANYA alur pengerjaan teknisi: Mulai → Selesai / Gagal.
+    //  Sparepart, Estimasi & Pembayaran sepenuhnya dipindah ke halaman Data Services.
+    if (!canAction) return actions;
 
-    //  NEW — aksi pembayaran di muka, terpisah dari aksi pengerjaan servis (semua role bisa akses)
-    if (o.payment_status === "DP" && o.payment_amount) { //  FIX — pastikan beneran ada nominal, bukan cuma status default
-      actions.push(
-        { label: "Lunas", color: "green", onClick: () => handleLunasDimukaClick(o) },
-        { label: "Cicil", color: "orange", onClick: () => handleCicilDimukaClick(o) },
-      );
-    } else if (!o.payment_amount) { //  FIX — payment_status bisa default "LUNAS" walau belum ada duit masuk
-      actions.push({ label: "Bayar", color: "zinc", onClick: () => handleBayarClick(o) });
+    switch (o.status) {
+      case "ANTRIAN":
+        // Di antrian cuma "Mulai". Setelah mulai baru muncul Selesai/Gagal.
+        actions.push({ label: "Mulai", color: "blue", onClick: () => openDialog(o, "mulai") });
+        break;
+      case "SEDANG_DIKERJAKAN":
+      case "MENUNGGU_SPAREPART": // order lama yg terlanjur menunggu sparepart tetap bisa diselesaikan
+        actions.push(
+          { label: "Selesai", color: "green", onClick: () => openDialog(o, "done") },
+          { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
+        );
+        break;
     }
 
     return actions;
   };
 
-  const handlePriceConfirm = async (price: number, reason?: string) => {
-    const body: Record<string, unknown> = { action: priceDialog.action };
-    if (priceDialog.action === "mulai") body.estimasi_harga = price;
-    if (priceDialog.action === "sparepart") {
-      body.biaya_sparepart = price;
-      body.alasan = reason;
-    }
-    const res = await fetch(`/api/service/${priceDialog.orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message || "Gagal memperbarui status");
-    setPriceDialog(PRICE_DIALOG_CLOSED);
-    showToast(priceDialog.action === "mulai" ? " Pengerjaan dimulai!" : " Ditandai menunggu sparepart.");
-    refresh();
-  };
-
-  const handleSparepartConfirm = async (payload: {
-    mode: "stock" | "manual";
-    reason: string;
-    price?: number;
-    accessory_id?: string;
-    unit_id?: string;
-    serial_number?: string;
-  }) => {
-    const body: Record<string, unknown> = {
-      action: "sparepart",
-      alasan: payload.reason,                               // dipakai utk log + keterangan jurnal
-      sparepart_mode: payload.mode,
-      sparepart_modal: payload.mode === "manual" ? payload.price : undefined,
-      accessories_used:
-        payload.mode === "stock" && payload.accessory_id
-          ? [{ accessory_id: payload.accessory_id, unit_id: payload.unit_id, qty: 1 }]
-          : undefined,
-    };
-
-    const res = await fetch(`/api/service/${sparepartDialog.orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message || "Gagal memperbarui status");
-    setSparepartDialog(SPAREPART_DIALOG_CLOSED);
-    showToast(" Sparepart dicatat & jurnal modal dibuat.");
-    refresh();
-  };
 
   const handleDialogConfirm = async (reason?: string) => {
     const res = await fetch(`/api/service/${dialog.orderId}`, {
@@ -844,7 +647,7 @@ export default function AntrianPage() {
             </div>
           ) : (
             <>
-             {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
+              {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
               <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
                 <div className="max-h-[65vh] overflow-auto"> {/*  NEW — dibatasi tinggi + scroll 2 arah, header bisa freeze di dalam sini */}
                   <table className="w-full text-sm">
@@ -1070,48 +873,6 @@ export default function AntrianPage() {
           onConfirm={handleDialogConfirm}
         />
 
-        <ServicePriceDialog
-          open={priceDialog.open}
-          title={priceDialog.title}
-          description={priceDialog.description}
-          confirmLabel={priceDialog.confirmLabel}
-          confirmClass={priceDialog.confirmClass}
-          priceLabel={priceDialog.priceLabel}
-          priceRequired={false}
-          defaultPrice={priceDialog.defaultPrice}
-          withReason={priceDialog.withReason}
-          reasonLabel={priceDialog.reasonLabel}
-          reasonPlaceholder={priceDialog.reasonPlaceholder}
-          reasonRequired={priceDialog.reasonRequired}
-          onCancel={() => setPriceDialog(PRICE_DIALOG_CLOSED)}
-          onConfirm={handlePriceConfirm}
-        />
-
-        <ServiceSparepartDialog
-          open={sparepartDialog.open}
-          orderId={sparepartDialog.orderId}
-          orderName={sparepartDialog.orderName}
-          orderType={sparepartDialog.orderType}
-          defaultPrice={sparepartDialog.defaultPrice}
-          onCancel={() => setSparepartDialog(SPAREPART_DIALOG_CLOSED)}
-          onConfirm={handleSparepartConfirm}
-        />
-
-        {/*  NEW — Popup input pembayaran di muka */}
-        <ServicePrepaymentModal
-          open={!!prepaymentOrder}
-          order={prepaymentOrder}
-          onClose={() => setPrepaymentOrder(null)}
-          onConfirm={handlePrepaymentConfirm}
-        />
-
-        {/*  NEW — Popup cicilan untuk DP di muka */}
-        <ServiceCicilanModal
-          open={!!cicilanOrder}
-          order={cicilanOrder}
-          onClose={() => setCicilanOrder(null)}
-          onConfirm={handleCicilanConfirm}
-        />
 
         <ServiceDetailModal orderId={detailId} onClose={() => setDetailId(null)} />
 

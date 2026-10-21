@@ -6,10 +6,17 @@ import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import ServiceDetailModal from "@/components/service/ServiceDetailModal";
 import ServicePaymentModal from "@/components/service/ServicePaymentModal";
 import ServiceCicilanModal from "@/components/service/ServiceCicilanModal";
+import ServiceSparepartDialog from "@/components/service/ServiceSparepartDialog"; //  NEW
+import ServicePriceDialog from "@/components/service/ServicePriceDialog"; //  NEW — dipakai tombol Estimasi
+import ServicePrepaymentModal from "@/components/service/ServicePrepaymentModal"; //  NEW — Bayar di muka
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-  
-const DONE_STATUSES: ServiceStatus[] = ["DONE", "GAGAL_DIPERBAIKI"];
+
+//  CHANGED — Data Services = SEMUA order yang belum tuntas diambil/dibatalkan
+const DONE_STATUSES: ServiceStatus[] = [
+  "ANTRIAN", "SEDANG_DIKERJAKAN", "MENUNGGU_SPAREPART",
+  "DONE", "GAGAL_DIPERBAIKI", "DIBATALKAN",
+];
 
 function formatDate(iso?: string) {
   if (!iso) return "—";
@@ -35,7 +42,7 @@ function fmtRupiah(n?: number) {
 type DialogState = {
   open: boolean;
   orderId: string;
-  action: "tidak_jadi" | "diambil_langsung" | "bayar_lunas" | ""; //  NEW — bayar_lunas
+  action: "tidak_jadi" | "diambil_langsung" | "bayar_lunas" | "batal_service" | "batal_diambil" | ""; //  CHANGED
   title: string;
   description: string;
   confirmLabel: string;
@@ -164,6 +171,12 @@ const IconClock = () => (
   </svg>
 );
 
+const IconPart = () => ( //  NEW
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.7 2.7-2-2z" />
+  </svg>
+);
+
 // ── Stat Card ──────────────────────────────────────────────────────────────────
 function StatCard({
   icon, label, count, gradient, iconBg, borderColor
@@ -198,7 +211,7 @@ function StatCard({
 }
 
 // ── Action Types & Button ──────────────────────────────────────────────────────
-type ActionColor = "emerald" | "rose" | "amber"; //  NEW — amber untuk tombol "Cicil"
+type ActionColor = "emerald" | "rose" | "amber" | "indigo" | "slate"; //  CHANGED — + Sparepart(indigo), Estimasi(slate)
 
 type ActionItem = {
   key: string;
@@ -211,7 +224,9 @@ type ActionItem = {
 const ACTION_VARIANTS: Record<ActionColor, string> = {
   emerald: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 focus-visible:ring-emerald-300",
   rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200 focus-visible:ring-rose-300",
-  amber: "bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 focus-visible:ring-amber-300", //  NEW
+  amber: "bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 focus-visible:ring-amber-300",
+  indigo: "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 focus-visible:ring-indigo-300", //  NEW
+  slate: "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 focus-visible:ring-slate-400", //  NEW
 };
 
 function ActionBtn({
@@ -380,6 +395,9 @@ export default function DonePage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<ServiceOrder | null>(null);
   const [cicilanOrder, setCicilanOrder] = useState<ServiceOrder | null>(null); //  NEW — order yang lagi diisi cicilan
+  const [sparepartOrder, setSparepartOrder] = useState<ServiceOrder | null>(null); //  NEW — popup Sparepart
+  const [estimasiOrder, setEstimasiOrder] = useState<ServiceOrder | null>(null); //  NEW — popup Estimasi
+  const [prepaymentOrder, setPrepaymentOrder] = useState<ServiceOrder | null>(null); //  NEW — popup Bayar di muka
   const [pickupChoice, setPickupChoice] = useState<PickupChoiceState>({ open: false, order: null });
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
@@ -394,7 +412,7 @@ export default function DonePage() {
       setDialog({
         open: true,
         orderId: order.id,
-      action: "diambil_langsung",
+        action: "diambil_langsung",
         title: "Konfirmasi Laptop Diambil",
         description: `Laptop "${order.nama} — ${order.type_laptop}" sudah lunas dibayar di muka. Konfirmasi laptop sudah diambil pelanggan?`,
         confirmLabel: "Ya, Sudah Diambil",
@@ -440,29 +458,19 @@ export default function DonePage() {
     if (!json.success) throw new Error(json.message || "Gagal");
     setDialog(DIALOG_CLOSED);
     showToast(
-      dialog.action === "diambil_langsung"
+      dialog.action === "diambil_langsung" || dialog.action === "batal_diambil"
         ? " Laptop berhasil ditandai sudah diambil."
-        : dialog.action === "bayar_lunas" //  NEW
-        ? " Pelunasan berhasil, laptop sudah diambil."
+        : dialog.action === "bayar_lunas"
+        ? " Pelunasan berhasil dicatat." //  CHANGED — lunas tidak lagi auto-diambil (2 langkah)
+        : dialog.action === "batal_service"
+        ? " Servis dibatalkan — menunggu diambil pelanggan."
         : " Order ditandai tidak jadi."
     );
     refresh();
   };
 
-  const openTidakJadiDialog = (order: ServiceOrder) => {
-    setDialog({
-      open: true,
-      orderId: order.id,
-      action: "tidak_jadi",
-      title: "Tandai Tidak Jadi",
-      description: `Order "${order.nama}" akan masuk ke History dengan status TIDAK JADI. Tulis alasannya.`,
-      confirmLabel: "Tandai Tidak Jadi",
-      confirmClass: "bg-rose-600 hover:bg-rose-700",
-      requireReason: true,
-    });
-  };
 
- //  NEW — klik "Lunas": konfirmasi lalu lunasi sisa DP sekaligus (masuk Riwayat)
+  //  NEW — klik "Lunas": konfirmasi lalu lunasi sisa DP sekaligus (masuk Riwayat)
   const handleLunasClick = (order: ServiceOrder) => {
     const sisa = Number(order.total_tagihan ?? 0) - Number(order.payment_amount ?? 0);
     setDialog({
@@ -500,51 +508,138 @@ export default function DonePage() {
     refresh();
   };
 
+  //  NEW — Sparepart (stok / manual), tidak ubah status perbaikan
+  const handleSparepartConfirm = async (payload: {
+    mode: "stock" | "manual";
+    reason: string;
+    price?: number;
+    accessory_id?: string;
+    unit_id?: string;
+    serial_number?: string;
+  }) => {
+    if (!sparepartOrder) return;
+    const res = await fetch(`/api/service/${sparepartOrder.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sparepart",
+        alasan: payload.reason,
+        sparepart_mode: payload.mode,
+        sparepart_modal: payload.mode === "manual" ? payload.price : undefined,
+        accessories_used:
+          payload.mode === "stock" && payload.accessory_id
+            ? [{ accessory_id: payload.accessory_id, unit_id: payload.unit_id, qty: 1 }]
+            : undefined,
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Gagal mencatat sparepart");
+    setSparepartOrder(null);
+    showToast(" Sparepart dicatat.");
+    refresh();
+  };
+
+  //  NEW — Estimasi (perkiraan, TIDAK masuk cashflow, tidak ubah status)
+  const handleEstimasiConfirm = async (price: number) => {
+    if (!estimasiOrder) return;
+    const res = await fetch(`/api/service/${estimasiOrder.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "set_estimasi", estimasi_harga: price }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Gagal menyimpan estimasi");
+    setEstimasiOrder(null);
+    showToast(" Estimasi biaya diperbarui.");
+    refresh();
+  };
+
+  //  NEW — Bayar di muka (Lunas / DP), status servis tidak berubah
+  const handlePrepaymentConfirm = async (payload: {
+    payment_amount: number;
+    payment_status: "LUNAS" | "DP";
+    total_tagihan?: number;
+    payment_method: "CASH" | "TRANSFER" | "QRIS";
+    payment_note?: string;
+    payment_proof_url: string;
+  }) => {
+    if (!prepaymentOrder) return;
+    const res = await fetch(`/api/service/${prepaymentOrder.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bayar_dimuka", ...payload }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Gagal menyimpan pembayaran");
+    setPrepaymentOrder(null);
+    showToast(payload.payment_status === "LUNAS" ? " Pembayaran lunas dicatat." : " DP dicatat.");
+    refresh();
+  };
+
+  //  NEW — Batal Services (langkah 1): isi alasan → status DIBATALKAN
+  const openBatalDialog = (order: ServiceOrder) => {
+    setDialog({
+      open: true,
+      orderId: order.id,
+      action: "batal_service",
+      title: "Batal Services",
+      description: `Batalkan servis "${order.nama} — ${order.type_laptop}"? Laptop akan menunggu diambil pelanggan, lalu masuk Riwayat. Tulis alasannya.`,
+      confirmLabel: "Batalkan Servis",
+      confirmClass: "bg-rose-600 hover:bg-rose-700",
+      requireReason: true,
+    });
+  };
+
+  //  NEW — Batal Services (langkah 2): laptop (dibatalkan) sudah diambil → Riwayat
+  const handleBatalDiambilClick = (order: ServiceOrder) => {
+    setDialog({
+      open: true,
+      orderId: order.id,
+      action: "batal_diambil",
+      title: "Konfirmasi Laptop Diambil",
+      description: `Laptop "${order.nama} — ${order.type_laptop}" (dibatalkan) sudah diambil pelanggan? Order akan masuk ke Riwayat.`,
+      confirmLabel: "Ya, Sudah Diambil",
+      confirmClass: "bg-emerald-600 hover:bg-emerald-700",
+    });
+  };
+
   /**
-   * Sumber tunggal daftar tombol aksi per order.
-   * Kombinasi tombol PERSIS sama seperti sebelumnya:
-   * - "Diambil" selalu ada
-   * - "Tidak Jadi" hanya untuk status DONE
-   *  NEW — kalau order lagi DP, tombolnya jadi "Lunas" & "Cicil"
+   * Sumber tunggal daftar tombol aksi per order (Data Services).
+   * Tools (Sparepart/Estimasi) selalu ada; lifecycle pembayaran & pengambilan menyesuaikan state.
    */
   const getActions = (o: ServiceOrder): ActionItem[] => {
-    if (o.payment_status === "DP") { //  NEW
+    //  Order sudah dibatalkan → tinggal konfirmasi diambil (langkah 2)
+    if (o.status === "DIBATALKAN") {
       return [
-        {
-          key: "lunas",
-          label: "Lunas",
-          color: "emerald",
-          icon: <IconCheckLg />,
-          onClick: () => handleLunasClick(o),
-        },
-        {
-          key: "cicil",
-          label: "Cicil",
-          color: "amber",
-          icon: <IconDollar />,
-          onClick: () => handleCicilClick(o),
-        },
+        { key: "batal_diambil", label: "Diambil", color: "emerald", icon: <IconCheck />, onClick: () => handleBatalDiambilClick(o) },
       ];
     }
 
+    // Tools CS — selalu tersedia, tidak mengubah status
     const actions: ActionItem[] = [
-      {
-        key: "diambil",
-        label: "Diambil",
-        color: "emerald",
-        icon: <IconCheck />,
-        onClick: () => handleDiambilClick(o),
-      },
+      { key: "sparepart", label: "Sparepart", color: "indigo", icon: <IconPart />, onClick: () => setSparepartOrder(o) },
+      { key: "estimasi", label: "Estimasi", color: "slate", icon: <IconDollar />, onClick: () => setEstimasiOrder(o) },
     ];
 
-    if (o.status === "DONE") {
-      actions.push({
-        key: "tidak_jadi",
-        label: "Tidak Jadi",
-        color: "rose",
-        icon: <IconBan />,
-        onClick: () => openTidakJadiDialog(o),
-      });
+    if (o.payment_status === "DP") {
+      // Masih ada sisa → lunasi / cicil
+      actions.push(
+        { key: "lunas", label: "Lunas", color: "emerald", icon: <IconCheckLg />, onClick: () => handleLunasClick(o) },
+        { key: "cicil", label: "Cicil", color: "amber", icon: <IconDollar />, onClick: () => handleCicilClick(o) },
+      );
+    } else if (o.payment_status === "LUNAS" && o.payment_amount) {
+      // Sudah lunas → kalau servis sudah kelar, boleh diambil
+      if (o.status === "DONE" || o.status === "GAGAL_DIPERBAIKI") {
+        actions.push({ key: "diambil", label: "Diambil", color: "emerald", icon: <IconCheck />, onClick: () => handleDiambilClick(o) });
+      }
+    } else {
+      // Belum ada pembayaran → Bayar (di muka). Yg masih proses bisa Batal, yg sudah kelar bisa Diambil.
+      actions.push({ key: "bayar", label: "Bayar", color: "emerald", icon: <IconDollar />, onClick: () => setPrepaymentOrder(o) });
+      if (o.status === "DONE" || o.status === "GAGAL_DIPERBAIKI") {
+        actions.push({ key: "diambil", label: "Diambil", color: "emerald", icon: <IconCheck />, onClick: () => handleDiambilClick(o) });
+      } else {
+        actions.push({ key: "batal", label: "Batal", color: "rose", icon: <IconBan />, onClick: () => openBatalDialog(o) });
+      }
     }
 
     return actions;
@@ -591,7 +686,7 @@ export default function DonePage() {
 
               <div className="min-w-0">
                 <h1 className="truncate text-xl font-black tracking-tight text-slate-800">
-                  Selesai &amp; Gagal
+                  Data Services
                 </h1>
 
                 <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -611,7 +706,7 @@ export default function DonePage() {
                   )}
                   <span className="text-gray-300">·</span>
                   <span className="truncate text-xs font-semibold text-gray-400 tabular-nums">
-                    {orders.length} order menunggu diambil
+                    {orders.length} order aktif
                   </span>
                 </div>
               </div>
@@ -653,7 +748,7 @@ export default function DonePage() {
           {/* ── Content ─────────────────────────────────────────────────────── */}
           {loading ? (
             <>
-             {/* Desktop skeleton */}
+              {/* Desktop skeleton */}
               <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
                 <div className="max-h-[65vh] overflow-auto"> {/*  NEW — freeze header */}
                   <table className="w-full text-sm">
@@ -696,7 +791,7 @@ export default function DonePage() {
             </div>
           ) : (
             <>
-            {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
+              {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
               <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
                 <div className="max-h-[65vh] overflow-auto"> {/*  NEW — dibatasi tinggi + scroll 2 arah, header freeze di dalam sini */}
                   <table className="w-full text-sm">
@@ -906,13 +1001,13 @@ export default function DonePage() {
           confirmLabel={dialog.confirmLabel}
           confirmClass={dialog.confirmClass}
           requireReason={dialog.requireReason}
-          reasonLabel="Alasan Tidak Jadi"
+          reasonLabel="Alasan"
           reasonPlaceholder="Tuliskan alasannya..."
           onCancel={() => setDialog(DIALOG_CLOSED)}
           onConfirm={handleConfirmDialog}
         />
 
-       <ServicePaymentModal
+        <ServicePaymentModal
           open={!!paymentOrder}
           order={paymentOrder}
           onClose={() => setPaymentOrder(null)}
@@ -925,6 +1020,39 @@ export default function DonePage() {
           order={cicilanOrder}
           onClose={() => setCicilanOrder(null)}
           onConfirm={handleCicilanConfirm}
+        />
+
+        {/*  NEW — Sparepart (stok / manual) */}
+        <ServiceSparepartDialog
+          open={!!sparepartOrder}
+          orderId={sparepartOrder?.id ?? ""}
+          orderName={sparepartOrder?.nama ?? ""}
+          orderType={sparepartOrder?.type_laptop ?? ""}
+          defaultPrice={Number(sparepartOrder?.biaya_sparepart ?? 0)}
+          onCancel={() => setSparepartOrder(null)}
+          onConfirm={handleSparepartConfirm}
+        />
+
+        {/*  NEW — Estimasi biaya (perkiraan) */}
+        <ServicePriceDialog
+          open={!!estimasiOrder}
+          title="Estimasi Biaya Servis"
+          description={estimasiOrder ? `Perkiraan biaya untuk "${estimasiOrder.nama} — ${estimasiOrder.type_laptop}". Cuma perkiraan, tidak masuk cashflow & bisa diubah kapan saja.` : ""}
+          confirmLabel="Simpan Estimasi"
+          confirmClass="bg-[#1a1a2e] hover:bg-[#2d2d4a]"
+          priceLabel="Estimasi Biaya"
+          priceRequired
+          defaultPrice={Number(estimasiOrder?.estimasi_harga ?? 0)}
+          onCancel={() => setEstimasiOrder(null)}
+          onConfirm={handleEstimasiConfirm}
+        />
+
+        {/*  NEW — Bayar di muka (Lunas / DP) */}
+        <ServicePrepaymentModal
+          open={!!prepaymentOrder}
+          order={prepaymentOrder}
+          onClose={() => setPrepaymentOrder(null)}
+          onConfirm={handlePrepaymentConfirm}
         />
 
         {/* ── Pickup Choice Modal (GAGAL_DIPERBAIKI) ────────────────────────── */}

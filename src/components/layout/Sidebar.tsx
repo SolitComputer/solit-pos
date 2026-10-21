@@ -447,7 +447,18 @@ const SERVICE_MENU: MenuGroup = {
   items: [
     { name: "Dashboard Service", href: "/dashboard/service/statistik", icon: Icons.dashboard },
     { name: "Antrian", href: "/dashboard/service/antrian", icon: Icons.serviceQueue },
-    { name: "Selesai (Done)", href: "/dashboard/service/done", icon: Icons.serviceDone },
+    { name: "Data Services", href: "/dashboard/service/done", icon: Icons.serviceDone },
+    { name: "Riwayat Service", href: "/dashboard/service/history", icon: Icons.serviceHistory },
+  ],
+};
+
+// Versi menu Service khusus Teknisi — TANPA "Data Services".
+// Teknisi hanya menjalankan alur Mulai → Selesai/Gagal di Antrian, lalu melihat Riwayat.
+const SERVICE_MENU_TEKNISI: MenuGroup = {
+  label: "Service",
+  items: [
+    { name: "Dashboard Service", href: "/dashboard/service/statistik", icon: Icons.dashboard },
+    { name: "Antrian", href: "/dashboard/service/antrian", icon: Icons.serviceQueue },
     { name: "Riwayat Service", href: "/dashboard/service/history", icon: Icons.serviceHistory },
   ],
 };
@@ -614,7 +625,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [ITEM_DATA_BARANG, { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi }, ITEM_LAPTOP_MINUS],
     },
     { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
-    SERVICE_MENU,
+    SERVICE_MENU_TEKNISI,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 

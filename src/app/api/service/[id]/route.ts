@@ -263,12 +263,15 @@ export async function PATCH(
       break;
 
     case "sparepart": {
-      if (!hasAnyRole(getEffectiveRoles(user), SERVICE_TEKNISI_ROLES))
+      //  CHANGED — dicatat dari Data Services (CS + teknisi + full access), bukan aksi khusus teknisi
+      if (!hasAnyRole(getEffectiveRoles(user), [...SERVICE_TEKNISI_ROLES, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE"]))
         return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
-      if (oldStatus !== "SEDANG_DIKERJAKAN")
-        return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
-      newStatus = "MENUNGGU_SPAREPART";
-      logCatatan = alasan ? `Menunggu sparepart: ${alasan}` : "Menunggu sparepart";
+      //  CHANGED — tidak wajib SEDANG_DIKERJAKAN & TIDAK mengubah status perbaikan teknisi.
+      //  Boleh dicatat selama order masih aktif, atau sudah selesai tapi belum diambil.
+      if (!isOrderAktif && oldStatus !== "DONE")
+        return NextResponse.json({ success: false, message: "Order sudah tidak aktif, sparepart tidak bisa dicatat" }, { status: 400 });
+      newStatus = oldStatus; //  CHANGED — status tidak berubah, cuma catat part/biaya
+      logCatatan = alasan ? `Sparepart dicatat: ${alasan}` : "Sparepart dicatat";
 
       const ketServis = (alasan ?? "").trim() || "Sparepart";
 
@@ -446,15 +449,11 @@ export async function PATCH(
       const sisaLunas = totalTagihanLunas - Number(current.payment_amount ?? 0);
 
       //  NEW — cuma tandai "diambil" kalau servisnya memang SUDAH selesai dikerjakan
-      newStatus = isOrderSelesai ? "SUDAH_DIAMBIL" : oldStatus;
+      newStatus = oldStatus; //  CHANGED — pelunasan TIDAK langsung "diambil"; konfirmasi Diambil terpisah (2 langkah)
       updatePayload = {
         payment_amount: totalTagihanLunas,
         payment_status: "LUNAS",
         payment_confirmed_at: new Date().toISOString(),
-        ...(isOrderSelesai ? {
-          diambil_by: user.id,
-          tanggal_diambil: new Date().toISOString(),
-        } : {}),
       };
       logCatatan = `Pelunasan sisa DP · Rp ${sisaLunas.toLocaleString("id-ID")} · Total lunas Rp ${totalTagihanLunas.toLocaleString("id-ID")}`;
       break;
@@ -473,18 +472,12 @@ export async function PATCH(
       const sudahDibayar = Number(current.payment_amount ?? 0);
       const totalBaru = sudahDibayar + cicilan_amount;
       const sudahLunas = totalBaru >= totalTagihanCicil;
-      const tandaiDiambil = sudahLunas && isOrderSelesai;
 
-      newStatus = tandaiDiambil ? "SUDAH_DIAMBIL" : oldStatus;
+      newStatus = oldStatus; //  CHANGED — cicilan (walau pas lunas) TIDAK langsung "diambil"; Diambil terpisah
       updatePayload = {
         payment_amount: totalBaru,
         payment_status: sudahLunas ? "LUNAS" : "DP",
-
         payment_confirmed_at: new Date().toISOString(),
-        ...(tandaiDiambil ? {
-          diambil_by: user.id,
-          tanggal_diambil: new Date().toISOString(),
-        } : {}),
       };
       logCatatan = sudahLunas
         ? `Cicilan Rp ${cicilan_amount.toLocaleString("id-ID")} · Lunas total Rp ${totalBaru.toLocaleString("id-ID")}`
@@ -520,6 +513,59 @@ export async function PATCH(
       logCatatan = statusBayarDimuka === "LUNAS"
         ? `Bayar di muka (LUNAS) · Rp ${payment_amount.toLocaleString("id-ID")}`
         : `DP di muka · Rp ${payment_amount.toLocaleString("id-ID")} dari total Rp ${totalTagihanDimuka.toLocaleString("id-ID")}`;
+      break;
+    }
+
+    //  NEW — Batal Services (langkah 1). Laptop masih di toko → status DIBATALKAN.
+    //  Hanya untuk order yang BELUM ada pembayaran (hindari urusan refund).
+    case "batal_service": {
+      if (!hasAnyRole(getEffectiveRoles(user), [...SERVICE_TEKNISI_ROLES, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE"]))
+        return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+      if (!isOrderAktif) //  CHANGED — batal hanya untuk order yang masih aktif (sesuai UI; cegah dobel-jurnal order DONE)
+        return NextResponse.json({ success: false, message: "Order sudah tidak aktif" }, { status: 400 });
+      if (current.payment_amount)
+        return NextResponse.json({ success: false, message: "Order sudah ada pembayaran, tidak bisa dibatalkan" }, { status: 400 });
+      if (!alasan?.trim())
+        return NextResponse.json({ success: false, message: "Alasan pembatalan wajib diisi" }, { status: 400 });
+
+      //  NEW — part yg terlanjur keluar dari stok untuk servis ini dijurnalkan sebagai biaya,
+      //  biar stok & akuntansi tetap sinkron walau servis dibatalkan. (Order batal = tanpa pembayaran,
+      //  jadi tidak akan pernah lewat done/gagal → aman dari dobel-jurnal.)
+      await journalSparepartOnCompletion(supabase, {
+        serviceId: id,
+        nama: current.nama ?? null,
+        userId: user.id,
+      });
+
+      newStatus = "DIBATALKAN";
+      updatePayload = { alasan_tidak_jadi: alasan.trim() };
+      logCatatan = `Servis dibatalkan: ${alasan.trim()}`;
+      break;
+    }
+
+    //  NEW — Batal Services (langkah 2). Laptop yg dibatalkan sudah diambil → masuk Riwayat (TIDAK_JADI).
+    case "batal_diambil": {
+      if (oldStatus !== "DIBATALKAN")
+        return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
+      newStatus = "TIDAK_JADI";
+      updatePayload = {
+        diambil_by: user.id,
+        tanggal_diambil: new Date().toISOString(),
+      };
+      logCatatan = "Laptop (dibatalkan) sudah diambil pelanggan";
+      break;
+    }
+
+    //  NEW — set/ubah estimasi biaya servis KAPAN SAJA (perkiraan untuk pelanggan).
+    //  TIDAK masuk cashflow, TIDAK mengubah status. Dipakai tombol "Estimasi" di Data Services.
+    case "set_estimasi": {
+      if (!hasAnyRole(getEffectiveRoles(user), [...SERVICE_TEKNISI_ROLES, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE"]))
+        return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+      if (estimasi_harga === undefined || !Number.isFinite(Number(estimasi_harga)) || Number(estimasi_harga) < 0)
+        return NextResponse.json({ success: false, message: "Estimasi harga wajib diisi dan tidak boleh negatif" }, { status: 400 });
+      newStatus = oldStatus;
+      updatePayload = { estimasi_harga: Math.round(Number(estimasi_harga)) };
+      logCatatan = `Estimasi biaya diperbarui: Rp ${Math.round(Number(estimasi_harga)).toLocaleString("id-ID")}`;
       break;
     }
 
