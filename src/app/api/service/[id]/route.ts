@@ -282,11 +282,11 @@ export async function PATCH(
       const prevSpareItems = (current.sparepart_items ?? "").toString().trim();
       const mergedSpareItems = prevSpareItems ? `${prevSpareItems}\n${entryText}` : entryText;
 
+      //  NEW — label bersih (buang §harga) buat keterangan jurnal
+      const spareLabel = entryText.split("§")[0]?.trim() || ketServis;
+
       if (accessories_used && accessories_used.length > 0) {
-        // ── DARI STOK AKSESORIS → cuma catat keluarnya stok + tandai alasan.
-        // JURNAL-nya DITUNDA sampai status Selesai/Gagal (lihat case done &
-        // gagal_diperbaiki). Jadi sparepart yang servisnya masih MENUNGGU_SPAREPART
-        // belum pernah masuk jurnal — sesuai permintaan.
+        // ── DARI STOK AKSESORIS → catat keluarnya stok + LANGSUNG jurnal (D450/K170).
         for (const acc of accessories_used) {
           if (acc.unit_id) {
             await supabase.from("accessory_units").update({ status: "KELUAR" }).eq("id", acc.unit_id);
@@ -306,17 +306,52 @@ export async function PATCH(
             p_qty: acc.qty,
           });
         }
-        // Modal stok tidak dititip di biaya_sparepart — nanti dihitung ulang dari
-        // accessory_outflows saat Selesai/Gagal (biar tetap akurat per SN).
+
+        //  NEW — jurnal modal STOK SEKARANG (D450 Biaya Printilan / K170 Aksesoris)
+        const unitIds = accessories_used.map((a) => a.unit_id).filter(Boolean) as string[];
+        const accIds = [...new Set(accessories_used.map((a) => a.accessory_id).filter(Boolean))] as string[];
+        const [{ data: unitRows }, { data: accRows }] = await Promise.all([
+          unitIds.length
+            ? supabase.from("accessory_units").select("id, buy_price").in("id", unitIds)
+            : Promise.resolve({ data: [] as any[] }),
+          accIds.length
+            ? supabase.from("accessories").select("id, buy_price").in("id", accIds)
+            : Promise.resolve({ data: [] as any[] }),
+        ]);
+        const unitBuyMap = new Map((unitRows ?? []).map((u: any) => [u.id, Math.round(Number(u.buy_price ?? 0))]));
+        const accBuyMap = new Map((accRows ?? []).map((a: any) => [a.id, Math.round(Number(a.buy_price ?? 0))]));
+
+        let modalStok = 0;
+        for (const acc of accessories_used) {
+          const unitBuy = acc.unit_id ? (unitBuyMap.get(acc.unit_id) ?? 0) : 0;
+          const buy = unitBuy > 0 ? unitBuy : (accBuyMap.get(acc.accessory_id) ?? 0);
+          modalStok += buy * Number(acc.qty || 1);
+        }
+        if (modalStok > 0) {
+          await insertSparepartJournal(supabase, {
+            nominal: modalStok,
+            debit: AKUN.BIAYA_PRINTILAN, // 450
+            kredit: AKUN.AKSESORIS,       // 170
+            keterangan: `Sparepart · ${current.nama ?? "—"} · ${spareLabel}`,
+            userId: user.id,
+          });
+        }
         updatePayload = {};
       } else if (sparepart_mode === "manual" && Number(sparepart_modal) > 0) {
-        // ── INPUT MANUAL → titip modal di biaya_sparepart, JANGAN jurnal dulu.
-        // Dijurnal nanti saat Selesai/Gagal (D460/K171).
-        updatePayload = { biaya_sparepart: Math.round(Number(sparepart_modal)) };
+        // ── INPUT MANUAL → simpan modal + LANGSUNG jurnal (D460/K171).
+        const modalManual = Math.round(Number(sparepart_modal));
+        await insertSparepartJournal(supabase, {
+          nominal: modalManual,
+          debit: AKUN.MODAL_SERVICE_KELUAR, // 460
+          kredit: AKUN.AKSESORIS_SERVICE,    // 171
+          keterangan: `Sparepart · ${current.nama ?? "—"} · ${spareLabel}`,
+          userId: user.id,
+        });
+        updatePayload = { biaya_sparepart: modalManual }; // disimpan utk catatan (tidak lagi dipakai jurnal)
       } else {
         updatePayload = {};
       }
-      updatePayload = { ...updatePayload, sparepart_items: mergedSpareItems }; //  NEW — simpan daftar sparepart
+      updatePayload = { ...updatePayload, sparepart_items: mergedSpareItems };
       break;
     }
 
@@ -365,13 +400,7 @@ export async function PATCH(
         }
       }
 
-      // ── Jurnal modal sparepart SEKARANG (status jadi DONE) — baik yang
-      // dititip saat MENUNGGU_SPAREPART maupun yang baru diisi saat Selesai ini.
-      await journalSparepartOnCompletion(supabase, {
-        serviceId: id,
-        nama: current.nama ?? null,
-        userId: user.id,
-      });
+      //  CHANGED — sparepart kini dijurnal SAAT ditambahkan (case "sparepart"), tidak lagi di sini (hindari dobel).
       break;
 
     case "gagal_diperbaiki":
@@ -389,14 +418,7 @@ export async function PATCH(
         alasan_tidak_jadi: alasan.trim(),
       };
       logCatatan = `Gagal diperbaiki: ${alasan.trim()}`;
-
-      // ── Jurnal modal sparepart SEKARANG (status jadi GAGAL) — modal tetap
-      // diakui walau servis gagal, sesuai keputusan bisnis.
-      await journalSparepartOnCompletion(supabase, {
-        serviceId: id,
-        nama: current.nama ?? null,
-        userId: user.id,
-      });
+      //  CHANGED — sparepart sudah dijurnal saat ditambahkan; tidak dijurnal lagi di sini.
       break;
 
     case "diambil":
@@ -537,15 +559,8 @@ export async function PATCH(
       if (!alasan?.trim())
         return NextResponse.json({ success: false, message: "Alasan pembatalan wajib diisi" }, { status: 400 });
 
-      //  NEW — part yg terlanjur keluar dari stok untuk servis ini dijurnalkan sebagai biaya,
-      //  biar stok & akuntansi tetap sinkron walau servis dibatalkan. (Order batal = tanpa pembayaran,
-      //  jadi tidak akan pernah lewat done/gagal → aman dari dobel-jurnal.)
-      await journalSparepartOnCompletion(supabase, {
-        serviceId: id,
-        nama: current.nama ?? null,
-        userId: user.id,
-      });
-
+      //  CHANGED — part yg terlanjur keluar sudah dijurnal saat ditambahkan (D450/K170),
+      //  jadi tidak dijurnal lagi di sini. Stok & akuntansi tetap sinkron.
       newStatus = "DIBATALKAN";
       updatePayload = { alasan_tidak_jadi: alasan.trim() };
       logCatatan = `Servis dibatalkan: ${alasan.trim()}`;
@@ -574,16 +589,7 @@ export async function PATCH(
       if (current.payment_amount)
         return NextResponse.json({ success: false, message: "Order sudah ada pembayaran, tidak bisa klaim garansi" }, { status: 400 });
 
-      //  Kalau garansi diklaim saat order masih aktif (belum pernah lewat done/gagal),
-      //  modal sparepart yg terlanjur keluar tetap dijurnal. Order DONE/GAGAL sudah dijurnal → skip (hindari dobel).
-      if (isOrderAktif) {
-        await journalSparepartOnCompletion(supabase, {
-          serviceId: id,
-          nama: current.nama ?? null,
-          userId: user.id,
-        });
-      }
-
+      //  CHANGED — sparepart sudah dijurnal saat ditambahkan; tidak dijurnal lagi di sini.
       newStatus = oldStatus; //  CHANGED — garansi tidak langsung diambil; tombol "Diambil" muncul setelah ini
       updatePayload = {
         payment_amount: 0,

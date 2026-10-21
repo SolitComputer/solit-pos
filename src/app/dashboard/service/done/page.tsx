@@ -680,24 +680,26 @@ export default function DonePage() {
     }
 
     // Tools CS — selalu tersedia, tidak mengubah status
+    // Sparepart selalu bisa dicatat (bahkan setelah bayar)
     const actions: ActionItem[] = [
       { key: "sparepart", label: "Sparepart", color: "indigo", icon: <IconPart />, onClick: () => setSparepartOrder(o) },
-      { key: "estimasi", label: "Estimasi", color: "slate", icon: <IconDollar />, onClick: () => setEstimasiChoice(o) },
     ];
 
-    //  Tombol "Diambil" cuma muncul kalau sudah ada pembayaran settled (Lunas penuh / Garansi Rp0)
     const sudahBayar = o.payment_status === "LUNAS" && !!o.payment_confirmed_at;
 
     if (o.payment_status === "DP") {
+      // masih DP → Sparepart + Lunas + Cicil
       actions.push(
         { key: "lunas", label: "Lunas", color: "emerald", icon: <IconCheckLg />, onClick: () => handleLunasClick(o) },
         { key: "cicil", label: "Cicil", color: "amber", icon: <IconDollar />, onClick: () => handleCicilClick(o) },
       );
     } else if (sudahBayar) {
+      //  CHANGED — sudah lunas → HANYA Sparepart + Diambil (Estimasi disembunyikan)
       actions.push({ key: "diambil", label: "Diambil", color: "emerald", icon: <IconCheck />, onClick: () => handleDiambilClick(o) });
     } else {
-      // Belum ada pembayaran → Bayar + Batal. "Diambil" sengaja BELUM muncul.
+      // belum bayar → Sparepart + Estimasi + Bayar + Batal
       actions.push(
+        { key: "estimasi", label: "Estimasi", color: "slate", icon: <IconDollar />, onClick: () => setEstimasiChoice(o) },
         { key: "bayar", label: "Bayar", color: "emerald", icon: <IconDollar />, onClick: () => setPrepaymentOrder(o) },
         { key: "batal", label: "Batal", color: "rose", icon: <IconBan />, onClick: () => openBatalDialog(o) },
       );
@@ -742,7 +744,7 @@ export default function DonePage() {
     : orders;
 
   const COLUMNS = ["No", "Pelanggan", "Laptop", "Masuk", "Selesai", "Total Waktu", "Teknisi", "Sparepart", "Payment", "Status", "Aksi"];
-  
+
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">

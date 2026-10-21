@@ -1268,7 +1268,7 @@ async function buildTransactionPaymentDrafts(
 // "sparepart") — jadi TIDAK dibukukan lagi di draft. Sparepart LAMA (sebelum
 // waktu ini) tetap dibukukan di sini seperti dulu.
 // ⚠️ Set ke jam DEPLOY sebenarnya.
-const SPAREPART_INSTANT_CUTOFF_ISO = "2026-10-10T17:00:00+07:00";
+const SPAREPART_INSTANT_CUTOFF_ISO = "2026-10-21T15:30:00+07:00"; //  set ke jam kamu DEPLOY perubahan "jurnal sparepart instan" ini
 
 async function buildServiceDrafts(
   supabase: SupabaseClient,
@@ -1310,6 +1310,7 @@ async function buildServiceDrafts(
   //   supaya data/perilaku lama tetap sama persis.
   const eligibleServices = ((svcs ?? []) as any[]).filter((s) => {
     if (s.payment_status === "DP") return true;
+    if (s.payment_status === "LUNAS" && s.payment_confirmed_at) return true; //  NEW — pembayaran lunas langsung masuk, tanpa nunggu "Diambil"
     if (s.status === "SUDAH_DIAMBIL") return true;
     if (s.status === "DONE") {
       const selesaiDate = s.tanggal_selesai ? jakartaDate(s.tanggal_selesai as string) : null;
@@ -1442,8 +1443,9 @@ async function buildServiceDrafts(
     if (isCompletion) {
       sparepart = modalByService.get(idStr) ?? 0;
       if (sparepart > 0) {
-        lines.push({ account_code: AKUN.MODAL_SERVICE_KELUAR, side: "DEBIT", nominal: sparepart });
-        lines.push({ account_code: AKUN.AKSESORIS_SERVICE, side: "KREDIT", nominal: sparepart });
+        //  CHANGED — modal sparepart STOK = D450/K170 (barang dari stok Aksesoris), konsisten dgn jurnal instan
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: sparepart });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: sparepart });
       }
     }
 
