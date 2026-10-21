@@ -950,6 +950,7 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   "ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH",
   "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH",
   "KEPALA_MARKETING", "MARKETING", "KEPALA_PENYEDIA_BARANG",
+  "PKL_PENGELOLA_BARANG", // samakan tampilan dgn Pengelola Barang: munculkan menu Data Barang
 ]);
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
