@@ -130,11 +130,19 @@ export default function KendaraanDashboardPage() {
                   </span>
                   <h2 className="text-sm font-black text-gray-900">Sedang Berjalan ({data.running.length})</h2>
                 </div>
-                {data.running.length === 0 ? (
-                  <EmptyState icon={<Clock size={20} />} text="Belum ada kendaraan yang sedang dipakai." />
-                ) : (
-                  <div className="space-y-2.5">
-                    {data.running.map((r) => (
+                {(() => {
+                  // Jaring pengaman tampilan: sembunyikan peminjaman "nyangkut" (> 12 jam).
+                  // Backend (FIX 2A) yang menutup datanya; ini cuma mencegah durasi
+                  // ekstrem sempat terlihat saat race dengan auto-expire.
+                  const STALE_MINUTES = 12 * 60;
+                  const runningVisible = data.running.filter(
+                    (r) => liveDurationMinutes(r.actual_start, nowMs || Date.now()) <= STALE_MINUTES
+                  );
+                  return runningVisible.length === 0 ? (
+                    <EmptyState icon={<Clock size={20} />} text="Belum ada kendaraan yang sedang dipakai." />
+                  ) : (
+                    <div className="space-y-2.5">
+                      {runningVisible.map((r) => (
                       <div key={r.id} className="border border-gray-100 hover:border-gray-200 rounded-xl p-3.5 flex items-center justify-between gap-3 bg-gray-50/40 transition-colors">
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-gray-900 truncate">{r.vehicle?.name ?? "—"}</p>
@@ -147,8 +155,9 @@ export default function KendaraanDashboardPage() {
                         </span>
                       </div>
                     ))}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </section>
 
               {/* Menunggu ACC */}

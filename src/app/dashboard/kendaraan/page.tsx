@@ -558,9 +558,23 @@ function VehicleCard({
   );
 }
 
+const REJECTED_DISMISS_KEY = "kendaraan_rejected_dismissed";
+
 function MyRejectedNotices({ requests }: { requests: BorrowRequest[] }) {
-  // Notifikasi penolakan (pengajuan REJECTED 7 hari terakhir), bisa ditutup per sesi.
+  // Notifikasi penolakan (pengajuan REJECTED), dismiss-nya persist di localStorage
+  // supaya "hilang selamanya" walau reload 30 detik / pindah halaman / refresh browser.
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  // Baca daftar yang sudah di-dismiss sekali saat mount (client-only -> aman dari hydration mismatch).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(REJECTED_DISMISS_KEY);
+      if (raw) setDismissed(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      /* localStorage tidak tersedia / JSON korup -> abaikan, fallback Set kosong */
+    }
+  }, []);
+
   const rejected = requests.filter((r) => r.status === "REJECTED" && !dismissed.has(r.id));
   if (rejected.length === 0) return null;
   return (
@@ -573,7 +587,17 @@ function MyRejectedNotices({ requests }: { requests: BorrowRequest[] }) {
             {r.approver && <p className="text-[10px] text-red-500/80 mt-0.5">Ditolak oleh: {r.approver.name}</p>}
           </div>
           <button
-            onClick={() => setDismissed((prev) => new Set(prev).add(r.id))}
+            onClick={() =>
+              setDismissed((prev) => {
+                const next = new Set(prev).add(r.id);
+                try {
+                  localStorage.setItem(REJECTED_DISMISS_KEY, JSON.stringify([...next]));
+                } catch {
+                  /* gagal tulis localStorage -> dismiss tetap jalan di sesi ini */
+                }
+                return next;
+              })
+            }
             className="w-6 h-6 rounded-lg text-red-400 hover:bg-red-100 flex items-center justify-center shrink-0 transition"
             aria-label="Tutup"
           >

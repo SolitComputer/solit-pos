@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriangle, Camera, Inbox, Pencil, Play, Check, X, Ban, ClipboardList, Circle, HelpCircle, Trophy, type LucideIcon } from "lucide-react";
+import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriangle, Camera, Inbox, Pencil, Play, Check, X, Ban, ClipboardList, Circle, HelpCircle, Trophy, Trash2, Upload, Users, GraduationCap, type LucideIcon } from "lucide-react";
 import { OvertimeTable, type OvertimeTableRow } from "@/components/attendance/OvertimeTable"; // ✅ NEW poin 15
 import { OvertimeFillDetailModal } from "@/components/attendance/OvertimeFillDetailModal"; // ✅ NEW
 import { OvertimeSOPBanner } from "@/components/attendance/OvertimeSOPBanner";
@@ -199,7 +199,7 @@ function ModalWrapper({ children, onClose, preventClose, wide }: { children: Rea
   );
 }
 
-function ModalHead({ icon, title, sub, onClose, noClose }: { icon: string; title: string; sub?: string; onClose: () => void; noClose?: boolean }) {
+function ModalHead({ icon, title, sub, onClose, noClose }: { icon: React.ReactNode; title: string; sub?: string; onClose: () => void; noClose?: boolean }) {
   return (
     <div className="px-5 pt-3 pb-4 border-b border-gray-100 flex items-start gap-3">
       <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-100 flex items-center justify-center text-base flex-shrink-0 shadow-sm">{icon}</div>
@@ -228,7 +228,7 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
   const duration = calcDuration(o.actual_start ?? o.scheduled_start, o.actual_end ?? o.scheduled_end);
   return (
     <ModalWrapper onClose={onClose} wide>
-      <ModalHead icon="" title="Detail Lemburan" sub={`${o.users?.name} · ${dateStr}`} onClose={onClose} />
+      <ModalHead icon={<ClipboardList size={18} className="text-gray-600" />} title="Detail Lemburan" sub={`${o.users?.name} · ${dateStr}`} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[72vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -318,20 +318,20 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
         <div className="flex-1 flex flex-col gap-2">
           {/* ── Baris 1: aksi utama sesuai status — 1 tombol dominan, full-width ── */}
           {currentUser?.id === o.user_id && o.status === "NEED_PROOF" && (
-            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="w-full h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Upload Foto</button>
+            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="w-full h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"><Upload size={14} /> Upload Foto</button>
           )}
           {currentUser?.id === o.user_id && o.status === "ONGOING" && !o.actual_end && (
-            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Selesai</button>
+            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"><Check size={14} /> Selesai</button>
           )}
           {canApproveTarget(currentUser?.roles ?? currentUser?.role, o.users?.role) && o.status === "PENDING" && (
             <div className="flex gap-2 w-full">
-              <button onClick={() => { onClose(); setTimeout(onReject, 100); }} className="flex-1 h-10 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-1.5"> Tolak</button>
-              <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Setujui</button>
+              <button onClick={() => { onClose(); setTimeout(onReject, 100); }} className="flex-1 h-10 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-1.5"><X size={14} /> Tolak</button>
+              <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"><CheckCircle2 size={14} /> Setujui</button>
             </div>
           )}
           {/* Bayaran hanya boleh diatur kalau lembur selesai DAN foto bukti sudah ada */}
           {canSetPay(currentUser?.role) && o.status === "COMPLETED" && !!o.proof_photo_url && (
-            <button onClick={() => { onClose(); setTimeout(onSetPay, 100); }} className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> {o.rate_per_hour ? "Edit Bayaran" : "Set Bayaran"}</button>
+            <button onClick={() => { onClose(); setTimeout(onSetPay, 100); }} className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"><FileText size={14} /> {o.rate_per_hour ? "Edit Bayaran" : "Set Bayaran"}</button>
           )}
           {/* Placeholder informatif: admin tahu kenapa tombol Set Bayaran belum muncul */}
           {canSetPay(currentUser?.role) && !o.proof_photo_url && (o.status === "NEED_PROOF" || o.status === "COMPLETED") && (
@@ -344,8 +344,8 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
           <div className="flex items-center justify-end gap-2">
             {isAdminRole(currentUser?.role) && (
               <>
-                <button onClick={() => { onClose(); setTimeout(onEdit, 100); }} className="h-10 px-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 flex items-center gap-1.5 transition-all"> Edit</button>
-                <button onClick={() => { onClose(); setTimeout(onDelete, 100); }} className="h-10 px-3.5 bg-white border border-red-100 text-red-500 rounded-xl text-xs font-semibold hover:bg-red-50 flex items-center transition-all"></button>
+                <button onClick={() => { onClose(); setTimeout(onEdit, 100); }} className="h-10 px-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 flex items-center gap-1.5 transition-all"><Pencil size={14} /> Edit</button>
+                <button onClick={() => { onClose(); setTimeout(onDelete, 100); }} className="h-10 px-3.5 bg-white border border-red-100 text-red-500 rounded-xl text-xs font-semibold hover:bg-red-50 flex items-center gap-1.5 transition-all"><Trash2 size={14} /></button>
               </>
             )}
             <button onClick={onClose} className="h-10 px-4 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition-all">Tutup</button>
@@ -378,7 +378,7 @@ function ProofPhotoModal({ overtime: o, onClose, canViewPay: showPay }: { overti
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="" title="Bukti Lemburan" sub={`${o.users?.name ?? "Karyawan"} · ${dateFormatted}`} onClose={onClose} />
+      <ModalHead icon={<Camera size={18} className="text-orange-500" />} title="Bukti Lemburan" sub={`${o.users?.name ?? "Karyawan"} · ${dateFormatted}`} onClose={onClose} />
       <div className="px-5 py-4 space-y-3 max-h-[75vh] overflow-y-auto">
         <div className="relative rounded-2xl overflow-hidden bg-black flex items-center justify-center min-h-[220px] shadow-sm">
           <img src={o.proof_photo_url} alt="Bukti" className="w-full max-h-72 object-contain rounded-2xl" />
@@ -476,11 +476,11 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
   if (confirmStep) {
     return (
       <ModalWrapper onClose={onClose} preventClose={approving}>
-        <ModalHead icon="" title="Konfirmasi ACC" sub="Langkah terakhir — pastikan datanya benar" onClose={onClose} noClose={approving} />
+        <ModalHead icon={<CheckCircle2 size={18} className="text-violet-600" />} title="Konfirmasi ACC" sub="Langkah terakhir — pastikan datanya benar" onClose={onClose} noClose={approving} />
         <div className="px-5 py-4 space-y-3.5">
           {error && <ErrorBanner msg={error} />}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
-            <p className="text-xs font-semibold text-amber-800 mb-1"> Tindakan ini langsung mengunci lemburan</p>
+            <p className="text-xs font-semibold text-amber-800 mb-1 flex items-center gap-1.5"><AlertTriangle size={13} /> Tindakan ini langsung mengunci lemburan</p>
             <p className="text-[11px] text-amber-700">Setelah di-ACC, karyawan wajib upload foto bukti dan pengajuan ini tidak bisa dibatalkan dari sini.</p>
           </div>
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5 space-y-2">
@@ -491,7 +491,7 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
         </div>
         <ModalFoot>
           <button onClick={() => setConfirmStep(false)} disabled={approving} className={secondaryBtn}>← Kembali</button>
-          <button onClick={approve} disabled={approving} className={primaryBtn}>{approving ? <Spinner /> : " Ya, ACC Sekarang"}</button>
+          <button onClick={approve} disabled={approving} className={primaryBtn}>{approving ? <Spinner /> : <><CheckCircle2 size={14} /> Ya, ACC Sekarang</>}</button>
         </ModalFoot>
       </ModalWrapper>
     );
@@ -499,7 +499,7 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="" title="Setujui Lemburan" sub={o.users?.name} onClose={onClose} />
+      <ModalHead icon={<CheckCircle2 size={18} className="text-violet-600" />} title="Setujui Lemburan" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[70vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
         <div className="bg-violet-50 border border-violet-100 rounded-xl p-3.5 space-y-2">
@@ -510,10 +510,10 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
             <span className="flex items-center gap-1.5">
               <span className="font-mono font-semibold text-gray-800">{formatTime(o.requested_start)}</span>
               {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start))) && (
-                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-200"> Terlambat</span>
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-200"><AlertTriangle size={9} /> Terlambat</span>
               )}
               {o.is_holiday && (
-                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200"> Hari Libur</span>
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200"><CalendarDays size={9} /> Hari Libur</span>
               )}
             </span>
           </div>
@@ -540,7 +540,7 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
       </div>
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
-        <button onClick={goToConfirm} className={primaryBtn}> Lanjut ke Konfirmasi</button>
+        <button onClick={goToConfirm} className={primaryBtn}><CheckCircle2 size={14} /> Lanjut ke Konfirmasi</button>
       </ModalFoot>
     </ModalWrapper>
   );
@@ -577,11 +577,11 @@ function RejectModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
   if (confirmStep) {
     return (
       <ModalWrapper onClose={onClose} preventClose={rejecting}>
-        <ModalHead icon="" title="Konfirmasi Penolakan" sub={o.users?.name} onClose={onClose} noClose={rejecting} />
+        <ModalHead icon={<X size={18} className="text-red-500" />} title="Konfirmasi Penolakan" sub={o.users?.name} onClose={onClose} noClose={rejecting} />
         <div className="px-5 py-4 space-y-3.5">
           {error && <ErrorBanner msg={error} />}
           <div className="bg-red-50 border border-red-200 rounded-xl p-3.5">
-            <p className="text-xs font-semibold text-red-800 mb-1"> Yakin tolak lemburan ini?</p>
+            <p className="text-xs font-semibold text-red-800 mb-1 flex items-center gap-1.5"><AlertTriangle size={13} /> Yakin tolak lemburan ini?</p>
             <p className="text-[11px] text-red-700">Karyawan akan melihat alasannya, dan pengajuan ini tidak dihitung lembur.</p>
           </div>
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
@@ -592,7 +592,7 @@ function RejectModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
         <ModalFoot>
           <button onClick={() => setConfirmStep(false)} disabled={rejecting} className={secondaryBtn}>← Kembali</button>
           <button onClick={reject} disabled={rejecting} className="flex-1 h-10 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 shadow-sm">
-            {rejecting ? <Spinner /> : " Ya, Tolak Sekarang"}
+            {rejecting ? <Spinner /> : <><X size={14} /> Ya, Tolak Sekarang</>}
           </button>
         </ModalFoot>
       </ModalWrapper>
@@ -601,7 +601,7 @@ function RejectModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="" title="Tolak Lemburan" sub={o.users?.name} onClose={onClose} />
+      <ModalHead icon={<X size={18} className="text-red-500" />} title="Tolak Lemburan" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5">
         {error && <ErrorBanner msg={error} />}
         <div>
@@ -618,7 +618,7 @@ function RejectModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
         <button onClick={goToConfirm} className="flex-1 h-10 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 shadow-sm">
-          Lanjut ke Konfirmasi
+          <X size={14} /> Lanjut ke Konfirmasi
         </button>
       </ModalFoot>
     </ModalWrapper>
@@ -706,7 +706,7 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="" title="Ajukan Lemburan" sub={currentUser?.name || "Karyawan"} onClose={onClose} />
+      <ModalHead icon={<Plus size={18} className="text-violet-600" />} title="Ajukan Lemburan" sub={currentUser?.name || "Karyawan"} onClose={onClose} />
       <div className="px-5 py-4 space-y-4 max-h-[78vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
         {!isHolidayOvertime && (
@@ -726,13 +726,13 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
             <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isHolidayOvertime ? "left-[18px]" : "left-0.5"}`} />
           </span>
           <div className="flex-1">
-            <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}> Lembur di hari libur</p>
+            <p className={`text-[11px] font-semibold leading-tight flex items-center gap-1.5 ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}><CalendarDays size={13} /> Lembur di hari libur</p>
             <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-violet-200" : "text-gray-400"}`}>Tanggal & jam dideteksi otomatis saat pengajuan</p>
           </div>
         </button>
         {isHolidayOvertime && (
           <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${nowWIB.isLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
-            <span className="text-sm">{nowWIB.isLate ? "" : ""}</span>
+            <span className="text-sm flex-shrink-0">{nowWIB.isLate ? <AlertTriangle size={16} className="text-amber-500" /> : <CheckCircle2 size={16} className="text-emerald-500" />}</span>
             <div className="text-xs">
               <p className={`font-semibold ${nowWIB.isLate ? "text-amber-700" : "text-emerald-700"}`}>
                 Terdeteksi jam {nowWIB.time} WIB {nowWIB.isLate ? "· Terlambat" : "· Tepat waktu"}
@@ -757,7 +757,7 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
           disabled={submitting || (!isHolidayOvertime && !requestDate) || !reasonType || (isLainnya && !reasonCustom.trim()) || !workDescription.trim()}
           className={primaryBtn}
         >
-          {submitting ? <><Spinner /><span>Mengirim...</span></> : " Ajukan"}
+          {submitting ? <><Spinner /><span>Mengirim...</span></> : <><Plus size={14} /> Ajukan</>}
         </button>
       </ModalFoot>
     </ModalWrapper>
@@ -831,7 +831,7 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="" title="Atur Bayaran" sub={o.users?.name} onClose={onClose} />
+      <ModalHead icon={<FileText size={18} className="text-emerald-600" />} title="Atur Bayaran" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[65vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
         {/* ✅ NEW — lembur hari libur: tidak ada pilihan mode, langsung kunci ke aturan */}
@@ -919,7 +919,7 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
       </div>
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
-        <button onClick={save} disabled={saving} className={primaryBtn}>{saving ? <Spinner /> : " Simpan"}</button>
+        <button onClick={save} disabled={saving} className={primaryBtn}>{saving ? <Spinner /> : <><Check size={14} /> Simpan</>}</button>
       </ModalFoot>
     </ModalWrapper>
   );
@@ -933,10 +933,10 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
   const [uploading, setUploading] = useState(false), [error, setError] = useState("");
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
 
-  const handleClose = () => { if (mustUpload) { setError(" Wajib upload foto bukti dulu."); return; } onClose(); };
+  const handleClose = () => { if (mustUpload) { setError("Wajib upload foto bukti dulu."); return; } onClose(); };
 
   const upload = async () => {
-    if (mustUpload && !photoFile) { setError(" Foto bukti wajib diupload."); return; }
+    if (mustUpload && !photoFile) { setError("Foto bukti wajib diupload."); return; }
     setUploading(true); setError("");
     try {
       let photoUrl: string | null = null;
@@ -955,17 +955,17 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
 
   return (
     <ModalWrapper onClose={handleClose} preventClose={mustUpload}>
-      <ModalHead icon={isNeedProof ? "" : ""} title={isNeedProof ? "Upload Bukti Lemburan" : "Selesaikan Lemburan"} sub={o.users?.name} onClose={handleClose} noClose={mustUpload} />
+      <ModalHead icon={isNeedProof ? <Upload size={18} className="text-orange-500" /> : <Check size={18} className="text-blue-600" />} title={isNeedProof ? "Upload Bukti Lemburan" : "Selesaikan Lemburan"} sub={o.users?.name} onClose={handleClose} noClose={mustUpload} />
       <div className="px-5 py-4 space-y-3.5 max-h-[75vh] overflow-y-auto">
         {isNeedProof && (
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-3.5">
-            <p className="font-semibold text-orange-800 text-xs mb-0.5"> Foto Bukti Wajib</p>
+            <p className="font-semibold text-orange-800 text-xs mb-0.5 flex items-center gap-1.5"><Camera size={13} /> Foto Bukti Wajib</p>
             <p className="text-[10px] text-orange-700">Upload foto bukti sebelum menutup halaman ini.</p>
           </div>
         )}
         {isAutoCompleted && !isNeedProof && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
-            <p className="font-semibold text-amber-800 text-xs mb-0.5"> Waktu Lembur Habis</p>
+            <p className="font-semibold text-amber-800 text-xs mb-0.5 flex items-center gap-1.5"><Clock size={13} /> Waktu Lembur Habis</p>
             <p className="text-[10px] text-amber-700">Lemburanmu selesai otomatis. Wajib upload foto bukti.</p>
           </div>
         )}
@@ -994,7 +994,7 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
         <ModalFoot>
           {!mustUpload && <button onClick={onClose} className={secondaryBtn}>Batal</button>}
           <button onClick={upload} disabled={uploading || (mustUpload && !photoFile)} className={primaryBtn}>
-            {uploading ? <Spinner /> : photoFile ? " Upload & Selesai" : mustUpload ? " Ambil Foto Dulu" : " Selesai"}
+            {uploading ? <Spinner /> : photoFile ? <><Upload size={14} /> Upload &amp; Selesai</> : mustUpload ? <><Camera size={14} /> Ambil Foto Dulu</> : <><Check size={14} /> Selesai</>}
           </button>
         </ModalFoot>
       )}
@@ -1130,7 +1130,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   return (
     <ModalWrapper onClose={onClose} wide>
       <ModalHead
-        icon=""
+        icon={<Pencil size={18} className="text-gray-600" />}
         title="Input Lembur Manual"
         sub={
           userRoles.some(r => (FULL_ACCESS_ROLES as readonly string[]).includes(r))
@@ -1164,7 +1164,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isHolidayOvertime ? "left-[18px]" : "left-0.5"}`} />
           </span>
           <div className="flex-1">
-            <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}> Lembur hari libur</p>
+            <p className={`text-[11px] font-semibold leading-tight flex items-center gap-1.5 ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}><CalendarDays size={13} /> Lembur hari libur</p>
             <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran otomatis: Tepat {isTargetPkl ? "50rb" : "100rb"} / Telat {isTargetPkl ? "25rb" : "50rb"}</p>
           </div>
         </button>
@@ -1187,7 +1187,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
               <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
             </div>
             <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${holidayIsLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
-              <span className="text-sm">{holidayIsLate ? "" : ""}</span>
+              <span className="text-sm flex-shrink-0">{holidayIsLate ? <AlertTriangle size={16} className="text-amber-500" /> : <CheckCircle2 size={16} className="text-emerald-500" />}</span>
               <div className="text-xs">
                 <p className={`font-semibold ${holidayIsLate ? "text-amber-700" : "text-emerald-700"}`}>
                   Jam masuk {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"} {isTargetPkl ? "(PKL)" : ""}
@@ -1253,7 +1253,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
         <ModalFoot>
           <button onClick={onClose} className={secondaryBtn}>Batal</button>
           <button onClick={submit} disabled={submitting || !targetUserId || !requestDate || !reasonType || !workDescription.trim()} className={primaryBtn}>
-            {submitting ? <><Spinner /><span>Menyimpan...</span></> : " Simpan Lembur"}
+            {submitting ? <><Spinner /><span>Menyimpan...</span></> : <><Check size={14} /> Simpan Lembur</>}
           </button>
         </ModalFoot>
       )}
@@ -1323,7 +1323,7 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
 
   return (
     <ModalWrapper onClose={onClose} wide>
-      <ModalHead icon="" title="Edit Lembur" sub={o.users?.name ?? "Karyawan"} onClose={onClose} />
+      <ModalHead icon={<Pencil size={18} className="text-gray-600" />} title="Edit Lembur" sub={o.users?.name ?? "Karyawan"} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[78vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
         <div className="grid grid-cols-2 gap-2.5">
@@ -1371,7 +1371,7 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
         <ModalFoot>
           <button onClick={onClose} className={secondaryBtn}>Batal</button>
           <button onClick={save} disabled={saving || !requestDate || !startTime || !endTime || !reasonType || (isLainnya && !reasonCustom.trim())} className={primaryBtn}>
-            {saving ? <><Spinner /><span>Menyimpan...</span></> : " Simpan Perubahan"}
+            {saving ? <><Spinner /><span>Menyimpan...</span></> : <><Check size={14} /> Simpan Perubahan</>}
           </button>
         </ModalFoot>
       )}
@@ -1395,7 +1395,7 @@ function DeleteConfirmModal({ overtime: o, onClose, onDeleted, canViewPay: showP
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="" title="Hapus Lembur" sub={o.users?.name} onClose={onClose} />
+      <ModalHead icon={<Trash2 size={18} className="text-red-500" />} title="Hapus Lembur" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5">
         {error && <ErrorBanner msg={error} />}
         <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2.5">
@@ -1425,7 +1425,7 @@ function DeleteConfirmModal({ overtime: o, onClose, onDeleted, canViewPay: showP
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
         <button onClick={handleDelete} disabled={deleting} className="flex-1 h-10 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 shadow-sm">
-          {deleting ? <Spinner /> : " Hapus Permanen"}
+          {deleting ? <Spinner /> : <><Trash2 size={14} /> Hapus Permanen</>}
         </button>
       </ModalFoot>
     </ModalWrapper>
@@ -1526,10 +1526,10 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
                   <div className="flex items-center gap-1.5 flex-wrap mb-1">
                     <StatusBadge status={o.status} />
                     {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start))) && (
-                      <span className="text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md"> Telat</span>
+                      <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md"><AlertTriangle size={8} /> Telat</span>
                     )}
                     {o.is_holiday && (
-                      <span className="text-[8px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md"> Libur</span>
+                      <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md"><CalendarDays size={8} /> Libur</span>
                     )}
                     {isMyUrgent && <span className="text-[8px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md">{o.status === "NEED_PROOF" ? "Upload foto" : "Selesaikan"}</span>}
                     {canApproveTarget(currentUser?.role, o.users?.role ?? userId) && o.status === "PENDING" && <span className="text-[8px] font-semibold text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-md">Perlu acc</span>}
@@ -1670,7 +1670,7 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
                       return <span key={s} className={`text-[8px] font-semibold px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.text} ${cfg.border}`}>{c} {cfg.label}</span>;
                     })}
                     {items.some(o => o.is_holiday) && (
-                      <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200"> Libur</span>
+                      <span className="inline-flex items-center gap-0.5 text-[8px] font-semibold px-1.5 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200"><CalendarDays size={8} /> Libur</span>
                     )}
                   </div>
                   {userCanViewPay && totalPay > 0 && (
@@ -2105,7 +2105,7 @@ export default function OvertimePage() {
                     <span className="font-semibold">{new Date(selectedDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}</span>
                     <span className="text-gray-400 ml-1.5">· {(byDate[selectedDate] || []).length} lemburan</span>
                   </p>
-                  <button onClick={() => setSelectedDate(null)} className="text-[10px] text-violet-500 hover:text-violet-700 font-semibold transition-colors"> Hapus</button>
+                  <button onClick={() => setSelectedDate(null)} className="inline-flex items-center gap-1 text-[10px] text-violet-500 hover:text-violet-700 font-semibold transition-colors"><X size={11} /> Hapus</button>
                 </div>
               </div>
             )}
@@ -2126,7 +2126,7 @@ export default function OvertimePage() {
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                       }`}
                   >
-                    <span className="text-sm">{tab === "KARYAWAN" ? "" : ""}</span>
+                    <span className="flex-shrink-0">{tab === "KARYAWAN" ? <Users size={14} /> : <GraduationCap size={14} />}</span>
                     <span>{tab === "KARYAWAN" ? "Karyawan" : "PKL"}</span>
                     <span className={`min-w-[22px] h-[22px] px-1.5 rounded-full flex items-center justify-center text-[10px] font-black tabular-nums transition-colors ${active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
                       }`}>
@@ -2218,10 +2218,10 @@ export default function OvertimePage() {
                   onChange={e => setSortBy(e.target.value as SortOption)}
                   className="h-10 px-3 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-gray-50/50 hover:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all cursor-pointer w-full sm:w-auto"
                 >
-                  <option value="PRIORITY"> Prioritas Belum di-ACC</option>
-                  <option value="DATE_DESC"> Tanggal Terbaru</option>
-                  <option value="DATE_ASC"> Tanggal Terlama</option>
-                  <option value="NAME_ASC"> Nama Karyawan (A–Z)</option>
+                  <option value="PRIORITY">Prioritas Belum di-ACC</option>
+                  <option value="DATE_DESC">Tanggal Terbaru</option>
+                  <option value="DATE_ASC">Tanggal Terlama</option>
+                  <option value="NAME_ASC">Nama Karyawan (A–Z)</option>
                 </select>
               </div>
             </div>

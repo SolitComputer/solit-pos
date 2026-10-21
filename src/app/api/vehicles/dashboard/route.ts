@@ -22,6 +22,30 @@ export async function GET(request: NextRequest) {
   const inUse = (vehicles ?? []).filter((v) => v.status === "DIPAKAI").length;
   const maintenance = (vehicles ?? []).filter((v) => v.status === "MAINTENANCE").length;
 
+  // ── AUTO-EXPIRE: tutup paksa peminjaman yang nyangkut (lupa check-out) ──────
+  // Request APPROVED yang actual_start-nya > 12 jam lalu dianggap "lupa check-out".
+  // duration_minutes = NULL -> sengaja TIDAK masuk leaderboard (data tidak valid).
+  // Vehicle-nya dilepas ke TERSEDIA. Jalan tiap dashboard di-load (auto-refresh 30s).
+  const STALE_HOURS = 12;
+  const staleCutoffIso = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();
+
+  const { data: staleReqs } = await supabaseVehicles
+    .from("vehicle_borrow_requests")
+    .update({ status: "COMPLETED", actual_end: new Date().toISOString(), duration_minutes: null })
+    .eq("status", "APPROVED")
+    .lt("actual_start", staleCutoffIso)
+    .select("vehicle_id");
+
+  if (staleReqs && staleReqs.length > 0) {
+    const staleVehicleIds = [...new Set(staleReqs.map((r) => r.vehicle_id))];
+    // Hanya lepas kendaraan yang DIPAKAI (jangan sentuh yang MAINTENANCE/manual).
+    await supabaseVehicles
+      .from("vehicles")
+      .update({ status: "TERSEDIA", updated_at: new Date().toISOString() })
+      .in("id", staleVehicleIds)
+      .eq("status", "DIPAKAI");
+  }
+
   // 2) Sedang berjalan (APPROVED) + Menunggu ACC (PENDING)
   const { data: activeRaw, error: aErr } = await supabaseVehicles
     .from("vehicle_borrow_requests")
