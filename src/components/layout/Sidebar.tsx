@@ -277,6 +277,7 @@ const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/
 const ITEM_BUAT_PENGANTARAN: MenuItem = { name: "Buat Pengantaran", href: "/dashboard/preparation/buat-pengantaran", icon: Icons.buatPengantaran };
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang", icon: Icons.barang };
+const ITEM_PEMINJAMAN_BARANG: MenuItem = { name: "Peminjaman Barang", href: "/dashboard/item-loans", icon: Icons.allUnits };
 const ITEM_AUDIT_OUTFLOW: MenuItem = { name: "Audit Barang Keluar", href: "/dashboard/audit-barang-keluar", icon: Icons.auditOutflow };
 const ITEM_FIXED_ASSETS: MenuItem = { name: "Aset", href: "/dashboard/fixed-assets", icon: Icons.fixedAsset };
 const ITEM_ASET_MATOT: MenuItem = { name: "Aset Matot", href: "/dashboard/fixed-assets/aset-matot", icon: Icons.assetMatot };
@@ -1130,6 +1131,28 @@ function withKendaraanGroup(groups: MenuGroup[]): MenuGroup[] {
   return [...rest.slice(0, at), KENDARAAN_GROUP, ...rest.slice(at)];
 }
 
+// Peminjaman Barang: SEMUA role boleh pinjam. Disuntik di level groups final
+// (BUKAN per-role di ROLE_MENUS) supaya ikut muncul untuk role dinamis juga,
+// sama persis pola withKendaraanGroup di atas. Item disisipkan ke grup
+// "Inventaris" yang sudah ada; kalau role itu belum punya grup Inventaris
+// (mis. role yang Data Barang-nya disaring), grup "Inventaris" dibuat baru.
+function withPeminjamanBarang(groups: MenuGroup[]): MenuGroup[] {
+  const HREF = ITEM_PEMINJAMAN_BARANG.href;
+  let injected = false;
+  const next = groups.map((g) => {
+    if (g.label !== "Inventaris") return g;
+    injected = true;
+    if (g.items.some((it) => it.href === HREF)) return g;
+    return { ...g, items: [...g.items, ITEM_PEMINJAMAN_BARANG] };
+  });
+  if (!injected) {
+    const utamaIdx = next.findIndex((g) => g.label === "Utama");
+    const at = utamaIdx >= 0 ? utamaIdx + 1 : next.length;
+    return [...next.slice(0, at), { label: "Inventaris", items: [ITEM_PEMINJAMAN_BARANG] }, ...next.slice(at)];
+  }
+  return next;
+}
+
 // SOP Pekerjaan: grup sidebar berisi "SOP Divisi".
 // Ditambahkan kondisional — hanya muncul kalau user punya mapping divisi
 // SOP atau merupakan admin (lihat hasSopAccess di lib/sop.ts).
@@ -1758,7 +1781,7 @@ export default function Sidebar() {
   // Akun whitelist boleh lihat Riwayat Transaksi walau role-nya tidak termasuk
   // (mis. Fikri — MARKETING). Sumber: TRANSACTION_VIEW_EXTRA_USER_IDS di permissions.ts.
   const canViewTransaksiByUserId = !!user?.id && (TRANSACTION_VIEW_EXTRA_USER_IDS as string[]).includes(user.id);
-  const groups: MenuGroup[] = withSopGroup(withKendaraanGroup(
+  const groups: MenuGroup[] = withPeminjamanBarang(withSopGroup(withKendaraanGroup(
     dedupeGroups([
       ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
       ...(isContractSigner ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT_SIGN] }] : []),
@@ -1773,7 +1796,7 @@ export default function Sidebar() {
         items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
       })),
     ])
-  ), effectiveRoles);
+  ), effectiveRoles));
 
   const groupsSig = groups.map((g) => g.label).join("|");
 

@@ -1557,6 +1557,17 @@ export default function AccessoryUnitsPage() {
     // Unit yang barcodenya sedang dibuka (null = tidak ada). Simpan objeknya
     // di state supaya referensinya stabil untuk BarcodeModal.
     const [barcodeUnit, setBarcodeUnit] = useState<AccessoryUnit | null>(null);
+    const [borrowedUnitIds, setBorrowedUnitIds] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/item-loans/active-units");
+                const json = await res.json();
+                if (json.success) setBorrowedUnitIds(new Set(json.data as string[]));
+            } catch { /* tidak fatal */ }
+        })();
+    }, []);
 
     useEffect(() => {
         getAuthUser().then(u => {
@@ -2248,6 +2259,9 @@ export default function AccessoryUnitsPage() {
                                                             <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">{unit.serial_number}</span>
                                                             {unit.serial_number.startsWith("ISI-SN-") && (
                                                                 <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Isi SN</span>
+                                                            )}
+                                                            {borrowedUnitIds.has(unit.id) && (
+                                                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded" title="Unit ini sedang dipinjam">Di Pinjam</span>
                                                             )}
                                                         </div>
                                                     </td>

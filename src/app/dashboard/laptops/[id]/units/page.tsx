@@ -263,6 +263,7 @@ export default function UnitsPage() {
 
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
+    const [borrowedUnitIds, setBorrowedUnitIds] = useState<Set<string>>(new Set());
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canAuditUnits = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canSOUnits = hasAnyRole(userRoles, SO_ROLES);
@@ -379,6 +380,17 @@ export default function UnitsPage() {
     }, [laptopId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+
+    // Unit yang sedang dipinjam (APPROVED) — penanda "Di Pinjam" per baris.
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/item-loans/active-units");
+                const json = await res.json();
+                if (json.success) setBorrowedUnitIds(new Set(json.data as string[]));
+            } catch { /* tidak fatal */ }
+        })();
+    }, []);
 
     // ✅ FIX #2: searchSN DIHAPUS dari dependency. Dulu tiap ketikan di kotak
     // Cari SN me-reset seluruh centang, jadi hasil centang pencarian sebelumnya
@@ -1344,6 +1356,7 @@ export default function UnitsPage() {
                                 renderActions={(row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
                                     if (!u) return null;
+                                    const isBorrowed = borrowedUnitIds.has(u.id);
                                     //  Dulu: `if (!u || !canManageUnits) return null` — kolom Aksi
                                     //  nutup penuh kalau bukan pengelola unit, jadi editor checklist
                                     //  yang bukan EDIT_UNITS tidak kebagian tombol apa pun. Sekarang
@@ -1353,6 +1366,12 @@ export default function UnitsPage() {
                                     if (!canQuickCondition && !canManageUnits && !canViewBarcode) return null;
                                     return (
                                         <>
+                                            {isBorrowed && (
+                                                <span className="h-8 px-2 inline-flex items-center rounded-lg text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 whitespace-nowrap"
+                                                    title="Unit ini sedang dipinjam">
+                                                    Di Pinjam
+                                                </span>
+                                            )}
                                             {/* Barcode per unit — 1 unit = 1 barcode, pakai presetUnit
                                                 di BarcodeModal (tak perlu fetch, RESERVED pun muncul). */}
                                             {canViewBarcode && (

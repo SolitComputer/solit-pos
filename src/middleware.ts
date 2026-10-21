@@ -97,7 +97,7 @@ function isSoOnlyRestrictedPath(pathname: string): boolean {
   if (/^\/api\/accessory-units\/[^/]+\/so$/.test(pathname)) return false;
   if (pathname === "/api/accessory-units" || /^\/api\/accessory-units\/[^/]+$/.test(pathname)) return false;
 
-  return true; 
+  return true;
 }
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
@@ -113,7 +113,7 @@ function isContractExempt(role?: string): boolean {
 }
 
 async function hasApprovedContract(userId: string): Promise<boolean> {
-  if (!CONTRACT_GATE_ENABLED) return true; 
+  if (!CONTRACT_GATE_ENABLED) return true;
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -279,7 +279,7 @@ export async function middleware(request: NextRequest) {
   // multi-instance), rate limit in-memory di sini efektif menahan flood dari
   // satu/segelintir sumber (script abuse, scanner) sebelum sempat menyentuh
   // DB atau hitung bcrypt — mengurangi biaya server per request jahat.
-    const rlIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rlIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   // 1 kantor = 1 IP publik bersama (sudah dikonfirmasi lewat insiden 403
   // Hostinger sebelumnya), plus app ini banyak fitur polling (presence,
   // badge notifikasi, leads-chat, dll) — GET dari banyak staff gampang
@@ -691,6 +691,8 @@ export const config = {
     "/api/service/:path*",
     "/api/accessories/:path*",
     "/api/item-outflows/:path*",
+    "/api/item-loans/:path*",
+    "/dashboard/item-loans/:path*",
     "/dashboard/accessories/:path*",
     "/api/seller-followups/:path*",
     "/api/seller-pics/:path*",

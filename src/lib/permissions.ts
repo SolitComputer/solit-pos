@@ -417,6 +417,31 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/laptops/edit": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
   "/dashboard/units": [...ALL_UNITS_ROLES],
   "/api/item-outflows": [...ITEM_OUTFLOW_ROLES],
+  // Peminjaman Barang — SEMUA role boleh buka & ajukan pinjam. `ALL_ROLES` tidak
+  // bisa di-spread di sini (didefinisikan setelah ROUTE_PERMISSIONS), jadi ditulis
+  // literal. Approve/reject tetap digate di handler pakai ITEM_LOAN_APPROVE_ROLES.
+  "/dashboard/item-loans": [
+    "ADMIN", "KEPALA_SALES", "CREW_SALES", "ACCOUNTING", "PURCHASING",
+    "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PENGANTARAN", "MARKETING",
+    "KEBERSIHAN", "KEPALA_MARKETING", "PROGRAMMER", "SOTECH", "ASISTEN_CEO",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_ONPOINT",
+    "ONPOINT", "KEPALA_SOTECH", "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH",
+    "KEPALA_ZENITH", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT",
+    "PKL_TEKNISI", "PKL_KONTEN", "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",
+    "PKL_PENGELOLA_BARANG", "PKL_ACCOUNTING", "KEPALA_PENGELOLA_BARANG",
+    "KEPALA_CC", "CUSTOMER_SERVICE",
+  ],
+  "/api/item-loans": [
+    "ADMIN", "KEPALA_SALES", "CREW_SALES", "ACCOUNTING", "PURCHASING",
+    "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PENGANTARAN", "MARKETING",
+    "KEBERSIHAN", "KEPALA_MARKETING", "PROGRAMMER", "SOTECH", "ASISTEN_CEO",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_ONPOINT",
+    "ONPOINT", "KEPALA_SOTECH", "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH",
+    "KEPALA_ZENITH", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT",
+    "PKL_TEKNISI", "PKL_KONTEN", "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",
+    "PKL_PENGELOLA_BARANG", "PKL_ACCOUNTING", "KEPALA_PENGELOLA_BARANG",
+    "KEPALA_CC", "CUSTOMER_SERVICE",
+  ],
   "/dashboard/laptops": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
@@ -1449,3 +1474,12 @@ export const ACCESSORY_UNIT_AUDIT_ROLES: UserRole[] = Array.from(new Set<UserRol
   ...SO_ROLES,
   ...ACCESSORY_AUDIT_ROLES,
 ]));
+
+// ── Peminjaman Barang (Item Loan) ───────────────────────────────────────────
+// Menu sidebar sendiri di grup Inventaris (BUKAN tab Data Barang).
+// VIEW: SEMUA role boleh buka halaman & mengajukan pinjaman.
+// APPROVE: hanya Pengelola Barang, Kepala Pengelola Barang, Admin (+Programmer).
+export const ITEM_LOAN_VIEW_ROLES: UserRole[] = [...ALL_ROLES];
+export const ITEM_LOAN_APPROVE_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+];

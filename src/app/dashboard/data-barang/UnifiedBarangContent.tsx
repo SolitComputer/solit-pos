@@ -76,6 +76,9 @@ interface UnifiedRow {
     // unit aktif. Dihitung di normalizeLaptop/normalizeAccessory dari status
     // per-unit, bukan dari flag model-level so_at/audited_at di atas.
     so_done: number; audit_done: number;
+    // Jumlah unit aktif yang sedang dipinjam (APPROVED). Dihitung belakangan
+    // setelah fetch /api/item-loans/active-units — penanda saja, bukan stok.
+    pinjam_done: number;
     unit_id?: string; unit_count: number;
     is_pedagang_listed?: boolean; // laptop: true kalau ADA unit aktif yang masuk Pricelist Pedagang
     raw: LaptopRaw | AccessoryRaw;
@@ -199,6 +202,7 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
         so_at: l.so_at ?? null, so_by: l.so_by ?? null,
         audited_at: l.audited_at ?? null, audited_by: l.audited_by ?? null,
         so_done: soDone, audit_done: auditDone,
+        pinjam_done: 0, // diisi setelah fetch active-units (lihat useEffect pinjaman)
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         is_pedagang_listed: aktif.some(u => u.is_pedagang_listed === true),
         raw: l,
@@ -247,6 +251,7 @@ const margin = (a.sell_price || 0) - (a.buy_price || 0);
         so_at: a.so_at ?? null, so_by: a.so_by ?? null,
         audited_at: a.audited_at ?? null, audited_by: a.audited_by ?? null,
         so_done: soDoneAcc, audit_done: auditDoneAcc,
+        pinjam_done: 0, // diisi setelah fetch active-units (lihat useEffect pinjaman)
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         raw: a,
     };
@@ -799,6 +804,8 @@ export default function UnifiedBarangContent() {
     const [categories, setCategories] = useState<{ id: string; name: string; type?: string | null }[]>([]);
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
+    // Set unit_id yang sedang dipinjam (APPROVED) — penanda "Di Pinjam".
+    const [borrowedUnitIds, setBorrowedUnitIds] = useState<Set<string>>(new Set());
 
     // Baca filter tersimpan SEKALI saat mount — kalau user baru balik dari
     // halaman Kelola Unit (habis SO), nilai di bawah langsung terisi filter
@@ -960,6 +967,18 @@ export default function UnifiedBarangContent() {
         })();
     }, []);
 
+    // Fetch unit yang sedang dipinjam → Set<unit_id>. Dipakai untuk hitung
+    // progress "Di Pinjam" X/Y per baris (penanda saja, tidak mengubah stok).
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/item-loans/active-units");
+                const json = await res.json();
+                if (json.success) setBorrowedUnitIds(new Set(json.data as string[]));
+            } catch { /* kalau gagal, kolom DP cuma kosong — tidak fatal */ }
+        })();
+    }, []);
+
     useEffect(() => {
         (async () => {
             try {
@@ -1043,8 +1062,18 @@ export default function UnifiedBarangContent() {
     }, [rows, tipeFilter]);
 
     const filteredRows = useMemo(() => {
-        let list = rows;
-
+        // Hitung ulang pinjam_done dari borrowedUnitIds: jumlah unit aktif model
+        // ini yang unit_id-nya ada di set pinjaman aktif. Dikerjakan di sini
+        // (bukan di normalizer) karena data pinjaman datang terpisah/asinkron.
+        let list = rows.map(r => {
+            const rawUnits = r.tipe === "LAPTOP"
+                ? ((r.raw as LaptopRaw).laptop_units ?? [])
+                    .filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id)
+                : ((r.raw as AccessoryRaw).accessory_units ?? [])
+                    .filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && !u.msj_group_id);
+            const pinjamDone = rawUnits.filter(u => borrowedUnitIds.has(u.id)).length;
+            return pinjamDone === r.pinjam_done ? r : { ...r, pinjam_done: pinjamDone };
+        });
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
 
         if (kategoriFilter.length > 0) {
@@ -1158,7 +1187,7 @@ export default function UnifiedBarangContent() {
             }
             return 0;
         });
-    }, [rows, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, deferredSearch, categories, sortBy, onlyUncategorized]);
+    }, [rows, borrowedUnitIds, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, deferredSearch, categories, sortBy, onlyUncategorized]);
 
     const visibleRows = filteredRows;
 
@@ -2094,6 +2123,9 @@ export default function UnifiedBarangContent() {
                                                         ) : (
                                                             <StatChip label="Stok" value={row.stok} tone={(row.stok ?? 0) === 0 ? "red" : "emerald"} />
                                                         )}
+                                                        {row.pinjam_done > 0 && (
+                                                            <StatChip label="Dipinjam" value={row.pinjam_done} tone="amber" />
+                                                        )}
                                                     </div>
 
                                                     {/* Toggle detail — CPU/RAM/Spek/Sumber/SN/dll disembunyikan di sini,
@@ -2276,7 +2308,7 @@ export default function UnifiedBarangContent() {
                                                         ? ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek", "Tes Kondisi"]
                                                         : ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek",
                                                             "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
-                                                            "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "MSJ", "M", "Stok", "SO", "Audit", "Aksi"]
+                                                            "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "MSJ", "M", "Stok", "DP", "SO", "Audit", "Aksi"]
                                                     ).map((h, hi) => (
                                                         <th key={h}
                                                             className={`px-3 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-left bg-zinc-50 border-b-2 border-zinc-100 sticky top-0 ${hi === 2 ? "left-0 z-20 min-w-[180px]" : "z-10"}`}>
@@ -2354,6 +2386,13 @@ export default function UnifiedBarangContent() {
                                                                 </td>
                                                                 <td className="px-3 py-3 text-xs text-center tabular-nums">
                                                                     <span className={(row.stok ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok ?? <Dash />}</span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-center tabular-nums">
+                                                                    {row.pinjam_done > 0
+                                                                        ? (row.unit_count > 1
+                                                                            ? <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg text-[11px] font-bold border bg-amber-50 text-amber-700 border-amber-200 tabular-nums" title={`${row.pinjam_done} dari ${row.unit_count} unit sedang dipinjam`}>{row.pinjam_done}/{row.unit_count}</span>
+                                                                            : <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-bold border bg-amber-50 text-amber-700 border-amber-200">Di Pinjam</span>)
+                                                                        : <Dash />}
                                                                 </td>
                                                                 <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                                     {row.unit_count > 1 ? (

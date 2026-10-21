@@ -23,6 +23,7 @@ export type LogEntity =
   | "cashflow"
   | "cashflow_audit_access"
   | "attendance"
+  | "item_loan" // ✅ ADD: log Peminjaman Barang (item_loans) — ajukan/approve/reject/kembalikan
   | "user";
 
 interface LogActivityParams {
