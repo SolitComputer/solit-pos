@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Search, X, Check, Ban, RotateCcw, Laptop as LaptopIcon, Wrench, Package, HandHelping } from "lucide-react";
+import { Search, X, Check, Ban, RotateCcw, Laptop as LaptopIcon, Wrench, Package, HandHelping, Camera } from "lucide-react";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { UserRole, hasAnyRole, ITEM_LOAN_APPROVE_ROLES } from "@/lib/permissions";
@@ -49,6 +50,11 @@ export default function ItemLoansPage() {
     const [submitting, setSubmitting] = useState(false);
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const boxRef = useRef<HTMLDivElement>(null);
+
+    // Scanner KAMERA (html5-qrcode)
+    const [scanOpen, setScanOpen] = useState(false);
+    const [scanError, setScanError] = useState<string | null>(null);
+    const cameraRef = useRef<Html5Qrcode | null>(null);
 
     const [loans, setLoans] = useState<LoanRow[]>([]);
     const [loading, setLoading] = useState(true);
@@ -134,6 +140,68 @@ export default function ItemLoansPage() {
         // 4) Banyak hasil & bukan SN persis (user mengetik nama) → buka dropdown manual.
         setSnResults(results); setSnOpen(true);
     };
+
+    // ── Scanner KAMERA — buka kamera, decode barcode, lalu isi field SN &
+    // auto-pilih lewat handleSnEnter. Library & konfig SAMA PERSIS dgn
+    // /scan/camera (BarcodeDetector native + format 1D Code128/39 dst).
+    useEffect(() => {
+        if (!scanOpen) return;
+        let cancelled = false;
+        const scanner = new Html5Qrcode("loan-camera-reader", {
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+            formatsToSupport: [
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.ITF,
+                Html5QrcodeSupportedFormats.CODABAR,
+            ],
+            verbose: false,
+        });
+        cameraRef.current = scanner;
+
+        scanner.start(
+            { facingMode: "environment" },
+            {
+                videoConstraints: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+                fps: 15,
+                qrbox: (w: number, h: number) => {
+                    const width = Math.min(w - 32, 400);
+                    const height = Math.min(Math.max(110, Math.floor(width * 0.4)), h - 32);
+                    return { width, height };
+                },
+                aspectRatio: 1.777,
+            },
+            async (decodedText) => {
+                if (cancelled) return;
+                // Bersihkan: buang karakter kontrol + AIM prefix (]C1, ]A0, ]Q0 dll)
+                // yg ditambah BarcodeDetector. Tanpa ini SN jadi "]C1xxx" → 404.
+                const sn = decodedText
+                    .replace(/[\u0000-\u001F\u007F]/g, "")
+                    .replace(/^\][A-Za-z]\d/, "")
+                    .trim();
+                if (!sn) return;
+                cancelled = true;
+                try { if (scanner.isScanning) await scanner.stop(); } catch { /* abaikan */ }
+                setScanOpen(false);
+                setSnQuery(sn);
+                handleSnEnter(sn); // auto-cari & auto-pilih, sama seperti scan fisik
+            },
+            () => { /* per-frame gagal decode — normal, diabaikan */ },
+        ).catch((err) => {
+            if (!cancelled) setScanError("Gagal membuka kamera: " + String(err));
+        });
+
+        return () => {
+            cancelled = true;
+            const s = cameraRef.current;
+            cameraRef.current = null;
+            if (s && s.isScanning) { s.stop().catch(() => { }); }
+        };
+    }, [scanOpen]);
 
     const resetForm = () => { setSelected(null); setSnQuery(""); setNotes(""); setSnResults([]); };
 
@@ -228,6 +296,10 @@ export default function ItemLoansPage() {
                                         </button>
                                     )}
                                 </div>
+                                <button type="button" onClick={() => { setScanError(null); setScanOpen(true); }}
+                                    className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-violet-700 hover:text-violet-900">
+                                    <Camera size={13} /> Scan pakai kamera
+                                </button>
                                 {snOpen && snResults.length > 0 && (
                                     <div className="absolute z-30 mt-1.5 w-full bg-white border border-zinc-200 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto">
                                         {snResults.map(r => (
@@ -341,6 +413,29 @@ export default function ItemLoansPage() {
                         )}
                     </div>
                 </div>
+
+                {/* ── Modal Scan Kamera ── */}
+                {scanOpen && (
+                    <div className="fixed inset-0 z-50 bg-black/90 flex flex-col">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                            <div>
+                                <p className="text-sm font-bold text-white">Scan Barcode Unit</p>
+                                <p className="text-[11px] text-white/50">Arahkan kamera ke barcode / QR pada SN</p>
+                            </div>
+                            <button onClick={() => setScanOpen(false)}
+                                className="h-9 px-3 rounded-lg bg-white/10 border border-white/15 text-xs font-semibold text-white hover:bg-white/20">
+                                Tutup
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4">
+                            <div id="loan-camera-reader" className="w-full max-w-md mx-auto overflow-hidden rounded-2xl" />
+                            {scanError && (
+                                <p className="mt-3 max-w-md mx-auto text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3">{scanError}</p>
+                            )}
+                            <p className="mt-3 text-center text-[11px] text-white/40">Hasil scan otomatis mengisi & memilih barang.</p>
+                        </div>
+                    </div>
+                )}
             </main>
         </DashboardLayout>
     );
