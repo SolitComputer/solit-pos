@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { generateInvoice } from "@/lib/invoice";
+import { markLoansSoldOnSale } from "@/lib/itemLoanSync";
 
 const OWNERSHIP_EXEMPT_ROLES = [
   "ADMIN",
@@ -354,6 +355,10 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
             .update({ status: "SOLD", reserved_by: null, reserved_invoice: null })
             .in("id", paidUnitIds);
 
+          // ✅ Peminjaman: unit yang baru terjual otomatis ditutup (PENDING/APPROVED
+          // → SOLD) & pindah ke Riwayat. Non-blocking: gagal sinkron tidak
+          // membatalkan pelunasan yang sudah sukses.
+          try { await markLoansSoldOnSale(supabaseAdmin, paidUnitIds, invoice_number); } catch { /* best-effort */ }
           // 8. Sync laptop parent qty untuk unit yang lunas
           const uniquePaidLaptopIds = [...new Set(paidUnits.map(u => u.laptop_id))];
           await Promise.all(uniquePaidLaptopIds.map(async (lid) => {
@@ -460,6 +465,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         .from("laptop_units")
         .update({ status: "SOLD", reserved_by: null, reserved_invoice: null })
         .in("id", unitIds);
+
+      // ✅ Peminjaman: tutup pinjaman aktif untuk semua unit yang terjual.
+      try { await markLoansSoldOnSale(supabaseAdmin, unitIds, invoice_number); } catch { /* best-effort */ }
 
       const uniqueLaptopIds = [...new Set(units.map(u => u.laptop_id))];
       await Promise.all(uniqueLaptopIds.map(async (lid) => {
@@ -679,6 +687,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         .from("laptop_units")
         .update({ status: "SOLD", reserved_by: null, reserved_invoice: null })
         .eq("id", unit.id);
+
+      // ✅ Peminjaman: tutup pinjaman aktif untuk unit yang terjual.
+      try { await markLoansSoldOnSale(supabaseAdmin, [unit.id], invoice_number); } catch { /* best-effort */ }
 
       const { data: remainingUnits } = await supabaseAdmin
         .from("laptop_units")
