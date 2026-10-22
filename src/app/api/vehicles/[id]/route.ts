@@ -12,6 +12,38 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ success: false, message: "Body tidak valid." }, { status: 400 });
 
+  // GUARD: kendaraan yang SEDANG DIPAKAI tidak boleh diubah detailnya lewat route ini.
+  // Satu-satunya PUT yang diizinkan saat DIPAKAI adalah "paksa bebaskan": ubah status
+  // saja ke TERSEDIA/MAINTENANCE (mis. peminjam lupa check-out) — ini menjaga mekanisme
+  // self-healing yang sudah ada di bawah tetap hidup. Edit nama/plat/tipe/bensin ditolak.
+  const { data: current, error: curErr } = await supabaseVehicles
+    .from("vehicles")
+    .select("status")
+    .eq("id", id)
+    .single();
+
+  if (curErr || !current)
+    return NextResponse.json({ success: false, message: "Kendaraan tidak ditemukan." }, { status: 404 });
+
+  if (current.status === "DIPAKAI") {
+    const hanyaMembebaskan =
+      (body.status === "TERSEDIA" || body.status === "MAINTENANCE") &&
+      body.name === undefined &&
+      body.type === undefined &&
+      body.plate_number === undefined &&
+      body.fuel_level === undefined &&
+      body.battery_level === undefined;
+
+    if (!hanyaMembebaskan)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Kendaraan sedang dipakai. Tunggu peminjam check-out, atau ubah statusnya saja untuk membebaskan.",
+        },
+        { status: 409 }
+      );
+  }
+
   const patch: Record<string, any> = { updated_at: new Date().toISOString() };
 
   if (body.name !== undefined) {
@@ -83,19 +115,29 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!me.isAdmin)
     return NextResponse.json({ success: false, message: "Hanya Admin yang bisa menghapus kendaraan." }, { status: 403 });
 
-  // Cegah hapus kendaraan yang lagi dipakai / punya pengajuan aktif
-  const { data: active } = await supabaseVehicles
+  // Cegah hapus kendaraan yang SEDANG DIPAKAI (ada peminjaman APPROVED aktif).
+  // Pengajuan PENDING TIDAK memblokir hapus — sesuai aturan (tombol Hapus tetap
+  // tersedia saat pending), tapi pending-nya ditolak dulu di bawah biar tidak
+  // jadi data yatim yang menunjuk ke kendaraan yang sudah tiada.
+  const { data: inUse } = await supabaseVehicles
     .from("vehicle_borrow_requests")
     .select("id")
     .eq("vehicle_id", id)
-    .in("status", ["PENDING", "APPROVED"])
+    .eq("status", "APPROVED")
     .limit(1);
 
-  if (active && active.length > 0)
+  if (inUse && inUse.length > 0)
     return NextResponse.json(
-      { success: false, message: "Kendaraan masih punya pengajuan aktif (pending/dipakai). Selesaikan dulu." },
-      { status: 400 }
+      { success: false, message: "Kendaraan sedang dipakai. Tunggu peminjam check-out dulu sebelum dihapus." },
+      { status: 409 }
     );
+
+  // Tolak pengajuan PENDING yang menempel ke kendaraan ini sebelum dihapus.
+  await supabaseVehicles
+    .from("vehicle_borrow_requests")
+    .update({ status: "REJECTED", rejection_note: "Dibatalkan otomatis: kendaraan dihapus oleh admin." })
+    .eq("vehicle_id", id)
+    .eq("status", "PENDING");
 
   const { error } = await supabaseVehicles.from("vehicles").delete().eq("id", id);
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });

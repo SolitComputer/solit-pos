@@ -536,20 +536,31 @@ function VehicleCard({
             </div>
           )}
 
-          {/* Aksi admin */}
+          {/* Aksi admin — Edit & Hapus dikunci saat kendaraan DIPAKAI (ada
+              peminjaman APPROVED aktif). Ini cuma lapisan UI; pengaman utama
+              ada di backend: /api/vehicles/[id]/route.ts */}
           {isAdmin && (
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
-              <button onClick={onEdit} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-gray-600 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 rounded-lg flex items-center justify-center gap-1 transition">
-                <Pencil size={12} /> Edit
-              </button>
-              {v.status === "MAINTENANCE" && (
-                <button onClick={restore} disabled={busy} className="flex-1 min-w-[110px] h-9 text-[11px] font-semibold text-emerald-600 border border-emerald-100 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
-                  {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Set Tersedia
-                </button>
+              {v.status === "DIPAKAI" ? (
+                <div className="w-full text-[10.5px] text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                  <Lock size={12} className="shrink-0" />
+                  Edit &amp; Hapus terkunci selama kendaraan dipakai.
+                </div>
+              ) : (
+                <>
+                  <button onClick={onEdit} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-gray-600 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 rounded-lg flex items-center justify-center gap-1 transition">
+                    <Pencil size={12} /> Edit
+                  </button>
+                  {v.status === "MAINTENANCE" && (
+                    <button onClick={restore} disabled={busy} className="flex-1 min-w-[110px] h-9 text-[11px] font-semibold text-emerald-600 border border-emerald-100 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
+                      {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Set Tersedia
+                    </button>
+                  )}
+                  <button onClick={del} disabled={deleting} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-red-500 border border-red-100 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
+                    {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Hapus
+                  </button>
+                </>
               )}
-              <button onClick={del} disabled={deleting} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-red-500 border border-red-100 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
-                {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Hapus
-              </button>
             </div>
           )}
         </div>
