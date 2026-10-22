@@ -708,6 +708,32 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
+  // Kepala Admin Barang — menu identik Pengelola Barang (full mirror).
+  KEPALA_ADMIN_BARANG: [
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_LAPTOP_MONITORING, ITEM_ALL_UNITS] },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+      ],
+    },
+    ADMIN_PENYEDIA_MENU,
+    { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
+  ],
+
+  // Admin Barang — SO-only: menu diringkas (Data Barang + Scanner). Menu non-SO
+  // sengaja tidak ditampilkan & path-nya juga diblok middleware.
+  ADMIN_BARANG: [
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Inventaris", items: [ITEM_DATA_BARANG] },
+    { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
+  ],
+
   MARKETING: [
     GROUP_ABSENSI,
     { label: "Management", items: [ITEM_USERS] },
@@ -1178,6 +1204,8 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PURCHASING: { label: "Purchasing", className: "bg-violet-50 text-violet-600" },
   PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
   KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-800" },
+  KEPALA_ADMIN_BARANG: { label: "Kepala Admin Barang", className: "bg-blue-50 text-blue-800" },
+  ADMIN_BARANG: { label: "Admin Barang", className: "bg-sky-50 text-sky-700" },
   TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
   KEPALA_TEKNISI: { label: "Kepala Teknisi", className: "bg-red-50 text-red-700" },
   PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },
