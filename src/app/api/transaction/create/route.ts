@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activityLogger";
 import { recordOutflow } from "@/lib/accessoryOutflow";
 import { ACCESSORY_ONLY_SALES_ROLES, UserRole } from "@/lib/permissions";
 import { buildLineItemsFromTxItems } from "@/lib/receiptItems";
+import { markLoansSoldOnSale } from "@/lib/itemLoanSync";
 
 function toNumber(value: any): number {
     if (value === null || value === undefined) return 0;
@@ -667,6 +668,21 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             }));
             const { error: wErr } = await supabase.from("warranties").insert(warranties);
             if (wErr) console.error("[warranty insert]", wErr.message);
+        }
+
+        // 9b. ✅ Peminjaman: kalau transaksi ini LANGSUNG lunas (cash, txStatus
+        // "PAID"), unit laptop & aksesoris ber-SN sudah jadi SOLD/TERJUAL di
+        // klaim atomik langkah 4c — jadi pinjaman aktif untuk unit itu otomatis
+        // ditutup (PENDING/APPROVED → SOLD) & pindah ke Riwayat. Untuk transaksi
+        // PENDING (DP/HELD/PACKING) unit BELUM terjual di sini, jadi sengaja
+        // tidak disentuh — penutupan pinjamannya terjadi nanti di confirm-payment.
+        // Non-blocking: gagal sinkron tidak membatalkan transaksi yang sukses.
+        if (txStatus === "PAID") {
+            const soldUnitIds = [
+                ...laptopUnitIds,
+                ...accessoryUnits.map(u => u.unit_id),
+            ];
+            try { await markLoansSoldOnSale(supabase, soldUnitIds, invoice_number); } catch { /* best-effort */ }
         }
 
         // 10. Seller follow-up — SKIP untuk E-Commerce (PACKING), biar tidak masuk Manajemen Seller

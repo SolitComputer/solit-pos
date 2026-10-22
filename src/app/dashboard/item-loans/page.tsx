@@ -15,8 +15,9 @@ interface LoanRow {
     id: string; item_type: "LAPTOP" | "AKSESORIS"; item_id: string;
     unit_id: string | null; serial_number: string | null; item_name: string;
     borrower_id: string; borrower_name: string; notes: string | null;
-    status: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED";
+    status: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "SOLD";
     approved_by_name: string | null; approved_at: string | null; returned_at: string | null; created_at: string;
+    sold_at: string | null; sold_invoice: string | null;
 }
 
 const STATUS_META: Record<LoanRow["status"], { label: string; cls: string }> = {
@@ -24,6 +25,15 @@ const STATUS_META: Record<LoanRow["status"], { label: string; cls: string }> = {
     APPROVED: { label: "Dipinjam",     cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
     REJECTED: { label: "Ditolak",      cls: "bg-rose-50 text-rose-600 border-rose-200" },
     RETURNED: { label: "Dikembalikan", cls: "bg-zinc-100 text-zinc-500 border-zinc-200" },
+    SOLD:     { label: "Terjual",      cls: "bg-blue-50 text-blue-700 border-blue-200" },
+};
+
+// Format tanggal+jam WIB untuk kolom waktu pinjam.
+const fmtWaktu = (iso: string | null) => {
+    if (!iso) return "-";
+    return new Date(iso).toLocaleString("id-ID", {
+        day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+    });
 };
 
 export default function ItemLoansPage() {
@@ -93,6 +103,38 @@ export default function ItemLoansPage() {
         setSnQuery(r.serial_number ? `${r.item_name} — ${r.serial_number}` : r.item_name);
         setSnOpen(false);
     };
+
+    // Dipicu saat tekan Enter — barcode scanner mengetik SN lalu kirim Enter.
+    // Barcode kita meng-encode serial_number langsung, jadi scan == ketik SN + Enter.
+    // `raw` dibaca dari DOM (e.currentTarget.value) supaya kebal dari lag state React.
+    const handleSnEnter = async (raw: string) => {
+        const q = raw.trim();
+        if (q.length < 2) return;
+
+        // Scanner sering lebih cepat dari debounce 300ms → fetch fresh saat Enter.
+        let results = snResults;
+        try {
+            const res = await fetch(`/api/item-loans/search-sn?q=${encodeURIComponent(q)}`);
+            const json = await res.json();
+            if (json.success) results = json.data as SnResult[];
+        } catch { /* fallback: pakai hasil yang sudah ada */ }
+
+        // 1) SN cocok persis (hasil scan barcode selalu lewat sini).
+        const exact = results.find(
+            r => (r.serial_number ?? "").trim().toLowerCase() === q.toLowerCase(),
+        );
+        if (exact) { pickSn(exact); return; }
+
+        // 2) Cuma 1 hasil → langsung pilih.
+        if (results.length === 1) { pickSn(results[0]); return; }
+
+        // 3) Tidak ada hasil → SN salah / unit tidak tersedia.
+        if (results.length === 0) { toast.error(`"${q}" tidak ditemukan / unit tidak tersedia`); return; }
+
+        // 4) Banyak hasil & bukan SN persis (user mengetik nama) → buka dropdown manual.
+        setSnResults(results); setSnOpen(true);
+    };
+
     const resetForm = () => { setSelected(null); setSnQuery(""); setNotes(""); setSnResults([]); };
 
     const submit = async () => {
@@ -134,7 +176,7 @@ export default function ItemLoansPage() {
     const visibleLoans = loans.filter(l =>
         tab === "PENDING" ? l.status === "PENDING"
             : tab === "APPROVED" ? l.status === "APPROVED"
-                : (l.status === "REJECTED" || l.status === "RETURNED")
+                : (l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD")
     );
 
     return (
@@ -169,7 +211,16 @@ export default function ItemLoansPage() {
                                     <input value={snQuery}
                                         onChange={e => { setSnQuery(e.target.value); setSelected(null); }}
                                         onFocus={() => snResults.length > 0 && setSnOpen(true)}
-                                        placeholder="Ketik SN / nama barang..."
+                                        onKeyDown={e => {
+                                            // ✅ SCANNER BARCODE: barcode kami meng-encode SN; scanner USB/BT mengetik
+                                            // SN lalu menekan Enter. handleSnEnter fetch fresh + cocokkan SN persis,
+                                            // jadi tetap jalan walau scanner lebih cepat dari debounce 300ms.
+                                            if (e.key === "Enter") {
+                                                e.preventDefault();
+                                                if (!selected) handleSnEnter(e.currentTarget.value);
+                                            }
+                                        }}
+                                        placeholder="Scan barcode / ketik SN / nama barang..."
                                         className="w-full h-10 border border-zinc-200 rounded-xl pl-9 pr-8 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
                                     {snQuery && (
                                         <button onClick={() => { setSnQuery(""); setSelected(null); setSnResults([]); }} className="absolute right-2.5 top-3 text-zinc-400 hover:text-zinc-600">
@@ -234,7 +285,7 @@ export default function ItemLoansPage() {
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="bg-zinc-50 border-b border-zinc-100">
-                                            {["Peminjam", "Barang", "SN", "Keterangan", "Status", "Aksi"].map(h => (
+                                            {["Peminjam", "Barang", "SN", "Waktu", "Keterangan", "Status", "Aksi"].map(h => (
                                                 <th key={h} className="px-3 py-3 text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                                             ))}
                                         </tr>
@@ -248,6 +299,13 @@ export default function ItemLoansPage() {
                                                     <td className="px-3 py-3 text-zinc-700">{l.item_name}</td>
                                                     <td className="px-3 py-3">
                                                         {l.serial_number ? <span className="font-mono text-[11px] text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">{l.serial_number}</span> : <span className="text-zinc-300">-</span>}
+                                                    </td>
+                                                    <td className="px-3 py-3 text-[11px] text-zinc-500 whitespace-nowrap">
+                                                        {l.status === "SOLD"
+                                                            ? <span title={l.sold_invoice ? `Terjual via ${l.sold_invoice}` : ""}>{fmtWaktu(l.sold_at)}</span>
+                                                            : l.status === "RETURNED"
+                                                                ? fmtWaktu(l.returned_at)
+                                                                : fmtWaktu(l.created_at)}
                                                     </td>
                                                     <td className="px-3 py-3 text-xs text-zinc-500 max-w-[200px] truncate" title={l.notes ?? ""}>{l.notes || <span className="text-zinc-300">-</span>}</td>
                                                     <td className="px-3 py-3">
