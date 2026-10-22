@@ -29,6 +29,7 @@ import {
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import { PRICE_RANGE_OPTIONS, getPriceRangeLabel, isPriceRange } from "@/lib/price-range";
+import InterestAutocomplete from "@/components/sales-reports/InterestAutocomplete";
 
 type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "ECOMMERCE" | "TOKOPEDIA" | "SHOPEE" | "SOSMED" | "THREADS" | "MITRA" | "RESELLER";
 
@@ -797,12 +798,12 @@ export default function LaporanHarianSalesPage() {
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Minat (Laptop)</label>
                   <div className="relative">
-                    <Laptop2 className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
+                    <Laptop2 className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
+                    <InterestAutocomplete
                       value={interest}
-                      onChange={(e) => setInterest(e.target.value)}
+                      onChange={setInterest}
                       placeholder="Contoh: Thinkpad T480, RAM 8GB"
-                      className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
+                      inputClassName="w-full pl-8 pr-8 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
                     />
                   </div>
                 </div>
