@@ -384,9 +384,14 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         // tolong tes dulu skenario ini kalau kamu pakai DP/Ambil Dulu untuk
         // aksesori ber-SN.
         const accessoryUnitStatus = txStatus === "PAID" ? "TERJUAL" : txStatus;
+        // ✅ FIX: revert ke status ASLI (TERSEDIA / MINUS_SIAP_JUAL) dari accUnitMap,
+        // bukan hard-code TERSEDIA — kalau tidak, SN aksesori dari Kelompok MSJ
+        // berubah status saat payment gagal & "hilang" dari kelompoknya.
         const revertAccUnitClaim = async (ids: string[]) => {
             await Promise.all(ids.map((uid) =>
-                supabase.from("accessory_units").update({ status: "TERSEDIA" }).eq("id", uid)
+                supabase.from("accessory_units")
+                    .update({ status: accUnitMap.get(uid)?.status ?? "TERSEDIA" })
+                    .eq("id", uid)
             ));
         };
         let claimedAccUnitIds: string[] = [];
@@ -594,9 +599,15 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                         for (const r of ag ?? []) if (r.msj_group_id) groupIdSet.add(r.msj_group_id);
                     }
                     if (groupIdSet.size > 0) {
-                        await supabase.from("msj_groups")
-                            .update({ status: "SOLD", sold_at: archivedAtISO, invoice: invoice_number })
-                            .in("id", [...groupIdSet]);
+                        // ✅ FIX: dulu kelompok langsung SOLD walau masih ada SN lain
+                        // yang belum terjual → SN sisa ikut "hilang". Sekarang kelompok
+                        // baru ditutup kalau sudah tidak ada SN MINUS_SIAP_JUAL tersisa
+                        // (cek + update atomik di 1 statement SQL lewat RPC).
+                        const { error: closeErr } = await supabase.rpc("close_msj_groups_if_empty", {
+                            p_group_ids: [...groupIdSet],
+                            p_invoice: invoice_number,
+                        });
+                        if (closeErr) console.error("[transaction/create] cek tutup kelompok MSJ gagal (non-fatal):", closeErr.message);
                     }
                 } catch (gErr: any) {
                     console.error("[transaction/create] tutup kelompok MSJ gagal (non-fatal):", gErr?.message ?? gErr);

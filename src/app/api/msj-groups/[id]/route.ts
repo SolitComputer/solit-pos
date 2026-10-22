@@ -13,9 +13,9 @@ export const GET = withAuth(async (_req: NextRequest, { params }: { params: Prom
 
     const [lapRes, accRes] = await Promise.all([
         supabaseAdmin.from("laptop_units")
-            .select("id, serial_number, selling_price, status, laptops(id, laptop_name, brand)").eq("msj_group_id", id),
+            .select("id, serial_number, selling_price, status, laptops(id, laptop_name, brand)").eq("msj_group_id", id).eq("status", "MINUS_SIAP_JUAL"),
         supabaseAdmin.from("accessory_units")
-            .select("id, serial_number, selling_price, status, accessories(id, name, category, brand)").eq("msj_group_id", id),
+            .select("id, serial_number, selling_price, status, accessories(id, name, category, brand)").eq("msj_group_id", id).eq("status", "MINUS_SIAP_JUAL"),
     ]);
     if (lapRes.error) return NextResponse.json({ success: false, error: lapRes.error.message }, { status: 500 });
     if (accRes.error) return NextResponse.json({ success: false, error: accRes.error.message }, { status: 500 });
@@ -81,6 +81,7 @@ export const PATCH = withAuth(async (req: NextRequest, { params }: { params: Pro
     if (Array.isArray(body.remove) && body.remove.length > 0) {
         const lapIds = body.remove.filter((i: any) => i.item_type === "LAPTOP").map((i: any) => String(i.unit_id));
         const accIds = body.remove.filter((i: any) => i.item_type === "ACCESSORY").map((i: any) => String(i.unit_id));
+
         if (lapIds.length > 0) await supabaseAdmin.from("laptop_units").update({ msj_group_id: null }).in("id", lapIds).eq("msj_group_id", id);
         if (accIds.length > 0) await supabaseAdmin.from("accessory_units").update({ msj_group_id: null }).in("id", accIds).eq("msj_group_id", id);
     }

@@ -158,6 +158,9 @@ export default function CreatePaymentPage() {
     const [msjGroups, setMsjGroups] = useState<MsjGroupLite[]>([]);
     const [showGroupPicker, setShowGroupPicker] = useState(false);
     const [loadingGroups, setLoadingGroups] = useState(false);
+    // Kelompok yang sedang dibuka di picker + SN yang dicentang user.
+    const [activeGroup, setActiveGroup] = useState<MsjGroupLite | null>(null);
+    const [pickedGroupUnitIds, setPickedGroupUnitIds] = useState<string[]>([]);
 
     const [rawDealPrice, setRawDealPrice] = useState<number>(0);
     const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
@@ -580,49 +583,71 @@ export default function CreatePaymentPage() {
 
     const openGroupPicker = async () => {
         setShowGroupPicker(true);
+        setActiveGroup(null);
+        setPickedGroupUnitIds([]);
         setLoadingGroups(true);
         try {
             const res = await fetch("/api/msj-groups?status=OPEN");
             const json = await res.json();
-            setMsjGroups(json.success ? (json.data ?? []) : []);
+            const groups: MsjGroupLite[] = json.success ? (json.data ?? []) : [];
+            // Kelompok yang SN tersedianya 0 (semua sudah terjual/pending) tidak ditampilkan.
+            setMsjGroups(groups.filter(g => g.items.length > 0));
         } catch { setMsjGroups([]); }
         finally { setLoadingGroups(false); }
     };
 
-    // Panggil kelompok → semua SN di dalamnya masuk sebagai unit terpilih.
-    // item_type LAPTOP → unit_type "laptop", ACCESSORY → "accessory" (field
-    // laptop_id di-reuse untuk accessory_id, persis pola handleSelectSnResult).
-    const handlePickGroup = (g: MsjGroupLite) => {
+    const closeGroupPicker = () => {
+        setShowGroupPicker(false);
+        setActiveGroup(null);
+        setPickedGroupUnitIds([]);
+    };
+
+    // Klik kelompok → buka daftar SN-nya. Default: semua SN yang belum ada di
+    // "Unit Terpilih" dicentang, jadi borong tetap bisa 1 klik.
+    const openGroupDetail = (g: MsjGroupLite) => {
         const existing = new Set(selectedUnits.map(u => u.unit_id));
-        // Tolak item yang parent_id (laptop_id/accessory_id master) kosong —
-        // transaction/create mewajibkannya (gagal validasi kalau "").
-        const invalid = g.items.filter(it => !it.parent_id);
+        setActiveGroup(g);
+        setPickedGroupUnitIds(g.items.filter(it => !existing.has(it.unit_id)).map(it => it.unit_id));
+    };
+
+    const toggleGroupUnit = (unitId: string) =>
+        setPickedGroupUnitIds(prev => prev.includes(unitId) ? prev.filter(id => id !== unitId) : [...prev, unitId]);
+
+    // HANYA SN yang dicentang yang masuk ke Unit Terpilih → hanya itu yang dikirim
+    // ke transaction/create. SN lain tidak disentuh: tetap di kelompok & tetap
+    // MINUS_SIAP_JUAL. item_type LAPTOP → unit_type "laptop", ACCESSORY →
+    // "accessory" (laptop_id di-reuse untuk accessory_id, pola handleSelectSnResult).
+    const handlePickGroup = () => {
+        if (!activeGroup) return;
+        const existing = new Set(selectedUnits.map(u => u.unit_id));
+        const chosen = activeGroup.items.filter(it => pickedGroupUnitIds.includes(it.unit_id) && !existing.has(it.unit_id));
+        if (chosen.length === 0) { alert("Pilih minimal 1 SN dari kelompok ini"); return; }
+
+        // Tolak item tanpa parent_id (laptop_id/accessory_id master) —
+        // transaction/create mewajibkannya.
+        const invalid = chosen.filter(it => !it.parent_id);
         if (invalid.length > 0) {
-            alert(`Kelompok "${g.name}" punya ${invalid.length} barang tanpa data master (SN: ${invalid.map(i => i.serial_number).join(", ")}). Tidak bisa dijual sampai diperbaiki.`);
+            alert(`SN berikut tidak punya data master: ${invalid.map(i => i.serial_number).join(", ")}. Tidak bisa dijual sampai diperbaiki.`);
             return;
         }
-        const additions = g.items
-            .filter(it => !existing.has(it.unit_id))
-            .map(it => ({
-                unit_id: it.unit_id,
-                // Field laptop_id di-reuse untuk accessory_id juga (pola UnitItem
-                // existing di handleSelectSnResult) — transaction/create membaca
-                // accessory_id dari field ini untuk unit_type "accessory".
-                laptop_id: it.parent_id as string,
-                serial_number: it.serial_number,
-                laptop_name: it.name,
-                selling_price: it.selling_price ?? 0,
-                unit_type: it.item_type === "LAPTOP" ? ("laptop" as const) : ("accessory" as const),
-            }));
+
+        const additions = chosen.map(it => ({
+            unit_id: it.unit_id,
+            laptop_id: it.parent_id as string,
+            serial_number: it.serial_number,
+            laptop_name: it.name,
+            selling_price: it.selling_price ?? 0,
+            unit_type: it.item_type === "LAPTOP" ? ("laptop" as const) : ("accessory" as const),
+        }));
         const newUnits = [...selectedUnits, ...additions];
         setSelectedUnits(newUnits);
         setValue("units", newUnits);
         setUnitPrices(prev => {
             const next = { ...prev };
-            for (const it of g.items) if (next[it.unit_id] === undefined) next[it.unit_id] = it.selling_price ?? 0;
+            for (const it of chosen) if (next[it.unit_id] === undefined) next[it.unit_id] = it.selling_price ?? 0;
             return next;
         });
-        setShowGroupPicker(false);
+        closeGroupPicker();
     };
     const handleSelectSnResult = (u: UnitOption) => {
         // FIX: tolak item yang laptop_id ATAU laptop_name-nya bakal kosong
@@ -1769,27 +1794,79 @@ export default function CreatePaymentPage() {
                 </form>
 
                 {/* ── Modal Picker Kelompok MSJ ── */}
+                      {/* ── Modal Picker Kelompok MSJ (pilih kelompok → centang SN) ── */}
                 {showGroupPicker && (
                     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
-                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowGroupPicker(false)} />
+                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeGroupPicker} />
                         <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh]">
-                            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                                <div>
-                                    <p className="font-bold text-gray-800 text-sm">Panggil Kelompok Minus Siap Jual</p>
-                                    <p className="text-xs text-gray-400 mt-0.5">Pilih kelompok — semua SN di dalamnya masuk sekaligus</p>
+                            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="font-bold text-gray-800 text-sm truncate">
+                                        {activeGroup ? activeGroup.name : "Panggil Kelompok Minus Siap Jual"}
+                                    </p>
+                                    <p className="text-xs text-gray-400 mt-0.5">
+                                        {activeGroup ? "Centang SN yang dijual — SN lain tetap di kelompok" : "Pilih kelompok, lalu pilih SN yang mau dijual"}
+                                    </p>
                                 </div>
-                                <button type="button" onClick={() => setShowGroupPicker(false)} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 transition">
+                                <button type="button" onClick={closeGroupPicker} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 transition flex-shrink-0">
                                     <X size={16} />
                                 </button>
                             </div>
+
                             <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2">
-                                {loadingGroups ? (
+                                {activeGroup ? (() => {
+                                    const existing = new Set(selectedUnits.map(u => u.unit_id));
+                                    const selectable = activeGroup.items.filter(it => !existing.has(it.unit_id));
+                                    const allPicked = selectable.length > 0 && selectable.every(it => pickedGroupUnitIds.includes(it.unit_id));
+                                    return (
+                                        <>
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                                                    SN Dipilih ({pickedGroupUnitIds.length}/{selectable.length})
+                                                </p>
+                                                {selectable.length > 0 && (
+                                                    <button type="button"
+                                                        onClick={() => setPickedGroupUnitIds(allPicked ? [] : selectable.map(it => it.unit_id))}
+                                                        className="text-[11px] font-bold text-violet-600 hover:text-violet-700">
+                                                        {allPicked ? "Kosongkan" : "Pilih Semua"}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">
+                                                {activeGroup.items.map(it => {
+                                                    const already = existing.has(it.unit_id);
+                                                    const checked = already || pickedGroupUnitIds.includes(it.unit_id);
+                                                    return (
+                                                        <label key={it.unit_id}
+                                                            className={`flex items-center gap-2.5 px-3.5 py-2.5 transition ${already ? "bg-gray-50 opacity-60 cursor-not-allowed" : checked ? "bg-violet-50/50 cursor-pointer" : "hover:bg-gray-50 cursor-pointer"}`}>
+                                                            <input type="checkbox" checked={checked} disabled={already}
+                                                                onChange={() => toggleGroupUnit(it.unit_id)}
+                                                                className="w-4 h-4 accent-violet-600 rounded shrink-0" />
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <p className="font-mono text-xs font-semibold text-gray-800 truncate">{it.serial_number}</p>
+                                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0 ${it.item_type === "LAPTOP" ? "bg-gray-100 border-gray-200 text-gray-600" : "bg-blue-50 border-blue-200 text-blue-600"}`}>
+                                                                        {it.item_type === "LAPTOP" ? "LAPTOP" : "AKSESORI"}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[10px] text-gray-500 truncate">
+                                                                    {it.name}{already ? " · sudah di Unit Terpilih" : ""}
+                                                                </p>
+                                                            </div>
+                                                            <span className="text-xs font-semibold text-gray-700 tabular-nums flex-shrink-0">{fmt(it.selling_price)}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    );
+                                })() : loadingGroups ? (
                                     <p className="text-sm text-gray-400 text-center py-8">Memuat kelompok...</p>
                                 ) : msjGroups.length === 0 ? (
                                     <p className="text-sm text-gray-400 text-center py-8">Belum ada kelompok tersedia</p>
                                 ) : (
                                     msjGroups.map(g => (
-                                        <button key={g.id} type="button" onClick={() => handlePickGroup(g)}
+                                        <button key={g.id} type="button" onClick={() => openGroupDetail(g)}
                                             className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-violet-300 hover:bg-violet-50/40 transition">
                                             <div className="flex items-center justify-between gap-2">
                                                 <p className="text-sm font-bold text-gray-800 truncate">{g.name}</p>
@@ -1800,8 +1877,22 @@ export default function CreatePaymentPage() {
                                     ))
                                 )}
                             </div>
-                            <div className="px-5 py-4 border-t border-gray-100">
-                                <button type="button" onClick={() => setShowGroupPicker(false)} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Tutup</button>
+
+                            <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
+                                {activeGroup ? (
+                                    <>
+                                        <button type="button" onClick={() => { setActiveGroup(null); setPickedGroupUnitIds([]); }}
+                                            className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition inline-flex items-center justify-center gap-1">
+                                            <ChevronLeft size={16} /> Kembali
+                                        </button>
+                                        <button type="button" onClick={handlePickGroup} disabled={pickedGroupUnitIds.length === 0}
+                                            className="flex-1 h-11 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 transition disabled:opacity-50">
+                                            Tambahkan {pickedGroupUnitIds.length} SN · {fmt(activeGroup.items.filter(it => pickedGroupUnitIds.includes(it.unit_id)).reduce((s, it) => s + (it.selling_price || 0), 0))}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <button type="button" onClick={closeGroupPicker} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Tutup</button>
+                                )}
                             </div>
                         </div>
                     </div>

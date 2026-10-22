@@ -23,12 +23,17 @@ export const GET = withAuth(async (req: NextRequest) => {
     if (groupIds.length === 0) return NextResponse.json({ success: true, data: [] });
 
     const [lapRes, accRes] = await Promise.all([
+        // ✅ Hanya SN yang MASIH tersedia (MINUS_SIAP_JUAL). SN yang sudah
+        // SOLD/RESERVED/HELD/PACKING tetap menyimpan msj_group_id (riwayat)
+        // tapi tidak dihitung & tidak bisa dipilih lagi di payment.
         supabaseAdmin.from("laptop_units")
             .select("id, serial_number, selling_price, status, msj_group_id, laptops(id, laptop_name, brand)")
-            .in("msj_group_id", groupIds),
+            .in("msj_group_id", groupIds)
+            .eq("status", "MINUS_SIAP_JUAL"),
         supabaseAdmin.from("accessory_units")
             .select("id, serial_number, selling_price, status, msj_group_id, accessories(id, name, category, brand)")
-            .in("msj_group_id", groupIds),
+            .in("msj_group_id", groupIds)
+            .eq("status", "MINUS_SIAP_JUAL"),
     ]);
     if (lapRes.error) return NextResponse.json({ success: false, error: lapRes.error.message }, { status: 500 });
     if (accRes.error) return NextResponse.json({ success: false, error: accRes.error.message }, { status: 500 });

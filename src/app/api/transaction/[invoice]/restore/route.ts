@@ -16,6 +16,107 @@ interface Props {
 const RESTORABLE_STATUSES = ["PAID", "RESERVED", "HELD", "PACKING", "PENDING"] as const;
 type RestorableStatus = (typeof RESTORABLE_STATUSES)[number];
 
+// ─── MSJ helpers ───────────────────────────────────────────────────────────
+// Unit yang dijual lewat Kelompok Minus Siap Jual tetap menyimpan msj_group_id
+// setelah terjual (riwayat). Saat transaksinya di-restore/batal, unit itu harus
+// balik ke KELOMPOK ASALNYA sebagai MINUS_SIAP_JUAL — bukan SIAP_JUAL — supaya
+// tidak nyangkut: tersembunyi dari Data Barang (msj_group_id terisi) tapi juga
+// tidak muncul di kelompok (status bukan MINUS_SIAP_JUAL).
+
+// Kembalikan unit laptop ke stok: unit MSJ → MINUS_SIAP_JUAL, unit biasa → SIAP_JUAL.
+async function releaseLaptopUnitsToStock(
+  unitIds: string[]
+): Promise<{ error: string | null; msjGroupIds: string[] }> {
+  if (unitIds.length === 0) return { error: null, msjGroupIds: [] };
+
+  const { data: rows, error: selErr } = await supabase
+    .from("laptop_units")
+    .select("id, msj_group_id")
+    .in("id", unitIds);
+  if (selErr) return { error: selErr.message, msjGroupIds: [] };
+
+  const msjUnitIds = new Set(
+    (rows ?? []).filter((r: any) => r.msj_group_id).map((r: any) => r.id as string)
+  );
+  const normalIds = unitIds.filter((id) => !msjUnitIds.has(id));
+  const msjGroupIds = [
+    ...new Set((rows ?? []).map((r: any) => r.msj_group_id).filter(Boolean)),
+  ] as string[];
+
+  if (normalIds.length > 0) {
+    const { error } = await supabase
+      .from("laptop_units")
+      .update({ status: "SIAP_JUAL", reserved_by: null, reserved_invoice: null })
+      .in("id", normalIds);
+    if (error) return { error: error.message, msjGroupIds: [] };
+  }
+
+  if (msjUnitIds.size > 0) {
+    const { error } = await supabase
+      .from("laptop_units")
+      .update({ status: "MINUS_SIAP_JUAL", reserved_by: null, reserved_invoice: null })
+      .in("id", [...msjUnitIds]);
+    if (error) return { error: error.message, msjGroupIds: [] };
+  }
+
+  return { error: null, msjGroupIds };
+}
+
+// Aksesori ber-SN dari Kelompok MSJ tidak tercatat di accessory_outflows
+// (transaction/create meng-klaimnya langsung di accessory_units), jadi
+// cancelOutflowByInvoice tidak mengembalikannya. Dikembalikan manual di sini
+// via serial_number di transaction_items. Return: id kelompok terdampak.
+async function restoreMsjAccessoryUnits(invoice: string): Promise<string[]> {
+  const { data: accItems } = await supabase
+    .from("transaction_items")
+    .select("serial_number")
+    .eq("invoice_number", invoice)
+    .eq("item_type", "accessory");
+
+  const sns = [
+    ...new Set(
+      (accItems ?? [])
+        .map((it: any) => (it.serial_number ?? "").toString().trim())
+        .filter((s: string) => s && s !== "-")
+    ),
+  ];
+  if (sns.length === 0) return [];
+
+  const { data: units, error } = await supabase
+    .from("accessory_units")
+    .select("id, msj_group_id")
+    .in("serial_number", sns)
+    .not("msj_group_id", "is", null)
+    .neq("status", "MINUS_SIAP_JUAL");
+  if (error) {
+    console.error("[RESTORE] cari aksesori MSJ gagal:", error.message);
+    return [];
+  }
+  if (!units || units.length === 0) return [];
+
+  const { error: updErr } = await supabase
+    .from("accessory_units")
+    .update({ status: "MINUS_SIAP_JUAL" })
+    .in("id", units.map((u: any) => u.id));
+  if (updErr) {
+    console.error("[RESTORE] kembalikan aksesori MSJ gagal:", updErr.message);
+    return [];
+  }
+
+  return [...new Set(units.map((u: any) => u.msj_group_id).filter(Boolean))] as string[];
+}
+
+// Buka lagi kelompok yang sudah SOLD karena sekarang punya SN tersedia lagi.
+async function reopenMsjGroups(groupIds: string[]) {
+  if (groupIds.length === 0) return;
+  const { error } = await supabase
+    .from("msj_groups")
+    .update({ status: "OPEN", sold_at: null, invoice: null })
+    .in("id", groupIds)
+    .eq("status", "SOLD");
+  if (error) console.error("[RESTORE] buka ulang kelompok MSJ gagal:", error.message);
+}
+
 async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { invoice } = await props.params;
@@ -132,6 +233,7 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
     // ── 3. Kembalikan semua unit ke SIAP_JUAL ─────────────────────────────
     const restoredUnitIds: string[] = [];
     const affectedLaptopIds = new Set<string>();
+    const msjGroupIdsToReopen = new Set<string>();
 
     if (unitIds.length > 0) {
       // Ambil laptop_id sebelum update (untuk recalc parent)
@@ -144,18 +246,17 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
         if (unit.laptop_id) affectedLaptopIds.add(unit.laptop_id);
       }
 
-      const { error: unitErr } = await supabase
-        .from("laptop_units")
-        .update({ status: "SIAP_JUAL", reserved_by: null, reserved_invoice: null })
-        .in("id", unitIds);
-
-      if (unitErr) {
-        console.error("[RESTORE] unit update error:", unitErr);
+      // ✅ MSJ: unit dari Kelompok MSJ balik ke kelompoknya (MINUS_SIAP_JUAL),
+      // unit biasa tetap SIAP_JUAL seperti sebelumnya.
+      const release = await releaseLaptopUnitsToStock(unitIds);
+      if (release.error) {
+        console.error("[RESTORE] unit update error:", release.error);
         return NextResponse.json(
-          { success: false, message: "Gagal mengembalikan status unit: " + unitErr.message },
+          { success: false, message: "Gagal mengembalikan status unit: " + release.error },
           { status: 500 }
         );
       }
+      release.msjGroupIds.forEach((id) => msjGroupIdsToReopen.add(id));
 
       restoredUnitIds.push(...unitIds);
     }
@@ -334,6 +435,16 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
     // 5b. Batalkan catatan outflow aksesoris jika ada
     await cancelOutflowByInvoice(invoice);
 
+    // 5c. ✅ MSJ: aksesori ber-SN dari kelompok balik ke MINUS_SIAP_JUAL, lalu
+    // kelompok yang sudah SOLD dibuka lagi. Non-fatal: restore tetap sukses.
+    try {
+      const accGroupIds = await restoreMsjAccessoryUnits(invoice);
+      accGroupIds.forEach((id) => msjGroupIdsToReopen.add(id));
+      await reopenMsjGroups([...msjGroupIdsToReopen]);
+    } catch (msjErr: any) {
+      console.error("[RESTORE] sinkron Kelompok MSJ gagal (non-fatal):", msjErr?.message ?? msjErr);
+    }
+
     // ── 6. Void warranty jika ada ─────────────────────────────────────────
     let warrantyVoided = false;
     const { data: warranty } = await supabase
@@ -424,18 +535,16 @@ async function handlePartialRestore({
     const affectedLaptopIds = new Set<string>();
     for (const u of unitsToRestore ?? []) if (u.laptop_id) affectedLaptopIds.add(u.laptop_id);
 
-    // 2. Kembalikan unit terpilih ke SIAP_JUAL
-    const { error: unitErr } = await supabase
-      .from("laptop_units")
-      .update({ status: "SIAP_JUAL", reserved_by: null, reserved_invoice: null })
-      .in("id", selectedUnitIds);
-
-    if (unitErr) {
+    // 2. Kembalikan unit terpilih ke stok — unit MSJ balik ke kelompoknya
+    //    (MINUS_SIAP_JUAL), unit biasa ke SIAP_JUAL.
+    const release = await releaseLaptopUnitsToStock(selectedUnitIds);
+    if (release.error) {
       return NextResponse.json(
-        { success: false, message: "Gagal mengembalikan status unit: " + unitErr.message },
+        { success: false, message: "Gagal mengembalikan status unit: " + release.error },
         { status: 500 }
       );
     }
+    await reopenMsjGroups(release.msjGroupIds);
 
     // 3. Sync qty & status laptop parent
     for (const laptopId of affectedLaptopIds) {
