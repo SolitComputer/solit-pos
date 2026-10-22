@@ -44,22 +44,28 @@ export const GET = withAuth(async (req: NextRequest) => {
   if (laptopRes.error) console.error("[item-returns search-sn laptop]", laptopRes.error);
   if (accRes.error) console.error("[item-returns search-sn acc]", accRes.error);
 
+  // Helper: join FK bisa balik object ATAU array [{...}] tergantung deteksi
+  // relasi Supabase. Ambil elemen pertama kalau array, biar aman dua-duanya.
+  const one = (rel: any) => (Array.isArray(rel) ? rel[0] : rel);
+
   // Laptop: modal = purchase_price + sparepart_cost (konsisten dgn jurnal).
   const laptopFmt = (laptopRes.data || [])
-    .filter((u: any) => Boolean(u.laptops?.id) && Boolean(u.laptops?.laptop_name))
+    .map((u: any) => ({ ...u, _lap: one(u.laptops) }))
+    .filter((u: any) => Boolean(u._lap?.id) && Boolean(u._lap?.laptop_name))
     .map((u: any) => ({
       unit_id: u.id,
       item_type: "LAPTOP" as const,
       serial_number: u.serial_number,
-      item_name: u.laptops.laptop_name,
+      item_name: u._lap.laptop_name,
       harga_modal: Math.round(Number(u.purchase_price ?? 0)) + Math.round(Number(u.sparepart_cost ?? 0)),
     }));
 
   // Aksesoris: modal = buy_price unit.
   const accFmt = (accRes.data || [])
-    .filter((u: any) => Boolean(u.accessories?.id))
+    .map((u: any) => ({ ...u, _acc: one(u.accessories) }))
+    .filter((u: any) => Boolean(u._acc?.id))
     .map((u: any) => {
-      const acc = u.accessories;
+      const acc = u._acc;
       const name = [acc.name, acc.brand, acc.spec].filter(Boolean).join(" ");
       return {
         unit_id: u.id,
