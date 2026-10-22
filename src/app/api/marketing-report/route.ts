@@ -5,10 +5,8 @@ import { fetchAllRows } from "@/lib/supabase-paginate";
 import { hasAnyRole, SALES_REPORT_AUDIT_ROLES } from "@/lib/permissions";
 import {
   aggregateMarketingReport,
-  resolvePeriodRangeUtc,
-  MARKETING_PERIODS,
+  resolveDateRangeUtc,
   type AuditedReportLite,
-  type MarketingPeriod,
 } from "@/lib/marketing-report";
 
 export const dynamic = "force-dynamic";
@@ -29,8 +27,9 @@ function getUserRoles(user: AuthUser): string[] {
     : [anyUser?.role].filter(Boolean);
 }
 
-// GET /api/marketing-report?period=today|week|month
-// GET /api/marketing-report?period=custom&from=YYYY-MM-DD&to=YYYY-MM-DD
+// GET /api/marketing-report?from=YYYY-MM-DD&to=YYYY-MM-DD
+// from & to opsional (kontrak sama dgn kalender InlineDateRange di Cashflow):
+// keduanya kosong = semua waktu, salah satu kosong = sisi itu tidak dibatasi.
 async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     if (!hasAnyRole(getUserRoles(user), VIEW_ROLES)) {
@@ -38,12 +37,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     }
 
     const { searchParams } = new URL(req.url);
-    const rawPeriod = searchParams.get("period") || "month";
-    const period: MarketingPeriod = (MARKETING_PERIODS as string[]).includes(rawPeriod)
-      ? (rawPeriod as MarketingPeriod)
-      : "month";
-
-    const range = resolvePeriodRangeUtc(period, searchParams.get("from"), searchParams.get("to"));
+    const range = resolveDateRangeUtc(searchParams.get("from"), searchParams.get("to"));
     if (!range.success) {
       return NextResponse.json({ success: false, message: range.error }, { status: 400 });
     }
@@ -56,8 +50,8 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         .from(TABLE)
         .select("id, channel, interest")
         .is("deleted_at", null)
-        .eq("audited", true)
-        .gte("created_at", startUtc);
+        .eq("audited", true);
+      if (startUtc) q = q.gte("created_at", startUtc);
       if (endUtc) q = q.lt("created_at", endUtc);
       return q
         .order("created_at", { ascending: false })
@@ -72,8 +66,8 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       .from(TABLE)
       .select("id", { count: "exact", head: true })
       .is("deleted_at", null)
-      .eq("audited", false)
-      .gte("created_at", startUtc);
+      .eq("audited", false);
+    if (startUtc) pendingQuery = pendingQuery.gte("created_at", startUtc);
     if (endUtc) pendingQuery = pendingQuery.lt("created_at", endUtc);
     const { count: pendingAuditCount, error: pendingError } = await pendingQuery;
     if (pendingError) throw new Error(pendingError.message);

@@ -17,20 +17,26 @@ import {
   X,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import InlineDateRange from "@/components/common/InlineDateRange";
 import {
   channelLabel,
   todayWibDate,
-  type MarketingPeriod,
   type MarketingReportData,
   type MarketingReportRow,
 } from "@/lib/marketing-report";
 
-const periodLabels: Record<MarketingPeriod, string> = {
-  today: "Hari ini",
-  week: "Minggu ini",
-  month: "Bulan ini",
-  custom: "Pilih tanggal",
-};
+// "2026-10-22" → "22 Okt 2026". Diparse manual (bukan new Date("YYYY-MM-DD"))
+// supaya tidak geser hari karena zona waktu.
+function fmtTanggalShort(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// Label periode — format sama dengan Cashflow ("Semua Waktu" / "1 Okt 2026 — 22 Okt 2026").
+function getPeriodLabel(from: string, to: string): string {
+  if (!from && !to) return "Semua Waktu";
+  return `${from ? fmtTanggalShort(from) : "..."} — ${to ? fmtTanggalShort(to) : "..."}`;
+}
 
 // Warna header kolom channel — mengikuti spreadsheet referensi
 // (WA hijau tua, Shopee oranye, FB biru, OLX cyan, Carousell merah,
@@ -63,7 +69,8 @@ function qtyCellClass(value: number, max: number): string {
 }
 
 export default function LaporanMarketingPage() {
-  const [period, setPeriod] = useState<MarketingPeriod>("month");
+  // Filter tanggal pakai kalender InlineDateRange (sama dengan Cashflow).
+  // Default: awal bulan ini s/d hari ini (WIB). Klik "Semua" di kalender = tanpa batas tanggal.
   const [customFrom, setCustomFrom] = useState(() => todayWibDate().slice(0, 8) + "01");
   const [customTo, setCustomTo] = useState(() => todayWibDate());
   const [report, setReport] = useState<MarketingReportData | null>(null);
@@ -77,16 +84,15 @@ export default function LaporanMarketingPage() {
   const requestIdRef = useRef(0);
 
   const fetchReport = useCallback(async () => {
-    if (period === "custom" && (!customFrom || !customTo)) return;
     const requestId = ++requestIdRef.current;
     try {
       setLoading(true);
       setError("");
-      const params = new URLSearchParams({ period });
-      if (period === "custom") {
-        params.set("from", customFrom);
-        params.set("to", customTo);
-      }
+      // from/to kosong tidak dikirim → API anggap sisi itu tidak dibatasi
+      // (kosong dua-duanya = semua waktu), persis perilaku filter Cashflow.
+      const params = new URLSearchParams();
+      if (customFrom) params.set("from", customFrom);
+      if (customTo) params.set("to", customTo);
       const res = await fetch(`/api/marketing-report?${params.toString()}`, { cache: "no-store" });
       const json = await res.json();
       if (requestId !== requestIdRef.current) return;
@@ -99,7 +105,7 @@ export default function LaporanMarketingPage() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [period, customFrom, customTo]);
+  }, [customFrom, customTo]);
 
   useEffect(() => {
     fetchReport();
@@ -168,6 +174,13 @@ export default function LaporanMarketingPage() {
   }, [report]);
 
   const hasData = (report?.rows.length ?? 0) > 0;
+  const periodLabel = getPeriodLabel(customFrom, customTo);
+
+  // Sama seperti handleDateRangeChange di Cashflow.
+  const handleDateRangeChange = (from: string, to: string) => {
+    setCustomFrom(from);
+    setCustomTo(to);
+  };
 
   return (
     <DashboardLayout>
@@ -204,54 +217,36 @@ export default function LaporanMarketingPage() {
           </button>
         </div>
 
-        {/* Filter periode + ringkasan */}
-        <div className="rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-4 sm:px-6 sm:py-5 space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div className="flex bg-gray-50/80 rounded-full border border-gray-100 p-0.5 self-start overflow-x-auto max-w-full [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
-              {(Object.keys(periodLabels) as MarketingPeriod[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPeriod(p)}
-                  className={`shrink-0 px-3 py-1.5 text-[11px] font-medium rounded-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${period === p ? "bg-violet-600 text-white shadow-sm shadow-violet-300/50" : "text-gray-500 hover:text-gray-900"}`}
-                >
-                  {periodLabels[p]}
-                </button>
-              ))}
+        {/* Filter tanggal (kalender Cashflow) + ringkasan */}
+        <div className="rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="flex flex-col-reverse lg:flex-row gap-4 lg:items-start">
+            <div className="flex-1 min-w-0 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-full">
+                  <Calendar className="w-3 h-3" />
+                  {periodLabel}
+                </span>
+                {customFrom && !customTo && (
+                  <span className="text-[11px] text-gray-400">Klik tanggal akhir di kalender untuk menutup rentang</span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                <SummaryCard icon={Hash} iconClass="bg-violet-50 text-violet-600" label="Total Qty" value={report?.grandTotal ?? 0} caption="leads terverifikasi" />
+                <SummaryCard icon={Layers} iconClass="bg-fuchsia-50 text-fuchsia-600" label="Kata Kunci" value={report?.rows.length ?? 0} caption="barang unik" />
+                <SummaryCard
+                  icon={Trophy}
+                  iconClass="bg-amber-50 text-amber-600"
+                  label="Channel Teratas"
+                  value={topChannel ? topChannel.qty : 0}
+                  caption={topChannel ? channelLabel(topChannel.channel) : "—"}
+                />
+                <SummaryCard icon={Clock} iconClass="bg-gray-100 text-gray-500" label="Menunggu Audit" value={report?.pendingAuditCount ?? 0} caption="belum dihitung" />
+              </div>
             </div>
 
-            {period === "custom" && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                <input
-                  type="date"
-                  value={customFrom}
-                  max={customTo || undefined}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  className="px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white"
-                />
-                <span className="text-xs text-gray-400">s/d</span>
-                <input
-                  type="date"
-                  value={customTo}
-                  min={customFrom || undefined}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  className="px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white"
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-            <SummaryCard icon={Hash} iconClass="bg-violet-50 text-violet-600" label="Total Qty" value={report?.grandTotal ?? 0} caption="leads terverifikasi" />
-            <SummaryCard icon={Layers} iconClass="bg-fuchsia-50 text-fuchsia-600" label="Kata Kunci" value={report?.rows.length ?? 0} caption="barang unik" />
-            <SummaryCard
-              icon={Trophy}
-              iconClass="bg-amber-50 text-amber-600"
-              label="Channel Teratas"
-              value={topChannel ? topChannel.qty : 0}
-              caption={topChannel ? channelLabel(topChannel.channel) : "—"}
-            />
-            <SummaryCard icon={Clock} iconClass="bg-gray-100 text-gray-500" label="Menunggu Audit" value={report?.pendingAuditCount ?? 0} caption="belum dihitung" />
+            <div className="shrink-0 self-center lg:self-start">
+              <InlineDateRange from={customFrom} to={customTo} onChange={handleDateRangeChange} />
+            </div>
           </div>
         </div>
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { fetchAllRows } from "@/lib/supabase-paginate";
+import { isPriceRange, type PriceRange } from "@/lib/price-range";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ interface NormalizedReport {
   sumber: string | null;
   ads: string | null;
   purchased: boolean;
+  price_range: PriceRange;
 }
 // Discriminated union (pakai flag `success`) supaya TypeScript bisa menyempitkan
 // (narrow) tipe `value` menjadi PASTI ada begitu `success === true` dicek —
@@ -78,9 +80,12 @@ function validateAndNormalize(body: any): ValidationResult {
   const sumber = (body.sumber ?? "").toString().trim();
   const purchased = Boolean(body.purchased);
   const ads = (body.ads ?? "").toString().trim(); // teks bebas, opsional (seperti sumber)
+  const price_range = (body.price_range ?? "").toString().trim();
   const isNoPhone = NO_PHONE_CHANNELS.includes(channel);
 
   if (!interest) return { success: false, error: "Minat wajib diisi" };
+  // Wajib & harus salah satu opsi resmi — tolak nilai kosong/asal dari client.
+  if (!isPriceRange(price_range)) return { success: false, error: "Range harga wajib dipilih" };
   if (isNoPhone && !partner_name) {
     const message = USERNAME_CHANNELS.includes(channel) ? "Username wajib diisi" : "Nama mitra/reseller wajib diisi";
     return { success: false, error: message };
@@ -98,6 +103,7 @@ function validateAndNormalize(body: any): ValidationResult {
       sumber: sumber || null,
       purchased,
       ads: ads || null, // null jika string kosong
+      price_range,
     },
   };
 }
