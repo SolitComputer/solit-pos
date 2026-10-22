@@ -1222,6 +1222,7 @@ export default function LaporanHarianSalesPage() {
                       )}
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Nama / Kontak</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Minat</th>
+                      <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Range Harga</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Keterangan</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Sumber</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Ads</th>
@@ -1257,6 +1258,9 @@ export default function LaporanHarianSalesPage() {
                           </div>
                         </td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={entry.interest}>{entry.interest}</td>
+                        <td className="border border-gray-200 px-4 py-3 whitespace-nowrap">
+                          <PriceRangeBadge value={entry.price_range} />
+                        </td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden md:table-cell" title={entry.keterangan || undefined}>{entry.keterangan || "—"}</td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[160px] truncate hidden lg:table-cell" title={entry.sumber || undefined}>{entry.sumber || "—"}</td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={displayAds(entry.ads) || undefined}>{displayAds(entry.ads) || "—"}</td>
@@ -1341,6 +1345,7 @@ export default function LaporanHarianSalesPage() {
                         <span className={`w-1.5 h-1.5 rounded-full ${channelDotClass[entry.channel]}`} />
                         {channelLabels[entry.channel]}
                       </span>
+                      {getPriceRangeLabel(entry.price_range) && <PriceRangeBadge value={entry.price_range} />}
                       {entry.audited && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-fuchsia-50 text-fuchsia-600 ring-1 ring-inset ring-fuchsia-100">
                           <ShieldCheck className="w-2.5 h-2.5" /> Terverifikasi
@@ -1511,6 +1516,17 @@ function StatusBadge({ purchased }: { purchased: boolean }) {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-200">
       <XCircle className="w-3 h-3" /> Tidak
+    </span>
+  );
+}
+
+// Laporan lama (price_range NULL) → tampil "—" tanpa merusak layout tabel.
+function PriceRangeBadge({ value }: { value: string | null | undefined }) {
+  const label = getPriceRangeLabel(value);
+  if (!label) return <span className="text-gray-300">—</span>;
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100 tabular-nums">
+      {label}
     </span>
   );
 }
