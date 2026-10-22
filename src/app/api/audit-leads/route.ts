@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
     minat: r.minat,
     keterangan: r.keterangan,
     sumber: r.sumber ?? null,
+    price_range: null as string | null, // input manual tidak punya range harga
     transaksi: r.transaksi,
     ads: typeof r.ads === "string" ? r.ads : null, // tabel audit_leads bertipe boolean — jangan ikut
     audited: r.audited,    audited_by_name: r.audited_by_name,
@@ -97,6 +98,7 @@ export async function GET(request: NextRequest) {
     minat: r.interest,
     keterangan: r.keterangan,
     sumber: r.sumber ?? null,
+    price_range: (r.price_range ?? null) as string | null, // laporan lama = null → UI tampil "—"
     transaksi: r.purchased,
     ads: r.ads ?? null, // teks bebas dari sales
     audited: r.audited,

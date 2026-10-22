@@ -24,10 +24,12 @@ import {
   Link2,
   ShoppingBag,
   UserCircle2,
+  Wallet,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { AUDIT_LEADS_INPUT_ROLES, AUDIT_LEADS_AUDIT_ROLES, SALES_REPORT_SOFT_DELETE_ROLES, hasAnyRole } from "@/lib/permissions";
+import { getPriceRangeLabel } from "@/lib/price-range";
 
 type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "TOKOPEDIA" | "SHOPEE" | "THREADS" | "MITRA" | "RESELLER";
 
@@ -42,6 +44,8 @@ const channelLabels: Record<Channel, string> = {
 interface LeadRow {
   id: string; channel: Channel; nama: string; minat: string; keterangan: string | null;
   sumber: string | null;
+  // Hanya terisi untuk source "sales_report"; input manual & laporan lama = null.
+  price_range: string | null;
   transaksi: boolean; ads: string | null; audited: boolean; audited_by_name: string | null;
   created_by: string; created_by_name: string; created_at: string;
   source: "manual" | "sales_report";
@@ -356,6 +360,9 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                   <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><Tag className="w-3 h-3" /> Minat</span>
                   </th>
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5"><Wallet className="w-3 h-3" /> Range Harga</span>
+                  </th>
                   <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><MessageSquare className="w-3 h-3" /> Keterangan</span>
                   </th>
@@ -383,7 +390,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                 {loading && rows.length === 0 ? (
                   [1, 2, 3].map((i) => (
                     <tr key={i} className="border-b border-gray-50 last:border-0">
-                      <td colSpan={10} className="px-4 py-3.5">
+                      <td colSpan={11} className="px-4 py-3.5">
                         <div className="flex items-center gap-3 animate-pulse">
                           <div className="h-3 w-5 bg-gray-100 rounded-full" />
                           <div className="h-3 flex-1 max-w-[160px] bg-gray-100 rounded-full" />
@@ -395,7 +402,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                   ))
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-12">
+                    <td colSpan={11} className="px-4 py-12">
                       <div className="flex flex-col items-center text-center">
                         <div className="w-11 h-11 rounded-full bg-violet-50 flex items-center justify-center mb-3">
                           <Inbox className="w-5 h-5 text-violet-300" />
@@ -432,6 +439,9 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                         </span>
                       </td>
                       <td className="px-4 py-3.5 align-top text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words leading-snug" title={row.minat}>{row.minat}</td>
+                      <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <PriceRangeBadge value={row.price_range} />
+                      </td>
                       <td className="px-4 py-3.5 align-top text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words leading-snug hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
                       <td className="px-4 py-3.5 align-top text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
                       <td className="px-4 py-3.5 text-center align-middle">
@@ -552,6 +562,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                     <TransaksiBadge value={row.transaksi} />
                   </div>
                   <p className="text-xs text-gray-600 leading-relaxed">{row.minat}</p>
+                  {getPriceRangeLabel(row.price_range) && <PriceRangeBadge value={row.price_range} />}
                   {row.keterangan && <p className="text-[11px] text-gray-400 leading-relaxed">{row.keterangan}</p>}
                   {row.sumber && <p className="text-[11px] text-gray-400">Sumber: {row.sumber}</p>}
                   <div className="flex items-center gap-2 pt-0.5">
@@ -672,6 +683,16 @@ function TransaksiBadge({ value }: { value: boolean }) {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-200">
       <XCircle className="w-3 h-3" /> Belum
+    </span>
+  );
+}
+
+function PriceRangeBadge({ value }: { value: string | null | undefined }) {
+  const label = getPriceRangeLabel(value);
+  if (!label) return <span className="text-[11px] text-gray-300 font-medium">—</span>;
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100 tabular-nums">
+      {label}
     </span>
   );
 }

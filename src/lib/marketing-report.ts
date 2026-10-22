@@ -56,9 +56,6 @@ export function channelLabel(channel: string): string {
   return MARKETING_CHANNEL_LABELS[channel] ?? channel;
 }
 
-export type MarketingPeriod = "today" | "week" | "month" | "custom";
-export const MARKETING_PERIODS: MarketingPeriod[] = ["today", "week", "month", "custom"];
-
 export interface MarketingReportRow {
   key: string; // kata kunci ter-normalisasi (lowercase, spasi rapi) — dipakai sebagai id grup
   keyword: string; // label tampilan (variasi penulisan yang paling sering dipakai sales)
@@ -157,8 +154,9 @@ export function aggregateMarketingReport(
 
 // ── Rentang tanggal (WIB) ────────────────────────────────────────────────────
 
+// startUtc / endUtc null = sisi itu tidak dibatasi.
 type RangeResult =
-  | { success: true; value: { startUtc: string; endUtc: string | null } }
+  | { success: true; value: { startUtc: string | null; endUtc: string | null } }
   | { success: false; error: string };
 
 function wibMidnightToUtcIso(wibMidnightMs: number): string {
@@ -178,47 +176,30 @@ function parseWibDate(value: string | null | undefined): number | null {
   return ms;
 }
 
-// Logika today/week/month SAMA dengan getPeriodStartUtc di
-// src/app/api/sales-reports/route.ts (sengaja diduplikasi, bukan di-import,
-// supaya route Laporan Harian Sales yang sudah jalan tidak perlu diubah).
-export function resolvePeriodRangeUtc(
-  period: MarketingPeriod,
-  from?: string | null,
-  to?: string | null
-): RangeResult {
-  const nowWib = new Date(Date.now() + WIB_OFFSET_MS);
-  const startOfTodayWib = Date.UTC(nowWib.getUTCFullYear(), nowWib.getUTCMonth(), nowWib.getUTCDate());
+// Rentang tanggal mengikuti kontrak kalender InlineDateRange (sama dgn Cashflow):
+//   from="" & to=""  → Semua (tanpa batas tanggal)
+//   from saja        → mulai `from` dan seterusnya
+//   to saja          → s/d `to`
+//   from & to        → from s/d to, INKLUSIF (to dipakai sampai 23:59:59 WIB)
+// Tanggal dihitung dalam WIB lalu dikonversi ke UTC untuk query created_at.
+export function resolveDateRangeUtc(from?: string | null, to?: string | null): RangeResult {
+  const hasFrom = Boolean(from);
+  const hasTo = Boolean(to);
+  const fromMs = hasFrom ? parseWibDate(from) : null;
+  const toMs = hasTo ? parseWibDate(to) : null;
 
-  if (period === "today") {
-    return { success: true, value: { startUtc: wibMidnightToUtcIso(startOfTodayWib), endUtc: null } };
-  }
-
-  if (period === "week") {
-    const day = new Date(startOfTodayWib).getUTCDay(); // 0 = Minggu
-    const diffToMonday = day === 0 ? 6 : day - 1;
-    return {
-      success: true,
-      value: { startUtc: wibMidnightToUtcIso(startOfTodayWib - diffToMonday * DAY_MS), endUtc: null },
-    };
-  }
-
-  if (period === "month") {
-    const startOfMonthWib = Date.UTC(nowWib.getUTCFullYear(), nowWib.getUTCMonth(), 1);
-    return { success: true, value: { startUtc: wibMidnightToUtcIso(startOfMonthWib), endUtc: null } };
-  }
-
-  // custom: from & to inklusif (YYYY-MM-DD, WIB)
-  const fromMs = parseWibDate(from);
-  const toMs = parseWibDate(to);
-  if (fromMs === null || toMs === null) {
+  if ((hasFrom && fromMs === null) || (hasTo && toMs === null)) {
     return { success: false, error: "Tanggal tidak valid (format YYYY-MM-DD)" };
   }
-  if (fromMs > toMs) {
+  if (fromMs !== null && toMs !== null && fromMs > toMs) {
     return { success: false, error: "Tanggal awal tidak boleh setelah tanggal akhir" };
   }
   return {
     success: true,
-    value: { startUtc: wibMidnightToUtcIso(fromMs), endUtc: wibMidnightToUtcIso(toMs + DAY_MS) },
+    value: {
+      startUtc: fromMs !== null ? wibMidnightToUtcIso(fromMs) : null,
+      endUtc: toMs !== null ? wibMidnightToUtcIso(toMs + DAY_MS) : null,
+    },
   };
 }
 

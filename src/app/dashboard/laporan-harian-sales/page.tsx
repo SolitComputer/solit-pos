@@ -23,9 +23,12 @@ import {
   MessageSquareText,
   Megaphone,
   Search,
+  Wallet,
+  ChevronDown,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserClient } from "@/lib/auth-client";
+import { PRICE_RANGE_OPTIONS, getPriceRangeLabel, isPriceRange } from "@/lib/price-range";
 
 type Channel = "WA" | "FB" | "IG" | "TIKTOK" | "OLX" | "CAROUSEL" | "ECOMMERCE" | "TOKOPEDIA" | "SHOPEE" | "SOSMED" | "THREADS" | "MITRA" | "RESELLER";
 
@@ -166,6 +169,7 @@ interface SalesReportEntry {
   sumber: string | null;
   purchased: boolean;
   ads: string | null;
+  price_range: string | null; // null = laporan lama sebelum fitur Range Harga
   filled_by: string;
   filled_by_name: string;
   audited: boolean;
@@ -285,6 +289,7 @@ export default function LaporanHarianSalesPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [partnerName, setPartnerName] = useState("");
   const [interest, setInterest] = useState("");
+  const [priceRange, setPriceRange] = useState(""); // "" = belum dipilih
   const [keterangan, setKeterangan] = useState("");
   const [sumber, setSumber] = useState("");
   const [purchased, setPurchased] = useState(false);
@@ -425,6 +430,7 @@ export default function LaporanHarianSalesPage() {
     setPhoneNumber("");
     setPartnerName("");
     setInterest("");
+    setPriceRange("");
     setKeterangan("");
     setSumber("");
     setAds("");
@@ -445,6 +451,8 @@ export default function LaporanHarianSalesPage() {
     setPhoneNumber(entry.phone_number ?? "");
     setPartnerName(entry.partner_name ?? "");
     setInterest(entry.interest);
+    // Laporan lama (NULL) → dropdown kosong, sales wajib pilih saat edit.
+    setPriceRange(isPriceRange(entry.price_range) ? entry.price_range : "");
     setKeterangan(entry.keterangan ?? "");
     setSumber(entry.sumber ?? "");
     setPurchased(entry.purchased);
@@ -467,6 +475,10 @@ export default function LaporanHarianSalesPage() {
 
     if (!interest.trim()) {
       setFormError("Minat wajib diisi");
+      return;
+    }
+    if (!isPriceRange(priceRange)) {
+      setFormError("Range harga wajib dipilih");
       return;
     }
     if (isNoPhoneChannel && !partnerName.trim()) {
@@ -492,6 +504,7 @@ export default function LaporanHarianSalesPage() {
             phone_number: isNoPhoneChannel ? "" : phoneNumber.trim(),
             partner_name: isNoPhoneChannel ? partnerName.trim() : "",
             interest: interest.trim(),
+            price_range: priceRange,
             keterangan: keterangan.trim(),
             sumber: sumber.trim(),
             purchased,
@@ -794,6 +807,29 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
+                {/* Range Harga (wajib) — kode disimpan ke kolom price_range,
+                    label diambil dari src/lib/price-range.ts. */}
+                <div>
+                  <label htmlFor="price-range" className="text-xs font-medium text-gray-600 mb-1 block">Range Harga</label>
+                  <div className="relative">
+                    <Wallet className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <select
+                      id="price-range"
+                      value={priceRange}
+                      onChange={(e) => setPriceRange(e.target.value)}
+                      className={`w-full appearance-none cursor-pointer pl-8 pr-9 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors ${priceRange ? "text-gray-900" : "text-gray-400"}`}
+                    >
+                      <option value="" disabled>Pilih range harga</option>
+                      {PRICE_RANGE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value} className="text-gray-900">
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Keterangan (opsional)</label>
                   <div className="relative">
@@ -920,6 +956,7 @@ export default function LaporanHarianSalesPage() {
                     <p><span className="text-gray-400">Channel:</span> <span className="font-medium text-gray-700">{channelLabels[auditTarget.channel]}</span></p>
                     <p><span className="text-gray-400">Kontak:</span> <span className="font-medium text-gray-700">{auditTarget.phone_number || auditTarget.partner_name}</span></p>
                     <p><span className="text-gray-400">Minat:</span> <span className="font-medium text-gray-700">{auditTarget.interest}</span></p>
+                    <p><span className="text-gray-400">Range Harga:</span> <span className="font-medium text-gray-700">{getPriceRangeLabel(auditTarget.price_range) ?? "—"}</span></p>
                     {auditTarget.keterangan && (
                       <p><span className="text-gray-400">Keterangan:</span> <span className="font-medium text-gray-700">{auditTarget.keterangan}</span></p>
                     )}
