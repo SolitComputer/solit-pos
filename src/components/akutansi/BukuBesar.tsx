@@ -90,6 +90,8 @@ export default function BukuBesar({ period }: { period: string }) {
     const [tableSearch, setTableSearch] = useState("");
     // Filter status cek: "all" = semua, "checked" = sudah dicek, "unchecked" = belum dicek
     const [checkFilter, setCheckFilter] = useState<"all" | "checked" | "unchecked">("all");
+    // Filter nama pencentang: "all" = semua, atau nama orang tertentu (lihat hanya baris yang dia cek)
+    const [checkerFilter, setCheckerFilter] = useState<string>("all");
     const [data, setData] = useState<LedgerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -239,6 +241,9 @@ export default function BukuBesar({ period }: { period: string }) {
             if (checkFilter === "checked" && !l.checked) return false;
             if (checkFilter === "unchecked" && (l.checked || l.is_synthetic)) return false;
 
+            // 1b) Filter nama pencentang — kalau nama dipilih, hanya baris yang dicek orang itu
+            if (checkerFilter !== "all" && l.checked_by_name !== checkerFilter) return false;
+
             // 2) Filter pencarian teks (kalau kosong, lolos semua)
             if (!q) return true;
             if (l.keterangan.toLowerCase().includes(q)) return true;
@@ -246,7 +251,29 @@ export default function BukuBesar({ period }: { period: string }) {
             if (l.kredit > 0 && (String(l.kredit).includes(q) || rp(l.kredit).toLowerCase().includes(q))) return true;
             return false;
         });
-    }, [data, tableSearch, checkFilter]);
+    }, [data, tableSearch, checkFilter, checkerFilter]);
+
+    // Daftar nama pencentang yang unik (buat opsi dropdown filter).
+    // Diambil dari baris yang sudah dicek & punya nama — diurut alfabet biar rapi.
+    const checkerNames = useMemo(() => {
+        if (!data) return [];
+        const set = new Set<string>();
+        for (const l of data.lines) {
+            if (l.checked && l.checked_by_name) set.add(l.checked_by_name);
+        }
+        return Array.from(set).sort((a, b) => a.localeCompare(b, "id-ID"));
+    }, [data]);
+
+    // Kalau nama yang sedang difilter sudah tidak ada lagi di daftar pencentang
+    // (misal baris terakhirnya di-uncheck), balikin filter ke "Semua" biar tabel
+    // nggak jadi kosong tanpa sebab yang kelihatan.
+    // CATATAN: wajib DI BAWAH `checkerNames` — kalau di atas, variabelnya masih
+    // di TDZ saat baris ini dirender (ini persis sumber error-nya).
+    useEffect(() => {
+        if (checkerFilter !== "all" && !checkerNames.includes(checkerFilter)) {
+            setCheckerFilter("all");
+        }
+    }, [checkerNames, checkerFilter]);
 
     const normalSide = useMemo(() => getNormalSide(accountCode), [accountCode]);
 
@@ -370,9 +397,25 @@ export default function BukuBesar({ period }: { period: string }) {
                 </div>
             )}
 
-            {/* ── Filter status cek ── */}
+            {/* ── Filter status cek & nama pencentang ── */}
             {data && data.lines.length > 0 && (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2 flex-wrap">
+                    {/* Filter per nama pencentang — hanya muncul kalau ada yang sudah dicek */}
+                    {checkerNames.length > 0 && (
+                        <select
+                            value={checkerFilter}
+                            onChange={(e) => setCheckerFilter(e.target.value)}
+                            title="Filter berdasarkan siapa yang mencentang"
+                            className="h-9 border border-gray-200 rounded-lg px-3 pr-8 text-xs font-bold bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition cursor-pointer"
+                        >
+                            <option value="all">Semua Pencentang</option>
+                            {checkerNames.map((name) => (
+                                <option key={name} value={name}>
+                                    {name} ({data.lines.filter((l) => l.checked_by_name === name).length})
+                                </option>
+                            ))}
+                        </select>
+                    )}
                     <select
                         value={checkFilter}
                         onChange={(e) => setCheckFilter(e.target.value as "all" | "checked" | "unchecked")}
