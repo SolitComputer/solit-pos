@@ -270,7 +270,8 @@ const AUDIT_LEADS_MENU: MenuGroup = {
     { name: "Reseller", href: "/dashboard/audit-leads/reseller", icon: Icons.salesReport },
   ],
 };
-const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashboard/hasil-penjualan", icon: Icons.salesResult };
+
+const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Laporan Marketing", href: "/dashboard/laporan-marketing", icon: Icons.salesResult };
 const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };

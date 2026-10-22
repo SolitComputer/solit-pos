@@ -1,0 +1,94 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { withAuth, AuthUser } from "@/lib/auth";
+import { fetchAllRows } from "@/lib/supabase-paginate";
+import { hasAnyRole, SALES_REPORT_AUDIT_ROLES } from "@/lib/permissions";
+import {
+  aggregateMarketingReport,
+  resolvePeriodRangeUtc,
+  MARKETING_PERIODS,
+  type AuditedReportLite,
+  type MarketingPeriod,
+} from "@/lib/marketing-report";
+
+export const dynamic = "force-dynamic";
+
+// Sumber data = tabel Laporan Harian Sales. Route ini READ-ONLY — tidak
+// menulis apa pun, jadi fungsi Laporan Harian Sales tidak terpengaruh.
+const TABLE = "sales_online_reports";
+
+// Yang boleh lihat Laporan Marketing = role yang boleh audit laporan sales
+// (ADMIN, PROGRAMMER, ASISTEN_CEO, KEPALA_MARKETING, MARKETING, PKL_MARKETING)
+// — sama persis dengan role yang dapat menu grup "Marketing" di sidebar.
+const VIEW_ROLES = SALES_REPORT_AUDIT_ROLES;
+
+function getUserRoles(user: AuthUser): string[] {
+  const anyUser = user as any;
+  return Array.isArray(anyUser?.roles) && anyUser.roles.length > 0
+    ? anyUser.roles
+    : [anyUser?.role].filter(Boolean);
+}
+
+// GET /api/marketing-report?period=today|week|month
+// GET /api/marketing-report?period=custom&from=YYYY-MM-DD&to=YYYY-MM-DD
+async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
+  try {
+    if (!hasAnyRole(getUserRoles(user), VIEW_ROLES)) {
+      return NextResponse.json({ success: false, message: "Tidak punya akses Laporan Marketing" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const rawPeriod = searchParams.get("period") || "month";
+    const period: MarketingPeriod = (MARKETING_PERIODS as string[]).includes(rawPeriod)
+      ? (rawPeriod as MarketingPeriod)
+      : "month";
+
+    const range = resolvePeriodRangeUtc(period, searchParams.get("from"), searchParams.get("to"));
+    if (!range.success) {
+      return NextResponse.json({ success: false, message: range.error }, { status: 400 });
+    }
+    const { startUtc, endUtc } = range.value;
+
+    // 1) Laporan yang SUDAH diaudit → bahan rekap.
+    //    Cuma ambil 2 kolom yang dibutuhkan (hemat bandwidth).
+    const { data, error } = await fetchAllRows((from, to) => {
+      let q = supabaseAdmin
+        .from(TABLE)
+        .select("id, channel, interest")
+        .is("deleted_at", null)
+        .eq("audited", true)
+        .gte("created_at", startUtc);
+      if (endUtc) q = q.lt("created_at", endUtc);
+      return q
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+    });
+    if (error) throw new Error(error.message);
+
+    // 2) Jumlah laporan yang BELUM diaudit di periode yang sama — cuma info
+    //    di UI ("x laporan menunggu audit"), TIDAK ikut dihitung di Qty.
+    let pendingQuery = supabaseAdmin
+      .from(TABLE)
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .eq("audited", false)
+      .gte("created_at", startUtc);
+    if (endUtc) pendingQuery = pendingQuery.lt("created_at", endUtc);
+    const { count: pendingAuditCount, error: pendingError } = await pendingQuery;
+    if (pendingError) throw new Error(pendingError.message);
+
+    const report = aggregateMarketingReport((data ?? []) as AuditedReportLite[]);
+
+    return NextResponse.json({
+      success: true,
+      data: { ...report, pendingAuditCount: pendingAuditCount ?? 0 },
+    });
+  } catch (error: any) {
+    // Detail error cuma masuk log PM2, jangan bocorkan nama tabel/kolom ke client.
+    console.error("Marketing report error:", error);
+    return NextResponse.json({ success: false, message: "Gagal memuat Laporan Marketing." }, { status: 500 });
+  }
+}
+
+export const GET = withAuth(getHandler);
