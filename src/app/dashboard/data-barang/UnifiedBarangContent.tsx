@@ -413,7 +413,14 @@ function readBarangFilter(): Partial<BarangFilterState> | null {
     if (typeof window === "undefined") return null;
     try {
         const raw = sessionStorage.getItem(BARANG_FILTER_KEY);
-        return raw ? (JSON.parse(raw) as Partial<BarangFilterState>) : null;
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as Partial<BarangFilterState>;
+        // kategoriFilter WAJIB array of string. Data versi lama (string tunggal)
+        // atau korup dibuang supaya Set/map di filteredRows tidak salah hitung.
+        parsed.kategoriFilter = Array.isArray(parsed.kategoriFilter)
+            ? parsed.kategoriFilter.filter((id): id is string => typeof id === "string")
+            : undefined;
+        return parsed;
     } catch {
         return null;
     }
@@ -802,6 +809,9 @@ export default function UnifiedBarangContent() {
     const [rows, setRows] = useState<UnifiedRow[]>(() => bootCache?.rows ?? []);
     const [loading, setLoading] = useState(() => bootCache === null);
     const [categories, setCategories] = useState<{ id: string; name: string; type?: string | null }[]>([]);
+    // true setelah fetch /api/categories selesai (sukses/gagal) — dipakai supaya
+    // filter kategori hasil restore tidak dievaluasi sebelum daftar kategori ada.
+    const [categoriesReady, setCategoriesReady] = useState(false);
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
     // Set unit_id yang sedang dipinjam (APPROVED) — penanda "Di Pinjam".
@@ -964,6 +974,7 @@ export default function UnifiedBarangContent() {
                 const json = await res.json();
                 if (json.success) setCategories(json.data);
             } catch { /* dropdown kosong kalau gagal, tidak fatal */ }
+            finally { setCategoriesReady(true); }
         })();
     }, []);
 
@@ -991,11 +1002,7 @@ export default function UnifiedBarangContent() {
         })();
     }, []);
 
-    const tipeChangeFirstRun = useRef(true);
-    useEffect(() => {
-        if (tipeChangeFirstRun.current) { tipeChangeFirstRun.current = false; return; }
-        setKategoriFilter([]);
-    }, [tipeFilter]);
+
 
     useEffect(() => {
         writeBarangFilter({
@@ -1004,9 +1011,17 @@ export default function UnifiedBarangContent() {
         });
     }, [tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, sortBy, search, onlyUncategorized]);
 
+    // ?tipe= = deep-link SEKALI pakai. Setelah diterapkan, param dibuang dari
+    // URL supaya refresh/back tidak menimpa ulang filter tersimpan user.
+    // Aman di Strict Mode: run kedua tidak menemukan param lagi → no-op.
     useEffect(() => {
-        const t = new URLSearchParams(window.location.search).get("tipe");
+        const url = new URL(window.location.href);
+        const t = url.searchParams.get("tipe");
         if (t === "LAPTOP" || t === "AKSESORIS") setTipeFilter(t);
+        if (t !== null) {
+            url.searchParams.delete("tipe");
+            window.history.replaceState(null, "", url.toString());
+        }
     }, []);
 
     useEffect(() => {
@@ -1048,6 +1063,22 @@ export default function UnifiedBarangContent() {
     const filterCategories = tipeFilter === "LAPTOP" ? laptopCategories
         : tipeFilter === "AKSESORIS" ? accessoryCategories
             : categories;
+
+    // Pengganti efek "reset kategori saat tipe berubah". Bukan mengosongkan
+    // total — hanya membuang ID kategori yang TIDAK cocok dengan tipe aktif
+    // (atau kategorinya sudah dihapus). Baru jalan setelah kategori termuat,
+    // jadi filter hasil restore dari sessionStorage tidak ikut terhapus,
+    // dan aman di React Strict Mode (idempotent, tidak bergantung run pertama).
+    useEffect(() => {
+        if (!categoriesReady || categories.length === 0 || kategoriFilter.length === 0) return;
+        const allowed = new Set(filterCategories.map(c => c.id));
+        const pruned = kategoriFilter.filter(id => allowed.has(id));
+        if (pruned.length !== kategoriFilter.length) setKategoriFilter(pruned);
+    }, [categoriesReady, categories, filterCategories, kategoriFilter]);
+
+    // Filter kategori aktif tapi daftar kategori belum ada → tahan tampilan di
+    // state loading, jangan tampilkan hasil filter yang belum valid.
+    const waitingCategoryFilter = kategoriFilter.length > 0 && !categoriesReady;
 
     const availableBrands = useMemo(() => {
         const set = new Set<string>();
@@ -1999,6 +2030,12 @@ export default function UnifiedBarangContent() {
                                     {filteredRows.length} dari {rows.length} barang
                                 </span>
 
+                                {tipeFilter !== "ALL" && (
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium max-w-full">
+                                        <span className="truncate">Tipe: {tipeFilter === "LAPTOP" ? "Laptop" : "Aksesoris"}</span>
+                                        <button onClick={() => setTipeFilter("ALL")} className="hover:text-rose-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                                    </span>
+                                )}
                                 {kategoriFilter.length > 0 && (
                                     <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium max-w-full">
                                         <span className="truncate">
@@ -2044,7 +2081,7 @@ export default function UnifiedBarangContent() {
                     </div>
 
                     {/* ── TABEL / DAFTAR BARANG ── */}
-                    {loading ? (
+                    {loading || waitingCategoryFilter ? (
                         <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm py-16 text-center text-sm text-zinc-400">Memuat data...</div>
                     ) : filteredRows.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm py-16 text-center px-4">

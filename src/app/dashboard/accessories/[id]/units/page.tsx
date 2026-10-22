@@ -1951,7 +1951,10 @@ export default function AccessoryUnitsPage() {
 
                     {/* Breadcrumb */}
                     <div className="flex items-center gap-2 text-sm">
-                        <Link href="/dashboard/data-barang?tab=barang&tipe=AKSESORIS" className="text-gray-400 hover:text-gray-600 transition">
+                        {/* Tanpa ?tipe= — filter Data Barang (tipe, kategori, search, dll)
+                            dipulihkan dari sessionStorage. Memaksa tipe di sini dulu
+                            menimpa filter user & menghapus kategori yang dipilih. */}
+                        <Link href="/dashboard/data-barang?tab=barang" className="text-gray-400 hover:text-gray-600 transition">
                             Data Aksesori
                         </Link>
                         <svg className="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
