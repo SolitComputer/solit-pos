@@ -60,6 +60,11 @@ const PKL_BLOCKED_ROUTES = ["/dashboard/users"];
 
 const SO_ONLY_USER_IDS = ["203810b5-f9e0-4de4-9495-e1378451fa29"];
 
+// Role yang DIKUNCI hanya boleh fitur SO. Hak akses dasar seperti Pengelola
+// Barang, tapi semua path non-SO di domain inventaris diblok — pola sama persis
+// dgn akun SO-only di atas, tapi per-ROLE.
+const SO_ONLY_ROLES = ["ADMIN_BARANG"];
+
 const SO_ONLY_DOMAIN_PREFIXES = [
   "/dashboard/data-barang",
   "/dashboard/accessories",
@@ -622,7 +627,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Gate tambahan: akun SO-only (lihat SO_ONLY_USER_IDS di atas) ──────────
-  if (SO_ONLY_USER_IDS.includes(user.id) && isSoOnlyRestrictedPath(pathname)) {
+  const isSoOnlyUser = SO_ONLY_USER_IDS.includes(user.id) || userRoles.some(r => SO_ONLY_ROLES.includes(r));
+  if (isSoOnlyUser && isSoOnlyRestrictedPath(pathname)) {
     if (!isPageRoute) {
       return NextResponse.json(
         { success: false, message: "Forbidden: akun ini hanya diizinkan mengakses fitur SO" },

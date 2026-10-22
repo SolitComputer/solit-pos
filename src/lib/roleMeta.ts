@@ -41,6 +41,7 @@ export const KEPALA_ROLES = new Set<string>([
   "KEPALA_PENYEDIA_BARANG",
   "KEPALA_SOTECH",
   "KEPALA_PENGELOLA_BARANG",
+  "KEPALA_ADMIN_BARANG",
 ]);
 
 export const PKL_ROLE_SET = new Set<string>([
@@ -70,6 +71,8 @@ export const ROLE_LABEL: Record<string, string> = {
   ACCOUNTING: "Accounting",
   PENGELOLA_BARANG: "Pengelola Barang",
   KEPALA_PENGELOLA_BARANG: "Kepala Pengelola Barang",
+  KEPALA_ADMIN_BARANG: "Kepala Admin Barang",
+  ADMIN_BARANG: "Admin Barang",
   TEKNISI: "Teknisi",
   PENGANTARAN: "Pengantaran",
   MARKETING: "Marketing",
@@ -109,6 +112,8 @@ export const ROLE_BADGE_STYLE: Record<string, BadgeStyle> = {
   ACCOUNTING: { bg: "#fffbeb", text: "#92400e", border: "#fde68a" },
   PENGELOLA_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
   KEPALA_PENGELOLA_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+  KEPALA_ADMIN_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+  ADMIN_BARANG: { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
   TEKNISI: { bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" },
   PENGANTARAN: { bg: "#f0fdfa", text: "#0f766e", border: "#99f6e4" },
   MARKETING: { bg: "#fdf2f8", text: "#9d174d", border: "#fbcfe8" },
@@ -147,6 +152,8 @@ export const ROLE_AVATAR_COLOR: Record<string, string> = {
   ACCOUNTING: "#d97706",
   PENGELOLA_BARANG: "#2563eb",
   KEPALA_PENGELOLA_BARANG: "#1d4ed8",
+  KEPALA_ADMIN_BARANG: "#1d4ed8",
+  ADMIN_BARANG: "#0369a1",
   TEKNISI: "#ea580c",
   PENGANTARAN: "#0d9488",
   KEPALA_ZENITH: "#7c3aed",
