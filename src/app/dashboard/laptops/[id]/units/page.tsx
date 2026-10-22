@@ -271,13 +271,13 @@ export default function UnitsPage() {
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
     const canSeePriceInfo = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
-        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
+        "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
     ] as UserRole[]);
     //  Daftar role sama persis dgn canExport di Data Barang (LaptopsContent.tsx)
     //  supaya hak akses export Excel konsisten di kedua halaman.
     const canExport = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
-        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "KEPALA_SOTECH",
+        "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_TEKNISI", "KEPALA_SOTECH",
         "MARKETING", "KEPALA_MARKETING",
     ] as UserRole[]);
     //  Full Access → boleh toggle mode Edit di Pop-up Detail unit
@@ -1428,6 +1428,17 @@ export default function UnitsPage() {
                     onClose={closeForm}
                     onSuccess={handleFormSuccess}
                     onError={(msg) => setAlertModal(msg)}
+                />
+            )}
+
+            {/* ✅ FIX: modal Tambah Banyak dulu di-import tapi TIDAK pernah
+                di-render → tombolnya seolah "mati". */}
+            {showBulkModal && (
+                <BulkAddUnitModal
+                    laptopId={laptopId}
+                    defaultSellingPrice={laptop?.selling_price ?? 0}
+                    onClose={() => setShowBulkModal(false)}
+                    onSuccess={handleFormSuccess}
                 />
             )}
 

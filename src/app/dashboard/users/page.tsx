@@ -481,12 +481,12 @@ function MultiRoleSelect({
   const ALL_ROLE_GROUPS = useMemo(() => {
     const groups = [
       { label: "Akses Penuh", roles: ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] },
-      { label: "Management", roles: ["KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] },
+      { label: "Management", roles: ["KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG"] },
       {
         label: "Operasional",
         roles: [
           "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
-          "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN",
+          "PENGELOLA_BARANG", "ADMIN_BARANG", "TEKNISI", "PENGANTARAN",
           "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"
         ]
       },
