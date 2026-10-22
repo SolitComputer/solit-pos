@@ -1923,6 +1923,141 @@ async function buildSparepartDrafts(
   return drafts;
 }
 
+// ── BARANG RETURN: SN diretur ke supplier → kas masuk, persediaan turun ──────
+// Jurnal: Dr 110 (Kas Saldo) / Cr 130 (HPP/Laptop) atau 170 (Aksesoris).
+// Sumbernya tabel item_returns yang BELUM di-restore. Muncul sebagai draft
+// PENDING — baru masuk jurnal umum setelah dikonfirmasi, sama seperti draft lain.
+async function buildItemReturnDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: rows, error } = await supabase
+    .from("item_returns")
+    .select("id, item_type, serial_number, item_name, supplier, harga, tanggal, keterangan, created_at")
+    .eq("is_restored", false)
+    .gte("created_at", startISO)
+    .lt("created_at", endISO)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch item_returns:", error.message);
+    return [];
+  }
+  if (!rows || rows.length === 0) return [];
+
+  const drafts: JournalDraft[] = [];
+  for (const r of rows as any[]) {
+    const nominal = Math.round(Number(r.harga ?? 0));
+    if (nominal <= 0) continue;
+
+    // Laptop → akun persediaan 130 (HPP). Aksesoris → 170 (Aksesoris).
+    const kreditAccount = r.item_type === "LAPTOP" ? AKUN.HPP : AKUN.AKSESORIS;
+    const tanggal = jakartaDate(r.created_at as string);
+
+    const lines = mergeLines([
+      { account_code: AKUN.KAS_SALDO, side: "DEBIT", nominal },    // 110
+      { account_code: kreditAccount, side: "KREDIT", nominal },    // 130 / 170
+    ]);
+
+    drafts.push({
+      source_type: "RETURN",
+      source_id: String(r.id),
+      source_category: "BARANG_RETURN",
+      tanggal,
+      sort_ts: (r.created_at as string) || `${tanggal}T00:00:00+07:00`,
+      keterangan: `Retur ${r.item_type === "LAPTOP" ? "Laptop" : "Aksesoris"} · ${r.item_name ?? "—"} - ${r.serial_number} - ${r.supplier}`,
+      ref: (r.serial_number as string) || null,
+      lines,
+      total: totalOf(lines),
+      meta: {
+        serial_number: r.serial_number ?? null,
+        supplier: r.supplier ?? null,
+        nominal,
+        modal_missing: false,
+      },
+    });
+  }
+
+  return drafts;
+}
+
+// ── BARANG RETURN REVERSAL: retur di-restore → balik jurnal D130/170 /K110 ────
+// Membalik jurnal forward (D110/K130·170) yang SUDAH diposting untuk retur itu,
+// di TANGGAL restore (restored_at). Kalau forward-nya belum pernah diposting
+// (masih pending saat di-restore), tidak ada yang dibalik — net-nya nol.
+// Muncul sebagai draft PENDING.
+async function buildItemReturnReversalDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: rows, error } = await supabase
+    .from("item_returns")
+    .select("id, serial_number, item_name, supplier, restored_at")
+    .eq("is_restored", true)
+    .not("restored_at", "is", null)
+    .gte("restored_at", startISO)
+    .lt("restored_at", endISO)
+    .order("restored_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch item_returns (reversal):", error.message);
+    return [];
+  }
+  if (!rows || rows.length === 0) return [];
+
+  // Ambil baris jurnal forward yang sudah diposting (source_id polos).
+  const ids = rows.map((r) => String(r.id));
+  const postedLinesById = new Map<string, any[]>();
+  for (const batch of chunkArray(ids, 150)) {
+    const { data: existing } = await supabase
+      .from("journal_entries")
+      .select("source_id, lines:journal_lines(account_code, side, nominal)")
+      .eq("source_type", "RETURN")
+      .in("source_id", batch);
+    for (const e of (existing ?? []) as any[]) {
+      postedLinesById.set(String(e.source_id), e.lines ?? []);
+    }
+  }
+
+  const drafts: JournalDraft[] = [];
+  for (const r of rows as any[]) {
+    const idStr = String(r.id);
+    const postedLines = postedLinesById.get(idStr);
+    if (!postedLines || postedLines.length === 0) continue; // forward belum diposting → tak ada yang dibalik
+
+    const flipped: DraftLine[] = [];
+    for (const l of postedLines) {
+      const nominal = Math.round(Number(l.nominal));
+      if (nominal <= 0) continue;
+      flipped.push({
+        account_code: l.account_code as string,
+        side: l.side === "DEBIT" ? "KREDIT" : "DEBIT", // ← balik sisi
+        nominal,
+      });
+    }
+    if (flipped.length === 0) continue;
+
+    const merged = mergeLines(flipped);
+    const tanggal = jakartaDate(r.restored_at as string);
+    drafts.push({
+      source_type: "RETURN",
+      source_id: `${idStr}__REVERSAL`,
+      source_category: "BARANG_RETURN_REVERSAL",
+      tanggal,
+      sort_ts: (r.restored_at as string) || `${tanggal}T00:00:00+07:00`,
+      keterangan: `Pembatalan Retur · ${r.item_name ?? "—"} - ${r.serial_number} - ${r.supplier}`,
+      ref: (r.serial_number as string) || null,
+      lines: merged,
+      total: totalOf(merged),
+      meta: { serial_number: r.serial_number ?? null, is_reversal: true, modal_missing: false },
+    });
+  }
+
+  return drafts;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 export async function buildDraftsForPeriod(
   supabase: SupabaseClient,
@@ -1930,7 +2065,7 @@ export async function buildDraftsForPeriod(
 ): Promise<JournalDraft[]> {
   const { startISO, endISO, startDate, endDateExclusive } = periodRange(period);
 
-   const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal, sparepart] = await Promise.all([
+   const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal, sparepart, itemReturn, itemReturnReversal] = await Promise.all([
     buildTransactionDrafts(supabase, startISO, endISO),
     buildTransactionAccrualDrafts(supabase, startISO, endISO),
     buildTransactionPaymentDrafts(supabase, startISO, endISO),
@@ -1940,9 +2075,11 @@ export async function buildDraftsForPeriod(
     buildItemOutflowKebutuhanDrafts(supabase, startISO, endISO),
     buildItemOutflowKebutuhanReversalDrafts(supabase, startISO, endISO),
     buildSparepartDrafts(supabase, period), //  NEW
+    buildItemReturnDrafts(supabase, startISO, endISO),         // ⬅️ retur masuk pending
+    buildItemReturnReversalDrafts(supabase, startISO, endISO), // ⬅️ pembatalan retur masuk pending
   ]);
 
-  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan, ...kebutuhanReversal, ...sparepart].sort((a, b) => {
+  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan, ...kebutuhanReversal, ...sparepart, ...itemReturn, ...itemReturnReversal].sort((a, b) => {
     if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
     return a.sort_ts.localeCompare(b.sort_ts);
   });

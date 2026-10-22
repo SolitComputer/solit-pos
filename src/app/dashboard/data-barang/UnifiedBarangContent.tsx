@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useDeferredValue, useRef } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Filter, RotateCcw, SlidersHorizontal, ArrowUpDown, Search, X, ChevronDown, ChevronUp, Tag, Maximize2, Minimize2 } from "lucide-react";
+import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, RotateCcw, SlidersHorizontal, ArrowUpDown, Search, X, ChevronDown, ChevronUp, Maximize2, Minimize2 } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
@@ -167,7 +167,7 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     // sama seperti SOLD, tapi tetap dibedakan dari penjualan di laporan.
     // msj_group_id terisi = unit sudah masuk Kelompok Minus Siap Jual → disembunyikan
     // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
-    const aktif = units.filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id);
+    const aktif = units.filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && u.status !== "RETURNED" && !u.msj_group_id);
     const siapJual = aktif.filter(u => u.status === "SIAP_JUAL").length;
     // "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual (bisa dibikin
     // payment). Dihitung terpisah dari minus biasa (SERVICE/BELUM_SIAP) yang
@@ -214,7 +214,7 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok.
     // msj_group_id terisi = unit sudah masuk Kelompok Minus Siap Jual → disembunyikan
     // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
-    const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && !u.msj_group_id);
+    const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && u.status !== "RETURNED" && !u.msj_group_id);
     const one = aktif.length === 1 ? aktif[0] : null;
     // Progress SO & Audit per-unit aksesoris (audit kolomnya sudah ada — R3 selesai).
     const soDoneAcc = aktif.filter(u => isUnitSoActive(u.so_at)).length;
@@ -1200,7 +1200,7 @@ export default function UnifiedBarangContent() {
     // ── Export Excel: RINGKAS (1 baris per model) ──────────────────────────
     const handleExportRingkas = useCallback(() => {
         try {
-            const exportRows: Record<string, string | number>[] = [];
+            const exportRows: Record<string, string | number>[] = []; 
             let no = 1;
 
             filteredRows.forEach((row) => {

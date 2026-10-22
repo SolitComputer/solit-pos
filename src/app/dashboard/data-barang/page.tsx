@@ -7,11 +7,12 @@
   import OutflowsContent from "./OutflowsContent";
   import CategoriesContent from "./CategoriesContent";
   import ArsipContent from "./ArsipContent";
+  import ReturnsContent from "./ReturnsContent";
   import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
   import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
 
 
-  type TabKey = "barang" | "arsip" | "outflows" | "pedagang" | "kategori";
+  type TabKey = "barang" | "arsip" | "return" | "outflows" | "pedagang" | "kategori";
 
   interface TabDef {
     key: TabKey;
@@ -32,6 +33,12 @@
       label: "Arsip Barang",
       roles: BARANG_FULL_ACCESS_ROLES,
       icon: "ti-archive",
+    },
+    {
+      key: "return",
+      label: "Barang Return",
+      roles: BARANG_FULL_ACCESS_ROLES,
+      icon: "ti-rotate",
     },
     {
       key: "outflows",
@@ -101,6 +108,13 @@
             <rect x="3" y="4" width="18" height="4" rx="1" />
             <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
             <line x1="9" y1="12" x2="15" y2="12" />
+          </svg>
+        );
+      case "ti-rotate":
+        return (
+          <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 2v6h6" />
+            <path d="M3 8a9 9 0 1 0 2.5-5.3L3 8" />
           </svg>
         );
       default:
@@ -259,8 +273,9 @@
             </div>
           ) : (
             <>
-              {activeTab === "barang" && visibleTabs.some((t) => t.key === "barang") && <UnifiedBarangContent />}
+               {activeTab === "barang" && visibleTabs.some((t) => t.key === "barang") && <UnifiedBarangContent />}
               {activeTab === "arsip" && visibleTabs.some((t) => t.key === "arsip") && <ArsipContent />}
+              {activeTab === "return" && visibleTabs.some((t) => t.key === "return") && <ReturnsContent />}
               {activeTab === "outflows" && visibleTabs.some((t) => t.key === "outflows") && <OutflowsContent />}
               {activeTab === "pedagang" && visibleTabs.some((t) => t.key === "pedagang") && <PriceListPedagangTab />}
               {activeTab === "kategori" && visibleTabs.some((t) => t.key === "kategori") && <CategoriesContent />}          </>
