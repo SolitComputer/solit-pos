@@ -91,6 +91,7 @@ type Entry = {
     is_stale?: boolean;
     source_nominal?: number | null;
     tx_payment_method?: string | null;
+    target_user_id?: string | null; // ⬅️ BARU: ID karyawan pemilik Kasbon/Cicilan (dipakai saat edit)
     created_by_user?: { name: string } | null;
     audited_by_user?: { name: string } | null;
 };
@@ -1272,6 +1273,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
     const categories = isOut ? Object.entries(EXPENSE_CATEGORIES) : Object.entries(INCOME_CATEGORIES).filter(([key]) => !(AUTO_INCOME_CATEGORIES as readonly string[]).includes(key));
     const [category, setCategory] = useState(entry.category);
     const [nominal, setNominal] = useState(String(entry.nominal ?? ""));
+    const [targetUserId, setTargetUserId] = useState(entry.target_user_id ?? ""); // ⬅️ BARU: prefill karyawan dari entry yang diedit
     const [keterangan, setKeterangan] = useState(entry.keterangan ?? "");
     const [tanggal, setTanggal] = useState(entry.tanggal);
     const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(entry.payment_method ?? "CASH");
@@ -1306,6 +1308,10 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
             return setError("Nominal tidak valid (tidak boleh kosong atau negatif)");
         if (extraItems.some((it) => !it.nominal || !Number.isFinite(Number(it.nominal)) || Number(it.nominal) <= 0))
             return setError("Nominal setiap kategori tambahan harus lebih dari 0");
+        // ⬅️ BARU: Kasbon/Cicilan wajib menunjuk karyawan (baris utama atau salah satu baris tambahan)
+        const needsTarget = isKasbonCicilanCategory(category) || extraItems.some((it) => isKasbonCicilanCategory(it.category));
+        if (needsTarget && !targetUserId)
+            return setError("Pilih karyawan dulu untuk Kasbon/Cicilan");
 
         setSaving(true);
         setError("");
@@ -1343,6 +1349,8 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                 tanggal,
                 payment_method: paymentMethod,
                 photo_url: finalPhotoUrl,
+                // ⬅️ BARU: ikut update karyawan. Kalau kategori bukan Kasbon/Cicilan, server mengosongkannya.
+                target_user_id: isKasbonCicilanCategory(category) ? targetUserId : null,
             };
 
             const res = await fetch(`/api/cashflow/${entry.id}`, {
@@ -1366,6 +1374,8 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                         tanggal,
                         payment_method: paymentMethod,
                         photo_url: finalPhotoUrl,
+                        // ⬅️ BARU: baris tambahan Kasbon/Cicilan bawa karyawan yang sama
+                        target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null,
                     }),
                 });
                 const j = await r.json();
@@ -1510,6 +1520,11 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                             </div>
                         )}
                     </div>
+                    {/* ⬅️ BARU: dropdown karyawan — muncul kalau baris utama ATAU salah satu baris tambahan Kasbon/Cicilan.
+                        Nilainya otomatis terisi karyawan sebelumnya lewat useState targetUserId di atas. */}
+                    {(isKasbonCicilanCategory(category) || extraItems.some((it) => isKasbonCicilanCategory(it.category))) && (
+                        <TargetUserSelect value={targetUserId} onChange={setTargetUserId} selectClassName={inputCls} />
+                    )}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
                         <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />

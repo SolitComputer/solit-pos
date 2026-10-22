@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { isValidCategory } from "@/lib/cashflow";
+import { isValidCategory, isKasbonCicilanCategory } from "@/lib/cashflow";
 
 function getAdmin(): SupabaseClient {
     return createClient(
@@ -178,6 +178,8 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
         payment_method?: string;
         photo_url?: string | null;
     };
+    // ⬅️ BARU: karyawan pemilik Kasbon/Cicilan (null kalau kategori lain)
+    const targetUserId = (body.target_user_id as string | undefined) || null;
 
     const nom = Math.round(Number(nominal));
 
@@ -207,6 +209,10 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
     if (!isValidCategory(entry.direction, category))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
 
+    // ⬅️ BARU: Kasbon/Cicilan wajib menunjuk karyawan
+    if (isKasbonCicilanCategory(category) && !targetUserId)
+        return NextResponse.json({ success: false, message: "Pilih karyawan dulu untuk Kasbon/Cicilan" }, { status: 400 });
+
     if (payment_method) {
         if (!["CASH", "SALDO"].includes(payment_method))
             return NextResponse.json(
@@ -222,6 +228,8 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
         nominal: nom,
         keterangan: keterangan?.trim() || null,
         tanggal: tanggal || jakartaToday,
+        // ⬅️ BARU: ganti kategori ke non-kasbon → karyawan otomatis dikosongkan
+        target_user_id: isKasbonCicilanCategory(category) ? targetUserId : null,
     };
     if (payment_method) {
         updatePayload.payment_method = payment_method;

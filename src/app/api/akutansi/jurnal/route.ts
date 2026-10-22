@@ -135,6 +135,26 @@ export const GET = withAuth(async (req) => {
     getServiceSyncDraftsByIds(supabase, primaryServiceIds),
   ]);
 
+  // ⬅️ BARU: nama karyawan (target_user) utk entry Kasbon/Cicilan dari Cashflow,
+  // supaya di Jurnal tampil nama karyawan pemilik kasbon — bukan nama penginput.
+  const cashflowTargetNameMap = new Map<string, string>();
+  if (primaryCashflowIds.length > 0) {
+    const { data: cfRows } = await supabase
+      .from("cashflow_entries")
+      .select("id, target_user_id")
+      .in("id", primaryCashflowIds)
+      .not("target_user_id", "is", null);
+    const targetIds = [...new Set((cfRows ?? []).map((r: any) => r.target_user_id as string).filter(Boolean))];
+    if (targetIds.length > 0) {
+      const { data: targetUsers } = await supabase.from("users").select("id, name").in("id", targetIds);
+      const nameById = new Map<string, string>((targetUsers ?? []).map((u: any) => [u.id as string, u.name as string]));
+      for (const r of (cfRows ?? []) as any[]) {
+        const nm = r.target_user_id ? nameById.get(r.target_user_id as string) : null;
+        if (nm) cashflowTargetNameMap.set(r.id as string, nm);
+      }
+    }
+  }
+
    const entriesWithMeta = entries.map((e: any) => {
             if (e.source_type === "CASHFLOW" && e.source_id) {
       const syncDraft = cashflowSyncDraftMap.get(e.source_id as string);
@@ -146,7 +166,8 @@ export const GET = withAuth(async (req) => {
       return {
         ...e,
         trx_meta: {
-          nama: cashflowMeta?.nama ?? null,
+          // ⬅️ BARU: Kasbon/Cicilan → nama karyawan (target_user); selain itu tetap nama lama
+          nama: cashflowTargetNameMap.get(e.source_id as string) ?? cashflowMeta?.nama ?? null,
           source_type: cashflowMeta?.source_type ?? null,
         },
         sync_available: syncAvailable,
