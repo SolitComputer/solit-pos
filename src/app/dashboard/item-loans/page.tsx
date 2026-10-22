@@ -61,6 +61,10 @@ export default function ItemLoansPage() {
     const [tab, setTab] = useState<"PENDING" | "APPROVED" | "HISTORY">("PENDING");
     const [actingId, setActingId] = useState<string | null>(null);
 
+    // Filter & search khusus tab Riwayat (HISTORY)
+    const [historyFilter, setHistoryFilter] = useState<"ALL" | "SOLD" | "RETURNED">("ALL");
+    const [historySearch, setHistorySearch] = useState("");
+
     useEffect(() => {
         (async () => {
             try {
@@ -241,11 +245,28 @@ export default function ItemLoansPage() {
         } finally { setActingId(null); }
     };
 
-    const visibleLoans = loans.filter(l =>
-        tab === "PENDING" ? l.status === "PENDING"
-            : tab === "APPROVED" ? l.status === "APPROVED"
-                : (l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD")
-    );
+    const visibleLoans = loans.filter(l => {
+        // Tab PENDING & APPROVED — tidak terpengaruh filter/search Riwayat.
+        if (tab === "PENDING") return l.status === "PENDING";
+        if (tab === "APPROVED") return l.status === "APPROVED";
+
+        // Tab HISTORY (Riwayat): REJECTED / RETURNED / SOLD.
+        const isHistory = l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD";
+        if (!isHistory) return false;
+
+        // Sub-filter status: Semua / Terjual / Dikembalikan.
+        if (historyFilter === "SOLD" && l.status !== "SOLD") return false;
+        if (historyFilter === "RETURNED" && l.status !== "RETURNED") return false;
+
+        // Search: peminjam / barang / SN / keterangan (case-insensitive).
+        const q = historySearch.trim().toLowerCase();
+        if (q) {
+            const hay = [l.borrower_name, l.item_name, l.serial_number ?? "", l.notes ?? ""]
+                .join(" ").toLowerCase();
+            if (!hay.includes(q)) return false;
+        }
+        return true;
+    });
 
     return (
         <DashboardLayout>
@@ -344,6 +365,34 @@ export default function ItemLoansPage() {
                                 </button>
                             ))}
                         </div>
+
+                        {tab === "HISTORY" && (
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 px-3 py-3 border-b border-zinc-100">
+                                <div className="relative flex-1 min-w-0">
+                                    <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 pointer-events-none" />
+                                    <input value={historySearch} onChange={e => setHistorySearch(e.target.value)}
+                                        placeholder="Cari peminjam, barang, SN, keterangan..."
+                                        className="w-full h-9 border border-zinc-200 rounded-xl pl-9 pr-8 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+                                    {historySearch && (
+                                        <button onClick={() => setHistorySearch("")} className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-600">
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex gap-1.5 flex-shrink-0">
+                                    {([
+                                        { k: "ALL", l: "Semua" },
+                                        { k: "SOLD", l: "Terjual" },
+                                        { k: "RETURNED", l: "Dikembalikan" },
+                                    ] as const).map(f => (
+                                        <button key={f.k} onClick={() => setHistoryFilter(f.k)}
+                                            className={`px-3 h-9 rounded-xl text-xs font-semibold transition ${historyFilter === f.k ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                            {f.l}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {loading ? (
                             <p className="py-12 text-center text-sm text-zinc-400">Memuat data...</p>
