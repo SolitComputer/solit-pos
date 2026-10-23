@@ -156,14 +156,11 @@ export default function MarketingInsightBoard() {
       (n, r) => n + ((r.cells[colId] ?? "").toString().trim() ? 1 : 0),
       0
     );
-    if (
-      filledCount > 0 &&
-      !window.confirm(
-        `Hapus kolom "${colName}"? ${filledCount} sel sudah terisi dan akan ikut terhapus. Tindakan ini tidak bisa dibatalkan.`
-      )
-    ) {
-      return; // user batal
-    }
+    const pesan =
+      filledCount > 0
+        ? `Hapus kolom "${colName}"? ${filledCount} sel sudah terisi dan akan ikut terhapus. Tindakan ini tidak bisa dibatalkan.`
+        : `Hapus kolom "${colName}"?`;
+    if (!window.confirm(pesan)) return; // user batal
     mutateActive((s) => ({
       ...s,
       columns: s.columns.filter((c) => c.id !== colId),
