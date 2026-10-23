@@ -1146,7 +1146,8 @@ export default function PKLReportsPage() {
     }, [reports]);
 
     // ── Access guard ───────────────────────────────────────────────────────
-    if (currentUser && !canAccessPage(currentUser.role)) {
+    // Fitur Laporan Kerja PKL dinonaktifkan — halaman ditutup untuk semua role.
+    if (currentUser) {
         return (
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center min-h-[60vh]">

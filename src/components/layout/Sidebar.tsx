@@ -1848,7 +1848,12 @@ export default function Sidebar() {
   // Akun whitelist boleh lihat Riwayat Transaksi walau role-nya tidak termasuk
   // (mis. Fikri — MARKETING). Sumber: TRANSACTION_VIEW_EXTRA_USER_IDS di permissions.ts.
   const canViewTransaksiByUserId = !!user?.id && (TRANSACTION_VIEW_EXTRA_USER_IDS as string[]).includes(user.id);
-  const groups: MenuGroup[] = withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKendaraanGroup(
+  const stripPklReports = (gs: MenuGroup[]): MenuGroup[] =>
+    gs
+      .map((g) => ({ ...g, items: g.items.filter((it) => it.href !== ITEM_PKL_REPORT.href) }))
+      .filter((g) => g.items.length > 0);
+
+  const groups: MenuGroup[] = stripPklReports(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKendaraanGroup(
     dedupeGroups([
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
@@ -1860,11 +1865,11 @@ export default function Sidebar() {
         items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
       })),
     ])
-  ), effectiveRoles)), {
+   ), effectiveRoles)), {
     showPerjanjian: !!(contractStatus && contractStatus !== "APPROVED"),
     showSign: isContractSigner,
     showExpiring: isContractExpiringAdmin,
-  });
+  }));
 
   const groupsSig = groups.map((g) => g.label).join("|");
 
