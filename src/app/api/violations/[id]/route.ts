@@ -70,6 +70,39 @@ async function patchHandler(req: NextRequest, ctx: any, user: AuthUser) {
     return NextResponse.json({ success: true, data: updated });
   }
 
+  // ── Edit data kasus + bukti foto (Admin). TIDAK mengubah severity/pelaku/poin. ──
+  if (action === "edit") {
+    if (!hasAnyRole(roles, VIOLATION_MANAGE_ROLES))
+      return NextResponse.json({ success: false, message: "Hanya Admin yang bisa mengedit pelanggaran" }, { status: 403 });
+    if (["DIBATALKAN", "PHK"].includes(kase.status))
+      return NextResponse.json({ success: false, message: "Kasus yang sudah dibatalkan / PHK tidak bisa diedit" }, { status: 400 });
+
+    const patch: Record<string, any> = { updated_at: nowIso };
+    if (typeof body.violation_type === "string" && body.violation_type.trim()) patch.violation_type = body.violation_type.trim();
+    if ("area" in body) patch.area = body.area?.trim() || null;
+    if ("shift" in body) patch.shift = body.shift || null;
+    if ("division" in body) patch.division = body.division?.trim() || null;
+    if (typeof body.reason === "string" && body.reason.trim()) patch.reason = body.reason.trim();
+    if (typeof body.incident_date === "string" && body.incident_date) patch.incident_date = body.incident_date;
+
+    // Bukti foto 3-arah: key absen = pertahankan, string = ganti, null = hapus.
+    if ("bukti_foto_url" in body) patch.bukti_foto_url = body.bukti_foto_url ?? null;
+
+    const { data: updated, error: upErr } = await supabaseAdmin
+      .from("violation_cases").update(patch).eq("id", id).select("*").single();
+    if (upErr) return NextResponse.json({ success: false, message: upErr.message }, { status: 500 });
+
+    // Tanggal berubah → sinkronkan year/month penalti kasus ini.
+    if (patch.incident_date) {
+      const d = new Date(`${patch.incident_date}T00:00:00Z`);
+      await supabaseAdmin.from("violation_penalties")
+        .update({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 })
+        .eq("case_id", id);
+    }
+
+    return NextResponse.json({ success: true, data: updated });
+  }
+
   // ── Tandai teguran sudah dikirim (atasan; pengiriman WA manual di luar sistem) ──
   if (action === "teguran") {
     if (!hasAnyRole(roles, VIOLATION_WARNING_ROLES))

@@ -1,10 +1,20 @@
 // Tipe & helper bersama untuk fitur "Laporan Insight" (sheet bulanan ala Excel).
 // Dipakai di API route maupun komponen client → JANGAN import modul server-only.
 
+export type InsightAlign = "left" | "center" | "right";
+
 export interface InsightColumn {
   id: string;
   name: string;
+  align?: InsightAlign; // perataan isi kolom (default: left). null/undefined = kiri.
 }
+
+// Map align → class Tailwind (ditulis literal supaya tidak ke-purge).
+export const INSIGHT_ALIGN_CLASS: Record<InsightAlign, string> = {
+  left: "text-left",
+  center: "text-center",
+  right: "text-right",
+};
 
 export interface InsightRow {
   id: string; // mode harian: "YYYY-MM-DD" (tanggal penuh). Sparse: hanya tanggal terisi.
@@ -12,10 +22,13 @@ export interface InsightRow {
   colors?: Record<string, string>; // colId -> key warna (lihat INSIGHT_COLORS)
 }
 
+export type InsightRowMode = "daily" | "manual";
+
 export interface InsightSheet {
   id: string;
   name: string;
-  period: string | null; // "YYYY-MM" (bulan tabel). null = anggap bulan berjalan.
+  period: string | null; // "YYYY-MM" (bulan tabel, utk mode harian). null = bulan berjalan.
+  row_mode: InsightRowMode; // "daily" = baris auto per tanggal; "manual" = baris bebas
   columns: InsightColumn[];
   rows: InsightRow[];
   sort_order: number;

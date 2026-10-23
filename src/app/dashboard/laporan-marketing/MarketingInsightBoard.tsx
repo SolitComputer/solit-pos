@@ -1,8 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, ChevronDown, Loader2, Pencil, Plus, Table2, Trash2, X } from "lucide-react";
-import { makeLocalId, type InsightSheet } from "@/lib/marketing-insight";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlignCenter, AlignLeft, AlignRight, AlertTriangle, CalendarDays, Check, ChevronDown, List, Loader2, Palette, Pencil, Plus, Table2, Trash2, X } from "lucide-react";
+import {
+  currentPeriodWib,
+  INSIGHT_ALIGN_CLASS,
+  INSIGHT_COLOR_BG,
+  INSIGHT_COLORS,
+  makeLocalId,
+  monthDates,
+  parseInsightNumber,
+  type InsightAlign,
+  type InsightRow,
+  type InsightRowMode,
+  type InsightSheet,
+} from "@/lib/marketing-insight";
 
 export default function MarketingInsightBoard() {
   const [sheets, setSheets] = useState<InsightSheet[]>([]);
@@ -11,12 +23,15 @@ export default function MarketingInsightBoard() {
   const [error, setError] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  // Modal edit judul tabel
+  const [colorCell, setColorCell] = useState<string | null>(null);
+  // Modal edit judul tabel (dipertahankan dari versi kamu)
   const [titleModalOpen, setTitleModalOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const active = sheets.find((s) => s.id === activeId) ?? null;
+  const isDaily = active?.row_mode === "daily";
+  const effPeriod = active?.period || currentPeriodWib();
 
   const load = useCallback(async () => {
     try {
@@ -48,7 +63,13 @@ export default function MarketingInsightBoard() {
         const res = await fetch(`/api/marketing-insight?id=${sheet.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: sheet.name, columns: sheet.columns, rows: sheet.rows }),
+          body: JSON.stringify({
+            name: sheet.name,
+            period: sheet.period,
+            row_mode: sheet.row_mode,
+            columns: sheet.columns,
+            rows: sheet.rows,
+          }),
         });
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan");
@@ -61,7 +82,6 @@ export default function MarketingInsightBoard() {
     }, 600);
   }, []);
 
-  // Ubah sheet aktif di state lokal + jadwalkan simpan.
   const mutateActive = useCallback(
     (updater: (s: InsightSheet) => InsightSheet) => {
       setSheets((prev) => {
@@ -111,7 +131,11 @@ export default function MarketingInsightBoard() {
     }
   };
 
-  // ── Edit struktur tabel (manual, ala Excel) ──
+  // ── Edit struktur / isi ──
+  const renameSheet = (name: string) => mutateActive((s) => ({ ...s, name }));
+  const setPeriod = (period: string) => mutateActive((s) => ({ ...s, period }));
+  const setRowMode = (row_mode: InsightRowMode) => mutateActive((s) => ({ ...s, row_mode }));
+
   const addColumn = () =>
     mutateActive((s) => ({
       ...s,
@@ -119,54 +143,119 @@ export default function MarketingInsightBoard() {
     }));
 
   const renameColumn = (colId: string, name: string) =>
-    mutateActive((s) => ({
-      ...s,
-      columns: s.columns.map((c) => (c.id === colId ? { ...c, name } : c)),
-    }));
+    mutateActive((s) => ({ ...s, columns: s.columns.map((c) => (c.id === colId ? { ...c, name } : c)) }));
 
-  const deleteColumn = (colId: string) =>
+  // Set perataan SEMUA kolom sekaligus (kontrol global di header tabel).
+  const setAllAlign = (align: InsightAlign) =>
+    mutateActive((s) => ({ ...s, columns: s.columns.map((c) => ({ ...c, align })) }));
+
+  const deleteColumn = (colId: string) => {
+    if (!active) return;
+    // Cek apakah kolom ini punya isi di baris mana pun — kalau ada, minta konfirmasi.
+    const colName = active.columns.find((c) => c.id === colId)?.name || "kolom ini";
+    const filledCount = active.rows.reduce(
+      (n, r) => n + ((r.cells[colId] ?? "").toString().trim() ? 1 : 0),
+      0
+    );
+    const pesan =
+      filledCount > 0
+        ? `Hapus kolom "${colName}"? ${filledCount} sel sudah terisi dan akan ikut terhapus. Tindakan ini tidak bisa dibatalkan.`
+        : `Hapus kolom "${colName}"?`;
+    if (!window.confirm(pesan)) return; // user batal
     mutateActive((s) => ({
       ...s,
       columns: s.columns.filter((c) => c.id !== colId),
       rows: s.rows.map((r) => {
-        const { [colId]: _drop, ...rest } = r.cells;
-        return { ...r, cells: rest };
+        const { [colId]: _c, ...cells } = r.cells;
+        const colors = { ...(r.colors || {}) };
+        delete colors[colId];
+        return { ...r, cells, colors };
       }),
     }));
+  };
 
-  const addRow = () =>
+  // Mode manual: baris bebas (id acak). Mode harian: baris upsert by tanggal.
+  const addRowManual = () =>
     mutateActive((s) => ({ ...s, rows: [...s.rows, { id: makeLocalId("r"), cells: {} }] }));
 
   const deleteRow = (rowId: string) =>
     mutateActive((s) => ({ ...s, rows: s.rows.filter((r) => r.id !== rowId) }));
 
+  const upsertRow = (rowId: string, apply: (r: InsightRow) => InsightRow) =>
+    mutateActive((s) => {
+      const rows = [...s.rows];
+      const i = rows.findIndex((r) => r.id === rowId);
+      if (i === -1) rows.push(apply({ id: rowId, cells: {} }));
+      else rows[i] = apply(rows[i]);
+      return { ...s, rows };
+    });
+
   const setCell = (rowId: string, colId: string, value: string) =>
-    mutateActive((s) => ({
-      ...s,
-      rows: s.rows.map((r) => (r.id === rowId ? { ...r, cells: { ...r.cells, [colId]: value } } : r)),
-    }));
+    upsertRow(rowId, (r) => ({ ...r, cells: { ...r.cells, [colId]: value } }));
 
-  const renameSheet = (name: string) => mutateActive((s) => ({ ...s, name }));
-
-  const openTitleModal = () => {
-    if (!active) return;
-    setTitleDraft(active.name); // isi draft dari nama tabel aktif saat ini
-    setTitleModalOpen(true);
+  const paintCell = (rowId: string, colId: string, color: string | null) => {
+    upsertRow(rowId, (r) => {
+      const colors = { ...(r.colors || {}) };
+      if (color) colors[colId] = color;
+      else delete colors[colId];
+      return { ...r, colors };
+    });
+    setColorCell(null);
   };
 
+  // Modal judul (punyamu — dipertahankan)
+  const openTitleModal = () => {
+    if (!active) return;
+    setTitleDraft(active.name);
+    setTitleModalOpen(true);
+  };
   const saveTitleModal = () => {
     const name = titleDraft.trim();
-    if (!name) return; // tolak judul kosong
-    renameSheet(name); // commit ke state + autosave (debounce 600ms yg sudah ada)
+    if (!name) return;
+    renameSheet(name);
     setTitleModalOpen(false);
   };
 
+  // ── Data turunan (mode harian) ──
+  const dates = useMemo(() => (isDaily ? monthDates(effPeriod) : []), [isDaily, effPeriod]);
+  const rowMap = useMemo(() => {
+    const m = new Map<string, InsightRow>();
+    active?.rows.forEach((r) => m.set(r.id, r));
+    return m;
+  }, [active]);
+
+  // Baris yang digambar: mode harian → tanggal; mode manual → rows apa adanya.
+  type DisplayRow = { id: string; label: string; sub?: string; weekend?: boolean; sunday?: boolean };
+  const displayRows = useMemo<DisplayRow[]>(() => {
+    if (!active) return [];
+    if (isDaily) {
+      return dates.map((d) => ({ id: d.id, label: String(d.day), sub: d.weekday, weekend: d.isWeekend, sunday: d.isSunday }));
+    }
+    return active.rows.map((r, i) => ({ id: r.id, label: String(i + 1) }));
+  }, [active, isDaily, dates]);
+
+  const totals = useMemo(() => {
+    const t: Record<string, number> = {};
+    if (!active) return t;
+    for (const col of active.columns) {
+      let sum = 0;
+      for (const dr of displayRows) sum += parseInsightNumber(rowMap.get(dr.id)?.cells[col.id]);
+      t[col.id] = sum;
+    }
+    return t;
+  }, [active, displayRows, rowMap]);
+
+  const monthLabel = useMemo(() => {
+    const [y, m] = effPeriod.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+  }, [effPeriod]);
+
   return (
     <div className="space-y-4">
-      {/* Toolbar: dropdown pilih/buat tabel + status simpan */}
+      {/* Toolbar */}
       <div className="rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-3.5 sm:px-5 sm:py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
             {/* Custom dropdown */}
             <div className="relative">
               <button
@@ -209,35 +298,52 @@ export default function MarketingInsightBoard() {
               )}
             </div>
 
-            {/* Tombol edit judul (buka modal) */}
             {active && (
-              <button
-                onClick={openTitleModal}
-                title="Edit judul tabel"
-                className="inline-flex items-center justify-center h-10 w-10 rounded-full text-gray-400 border border-gray-200 hover:text-violet-600 hover:border-violet-200 hover:bg-violet-50 shrink-0"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
+              <>
+                {/* Edit judul (modal) */}
+                <button
+                  onClick={openTitleModal}
+                  title="Edit judul tabel"
+                  className="inline-flex items-center justify-center h-10 w-10 rounded-full text-gray-400 border border-gray-200 hover:text-violet-600 hover:border-violet-200 hover:bg-violet-50 shrink-0"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+
+                {/* Toggle mode Harian / Manual */}
+                <div className="inline-flex items-center bg-gray-50 border border-gray-200 rounded-full p-0.5 h-10">
+                  <button
+                    onClick={() => setRowMode("daily")}
+                    className={`inline-flex items-center gap-1 px-3 h-9 rounded-full text-xs font-semibold ${isDaily ? "bg-violet-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <CalendarDays className="w-3.5 h-3.5" /> Harian
+                  </button>
+                  <button
+                    onClick={() => setRowMode("manual")}
+                    className={`inline-flex items-center gap-1 px-3 h-9 rounded-full text-xs font-semibold ${!isDaily ? "bg-violet-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <List className="w-3.5 h-3.5" /> Manual
+                  </button>
+                </div>
+
+                {/* Pemilih bulan (hanya mode harian) */}
+                {isDaily && (
+                  <input
+                    type="month"
+                    value={effPeriod}
+                    onChange={(e) => e.target.value && setPeriod(e.target.value)}
+                    title="Bulan tabel"
+                    className="h-10 px-3 rounded-full bg-gray-50 border border-gray-200 text-sm font-semibold text-gray-700 outline-none focus:border-violet-300"
+                  />
+                )}
+              </>
             )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-[11px] inline-flex items-center gap-1.5 text-gray-400 min-w-[90px] justify-end">
-              {saveState === "saving" && (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" /> Menyimpan…
-                </>
-              )}
-              {saveState === "saved" && (
-                <>
-                  <Check className="w-3 h-3 text-emerald-500" /> Tersimpan
-                </>
-              )}
-              {saveState === "error" && (
-                <>
-                  <AlertTriangle className="w-3 h-3 text-red-500" /> Gagal
-                </>
-              )}
+              {saveState === "saving" && (<><Loader2 className="w-3 h-3 animate-spin" /> Menyimpan…</>)}
+              {saveState === "saved" && (<><Check className="w-3 h-3 text-emerald-500" /> Tersimpan</>)}
+              {saveState === "error" && (<><AlertTriangle className="w-3 h-3 text-red-500" /> Gagal</>)}
             </span>
             <button
               onClick={createSheet}
@@ -264,12 +370,9 @@ export default function MarketingInsightBoard() {
         </p>
       )}
 
-      {/* Konten */}
       {loading ? (
         <div className="space-y-2">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-9 rounded-lg bg-gray-100 animate-pulse" />
-          ))}
+          {[1, 2, 3, 4].map((i) => (<div key={i} className="h-9 rounded-lg bg-gray-100 animate-pulse" />))}
         </div>
       ) : !active ? (
         <div className="py-16 flex flex-col items-center text-center">
@@ -277,30 +380,57 @@ export default function MarketingInsightBoard() {
             <Table2 className="w-6 h-6 text-violet-300" />
           </div>
           <p className="text-sm font-medium text-gray-700">Belum ada tabel insight</p>
-          <p className="text-xs text-gray-400 mt-1 max-w-[280px]">
-            Buat tabel pertama, lalu tambah kolom &amp; baris sesuai kebutuhan — isinya manual seperti Excel.
+          <p className="text-xs text-gray-400 mt-1 max-w-[300px]">
+            Buat tabel, pilih mode Harian (baris tanggal otomatis) atau Manual (baris bebas), lalu isi seperti Excel.
           </p>
-          <button
-            onClick={createSheet}
-            className="mt-4 inline-flex items-center gap-1.5 h-10 px-4 rounded-full text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700"
-          >
+          <button onClick={createSheet} className="mt-4 inline-flex items-center gap-1.5 h-10 px-4 rounded-full text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700">
             <Plus className="w-4 h-4" /> Buat tabel baru
           </button>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-gray-50 overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <h2 className="text-sm font-bold text-gray-900 capitalize">{isDaily ? monthLabel : active.name}</h2>
+              {/* Rata semua kolom sekaligus */}
+              <div className="inline-flex items-center gap-0.5 bg-gray-50 border border-gray-200 rounded-lg p-0.5">
+                {([
+                  { key: "left" as const, Icon: AlignLeft, title: "Rata kiri semua kolom" },
+                  { key: "center" as const, Icon: AlignCenter, title: "Rata tengah semua kolom" },
+                  { key: "right" as const, Icon: AlignRight, title: "Rata kanan semua kolom" },
+                ]).map(({ key, Icon, title }) => {
+                  const allActive = active.columns.length > 0 && active.columns.every((c) => (c.align ?? "left") === key);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setAllAlign(key)}
+                      title={title}
+                      className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${allActive ? "bg-violet-600 text-white shadow-sm" : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"}`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <span className="text-[11px] text-gray-400">
+              {isDaily ? `${dates.length} hari · total otomatis` : `${active.rows.length} baris`} · klik titik di pojok sel untuk warnai
+            </span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="w-9 border border-gray-200 px-1 py-1.5 text-[11px] text-gray-400 font-semibold">#</th>
+                  <th className="sticky left-0 z-10 bg-violet-600 text-white border border-violet-700 px-2 py-2 text-left font-bold min-w-[84px]">
+                    {isDaily ? "Tanggal" : "#"}
+                  </th>
                   {active.columns.map((col) => (
                     <th key={col.id} className="border border-gray-200 px-1 py-1 min-w-[120px]">
                       <div className="flex items-center gap-0.5">
                         <input
                           value={col.name}
                           onChange={(e) => renameColumn(col.id, e.target.value)}
-                          className="flex-1 min-w-0 px-1.5 py-0.5 rounded-md bg-transparent border border-transparent hover:border-gray-200 focus:border-violet-300 focus:bg-white outline-none text-[11px] font-bold text-gray-700"
+                          className={`flex-1 min-w-0 px-1.5 py-0.5 rounded-md bg-transparent border border-transparent hover:border-gray-200 focus:border-violet-300 focus:bg-white outline-none text-[11px] font-bold text-gray-700 ${INSIGHT_ALIGN_CLASS[col.align ?? "left"]}`}
                           placeholder="Nama kolom"
                         />
                         <button
@@ -325,60 +455,118 @@ export default function MarketingInsightBoard() {
                 </tr>
               </thead>
               <tbody>
-                {active.rows.length === 0 ? (
+                {displayRows.length === 0 ? (
                   <tr>
-                     <td colSpan={active.columns.length + 2} className="border border-gray-200 px-4 py-6 text-center text-gray-400">
-                      Belum ada baris. Klik “+ Baris” di bawah.
+                    <td colSpan={active.columns.length + 2} className="border border-gray-200 px-4 py-6 text-center text-gray-400">
+                      {isDaily ? "Pilih bulan di atas." : "Belum ada baris. Klik “+ Baris” di bawah."}
                     </td>
                   </tr>
                 ) : (
-                  active.rows.map((row, idx) => (
-                    <tr key={row.id} className="group hover:bg-violet-50/30">
-                      <td className="border border-gray-200 text-center text-[11px] text-gray-400 relative">
-                        <span className="group-hover:hidden">{idx + 1}</span>
-                        <button
-                          onClick={() => deleteRow(row.id)}
-                          title="Hapus baris"
-                          className="hidden group-hover:flex items-center justify-center w-full h-full text-gray-300 hover:text-red-500"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </td>
-                      {active.columns.map((col) => (
-                        <td key={col.id} className="border border-gray-200 p-0">
-                          <input
-                            value={row.cells[col.id] ?? ""}
-                            onChange={(e) => setCell(row.id, col.id, e.target.value)}
-                            className="w-full px-2 py-1.5 bg-transparent outline-none focus:bg-violet-50/50 text-gray-800"
-                          />
+                  displayRows.map((dr) => {
+                    const row = rowMap.get(dr.id);
+                    return (
+                      <tr key={dr.id} className="group hover:bg-violet-50/20">
+                        <td className={`sticky left-0 z-[1] border border-gray-200 px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap ${dr.weekend ? "bg-gray-50" : "bg-white"} group-hover:bg-violet-50 relative`}>
+                          {isDaily ? (
+                            <>
+                              <span className={dr.sunday ? "text-red-500" : "text-gray-700"}>{dr.label}</span>
+                              <span className="text-gray-400 font-normal ml-1">{dr.sub}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="group-hover:hidden text-gray-400">{dr.label}</span>
+                              <button
+                                onClick={() => deleteRow(dr.id)}
+                                title="Hapus baris"
+                                className="hidden group-hover:flex items-center justify-center w-full h-full text-gray-300 hover:text-red-500 absolute inset-0"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </>
+                          )}
                         </td>
-                      ))}
-                      <td className="border border-gray-200" />
-                    </tr>
-                  ))
+                        {active.columns.map((col) => {
+                          const cellKey = `${dr.id}:${col.id}`;
+                          const color = row?.colors?.[col.id];
+                          return (
+                            <td key={col.id} className={`relative border border-gray-200 p-0 ${color ? INSIGHT_COLOR_BG[color] : ""}`}>
+                              <input
+                                value={row?.cells[col.id] ?? ""}
+                                onChange={(e) => setCell(dr.id, col.id, e.target.value)}
+                                className={`w-full px-2 py-1.5 bg-transparent outline-none focus:bg-white/60 text-gray-800 tabular-nums ${INSIGHT_ALIGN_CLASS[col.align ?? "left"]}`}
+                              />
+                              <button
+                                onClick={() => setColorCell((v) => (v === cellKey ? null : cellKey))}
+                                title="Warnai sel"
+                                className={`absolute top-0.5 right-0.5 w-4 h-4 rounded-full border border-white shadow-sm transition-opacity ${colorCell === cellKey ? "opacity-100" : "opacity-0 group-hover:opacity-100"} ${color ? INSIGHT_COLOR_BG[color] : "bg-gray-200"}`}
+                              >
+                                <Palette className="w-2.5 h-2.5 text-gray-500 mx-auto" />
+                              </button>
+                              {colorCell === cellKey && (
+                                <>
+                                  <div className="fixed inset-0 z-20" onClick={() => setColorCell(null)} />
+                                  <div className="absolute z-30 top-6 right-0 flex items-center gap-1 p-1.5 rounded-xl bg-white border border-gray-100 shadow-xl ring-1 ring-gray-100">
+                                    {INSIGHT_COLORS.map((c) => (
+                                      <button
+                                        key={c.key}
+                                        onClick={() => paintCell(dr.id, col.id, c.key)}
+                                        title={c.label}
+                                        className={`w-5 h-5 rounded-full ${c.dot} ring-2 ${color === c.key ? "ring-gray-700" : "ring-transparent"} hover:scale-110 transition`}
+                                      />
+                                    ))}
+                                    <button
+                                      onClick={() => paintCell(dr.id, col.id, null)}
+                                      title="Hapus warna"
+                                      className="w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center text-gray-400 hover:text-red-500"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="border border-gray-200" />
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
+              {displayRows.length > 0 && (
+                <tfoot>
+                  <tr className="bg-violet-50">
+                    <td className="sticky left-0 z-[1] bg-violet-100 border border-violet-200 px-2 py-2 font-bold text-violet-800 text-[11px]">TOTAL</td>
+                    {active.columns.map((col) => (
+                      <td key={col.id} className={`border border-violet-200 px-2 py-2 font-bold tabular-nums text-violet-800 ${INSIGHT_ALIGN_CLASS[col.align ?? "left"]}`}>
+                        {totals[col.id] || 0}
+                      </td>
+                    ))}
+                    <td className="border border-violet-200" />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
-          <div className="px-3 py-2.5 border-t border-gray-100 bg-gray-50/50">
-            <button
-              onClick={addRow}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-semibold text-violet-600 bg-white border border-violet-200 hover:bg-violet-50"
-            >
-              <Plus className="w-3.5 h-3.5" /> Baris
-            </button>
-          </div>
+
+          {/* Tombol + Baris hanya muncul di mode Manual */}
+          {!isDaily && (
+            <div className="px-3 py-2.5 border-t border-gray-100 bg-gray-50/50">
+              <button
+                onClick={addRowManual}
+                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-semibold text-violet-600 bg-white border border-violet-200 hover:bg-violet-50"
+              >
+                <Plus className="w-3.5 h-3.5" /> Baris
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Modal edit judul tabel */}
+      {/* Modal edit judul tabel (dipertahankan dari versi kamu) */}
       {titleModalOpen && active && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Overlay — klik di luar = batal (tidak menyimpan) */}
-          <div
-            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
-            onClick={() => setTitleModalOpen(false)}
-          />
+          <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setTitleModalOpen(false)} />
           <div className="relative z-10 w-full max-w-sm rounded-3xl bg-white border border-gray-100 shadow-xl ring-1 ring-gray-100 p-5">
             <div className="flex items-center gap-2.5 mb-4">
               <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-sm shadow-violet-300/40">
@@ -389,7 +577,6 @@ export default function MarketingInsightBoard() {
                 <p className="text-[11px] text-gray-400">Ubah nama tabel insight ini</p>
               </div>
             </div>
-
             <input
               autoFocus
               value={titleDraft}
@@ -401,12 +588,8 @@ export default function MarketingInsightBoard() {
               placeholder="Nama tabel"
               className="w-full h-11 px-3.5 rounded-xl bg-gray-50 border border-gray-200 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white text-sm font-semibold text-gray-800"
             />
-
             <div className="flex items-center justify-end gap-2 mt-5">
-              <button
-                onClick={() => setTitleModalOpen(false)}
-                className="h-10 px-4 rounded-full text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200"
-              >
+              <button onClick={() => setTitleModalOpen(false)} className="h-10 px-4 rounded-full text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200">
                 Batal
               </button>
               <button
