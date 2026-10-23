@@ -12,10 +12,13 @@ export interface InsightRow {
   colors?: Record<string, string>; // colId -> key warna (lihat INSIGHT_COLORS)
 }
 
+export type InsightRowMode = "daily" | "manual";
+
 export interface InsightSheet {
   id: string;
   name: string;
-  period: string | null; // "YYYY-MM" (bulan tabel). null = anggap bulan berjalan.
+  period: string | null; // "YYYY-MM" (bulan tabel, utk mode harian). null = bulan berjalan.
+  row_mode: InsightRowMode; // "daily" = baris auto per tanggal; "manual" = baris bebas
   columns: InsightColumn[];
   rows: InsightRow[];
   sort_order: number;

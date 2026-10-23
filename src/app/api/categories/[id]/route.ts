@@ -27,9 +27,12 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("id", id)
       .single();
 
-    const typeInput = String(body.type ?? "").trim().toUpperCase();
+       const typeInput = String(body.type ?? "").trim().toUpperCase();
+    // Kolom `type` di DB ber-constraint NOT NULL. "Semua / Umum" di dropdown
+    // artinya Aksesoris — simpan eksplisit sebagai 'AKSESORIS', JANGAN null,
+    // supaya tidak menabrak not-null (error 23502).
     const type = (!typeInput || typeInput === "ALL" || typeInput === "SEMUA" || typeInput === "UMUM")
-      ? null
+      ? "AKSESORIS"
       : typeInput;
     const basePayload = {
       name,
@@ -39,12 +42,14 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     let { data, error } = await supabase
       .from("laptop_categories")
-      .update(type ? { ...basePayload, type } : { ...basePayload, type: null })
+      .update({ ...basePayload, type })
       .eq("id", id)
       .select()
       .single();
 
-    // Kolom `type` belum ada (42703) atau check constraint DB lama (23514) → ulangi tanpa type.
+    // Fallback hanya untuk DB lama: kolom `type` belum ada (42703) atau check
+    // constraint lama menolak nilainya (23514). Not-null (23502) TIDAK termasuk
+    // di sini — justru itu yang dicegah dengan default 'AKSESORIS' di atas.
     if (error?.code === "42703" || error?.code === "23514") {
       ({ data, error } = await supabase
         .from("laptop_categories")
