@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CalendarDays, Check, ChevronDown, List, Loader2, Palette, Pencil, Plus, Table2, Trash2, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, AlertTriangle, CalendarDays, Check, ChevronDown, List, Loader2, Palette, Pencil, Plus, Table2, Trash2, X } from "lucide-react";
 import {
   currentPeriodWib,
+  INSIGHT_ALIGN_CLASS,
   INSIGHT_COLOR_BG,
   INSIGHT_COLORS,
   makeLocalId,
   monthDates,
   parseInsightNumber,
+  type InsightAlign,
   type InsightRow,
   type InsightRowMode,
   type InsightSheet,
@@ -143,7 +145,25 @@ export default function MarketingInsightBoard() {
   const renameColumn = (colId: string, name: string) =>
     mutateActive((s) => ({ ...s, columns: s.columns.map((c) => (c.id === colId ? { ...c, name } : c)) }));
 
-  const deleteColumn = (colId: string) =>
+  const setColumnAlign = (colId: string, align: InsightAlign) =>
+    mutateActive((s) => ({ ...s, columns: s.columns.map((c) => (c.id === colId ? { ...c, align } : c)) }));
+
+  const deleteColumn = (colId: string) => {
+    if (!active) return;
+    // Cek apakah kolom ini punya isi di baris mana pun — kalau ada, minta konfirmasi.
+    const colName = active.columns.find((c) => c.id === colId)?.name || "kolom ini";
+    const filledCount = active.rows.reduce(
+      (n, r) => n + ((r.cells[colId] ?? "").toString().trim() ? 1 : 0),
+      0
+    );
+    if (
+      filledCount > 0 &&
+      !window.confirm(
+        `Hapus kolom "${colName}"? ${filledCount} sel sudah terisi dan akan ikut terhapus. Tindakan ini tidak bisa dibatalkan.`
+      )
+    ) {
+      return; // user batal
+    }
     mutateActive((s) => ({
       ...s,
       columns: s.columns.filter((c) => c.id !== colId),
@@ -154,6 +174,7 @@ export default function MarketingInsightBoard() {
         return { ...r, cells, colors };
       }),
     }));
+  };
 
   // Mode manual: baris bebas (id acak). Mode harian: baris upsert by tanggal.
   const addRowManual = () =>
@@ -383,25 +404,46 @@ export default function MarketingInsightBoard() {
                   <th className="sticky left-0 z-10 bg-violet-600 text-white border border-violet-700 px-2 py-2 text-left font-bold min-w-[84px]">
                     {isDaily ? "Tanggal" : "#"}
                   </th>
-                  {active.columns.map((col) => (
-                    <th key={col.id} className="border border-gray-200 px-1 py-1 min-w-[120px]">
-                      <div className="flex items-center gap-0.5">
-                        <input
-                          value={col.name}
-                          onChange={(e) => renameColumn(col.id, e.target.value)}
-                          className="flex-1 min-w-0 px-1.5 py-0.5 rounded-md bg-transparent border border-transparent hover:border-gray-200 focus:border-violet-300 focus:bg-white outline-none text-[11px] font-bold text-gray-700"
-                          placeholder="Nama kolom"
-                        />
-                        <button
-                          onClick={() => deleteColumn(col.id)}
-                          title="Hapus kolom"
-                          className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </th>
-                  ))}
+                  {active.columns.map((col) => {
+                    const align = col.align ?? "left";
+                    const alignOpts: { key: InsightAlign; Icon: typeof AlignLeft; title: string }[] = [
+                      { key: "left", Icon: AlignLeft, title: "Rata kiri" },
+                      { key: "center", Icon: AlignCenter, title: "Rata tengah" },
+                      { key: "right", Icon: AlignRight, title: "Rata kanan" },
+                    ];
+                    return (
+                      <th key={col.id} className="border border-gray-200 px-1 py-1 min-w-[120px]">
+                        <div className="flex items-center gap-0.5">
+                          <input
+                            value={col.name}
+                            onChange={(e) => renameColumn(col.id, e.target.value)}
+                            className={`flex-1 min-w-0 px-1.5 py-0.5 rounded-md bg-transparent border border-transparent hover:border-gray-200 focus:border-violet-300 focus:bg-white outline-none text-[11px] font-bold text-gray-700 ${INSIGHT_ALIGN_CLASS[align]}`}
+                            placeholder="Nama kolom"
+                          />
+                          <button
+                            onClick={() => deleteColumn(col.id)}
+                            title="Hapus kolom"
+                            className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {/* Pengaturan perataan kolom (kiri/tengah/kanan) */}
+                        <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                          {alignOpts.map(({ key, Icon, title }) => (
+                            <button
+                              key={key}
+                              onClick={() => setColumnAlign(col.id, key)}
+                              title={title}
+                              className={`w-5 h-5 flex items-center justify-center rounded ${align === key ? "bg-violet-100 text-violet-600" : "text-gray-300 hover:text-gray-500 hover:bg-gray-100"}`}
+                            >
+                              <Icon className="w-3 h-3" />
+                            </button>
+                          ))}
+                        </div>
+                      </th>
+                    );
+                  })}
                   <th className="w-10 border border-gray-200 px-1 py-1">
                     <button
                       onClick={addColumn}
@@ -452,7 +494,7 @@ export default function MarketingInsightBoard() {
                               <input
                                 value={row?.cells[col.id] ?? ""}
                                 onChange={(e) => setCell(dr.id, col.id, e.target.value)}
-                                className="w-full px-2 py-1.5 bg-transparent outline-none focus:bg-white/60 text-gray-800 tabular-nums"
+                                className={`w-full px-2 py-1.5 bg-transparent outline-none focus:bg-white/60 text-gray-800 tabular-nums ${INSIGHT_ALIGN_CLASS[col.align ?? "left"]}`}
                               />
                               <button
                                 onClick={() => setColorCell((v) => (v === cellKey ? null : cellKey))}
@@ -497,7 +539,7 @@ export default function MarketingInsightBoard() {
                   <tr className="bg-violet-50">
                     <td className="sticky left-0 z-[1] bg-violet-100 border border-violet-200 px-2 py-2 font-bold text-violet-800 text-[11px]">TOTAL</td>
                     {active.columns.map((col) => (
-                      <td key={col.id} className="border border-violet-200 px-2 py-2 text-center font-bold tabular-nums text-violet-800">
+                      <td key={col.id} className={`border border-violet-200 px-2 py-2 font-bold tabular-nums text-violet-800 ${INSIGHT_ALIGN_CLASS[col.align ?? "left"]}`}>
                         {totals[col.id] || 0}
                       </td>
                     ))}
