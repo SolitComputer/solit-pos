@@ -22,11 +22,11 @@ interface LoanRow {
 }
 
 const STATUS_META: Record<LoanRow["status"], { label: string; cls: string }> = {
-    PENDING:  { label: "Menunggu",     cls: "bg-amber-50 text-amber-700 border-amber-200" },
-    APPROVED: { label: "Dipinjam",     cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-    REJECTED: { label: "Ditolak",      cls: "bg-rose-50 text-rose-600 border-rose-200" },
+    PENDING: { label: "Menunggu", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+    APPROVED: { label: "Dipinjam", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    REJECTED: { label: "Ditolak", cls: "bg-rose-50 text-rose-600 border-rose-200" },
     RETURNED: { label: "Dikembalikan", cls: "bg-zinc-100 text-zinc-500 border-zinc-200" },
-    SOLD:     { label: "Terjual",      cls: "bg-blue-50 text-blue-700 border-blue-200" },
+    SOLD: { label: "Terjual", cls: "bg-blue-50 text-blue-700 border-blue-200" },
     RETURN_PENDING: { label: "Menunggu Pengembalian", cls: "bg-orange-50 text-orange-700 border-orange-200" },
 };
 
@@ -308,19 +308,19 @@ export default function ItemLoansPage() {
                 <div className="max-w-5xl mx-auto space-y-4 sm:space-y-5">
 
                     <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-                        <div className="flex items-center gap-3 px-4 sm:px-6 py-4">
-                            <div className="w-10 h-10 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md shadow-zinc-900/25">
-                                <HandHelping className="w-5 h-5 text-white" />
+                        <div className="flex items-center gap-3.5 px-4 sm:px-6 py-4 sm:py-5">
+                            <div className="w-11 h-11 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md shadow-zinc-900/25">
+                                <HandHelping className="w-[22px] h-[22px] text-white" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <h1 className="text-[15px] font-bold text-zinc-900 tracking-tight leading-tight truncate">Peminjaman Barang</h1>
+                                <h1 className="text-base sm:text-lg font-bold text-zinc-900 tracking-tight leading-tight truncate">Peminjaman Barang</h1>
                                 <p className="text-[11.5px] text-zinc-400 mt-1 truncate">Ajukan pinjam barang inventaris, lalu disetujui Pengelola Barang</p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 sm:p-5 space-y-3">
-                        <h3 className="text-[13px] font-bold text-zinc-700">Ajukan Peminjaman Barang</h3>
+                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 sm:p-5 space-y-3.5">
+                        <h3 className="text-[13px] font-bold text-zinc-700 pb-3 border-b border-zinc-100">Ajukan Peminjaman Barang</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">Nama Peminjam</label>
@@ -374,7 +374,7 @@ export default function ItemLoansPage() {
 
                         {/* ── Daftar barang yang mau dipinjam (keranjang) ── */}
                         {cart.length > 0 && (
-                            <div className="space-y-1.5">
+                            <div className="space-y-2 pt-1">
                                 <div className="flex items-center justify-between">
                                     <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest">Daftar Barang ({cart.length})</label>
                                     <button type="button" onClick={() => setCart([])}
@@ -459,19 +459,25 @@ export default function ItemLoansPage() {
                         )}
 
                         {loading ? (
-                            <p className="py-12 text-center text-sm text-zinc-400">Memuat data...</p>
+                            <div className="py-14 flex flex-col items-center justify-center gap-3 text-zinc-400">
+                                <div className="w-6 h-6 border-2 border-zinc-200 border-t-zinc-500 rounded-full animate-spin" />
+                                <p className="text-sm">Memuat data...</p>
+                            </div>
                         ) : visibleLoans.length === 0 ? (
-                            <div className="py-12 text-center">
-                                <Package size={28} className="mx-auto text-zinc-300 mb-2" />
-                                <p className="text-sm text-zinc-400">Belum ada data</p>
+                            <div className="py-14 px-4 text-center">
+                                <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center">
+                                    <Package size={26} className="text-zinc-300" />
+                                </div>
+                                <p className="text-sm font-medium text-zinc-400">Belum ada data</p>
+                                <p className="text-xs text-zinc-300 mt-1">Data peminjaman akan muncul di sini</p>
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
+                            <div className="overflow-auto max-h-[70vh]">
                                 <table className="w-full text-sm">
-                                    <thead>
+                                    <thead className="sticky top-0 z-10">
                                         <tr className="bg-zinc-50 border-b border-zinc-100">
                                             {["Peminjam", "Barang", "SN", "Waktu", "Keterangan", "Status", "Aksi"].map(h => (
-                                                <th key={h} className="px-3 py-3 text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                                                <th key={h} className="px-3 py-3 text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest whitespace-nowrap bg-zinc-50">{h}</th>
                                             ))}
                                         </tr>
                                     </thead>
@@ -479,13 +485,13 @@ export default function ItemLoansPage() {
                                         {visibleLoans.map(l => {
                                             const s = STATUS_META[l.status];
                                             return (
-                                                <tr key={l.id} className="border-b border-zinc-50 hover:bg-zinc-50/60">
+                                                <tr key={l.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
                                                     <td className="px-3 py-3 font-semibold text-zinc-800 whitespace-nowrap">{l.borrower_name}</td>
                                                     <td className="px-3 py-3 text-zinc-700">{l.item_name}</td>
                                                     <td className="px-3 py-3">
                                                         {l.serial_number ? <span className="font-mono text-[11px] text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">{l.serial_number}</span> : <span className="text-zinc-300">-</span>}
                                                     </td>
-                                                    <td className="px-3 py-3 text-[11px] text-zinc-500 whitespace-nowrap">
+                                                    <td className="px-3 py-3 text-[11px] text-zinc-500 whitespace-nowrap tabular-nums">
                                                         {l.status === "SOLD"
                                                             ? <span title={l.sold_invoice ? `Terjual via ${l.sold_invoice}` : ""}>{fmtWaktu(l.sold_at)}</span>
                                                             : l.status === "RETURNED"
