@@ -71,7 +71,9 @@ export interface CCReport {
 
   take_done: boolean;
   videographer: string | null;
+  videographer_user_id: string | null;
   talent: string | null;
+  talent_user_id: string | null;
   location: string | null;
   equipment: string | null;
   take_start: string | null;
@@ -82,6 +84,7 @@ export interface CCReport {
   edit_done: boolean;
   needs_revision?: boolean;
   editor_name: string | null;
+  editor_user_id: string | null;
   editor_work: string | null;
   edit_start: string | null;
   edit_end: string | null;

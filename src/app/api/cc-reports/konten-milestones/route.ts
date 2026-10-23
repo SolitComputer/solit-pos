@@ -4,19 +4,18 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-// ✅ Lencana Konten Kreator — pola sama persis dengan Lencana Penyedia
-// Barang/Sales/Teknisi: MILESTONE kumulatif ALL-TIME, TIDAK dibatasi Top 3.
+// ✅ Lencana Konten Kreator — MILESTONE kumulatif ALL-TIME, TIDAK dibatasi Top 3.
 //
-// ASUMSI (koreksi kalau salah): "take video dan edit X video" dihitung
-// sebagai TOTAL PENYELESAIAN TAHAP — jumlah tahap Take yang diselesaikan
-// (take_done_by = user) DITAMBAH jumlah tahap Edit yang diselesaikan
-// (edit_done_by = user), BUKAN jumlah video unik. Kalau 1 orang mengerjakan
-// Take DAN Edit untuk 1 video yang sama, itu dihitung 2 — ini mengikuti
-// pola scoring "Leaderboard Kerja" yang sudah ada di project ini (4 poin
-// Take + 4 poin Edit, dihitung terpisah). Konten yang di-Batal
-// (is_cancelled) tidak dihitung, sama seperti item/order yang
-// dibatalkan/gagal di fitur Lencana lain.
+// SCORING: berbasis PERAN yang ditugaskan di tiap konten. Tiap peran yang
+// terisi dengan user divisi Konten bernilai 4 poin:
+//   - videographer_user_id → +4
+//   - talent_user_id       → +4
+//   - editor_user_id       → +4
+// Jadi 1 konten maksimal 12 poin (kalau ketiga peran terisi). Nama yang
+// diketik manual (user_id null) TIDAK dihitung. Konten yang di-Batal
+// (is_cancelled) tidak dihitung.
 const MILESTONES = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
+const POINTS_PER_ROLE = 4;
 
 function highestMilestone(total: number): number {
   let tier = 0;
@@ -32,68 +31,59 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     const { searchParams } = new URL(req.url);
 
-    const totalByUser = new Map<string, { name: string; total: number }>();
+    const totalByUser = new Map<string, { total: number }>();
 
-    // 1) Semua tahap Take yang sudah selesai
+    const addPoints = (id: string | null | undefined) => {
+      if (!id) return;
+      const cur = totalByUser.get(id) ?? { total: 0 };
+      cur.total += POINTS_PER_ROLE;
+      totalByUser.set(id, cur);
+    };
+
+    // Semua konten yang TIDAK dibatalkan — tiap peran terisi = 4 poin.
+    // `.not("is_cancelled", "is", true)` = IS NOT TRUE → ikut baris false DAN null.
     {
       let from = 0;
       while (true) {
         const { data, error } = await supabaseAdmin
           .from("cc_reports")
-          .select("take_done_by, take_done_by_name")
-          .eq("take_done", true)
-          .eq("is_cancelled", false)
-          .not("take_done_by", "is", null)
+          .select("videographer_user_id, talent_user_id, editor_user_id")
+          .not("is_cancelled", "is", true)
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw error;
         if (!data || data.length === 0) break;
         data.forEach((r: any) => {
-          const cur = totalByUser.get(r.take_done_by) ?? { name: r.take_done_by_name ?? "Unknown", total: 0 };
-          cur.total += 1;
-          if (r.take_done_by_name) cur.name = r.take_done_by_name;
-          totalByUser.set(r.take_done_by, cur);
+          addPoints(r.videographer_user_id);
+          addPoints(r.talent_user_id);
+          addPoints(r.editor_user_id);
         });
         if (data.length < PAGE_SIZE) break;
         from += PAGE_SIZE;
       }
     }
 
-    // 2) Semua tahap Edit yang sudah selesai
-    {
-      let from = 0;
-      while (true) {
-        const { data, error } = await supabaseAdmin
-          .from("cc_reports")
-          .select("edit_done_by, edit_done_by_name")
-          .eq("edit_done", true)
-          .eq("is_cancelled", false)
-          .not("edit_done_by", "is", null)
-          .range(from, from + PAGE_SIZE - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        data.forEach((r: any) => {
-          const cur = totalByUser.get(r.edit_done_by) ?? { name: r.edit_done_by_name ?? "Unknown", total: 0 };
-          cur.total += 1;
-          if (r.edit_done_by_name) cur.name = r.edit_done_by_name;
-          totalByUser.set(r.edit_done_by, cur);
-        });
-        if (data.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-    }
-
-    // 3) Nama & total sudah cukup dari denormalized columns di atas, cuma
-    //    "role" yang perlu di-lookup dari tabel users untuk subtitle di tabel
+    // Nama & role di-lookup dari tabel users (user_id bukan denormalized name).
     const userIds = Array.from(totalByUser.keys());
     const safeIds = userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"];
     const { data: usersData } = await supabaseAdmin
       .from("users")
-      .select("id, role")
+      .select("id, name, role")
       .in("id", safeIds);
-    const roleMap = new Map((usersData ?? []).map((u: any) => [u.id, u.role]));
+    const infoMap = new Map(
+      (usersData ?? []).map((u: any) => [u.id, { name: u.name ?? "Unknown", role: u.role ?? "" }])
+    );
 
     const ranked = Array.from(totalByUser.entries())
-      .map(([id, v]) => ({ user_id: id, name: v.name, role: roleMap.get(id) ?? "", total: v.total, milestone: highestMilestone(v.total) }))
+      .map(([id, v]) => {
+        const info = infoMap.get(id);
+        return {
+          user_id: id,
+          name: info?.name ?? "Unknown",
+          role: info?.role ?? "",
+          total: v.total,
+          milestone: highestMilestone(v.total),
+        };
+      })
       .sort((a, b) => b.total - a.total)
       .map((row, i) => ({ ...row, rank: i + 1 }));
 

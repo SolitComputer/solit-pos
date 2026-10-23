@@ -7,11 +7,13 @@ import { hasAnyRole, CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
 export const dynamic = "force-dynamic";
 
 const TAKE_FIELDS = [
-  "videographer", "talent", "location", "equipment",
+  "videographer", "videographer_user_id",
+  "talent", "talent_user_id",
+  "location", "equipment",
   "take_start", "take_end", "take_received_editor", "take_done",
 ] as const;
 const EDIT_FIELDS = [
-  "editor_name", "editor_work", "device", "edit_start", "edit_end",
+  "editor_name", "editor_user_id", "editor_work", "device", "edit_start", "edit_end",
   "ready_folder_link", "edit_done",
 ] as const;
 const POSTING_FIELDS = ["posting_done"] as const;

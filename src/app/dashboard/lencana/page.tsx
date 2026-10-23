@@ -1509,14 +1509,14 @@ function KontenKreatorLeaderboard() {
             title="Lencana Konten Kreator"
             description={
                 <>
-                    Dihitung dari <strong>total tahap Take + Edit</strong> video yang berhasil diselesaikan (konten yang di-Batal tidak termasuk) sepanjang waktu bekerja — kalau 1 orang mengerjakan Take dan Edit di video yang sama, dihitung 2. Lencana didapat berdasarkan MILESTONE total yang sudah dicapai: 100, 200, 300, 400, 500, 600, 700, 800, 900, sampai 1000 — bersifat kumulatif &amp; permanen begitu tercapai, ditampilkan untuk semua yang sudah meraihnya (tidak dibatasi Top 3).
+                    Dihitung dari <strong>peran yang ditugaskan di tiap konten</strong> — Videographer, Talent, atau Editor. Tiap peran yang diisi dengan anggota divisi Konten bernilai <strong>4 poin</strong> (1 konten maksimal 12 poin kalau ketiga peran terisi; konten yang di-Batal tidak dihitung). Nama yang diketik manual (bukan dipilih dari daftar) tidak menghasilkan poin. Lencana didapat berdasarkan MILESTONE total poin yang sudah dicapai: 100, 200, 300, 400, 500, 600, 700, 800, 900, sampai 1000 — bersifat kumulatif &amp; permanen begitu tercapai, ditampilkan untuk semua yang sudah meraihnya (tidak dibatasi Top 3).
                 </>
             }
             board={board}
             loading={loading}
             emptyMessage="Belum ada data Konten Kreator"
             alwaysShowMilestone={true}
-            totalLabel="Total Video"
+            totalLabel="Total Poin"
             rowGradient="from-cyan-400 to-blue-500"
             valueColorClass="text-cyan-600"
         />

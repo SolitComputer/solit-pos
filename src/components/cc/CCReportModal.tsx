@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Ban, X, RefreshCw } from "lucide-react";
 import { useRegisterOverlay } from "@/contexts/OverlayContext";
 import {
@@ -44,7 +44,9 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
 
   const [take, setTake] = useState({
     videographer: report.videographer ?? "",
+    videographer_user_id: report.videographer_user_id ?? "",
     talent: report.talent ?? "",
+    talent_user_id: report.talent_user_id ?? "",
     location: report.location ?? "",
     equipment: report.equipment ?? "",
     take_start: isoToLocalInput(report.take_start),
@@ -54,6 +56,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
 
   const [edit, setEdit] = useState({
     editor_name: report.editor_name ?? "",
+    editor_user_id: report.editor_user_id ?? "",
     editor_work: report.editor_work ?? "",
     device: report.device ?? "", //  Device sekarang bagian dari tahap Editing, bukan Take
     edit_start: isoToLocalInput(report.edit_start),
@@ -63,6 +66,15 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
 
   const [saving, setSaving] = useState(false);
   const [brand, setBrand] = useState<CCBrand>(report.brand ?? DEFAULT_BRAND);
+
+  // Daftar user divisi Konten untuk dropdown Videographer / Talent / Editor.
+  const [kontenUsers, setKontenUsers] = useState<{ id: string; name: string; role: string }[]>([]);
+  useEffect(() => {
+    fetch("/api/cc-reports/konten-users")
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setKontenUsers(d.users); })
+      .catch(() => { });
+  }, []);
 
   const changeBrand = async (b: CCBrand) => {
     const prev = brand;
@@ -93,7 +105,9 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
   const saveTake = (markDone: boolean) =>
     patch({
       videographer: take.videographer,
+      videographer_user_id: take.videographer_user_id || null,
       talent: take.talent,
+      talent_user_id: take.talent_user_id || null,
       location: take.location,
       equipment: take.equipment,
       take_start: localInputToIso(take.take_start),
@@ -105,6 +119,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
   const saveEdit = async (markDone: boolean) => {
     await patch({
       editor_name: edit.editor_name,
+      editor_user_id: edit.editor_user_id || null,
       editor_work: edit.editor_work,
       device: edit.device, //  ikut disimpan dari tab Editing
       edit_start: localInputToIso(edit.edit_start),
@@ -256,6 +271,14 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
             </div>
           )}
 
+          {/* Datalist bersama untuk combobox Videographer / Talent / Editor.
+              Dirender sekali di sini supaya ketiga tab bisa pakai id yang sama. */}
+          <datalist id="cc-konten-users">
+            {kontenUsers.map((u) => (
+              <option key={u.id} value={u.name} />
+            ))}
+          </datalist>
+
           {/* ── TAKE ── */}
           {tab === "take" && (
             <div className="space-y-4 rounded-2xl bg-white p-4 ring-1 ring-gray-100">
@@ -266,12 +289,22 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
               )}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Videographer">
-                  <input className={INPUT} disabled={locked} value={take.videographer} onChange={(e) => setTake({ ...take, videographer: e.target.value })} />
-                </Field>
-                <Field label="Talent">
-                  <input className={INPUT} disabled={locked} value={take.talent} onChange={(e) => setTake({ ...take, talent: e.target.value })} />
-                </Field>
+                <PersonComboField
+                  label="Videographer"
+                  listId="cc-konten-users"
+                  options={kontenUsers}
+                  disabled={locked}
+                  value={take.videographer}
+                  onChange={(name, userId) => setTake({ ...take, videographer: name, videographer_user_id: userId })}
+                />
+                <PersonComboField
+                  label="Talent"
+                  listId="cc-konten-users"
+                  options={kontenUsers}
+                  disabled={locked}
+                  value={take.talent}
+                  onChange={(name, userId) => setTake({ ...take, talent: name, talent_user_id: userId })}
+                />
                 <Field label="Tempat">
                   <input className={INPUT} disabled={locked} value={take.location} onChange={(e) => setTake({ ...take, location: e.target.value })} />
                 </Field>
@@ -323,9 +356,14 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Nama Editor">
-                  <input className={INPUT} disabled={locked} value={edit.editor_name} onChange={(e) => setEdit({ ...edit, editor_name: e.target.value })} />
-                </Field>
+                <PersonComboField
+                  label="Nama Editor"
+                  listId="cc-konten-users"
+                  options={kontenUsers}
+                  disabled={locked}
+                  value={edit.editor_name}
+                  onChange={(name, userId) => setEdit({ ...edit, editor_name: name, editor_user_id: userId })}
+                />
                 <Field label="Dikerjakan Editor (catatan)">
                   <input className={INPUT} disabled={locked} value={edit.editor_work} onChange={(e) => setEdit({ ...edit, editor_work: e.target.value })} />
                 </Field>
@@ -397,6 +435,37 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label className="text-[11px] font-bold uppercase tracking-wide text-gray-400">{label}</label>
       <div className="mt-1">{children}</div>
     </div>
+  );
+}
+
+/**
+ * Combobox nama: bisa dipilih dari daftar divisi Konten ATAU diketik manual.
+ * Kalau nama persis cocok dengan user di daftar → userId keisi (dapat poin).
+ * Kalau diketik manual/tidak cocok → userId "" (tersimpan null, tanpa poin).
+ */
+function PersonComboField({
+  label, value, listId, options, disabled, onChange,
+}: {
+  label: string;
+  value: string;
+  listId: string;
+  options: { id: string; name: string }[];
+  disabled?: boolean;
+  onChange: (name: string, userId: string) => void;
+}) {
+  const resolve = (name: string) =>
+    options.find((u) => u.name.trim().toLowerCase() === name.trim().toLowerCase())?.id ?? "";
+  return (
+    <Field label={label}>
+      <input
+        className={INPUT}
+        list={listId}
+        disabled={disabled}
+        value={value}
+        placeholder="Pilih / ketik nama… (opsional)"
+        onChange={(e) => onChange(e.target.value, resolve(e.target.value))}
+      />
+    </Field>
   );
 }
 
