@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { hasAnyRole, SALES_REPORT_AUDIT_ROLES } from "@/lib/permissions";
+import { currentPeriodWib } from "@/lib/marketing-insight";
 
 export const dynamic = "force-dynamic";
 
@@ -56,11 +57,13 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     const stamp = Date.now().toString(36);
     const columns = [{ id: `c_${stamp}`, name: "Kolom 1" }];
-    const rows = [{ id: `r_${stamp}`, cells: {} }];
+    // Baris mode harian (per tanggal) digenerate di client sesuai `period`,
+    // jadi tabel baru mulai TANPA baris tersimpan (rows kosong = hemat).
+    const period = currentPeriodWib(); // "YYYY-MM" (bulan berjalan WIB)
 
     const { data, error } = await supabaseAdmin
       .from(TABLE)
-      .insert({ name, columns, rows, sort_order, created_by: user.id, created_by_name: user.name })
+      .insert({ name, columns, rows: [], period, sort_order, created_by: user.id, created_by_name: user.name })
       .select()
       .single();
     if (error) throw new Error(error.message);
@@ -85,6 +88,7 @@ async function patchHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     if (typeof body.name === "string") patch.name = body.name.trim() || "Tabel Baru";
     if (Array.isArray(body.columns)) patch.columns = body.columns;
     if (Array.isArray(body.rows)) patch.rows = body.rows;
+    if (typeof body.period === "string" && /^\d{4}-\d{2}$/.test(body.period)) patch.period = body.period;
 
     const { data, error } = await supabaseAdmin
       .from(TABLE)
