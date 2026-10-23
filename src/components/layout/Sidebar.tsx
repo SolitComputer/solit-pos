@@ -1197,6 +1197,43 @@ function withSopGroup(groups: MenuGroup[], userEffectiveRoles: string[]): MenuGr
   return [...rest.slice(0, at), SOP_GROUP, ...rest.slice(at)];
 }
 
+// Kontrak: dulu grup "Kontrak Kerja" sendiri. Sekarang item-nya disuntik ke
+// dalam grup "Absensi" sebagai submenu — kondisinya tetap sama persis dengan
+// yang dulu, jadi hak akses & fungsi tidak berubah:
+//   - Perjanjian Kontrak   → user yg kontraknya belum APPROVED (showPerjanjian)
+//   - Tanda Tangan Kontrak → contract signer                   (showSign)
+//   - Daftar Kontrak       → admin contract-expiring           (showExpiring)
+// Pola identik dgn withKendaraanGroup/withPeminjamanBarang: disuntik di level
+// groups final supaya role dinamis (menu dari DB) pun kebagian.
+function withContractInAbsensi(
+  groups: MenuGroup[],
+  opts: { showPerjanjian: boolean; showSign: boolean; showExpiring: boolean },
+): MenuGroup[] {
+  const items: MenuItem[] = [];
+  if (opts.showPerjanjian) items.push(ITEM_CONTRACT);
+  if (opts.showSign) items.push(ITEM_CONTRACT_SIGN);
+  if (opts.showExpiring) items.push(ITEM_CONTRACT_EXPIRING);
+  if (items.length === 0) return groups;
+
+  let injected = false;
+  const next = groups.map((g) => {
+    if (g.label !== "Absensi") return g;
+    injected = true;
+    const existing = new Set(g.items.map((it) => it.href));
+    const toAdd = items.filter((it) => !existing.has(it.href));
+    return toAdd.length ? { ...g, items: [...g.items, ...toAdd] } : g;
+  });
+
+  // Fallback: role tanpa grup "Absensi" (jarang) — buat grup Absensi minimal
+  // berisi item kontrak, ditaruh setelah "Utama" biar tetap rapi.
+  if (!injected) {
+    const utamaIdx = next.findIndex((g) => g.label === "Utama");
+    const at = utamaIdx >= 0 ? utamaIdx + 1 : next.length;
+    return [...next.slice(0, at), { label: "Absensi", items }, ...next.slice(at)];
+  }
+  return next;
+}
+
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
   KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
@@ -1811,11 +1848,8 @@ export default function Sidebar() {
   // Akun whitelist boleh lihat Riwayat Transaksi walau role-nya tidak termasuk
   // (mis. Fikri — MARKETING). Sumber: TRANSACTION_VIEW_EXTRA_USER_IDS di permissions.ts.
   const canViewTransaksiByUserId = !!user?.id && (TRANSACTION_VIEW_EXTRA_USER_IDS as string[]).includes(user.id);
-  const groups: MenuGroup[] = withPeminjamanBarang(withSopGroup(withKendaraanGroup(
+  const groups: MenuGroup[] = withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKendaraanGroup(
     dedupeGroups([
-      ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
-      ...(isContractSigner ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT_SIGN] }] : []),
-      ...(isContractExpiringAdmin ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT_EXPIRING] }] : []),
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
       ...(canViewTransaksiByUserId
@@ -1826,7 +1860,11 @@ export default function Sidebar() {
         items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
       })),
     ])
-  ), effectiveRoles));
+  ), effectiveRoles)), {
+    showPerjanjian: !!(contractStatus && contractStatus !== "APPROVED"),
+    showSign: isContractSigner,
+    showExpiring: isContractExpiringAdmin,
+  });
 
   const groupsSig = groups.map((g) => g.label).join("|");
 
