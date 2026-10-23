@@ -36,6 +36,10 @@ export interface InventoryRow {
     official_price?: number | null;
     official_price_note?: string;
 
+    /** Sembunyikan kolom Harga Official untuk baris ini (mis. aksesoris yang
+     *  tidak punya konsep official price). Default undefined → tampil seperti biasa. */
+    hide_official?: boolean;
+
     /** Gross Profit = Harga Store - Harga Sparepart - Harga Modal */
     gross_profit?: number | null;
     gross_profit_note?: string;
@@ -373,9 +377,13 @@ export default function InventoryTable({
                             </td>
 
                             <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                                <span className="text-xs font-semibold text-gray-600 tabular-nums">
-                                    {fmt((row.harga_jual ?? 0) + OFFICIAL_PRICE_MARKUP)}
-                                </span>
+                                {row.hide_official ? (
+                                    <Dash />
+                                ) : (
+                                    <span className="text-xs font-semibold text-gray-600 tabular-nums">
+                                        {fmt((row.harga_jual ?? 0) + OFFICIAL_PRICE_MARKUP)}
+                                    </span>
+                                )}
                             </td>
 
                             {canSeePrivate && (
