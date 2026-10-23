@@ -11,6 +11,8 @@
  * supaya aman dipakai juga oleh halaman client.
  */
 
+import { getPriceRangeLabel, PRICE_RANGE_OPTIONS } from "@/lib/price-range";
+
 export const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta = UTC+7
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -74,6 +76,7 @@ export interface MarketingReportData {
 export interface AuditedReportLite {
   channel: string | null;
   interest: string | null;
+  price_range?: string | null;
 }
 
 function cleanKeyword(raw: string): string {
@@ -101,9 +104,13 @@ function pickDisplayLabel(variants: Map<string, number>): string {
   return best;
 }
 
+export type MarketingGroupBy = "interest" | "price_range";
+
 export function aggregateMarketingReport(
-  reports: AuditedReportLite[]
+  reports: AuditedReportLite[],
+  options: { groupBy?: MarketingGroupBy } = {}
 ): Omit<MarketingReportData, "pendingAuditCount"> {
+  const groupBy = options.groupBy ?? "interest";
   const groups = new Map<
     string,
     { channels: Record<string, number>; total: number; variants: Map<string, number> }
@@ -113,10 +120,20 @@ export function aggregateMarketingReport(
   const knownChannels = MARKETING_CHANNELS as readonly string[];
 
   for (const report of reports) {
-    const original = cleanKeyword(report.interest ?? "");
-    if (!original) continue;
-
-    const key = original.toLowerCase();
+    let original: string;
+    let key: string;
+    if (groupBy === "price_range") {
+      // price_range disimpan sbg KODE (LT_1, 1_2, …). Group id = kode,
+      // label tampil (kolom "Range Harga") = getPriceRangeLabel(kode).
+      const code = (report.price_range ?? "").trim();
+      if (!code) continue;
+      key = code;
+      original = getPriceRangeLabel(code) ?? code;
+    } else {
+      original = cleanKeyword(report.interest ?? "");
+      if (!original) continue;
+      key = original.toLowerCase();
+    }
     const channel = (report.channel ?? "").trim().toUpperCase() || "LAINNYA";
     if (!knownChannels.includes(channel)) unknownChannels.add(channel);
 
@@ -138,7 +155,17 @@ export function aggregateMarketingReport(
     channels: g.channels,
     total: g.total,
   }));
-  rows.sort((a, b) => b.total - a.total || a.keyword.localeCompare(b.keyword, "id"));
+  if (groupBy === "price_range") {
+    // Urut murah → mahal sesuai urutan PRICE_RANGE_OPTIONS (pakai KODE di row.key).
+    const order: string[] = PRICE_RANGE_OPTIONS.map((o) => o.value);
+        const idx = (k: string) => {
+      const i = order.indexOf(k);
+      return i === -1 ? order.length : i; // kode tak dikenal → paling bawah
+    };
+    rows.sort((a, b) => idx(a.key) - idx(b.key) || b.total - a.total);
+  } else {
+    rows.sort((a, b) => b.total - a.total || a.keyword.localeCompare(b.keyword, "id"));
+  }
 
   const grandTotal = rows.reduce((sum, r) => sum + r.total, 0);
 

@@ -24,6 +24,8 @@ import {
   type MarketingReportData,
   type MarketingReportRow,
 } from "@/lib/marketing-report";
+import MarketingPriceRangeReport from "./MarketingPriceRangeReport";
+import MarketingInsightBoard from "./MarketingInsightBoard";
 
 // "2026-10-22" → "22 Okt 2026". Diparse manual (bukan new Date("YYYY-MM-DD"))
 // supaya tidak geser hari karena zona waktu.
@@ -79,6 +81,7 @@ export default function LaporanMarketingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [hideEmptyChannels, setHideEmptyChannels] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight">("barang");
 
   // Abaikan response lama kalau user ganti filter cepat-cepat (race condition).
   const requestIdRef = useRef(0);
@@ -217,185 +220,215 @@ export default function LaporanMarketingPage() {
           </button>
         </div>
 
-        {/* Filter tanggal (kalender Cashflow) + ringkasan */}
-        <div className="rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-4 sm:px-6 sm:py-5">
-          <div className="flex flex-col-reverse lg:flex-row gap-4 lg:items-start">
-            <div className="flex-1 min-w-0 space-y-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-full">
-                  <Calendar className="w-3 h-3" />
-                  {periodLabel}
-                </span>
-                {customFrom && !customTo && (
-                  <span className="text-[11px] text-gray-400">Klik tanggal akhir di kalender untuk menutup rentang</span>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                <SummaryCard icon={Hash} iconClass="bg-violet-50 text-violet-600" label="Total Qty" value={report?.grandTotal ?? 0} caption="leads terverifikasi" />
-                <SummaryCard icon={Layers} iconClass="bg-fuchsia-50 text-fuchsia-600" label="Kata Kunci" value={report?.rows.length ?? 0} caption="barang unik" />
-                <SummaryCard
-                  icon={Trophy}
-                  iconClass="bg-amber-50 text-amber-600"
-                  label="Channel Teratas"
-                  value={topChannel ? topChannel.qty : 0}
-                  caption={topChannel ? channelLabel(topChannel.channel) : "—"}
-                />
-                <SummaryCard icon={Clock} iconClass="bg-gray-100 text-gray-500" label="Menunggu Audit" value={report?.pendingAuditCount ?? 0} caption="belum dihitung" />
-              </div>
-            </div>
-
-            <div className="shrink-0 self-center lg:self-start">
-              <InlineDateRange from={customFrom} to={customTo} onChange={handleDateRangeChange} />
-            </div>
-          </div>
-        </div>
-
-        {/* Tabel */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-gray-50 overflow-hidden">
-          <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-sm shadow-violet-200/60">
-                <ShieldCheck className="w-4 h-4 text-white" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-sm font-bold text-gray-900">Rekap per Kata Kunci</h2>
-                <p className="text-[11px] text-gray-500 mt-0.5 truncate">Qty = jumlah laporan teraudit dengan minat yang sama</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Escape") setSearchQuery(""); }}
-                  placeholder="Cari kata kunci..."
-                  aria-label="Cari kata kunci"
-                  className="w-full pl-8 pr-8 py-2 text-xs bg-gray-50 border border-gray-200 rounded-full outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    aria-label="Hapus pencarian"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-200/60"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
+        {/* Tab switcher */}
+        <div className="flex items-center gap-1 bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 rounded-full p-1 w-fit">
+          {([
+            { key: "barang", label: "Laporan Barang", icon: BarChart3 },
+            { key: "range", label: "Range Harga", icon: Hash },
+            { key: "insight", label: "Insight", icon: Layers },
+          ] as const).map((t) => {
+            const Icon = t.icon;
+            const isActive = activeTab === t.key;
+            return (
               <button
-                onClick={() => setHideEmptyChannels((v) => !v)}
-                title={hideEmptyChannels ? "Tampilkan semua channel" : "Sembunyikan channel yang kosong"}
-                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-semibold border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${hideEmptyChannels ? "bg-violet-600 border-violet-600 text-white" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                className={`inline-flex items-center gap-1.5 px-3.5 sm:px-4 h-9 rounded-full text-xs sm:text-sm font-semibold transition-all focus:outline-none ${isActive ? "bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-sm shadow-violet-300/40" : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"}`}
               >
-                {hideEmptyChannels ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                <span className="hidden sm:inline">Channel kosong</span>
+                <Icon className="w-3.5 h-3.5" />
+                {t.label}
               </button>
+            );
+          })}
+        </div>
+
+        {activeTab === "barang" && (
+          <div className="space-y-4 sm:space-y-5">
+
+            {/* Filter tanggal (kalender Cashflow) + ringkasan */}
+            <div className="rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-4 sm:px-6 sm:py-5">
+              <div className="flex flex-col-reverse lg:flex-row gap-4 lg:items-start">
+                <div className="flex-1 min-w-0 space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-full">
+                      <Calendar className="w-3 h-3" />
+                      {periodLabel}
+                    </span>
+                    {customFrom && !customTo && (
+                      <span className="text-[11px] text-gray-400">Klik tanggal akhir di kalender untuk menutup rentang</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                    <SummaryCard icon={Hash} iconClass="bg-violet-50 text-violet-600" label="Total Qty" value={report?.grandTotal ?? 0} caption="leads terverifikasi" />
+                    <SummaryCard icon={Layers} iconClass="bg-fuchsia-50 text-fuchsia-600" label="Kata Kunci" value={report?.rows.length ?? 0} caption="barang unik" />
+                    <SummaryCard
+                      icon={Trophy}
+                      iconClass="bg-amber-50 text-amber-600"
+                      label="Channel Teratas"
+                      value={topChannel ? topChannel.qty : 0}
+                      caption={topChannel ? channelLabel(topChannel.channel) : "—"}
+                    />
+                    <SummaryCard icon={Clock} iconClass="bg-gray-100 text-gray-500" label="Menunggu Audit" value={report?.pendingAuditCount ?? 0} caption="belum dihitung" />
+                  </div>
+                </div>
+
+                <div className="shrink-0 self-center lg:self-start">
+                  <InlineDateRange from={customFrom} to={customTo} onChange={handleDateRangeChange} />
+                </div>
+              </div>
+            </div>
+
+            {/* Tabel */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-gray-50 overflow-hidden">
+              <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-sm shadow-violet-200/60">
+                    <ShieldCheck className="w-4 h-4 text-white" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-bold text-gray-900">Rekap per Kata Kunci</h2>
+                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">Qty = jumlah laporan teraudit dengan minat yang sama</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Escape") setSearchQuery(""); }}
+                      placeholder="Cari kata kunci..."
+                      aria-label="Cari kata kunci"
+                      className="w-full pl-8 pr-8 py-2 text-xs bg-gray-50 border border-gray-200 rounded-full outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        aria-label="Hapus pencarian"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-200/60"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setHideEmptyChannels((v) => !v)}
+                    title={hideEmptyChannels ? "Tampilkan semua channel" : "Sembunyikan channel yang kosong"}
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-semibold border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${hideEmptyChannels ? "bg-violet-600 border-violet-600 text-white" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+                  >
+                    {hideEmptyChannels ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    <span className="hidden sm:inline">Channel kosong</span>
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-4 sm:px-5 py-3">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  {error}
+                </p>
+              )}
+
+              {loading && !report ? (
+                <div className="p-4 sm:p-5 space-y-2">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="h-7 rounded-md bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+                  ))}
+                </div>
+              ) : !hasData ? (
+                <div className="py-12 flex flex-col items-center text-center px-6">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 flex items-center justify-center mb-3 ring-1 ring-violet-100/60">
+                    <BarChart3 className="w-6 h-6 text-violet-300" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-700">Belum ada laporan teraudit pada periode ini</p>
+                  <p className="text-xs text-gray-400 mt-1 max-w-[280px]">
+                    {(report?.pendingAuditCount ?? 0) > 0
+                      ? `${report?.pendingAuditCount} laporan masih menunggu audit. Data otomatis masuk setelah diaudit.`
+                      : "Laporan Harian Sales yang sudah diaudit akan muncul di sini."}
+                  </p>
+                </div>
+              ) : (
+                <div className={`overflow-x-auto transition-opacity ${loading ? "opacity-60" : ""}`}>
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="sticky left-0 z-10 bg-violet-600 text-white border border-violet-700 px-3 py-2 text-left font-bold whitespace-nowrap min-w-[180px]">
+                          Model / Kata Kunci
+                        </th>
+                        {visibleChannels.map((ch) => (
+                          <th
+                            key={ch}
+                            className={`border border-gray-300 px-2 py-2 text-center font-bold whitespace-nowrap min-w-[76px] ${channelHeaderClass[ch] ?? "bg-gray-500 text-white"}`}
+                          >
+                            {channelLabel(ch)}
+                          </th>
+                        ))}
+                        <th className="bg-violet-600 text-white border border-violet-700 px-3 py-2 text-center font-bold min-w-[72px]">
+                          TOTAL
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={visibleChannels.length + 2} className="border border-gray-200 px-4 py-8 text-center text-gray-400">
+                            Tidak ada kata kunci yang cocok dengan &quot;{searchQuery.trim()}&quot;
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredRows.map((row) => (
+                          <tr key={row.key} className="group hover:bg-violet-50/40">
+                            <td
+                              className="sticky left-0 z-[1] bg-white group-hover:bg-violet-50 border border-gray-200 px-3 py-1.5 text-gray-800 max-w-[260px] truncate"
+                              title={row.keyword}
+                            >
+                              {row.keyword}
+                            </td>
+                            {visibleChannels.map((ch) => {
+                              const qty = row.channels[ch] ?? 0;
+                              return (
+                                <td
+                                  key={ch}
+                                  className={`border border-gray-200 px-2 py-1.5 text-center tabular-nums ${qtyCellClass(qty, maxCellQty)}`}
+                                  title={qty > 0 ? `${row.keyword} — ${channelLabel(ch)}: ${qty}` : undefined}
+                                >
+                                  {qty > 0 ? qty : ""}
+                                </td>
+                              );
+                            })}
+                            <td className={`border border-gray-200 px-2 py-1.5 text-center tabular-nums font-bold ${qtyCellClass(row.total, maxRowTotal)}`}>
+                              {row.total}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {filteredRows.length > 0 && (
+                      <tfoot>
+                        <tr className="bg-violet-50">
+                          <td className="sticky left-0 z-[1] bg-violet-100 border border-violet-200 px-3 py-2 font-bold text-violet-800">
+                            TOTAL
+                          </td>
+                          {visibleChannels.map((ch) => (
+                            <td key={ch} className="border border-violet-200 px-2 py-2 text-center font-bold tabular-nums text-violet-800">
+                              {footer.perChannel[ch] ?? 0}
+                            </td>
+                          ))}
+                          <td className="border border-violet-300 px-2 py-2 text-center font-black tabular-nums bg-violet-600 text-white">
+                            {footer.total}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              )}
             </div>
           </div>
+        )}
 
-          {error && (
-            <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-4 sm:px-5 py-3">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              {error}
-            </p>
-          )}
-
-          {loading && !report ? (
-            <div className="p-4 sm:p-5 space-y-2">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-7 rounded-md bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
-              ))}
-            </div>
-          ) : !hasData ? (
-            <div className="py-12 flex flex-col items-center text-center px-6">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 flex items-center justify-center mb-3 ring-1 ring-violet-100/60">
-                <BarChart3 className="w-6 h-6 text-violet-300" />
-              </div>
-              <p className="text-sm font-medium text-gray-700">Belum ada laporan teraudit pada periode ini</p>
-              <p className="text-xs text-gray-400 mt-1 max-w-[280px]">
-                {(report?.pendingAuditCount ?? 0) > 0
-                  ? `${report?.pendingAuditCount} laporan masih menunggu audit. Data otomatis masuk setelah diaudit.`
-                  : "Laporan Harian Sales yang sudah diaudit akan muncul di sini."}
-              </p>
-            </div>
-          ) : (
-            <div className={`overflow-x-auto transition-opacity ${loading ? "opacity-60" : ""}`}>
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr>
-                    <th className="sticky left-0 z-10 bg-violet-600 text-white border border-violet-700 px-3 py-2 text-left font-bold whitespace-nowrap min-w-[180px]">
-                      Model / Kata Kunci
-                    </th>
-                    {visibleChannels.map((ch) => (
-                      <th
-                        key={ch}
-                        className={`border border-gray-300 px-2 py-2 text-center font-bold whitespace-nowrap min-w-[76px] ${channelHeaderClass[ch] ?? "bg-gray-500 text-white"}`}
-                      >
-                        {channelLabel(ch)}
-                      </th>
-                    ))}
-                    <th className="bg-violet-600 text-white border border-violet-700 px-3 py-2 text-center font-bold min-w-[72px]">
-                      TOTAL
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={visibleChannels.length + 2} className="border border-gray-200 px-4 py-8 text-center text-gray-400">
-                        Tidak ada kata kunci yang cocok dengan &quot;{searchQuery.trim()}&quot;
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRows.map((row) => (
-                      <tr key={row.key} className="group hover:bg-violet-50/40">
-                        <td
-                          className="sticky left-0 z-[1] bg-white group-hover:bg-violet-50 border border-gray-200 px-3 py-1.5 text-gray-800 max-w-[260px] truncate"
-                          title={row.keyword}
-                        >
-                          {row.keyword}
-                        </td>
-                        {visibleChannels.map((ch) => {
-                          const qty = row.channels[ch] ?? 0;
-                          return (
-                            <td
-                              key={ch}
-                              className={`border border-gray-200 px-2 py-1.5 text-center tabular-nums ${qtyCellClass(qty, maxCellQty)}`}
-                              title={qty > 0 ? `${row.keyword} — ${channelLabel(ch)}: ${qty}` : undefined}
-                            >
-                              {qty > 0 ? qty : ""}
-                            </td>
-                          );
-                        })}
-                        <td className={`border border-gray-200 px-2 py-1.5 text-center tabular-nums font-bold ${qtyCellClass(row.total, maxRowTotal)}`}>
-                          {row.total}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-                {filteredRows.length > 0 && (
-                  <tfoot>
-                    <tr className="bg-violet-50">
-                      <td className="sticky left-0 z-[1] bg-violet-100 border border-violet-200 px-3 py-2 font-bold text-violet-800">
-                        TOTAL
-                      </td>
-                      {visibleChannels.map((ch) => (
-                        <td key={ch} className="border border-violet-200 px-2 py-2 text-center font-bold tabular-nums text-violet-800">
-                          {footer.perChannel[ch] ?? 0}
-                        </td>
-                      ))}
-                      <td className="border border-violet-300 px-2 py-2 text-center font-black tabular-nums bg-violet-600 text-white">
-                        {footer.total}
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          )}
-        </div>
+        {activeTab === "range" && <MarketingPriceRangeReport />}
+        {activeTab === "insight" && <MarketingInsightBoard />}
       </div>
     </DashboardLayout>
   );
