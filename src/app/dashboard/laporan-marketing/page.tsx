@@ -6,6 +6,7 @@ import {
   BarChart3,
   Calendar,
   Clock,
+  Download,
   Eye,
   EyeOff,
   Hash,
@@ -24,6 +25,7 @@ import {
   type MarketingReportData,
   type MarketingReportRow,
 } from "@/lib/marketing-report";
+import { exportMarketingReportExcel } from "@/lib/marketing-report-excel";
 import MarketingPriceRangeReport from "./MarketingPriceRangeReport";
 import MarketingInsightBoard from "./MarketingInsightBoard";
 
@@ -82,6 +84,7 @@ export default function LaporanMarketingPage() {
   const [hideEmptyChannels, setHideEmptyChannels] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight">("barang");
+  const [exporting, setExporting] = useState(false);
 
   // Abaikan response lama kalau user ganti filter cepat-cepat (race condition).
   const requestIdRef = useRef(0);
@@ -183,6 +186,34 @@ export default function LaporanMarketingPage() {
   const handleDateRangeChange = (from: string, to: string) => {
     setCustomFrom(from);
     setCustomTo(to);
+  };
+
+  // Export Excel = PERSIS yang sedang tampil (periode, pencarian, toggle channel kosong).
+  const handleExport = async () => {
+    if (!report || exporting || filteredRows.length === 0) return;
+    setExporting(true);
+    try {
+      await exportMarketingReportExcel({
+        rows: filteredRows,
+        channels: visibleChannels,
+        footer,
+        summary: {
+          grandTotal: report.grandTotal,
+          keywordCount: report.rows.length,
+          topChannel,
+          pendingAuditCount: report.pendingAuditCount,
+        },
+        periodLabel,
+        from: customFrom,
+        to: customTo,
+        searchQuery,
+      });
+    } catch (err) {
+      console.error("Export Laporan Marketing error:", err);
+      setError("Gagal export Excel. Coba lagi.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -318,6 +349,15 @@ export default function LaporanMarketingPage() {
                   >
                     {hideEmptyChannels ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                     <span className="hidden sm:inline">Channel kosong</span>
+                  </button>
+                  <button
+                    onClick={handleExport}
+                    disabled={loading || exporting || filteredRows.length === 0}
+                    title="Export tabel yang sedang tampil ke Excel"
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-semibold border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                  >
+                    <Download className={`w-3 h-3 ${exporting ? "animate-bounce" : ""}`} />
+                    <span className="hidden sm:inline">{exporting ? "Mengekspor..." : "Export Excel"}</span>
                   </button>
                 </div>
               </div>
