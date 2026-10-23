@@ -47,7 +47,7 @@ export default function ItemLoansPage() {
     const [snQuery, setSnQuery] = useState("");
     const [snResults, setSnResults] = useState<SnResult[]>([]);
     const [snOpen, setSnOpen] = useState(false);
-    const [selected, setSelected] = useState<SnResult | null>(null);
+    const [cart, setCart] = useState<SnResult[]>([]);
     const [notes, setNotes] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,9 +111,13 @@ export default function ItemLoansPage() {
         return () => document.removeEventListener("mousedown", onClick);
     }, []);
 
+    // Kunci unik 1 unit barang — cegah SN/unit yang sama masuk keranjang 2x.
+    const cartKey = (x: SnResult) => `${x.item_type}-${x.item_id}-${x.unit_id ?? "parent"}`;
+
     const pickSn = (r: SnResult) => {
-        setSelected(r);
-        setSnQuery(r.serial_number ? `${r.item_name} — ${r.serial_number}` : r.item_name);
+        setCart(prev => prev.some(p => cartKey(p) === cartKey(r)) ? prev : [...prev, r]);
+        setSnQuery("");      // kosongkan field → langsung bisa scan/ketik barang berikutnya
+        setSnResults([]);
         setSnOpen(false);
     };
 
@@ -210,25 +214,45 @@ export default function ItemLoansPage() {
         };
     }, [scanOpen]);
 
-    const resetForm = () => { setSelected(null); setSnQuery(""); setNotes(""); setSnResults([]); };
+    const resetForm = () => { setCart([]); setSnQuery(""); setNotes(""); setSnResults([]); };
 
     const submit = async () => {
-        if (!selected) { toast.error("Pilih barang & SN dulu"); return; }
+        if (cart.length === 0) { toast.error("Pilih barang & SN dulu"); return; }
         setSubmitting(true);
         try {
-            const res = await fetch("/api/item-loans", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    item_type: selected.item_type, item_id: selected.item_id, unit_id: selected.unit_id,
-                    serial_number: selected.serial_number, item_name: selected.item_name, notes,
+            // Kirim paralel — tiap barang = 1 pengajuan = 1 baris di tabel.
+            const outcomes = await Promise.all(
+                cart.map(async (item) => {
+                    try {
+                        const res = await fetch("/api/item-loans", {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                item_type: item.item_type, item_id: item.item_id, unit_id: item.unit_id,
+                                serial_number: item.serial_number, item_name: item.item_name, notes,
+                            }),
+                        });
+                        const json = await res.json();
+                        if (!json.success) throw new Error(json.message || "Gagal");
+                        return { item, ok: true as const };
+                    } catch (e) {
+                        return { item, ok: false as const, msg: e instanceof Error ? e.message : "Gagal" };
+                    }
                 }),
-            });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.message || "Gagal mengajukan pinjaman");
-            toast.success("Pengajuan pinjaman terkirim");
-            resetForm(); fetchLoans();
-        } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Gagal mengajukan pinjaman");
+            );
+
+            const okCount = outcomes.filter(o => o.ok).length;
+            const failed = outcomes.filter((o): o is { item: SnResult; ok: false; msg: string } => !o.ok);
+
+            if (okCount > 0) toast.success(`${okCount} pengajuan pinjaman terkirim`);
+            failed.forEach(f => toast.error(`${f.item.item_name}: ${f.msg}`));
+
+            if (failed.length === 0) {
+                resetForm();                        // semua sukses → bersihkan form
+            } else {
+                setCart(failed.map(f => f.item));   // sisakan yang gagal supaya bisa diulang
+                setSnQuery(""); setSnResults([]);
+            }
+            fetchLoans();
         } finally { setSubmitting(false); }
     };
 
@@ -308,7 +332,7 @@ export default function ItemLoansPage() {
                                 <div className="relative">
                                     <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3 pointer-events-none" />
                                     <input value={snQuery}
-                                        onChange={e => { setSnQuery(e.target.value); setSelected(null); }}
+                                        onChange={e => setSnQuery(e.target.value)}
                                         onFocus={() => snResults.length > 0 && setSnOpen(true)}
                                         onKeyDown={e => {
                                             // ✅ SCANNER BARCODE: barcode kami meng-encode SN; scanner USB/BT mengetik
@@ -316,13 +340,13 @@ export default function ItemLoansPage() {
                                             // jadi tetap jalan walau scanner lebih cepat dari debounce 300ms.
                                             if (e.key === "Enter") {
                                                 e.preventDefault();
-                                                if (!selected) handleSnEnter(e.currentTarget.value);
+                                                handleSnEnter(e.currentTarget.value);
                                             }
                                         }}
                                         placeholder="Scan barcode / ketik SN / nama barang..."
                                         className="w-full h-10 border border-zinc-200 rounded-xl pl-9 pr-8 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
                                     {snQuery && (
-                                        <button onClick={() => { setSnQuery(""); setSelected(null); setSnResults([]); }} className="absolute right-2.5 top-3 text-zinc-400 hover:text-zinc-600">
+                                        <button onClick={() => { setSnQuery(""); setSnResults([]); }} className="absolute right-2.5 top-3 text-zinc-400 hover:text-zinc-600">
                                             <X className="w-3.5 h-3.5" />
                                         </button>
                                     )}
@@ -347,6 +371,36 @@ export default function ItemLoansPage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* ── Daftar barang yang mau dipinjam (keranjang) ── */}
+                        {cart.length > 0 && (
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest">Daftar Barang ({cart.length})</label>
+                                    <button type="button" onClick={() => setCart([])}
+                                        className="text-[11px] font-semibold text-rose-500 hover:text-rose-700">Kosongkan</button>
+                                </div>
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                    {cart.map((c, i) => (
+                                        <div key={`${c.item_type}-${c.item_id}-${c.unit_id ?? "parent"}`}
+                                            className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2">
+                                            {c.item_type === "LAPTOP"
+                                                ? <LaptopIcon size={14} className="text-zinc-500 flex-shrink-0" />
+                                                : <Wrench size={14} className="text-zinc-500 flex-shrink-0" />}
+                                            <span className="text-xs text-zinc-700 truncate flex-1">{c.item_name}</span>
+                                            {c.serial_number
+                                                ? <span className="text-[11px] font-mono text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{c.serial_number}</span>
+                                                : <span className="text-[10px] font-semibold text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">tanpa SN</span>}
+                                            <button type="button" onClick={() => setCart(prev => prev.filter((_, idx) => idx !== i))}
+                                                className="text-zinc-400 hover:text-rose-600 flex-shrink-0">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">Keterangan</label>
                             <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}
@@ -354,10 +408,10 @@ export default function ItemLoansPage() {
                                 className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 resize-none" />
                         </div>
                         <div className="flex justify-end">
-                            <button onClick={submit} disabled={submitting || !selected}
+                            <button onClick={submit} disabled={submitting || cart.length === 0}
                                 className="h-10 px-5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition disabled:opacity-50 flex items-center gap-2">
                                 {submitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                                Ajukan Pinjaman
+                                Ajukan Pinjaman{cart.length > 0 ? ` (${cart.length})` : ""}
                             </button>
                         </div>
                     </div>
