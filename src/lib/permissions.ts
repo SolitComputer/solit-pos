@@ -1108,6 +1108,9 @@ export const PKL_PARENT_ROLE: Partial<Record<UserRole, UserRole>> = {
   PKL_PENGANTARAN: "PENGANTARAN",
   PKL_CUSTOMER_SERVICE: "CUSTOMER_SERVICE",
   PKL_PENGELOLA_BARANG: "PENGELOLA_BARANG",
+  // Admin Barang — akses disamakan dgn PKL Pengelola Barang (via parent
+  // PENGELOLA_BARANG), TAPI bukan role magang (tidak masuk PKL_ROLES/laporan PKL).
+  ADMIN_BARANG: "PENGELOLA_BARANG",
   // PKL_ACCOUNTING SENGAJA TIDAK dimapping ke ACCOUNTING di sini — kalau
   // dimapping, dia bakal ikut ke-expand dapat semua akses ACCOUNTING
   // (termasuk Cashflow), padahal requirement-nya PKL Accounting cuma boleh
@@ -1298,7 +1301,6 @@ export const BARANG_PRIVATE_VIEW_ROLES: UserRole[] = [
   "ASISTEN_CEO",
   "ACCOUNTING",
   "KEPALA_TEKNISI",
-  "ADMIN_BARANG",
 ];
 
 // ── Data Barang: Role "lihat kolom dasar saja" ───────────────────────────────
@@ -1370,7 +1372,7 @@ export const CONDITION_CHECK_EDITOR_USER_IDS: string[] = [
   "7594367d-b27b-49a8-a427-5ecb7fa2d21f",
   "20c4df76-db02-4e36-977b-27b76c7fa803",
 ];
-export const CONDITION_CHECK_EDITOR_ROLES: UserRole[] = ["ADMIN", "PKL_PENGELOLA_BARANG", "PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG"];
+export const CONDITION_CHECK_EDITOR_ROLES: UserRole[] = ["ADMIN", "PKL_PENGELOLA_BARANG", "ADMIN_BARANG", "PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG"];
 
 export function canEditConditionChecks(
   userId: string | null | undefined,
