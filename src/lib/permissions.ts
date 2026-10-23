@@ -1491,5 +1491,5 @@ export const ACCESSORY_UNIT_AUDIT_ROLES: UserRole[] = Array.from(new Set<UserRol
 // APPROVE: hanya Pengelola Barang, Kepala Pengelola Barang, Admin (+Programmer).
 export const ITEM_LOAN_VIEW_ROLES: UserRole[] = [...ALL_ROLES];
 export const ITEM_LOAN_APPROVE_ROLES: UserRole[] = [
-  "ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "ADMIN", "PROGRAMMER", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG",
 ];
