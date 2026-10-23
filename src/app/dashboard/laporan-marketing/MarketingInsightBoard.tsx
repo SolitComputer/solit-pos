@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlignCenter, AlignLeft, AlignRight, AlertTriangle, CalendarDays, Check, ChevronDown, Download, List, Loader2, Palette, Pencil, Plus, Table2, Trash2, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, AlertTriangle, CalendarDays, Check, ChevronDown, Download, List, Loader2, Pencil, Plus, Table2, Trash2, X } from "lucide-react";
 import {
     currentPeriodWib,
     INSIGHT_ALIGN_CLASS,
@@ -26,7 +26,10 @@ export default function MarketingInsightBoard() {
     const [error, setError] = useState("");
     const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
     const [dropdownOpen, setDropdownOpen] = useState(false);
-    const [colorCell, setColorCell] = useState<string | null>(null);
+    // Seleksi rentang sel (ala Excel). Koordinat = index: r = index displayRows, c = index kolom.
+    const [selStart, setSelStart] = useState<{ r: number; c: number } | null>(null);
+    const [selEnd, setSelEnd] = useState<{ r: number; c: number } | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
     // Modal edit judul tabel (dipertahankan dari versi kamu)
     const [titleModalOpen, setTitleModalOpen] = useState(false);
     const [titleDraft, setTitleDraft] = useState("");
@@ -305,16 +308,6 @@ export default function MarketingInsightBoard() {
     const setCell = (rowId: string, colId: string, value: string) =>
         upsertRow(rowId, (r) => ({ ...r, cells: { ...r.cells, [colId]: value } }));
 
-    const paintCell = (rowId: string, colId: string, color: string | null) => {
-        upsertRow(rowId, (r) => {
-            const colors = { ...(r.colors || {}) };
-            if (color) colors[colId] = color;
-            else delete colors[colId];
-            return { ...r, colors };
-        });
-        setColorCell(null);
-    };
-
     // Modal judul (punyamu — dipertahankan)
     const openTitleModal = () => {
         if (!active) return;
@@ -361,6 +354,73 @@ export default function MarketingInsightBoard() {
         const [y, m] = effPeriod.split("-").map(Number);
         return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
     }, [effPeriod]);
+
+    // ── Seleksi rentang + ADS ──
+    // Kuning (key "amber") = penanda ADS. Status ADS DITURUNKAN dari warna,
+    // jadi otomatis sinkron & ikut tersimpan (tidak perlu kolom DB baru).
+    const ADS_COLOR = "amber";
+
+    // Akhiri drag saat mouse dilepas di mana pun.
+    useEffect(() => {
+        const up = () => setIsDragging(false);
+        window.addEventListener("mouseup", up);
+        return () => window.removeEventListener("mouseup", up);
+    }, []);
+
+    // Reset seleksi saat ganti tabel / bulan / mode (index bisa jadi tidak valid).
+    useEffect(() => {
+        setSelStart(null);
+        setSelEnd(null);
+    }, [activeId, effPeriod, isDaily]);
+
+    const selRect = useMemo(() => {
+        if (!selStart || !selEnd) return null;
+        return {
+            r1: Math.min(selStart.r, selEnd.r),
+            r2: Math.max(selStart.r, selEnd.r),
+            c1: Math.min(selStart.c, selEnd.c),
+            c2: Math.max(selStart.c, selEnd.c),
+        };
+    }, [selStart, selEnd]);
+
+    const inSelection = (r: number, c: number) =>
+        !!selRect && r >= selRect.r1 && r <= selRect.r2 && c >= selRect.c1 && c <= selRect.c2;
+
+    const selCount = selRect ? (selRect.r2 - selRect.r1 + 1) * (selRect.c2 - selRect.c1 + 1) : 0;
+
+    const startSel = (r: number, c: number) => {
+        setSelStart({ r, c });
+        setSelEnd({ r, c });
+        setIsDragging(true);
+    };
+    const extendSel = (r: number, c: number) => {
+        if (!isDragging) return;
+        setSelEnd({ r, c });
+        window.getSelection()?.removeAllRanges(); // cegah blok teks browser saat drag
+    };
+
+    // Warnai SEMUA sel di rentang terpilih sekaligus (null = hapus warna → ADS ikut hilang).
+    const paintSelection = (color: string | null) => {
+        if (!active || !selRect) return;
+        const rowIds = displayRows.slice(selRect.r1, selRect.r2 + 1).map((d) => d.id);
+        const colIds = active.columns.slice(selRect.c1, selRect.c2 + 1).map((c) => c.id);
+        mutateActive((s) => {
+            const rows = [...s.rows];
+            for (const rid of rowIds) {
+                const idx = rows.findIndex((r) => r.id === rid);
+                const base = idx === -1 ? { id: rid, cells: {}, colors: {} as Record<string, string> } : rows[idx];
+                const colors = { ...(base.colors || {}) };
+                for (const cid of colIds) {
+                    if (color) colors[cid] = color;
+                    else delete colors[cid];
+                }
+                const next = { ...base, colors };
+                if (idx === -1) rows.push(next);
+                else rows[idx] = next;
+            }
+            return { ...s, rows };
+        });
+    };
 
     return (
         <div className="space-y-4">
@@ -540,8 +600,46 @@ export default function MarketingInsightBoard() {
                         </div>
                     </div>
 
+                    {/* Toolbar warna untuk sel/blok terpilih — kuning = ADS */}
+                    {selRect && (
+                        <div className="px-4 sm:px-5 py-2 border-b border-violet-100 bg-violet-50/60 flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-semibold text-violet-700">{selCount} sel dipilih</span>
+                            <span className="text-gray-300">·</span>
+                            <span className="text-[11px] text-gray-500">Warnai:</span>
+                            <div className="flex items-center gap-1.5">
+                                {INSIGHT_COLORS.map((c) => (
+                                    <button
+                                        key={c.key}
+                                        onClick={() => paintSelection(c.key)}
+                                        title={c.key === ADS_COLOR ? "Kuning = tandai ADS" : c.label}
+                                        className={`relative w-6 h-6 rounded-full ${c.dot} ring-2 ring-white shadow hover:scale-110 transition`}
+                                    >
+                                        {c.key === ADS_COLOR && (
+                                            <span className="absolute -top-1.5 -right-1.5 px-0.5 text-[7px] font-extrabold leading-none rounded bg-amber-600 text-white">
+                                                ADS
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => paintSelection(null)}
+                                    title="Hapus warna (ADS ikut terhapus)"
+                                    className="w-6 h-6 rounded-full border border-gray-300 bg-white flex items-center justify-center text-gray-400 hover:text-red-500"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                            <button
+                                onClick={() => { setSelStart(null); setSelEnd(null); }}
+                                className="ml-auto text-[11px] font-semibold text-gray-400 hover:text-gray-700"
+                            >
+                                Batal pilih
+                            </button>
+                        </div>
+                    )}
+
                     <div className="overflow-x-auto">
-                        <table className="text-[11px] border-collapse" style={{ minWidth: "max-content" }}>
+                        <table className={`text-[11px] border-collapse ${isDragging ? "select-none" : ""}`} style={{ minWidth: "max-content" }}>
                             <thead>
                                 <tr>
                                     <th className="sticky left-0 z-10 bg-violet-700 text-white border-r border-violet-800 px-2.5 py-1.5 text-left font-bold min-w-[72px]">
@@ -588,7 +686,7 @@ export default function MarketingInsightBoard() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    displayRows.map((dr) => {
+                                    displayRows.map((dr, rIdx) => {
                                         const row = rowMap.get(dr.id);
                                         return (
                                             <tr key={dr.id} className="group hover:bg-violet-50/40">
@@ -611,45 +709,27 @@ export default function MarketingInsightBoard() {
                                                         </>
                                                     )}
                                                 </td>
-                                                {active.columns.map((col) => {
-                                                    const cellKey = `${dr.id}:${col.id}`;
+                                                {active.columns.map((col, cIdx) => {
                                                     const color = row?.colors?.[col.id];
+                                                    const isAds = color === ADS_COLOR;
+                                                    const selected = inSelection(rIdx, cIdx);
                                                     return (
-                                                        <td key={col.id} className={`relative border-b border-l border-gray-100 p-0 ${color ? INSIGHT_COLOR_BG[color] : ""}`}>
+                                                        <td
+                                                            key={col.id}
+                                                            onMouseDown={() => startSel(rIdx, cIdx)}
+                                                            onMouseEnter={() => extendSel(rIdx, cIdx)}
+                                                            className={`relative border-b border-l border-gray-100 p-0 ${color ? INSIGHT_COLOR_BG[color] : ""} ${selected ? "ring-2 ring-inset ring-violet-500/70 z-[1]" : ""}`}
+                                                        >
+                                                            {isAds && (
+                                                                <span className="pointer-events-none absolute top-0 right-0 z-[1] px-1 text-[8px] font-extrabold leading-none rounded-bl bg-amber-500 text-white shadow-sm">
+                                                                    ADS
+                                                                </span>
+                                                            )}
                                                             <input
                                                                 value={row?.cells[col.id] ?? ""}
                                                                 onChange={(e) => setCell(dr.id, col.id, e.target.value)}
                                                                 className={`w-full px-1.5 py-1 bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-violet-300 text-gray-800 tabular-nums ${INSIGHT_ALIGN_CLASS[col.align ?? "left"]}`}
                                                             />
-                                                            <button
-                                                                onClick={() => setColorCell((v) => (v === cellKey ? null : cellKey))}
-                                                                title="Warnai sel"
-                                                                className={`absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full border border-white shadow-sm transition-opacity ${colorCell === cellKey ? "opacity-100" : "opacity-0 group-hover:opacity-100"} ${color ? INSIGHT_COLOR_BG[color] : "bg-gray-200"}`}
-                                                            >
-                                                                <Palette className="w-2 h-2 text-gray-500 mx-auto" />
-                                                            </button>
-                                                            {colorCell === cellKey && (
-                                                                <>
-                                                                    <div className="fixed inset-0 z-20" onClick={() => setColorCell(null)} />
-                                                                    <div className="absolute z-30 top-5 right-0 flex items-center gap-1 p-1.5 rounded-xl bg-white border border-gray-100 shadow-xl ring-1 ring-gray-100">
-                                                                        {INSIGHT_COLORS.map((c) => (
-                                                                            <button
-                                                                                key={c.key}
-                                                                                onClick={() => paintCell(dr.id, col.id, c.key)}
-                                                                                title={c.label}
-                                                                                className={`w-5 h-5 rounded-full ${c.dot} ring-2 ${color === c.key ? "ring-gray-700" : "ring-transparent"} hover:scale-110 transition`}
-                                                                            />
-                                                                        ))}
-                                                                        <button
-                                                                            onClick={() => paintCell(dr.id, col.id, null)}
-                                                                            title="Hapus warna"
-                                                                            className="w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center text-gray-400 hover:text-red-500"
-                                                                        >
-                                                                            <X className="w-3 h-3" />
-                                                                        </button>
-                                                                    </div>
-                                                                </>
-                                                            )}
                                                         </td>
                                                     );
                                                 })}
