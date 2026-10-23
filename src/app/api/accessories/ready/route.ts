@@ -5,8 +5,8 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { LAPTOP_READY_VIEW_ROLES } from "@/lib/permissions";
 
 // Kategori aksesoris yang boleh tampil di halaman Barang Siap Jual.
-// Dibatasi HDD & RAM sesuai requirement — kategori lain tidak muncul di sini.
-const READY_ACCESSORY_CATEGORIES = ["HDD", "RAM"];
+// Dibatasi HDD, RAM & SSD sesuai requirement — kategori lain tidak muncul di sini.
+const READY_ACCESSORY_CATEGORIES = ["HDD", "RAM", "SSD"];
 
 async function handler(_req: NextRequest, _ctx: any, _user: AuthUser) {
     try {

@@ -97,3 +97,32 @@ export const INSIGHT_COLORS: { key: string; label: string; bg: string; dot: stri
 export const INSIGHT_COLOR_BG: Record<string, string> = Object.fromEntries(
   INSIGHT_COLORS.map((c) => [c.key, c.bg])
 );
+
+// Warna header kolom (dipilih otomatis berputar per kolom) — biar mirip
+// spreadsheet referensi yang header-nya warna-warni. Ditulis literal (bukan
+// dirangkai) supaya tidak ke-purge Tailwind.
+export const INSIGHT_HEADER_PALETTE = [
+  "bg-blue-600",
+  "bg-emerald-600",
+  "bg-orange-500",
+  "bg-pink-600",
+  "bg-cyan-600",
+  "bg-amber-600",
+  "bg-indigo-600",
+  "bg-rose-600",
+  "bg-teal-600",
+  "bg-fuchsia-600",
+];
+
+// Padanan HEX untuk Export Excel (ARGB tanpa '#', dipakai ExcelJS).
+export const INSIGHT_HEADER_HEX = [
+  "2563EB", "059669", "F97316", "DB2777", "0891B2",
+  "D97706", "4F46E5", "E11D48", "0D9488", "C026D3",
+];
+export const INSIGHT_CELL_HEX: Record<string, string> = {
+  red: "FEE2E2",
+  amber: "FEF3C7",
+  green: "DCFCE7",
+  blue: "DBEAFE",
+  violet: "EDE9FE",
+};
