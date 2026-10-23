@@ -44,7 +44,7 @@ export default function InterestAutocomplete({
         setLoading(true);
         const res = await fetch(
           `/api/sales-reports/interest-suggestions?q=${encodeURIComponent(query)}`,
-          { signal: controller.signal }
+          { signal: controller.signal, cache: "no-store" }
         );
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat saran");
