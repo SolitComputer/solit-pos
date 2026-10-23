@@ -28,6 +28,7 @@ import {
 import { exportMarketingReportExcel } from "@/lib/marketing-report-excel";
 import MarketingPriceRangeReport from "./MarketingPriceRangeReport";
 import MarketingInsightBoard from "./MarketingInsightBoard";
+import SalesErrorReport from "./SalesErrorReport";
 
 // "2026-10-22" → "22 Okt 2026". Diparse manual (bukan new Date("YYYY-MM-DD"))
 // supaya tidak geser hari karena zona waktu.
@@ -83,7 +84,7 @@ export default function LaporanMarketingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [hideEmptyChannels, setHideEmptyChannels] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight">("barang");
+  const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight" | "kesalahan">("barang");
   const [exporting, setExporting] = useState(false);
 
   // Abaikan response lama kalau user ganti filter cepat-cepat (race condition).
@@ -257,6 +258,7 @@ export default function LaporanMarketingPage() {
             { key: "barang", label: "Laporan Barang", icon: BarChart3 },
             { key: "range", label: "Range Harga", icon: Hash },
             { key: "insight", label: "Insight", icon: Layers },
+            { key: "kesalahan", label: "Kesalahan Sales", icon: AlertTriangle },
           ] as const).map((t) => {
             const Icon = t.icon;
             const isActive = activeTab === t.key;
@@ -467,8 +469,9 @@ export default function LaporanMarketingPage() {
           </div>
         )}
 
-        {activeTab === "range" && <MarketingPriceRangeReport />}
+           {activeTab === "range" && <MarketingPriceRangeReport />}
         {activeTab === "insight" && <MarketingInsightBoard />}
+        {activeTab === "kesalahan" && <SalesErrorReport />}
       </div>
     </DashboardLayout>
   );

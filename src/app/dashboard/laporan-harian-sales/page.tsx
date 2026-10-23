@@ -177,6 +177,8 @@ interface SalesReportEntry {
   audited_by: string | null;
   audited_by_name: string | null;
   audited_at: string | null;
+  rejected?: boolean;
+  reject_reason?: string | null;
   created_at: string;
 }
 
@@ -326,6 +328,38 @@ export default function LaporanHarianSalesPage() {
   const [auditStep, setAuditStep] = useState<1 | 2>(1);
   const [auditing, setAuditing] = useState(false);
   const [auditError, setAuditError] = useState("");
+
+  // --- Tolak audit ---
+  const REJECT_REASONS = [
+    { value: "CHAT_TIDAK_TERBALAS", label: "Chat Tidak Terbalas" },
+    { value: "SALAH_INPUT", label: "Salah Input Keterangan" },
+    { value: "DATA_TIDAK_SESUAI", label: "Data Tidak Sesuai" },
+  ] as const;
+  const [rejectTarget, setRejectTarget] = useState<SalesReportEntry | null>(null);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectError, setRejectError] = useState("");
+
+  const confirmReject = async (reason: string) => {
+    if (!rejectTarget) return;
+    try {
+      setRejecting(true);
+      setRejectError("");
+      const res = await fetch("/api/sales-reports/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: rejectTarget.id, reason }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "Gagal menolak laporan");
+      const rid = rejectTarget.id;
+      setEntries((prev) => prev.map((e) => (e.id === rid ? { ...e, rejected: true, reject_reason: reason } : e)));
+      setRejectTarget(null);
+    } catch (err: any) {
+      setRejectError(err.message);
+    } finally {
+      setRejecting(false);
+    }
+  };
 
   const fetchEntries = useCallback(async (p: Period) => {
     try {
@@ -1015,6 +1049,102 @@ export default function LaporanHarianSalesPage() {
           </div>
         )}
 
+        {/* Modal Tolak Audit — pilih 1 dari 3 alasan */}
+        {rejectTarget && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm"
+            onClick={() => { if (!rejecting) setRejectTarget(null); }}
+          >
+            <div className="relative w-full max-w-sm rounded-3xl bg-white border border-gray-100 shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="w-9 h-9 rounded-2xl bg-red-500 flex items-center justify-center shrink-0 shadow-sm">
+                  <XCircle className="w-4 h-4 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-gray-900">Tolak Audit</h2>
+                  <p className="text-[11px] text-gray-400">Pilih alasan penolakan — laporan ini akan ditandai sebagai temuan.</p>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-500 mb-3">
+                Sales: <span className="font-semibold text-gray-700">{rejectTarget.filled_by_name}</span> · Minat: <span className="font-semibold text-gray-700">{rejectTarget.interest}</span>
+              </p>
+              <div className="space-y-2">
+                {REJECT_REASONS.map((r) => (
+                  <button
+                    key={r.value}
+                    disabled={rejecting}
+                    onClick={() => confirmReject(r.value)}
+                    className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
+                  >
+                    {r.label}
+                    {rejecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 opacity-40" />}
+                  </button>
+                ))}
+              </div>
+              {rejectError && (
+                <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mt-3">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {rejectError}
+                </p>
+              )}
+              <button
+                onClick={() => setRejectTarget(null)}
+                disabled={rejecting}
+                className="w-full mt-3 h-10 rounded-full text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Tolak Audit — pilih 1 dari 3 alasan */}
+        {rejectTarget && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm"
+            onClick={() => { if (!rejecting) setRejectTarget(null); }}
+          >
+            <div className="relative w-full max-w-sm rounded-3xl bg-white border border-gray-100 shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="w-9 h-9 rounded-2xl bg-red-500 flex items-center justify-center shrink-0 shadow-sm">
+                  <XCircle className="w-4 h-4 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-gray-900">Tolak Audit</h2>
+                  <p className="text-[11px] text-gray-400">Pilih alasan penolakan — laporan ini akan ditandai sebagai temuan.</p>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-500 mb-3">
+                Sales: <span className="font-semibold text-gray-700">{rejectTarget.filled_by_name}</span> · Minat: <span className="font-semibold text-gray-700">{rejectTarget.interest}</span>
+              </p>
+              <div className="space-y-2">
+                {REJECT_REASONS.map((r) => (
+                  <button
+                    key={r.value}
+                    disabled={rejecting}
+                    onClick={() => confirmReject(r.value)}
+                    className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
+                  >
+                    {r.label}
+                    {rejecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 opacity-40" />}
+                  </button>
+                ))}
+              </div>
+              {rejectError && (
+                <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mt-3">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {rejectError}
+                </p>
+              )}
+              <button
+                onClick={() => setRejectTarget(null)}
+                disabled={rejecting}
+                className="w-full mt-3 h-10 rounded-full text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* List */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-gray-50 overflow-hidden">
           <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center justify-between gap-2">
@@ -1269,20 +1399,33 @@ export default function LaporanHarianSalesPage() {
                           <StatusBadge purchased={entry.purchased} />
                         </td>
                         <td className="border border-gray-200 px-4 py-3 text-center">
-                          {entry.audited ? (
+                                                {entry.audited ? (
                             <span
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-fuchsia-50 text-fuchsia-600 ring-1 ring-inset ring-fuchsia-100"
                               title={`Diaudit oleh ${entry.audited_by_name ?? "-"}`}
                             >
                               <ShieldCheck className="w-3 h-3" /> Terverifikasi
                             </span>
+                          ) : entry.rejected ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-600 ring-1 ring-inset ring-red-100">
+                              <XCircle className="w-3 h-3" /> Ditolak
+                            </span>
                           ) : canAudit ? (
-                            <button
-                              onClick={() => openAuditModal(entry)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-fuchsia-600 text-white hover:bg-fuchsia-700 active:scale-95 transition-all shadow-sm shadow-fuchsia-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
-                            >
-                              <ClipboardCheck className="w-3 h-3" /> Audit
-                            </button>
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                onClick={() => openAuditModal(entry)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-fuchsia-600 text-white hover:bg-fuchsia-700 active:scale-95 transition-all shadow-sm shadow-fuchsia-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
+                              >
+                                <ClipboardCheck className="w-3 h-3" /> Audit
+                              </button>
+                              <button
+                                onClick={() => { setRejectTarget(entry); setRejectError(""); }}
+                                title="Tolak audit"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white text-red-600 border border-red-200 hover:bg-red-50 active:scale-95 transition-all"
+                              >
+                                <XCircle className="w-3 h-3" /> Tolak
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-[11px] text-gray-300 font-medium">Menunggu</span>
                           )}
@@ -1347,9 +1490,14 @@ export default function LaporanHarianSalesPage() {
                         {channelLabels[entry.channel]}
                       </span>
                       {getPriceRangeLabel(entry.price_range) && <PriceRangeBadge value={entry.price_range} />}
-                      {entry.audited && (
+                                       {entry.audited && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-fuchsia-50 text-fuchsia-600 ring-1 ring-inset ring-fuchsia-100">
                           <ShieldCheck className="w-2.5 h-2.5" /> Terverifikasi
+                        </span>
+                      )}
+                      {entry.rejected && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-600 ring-1 ring-inset ring-red-100">
+                          <XCircle className="w-2.5 h-2.5" /> Ditolak
                         </span>
                       )}
                     </div>
@@ -1358,13 +1506,21 @@ export default function LaporanHarianSalesPage() {
                     {entry.sumber && <p className="text-[11px] text-gray-400 pl-10">Sumber: {entry.sumber}</p>}
                     {displayAds(entry.ads) && <p className="text-[11px] text-gray-400 pl-10">Ads: {displayAds(entry.ads)}</p>}
                     <div className="flex items-center gap-2 pt-1">
-                      {!entry.audited && canAudit && (
-                        <button
-                          onClick={() => openAuditModal(entry)}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-fuchsia-200 text-fuchsia-600 hover:bg-fuchsia-50 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
-                        >
-                          <ClipboardCheck className="w-3 h-3" /> Audit
-                        </button>
+                      {!entry.audited && !entry.rejected && canAudit && (
+                        <>
+                          <button
+                            onClick={() => openAuditModal(entry)}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-fuchsia-200 text-fuchsia-600 hover:bg-fuchsia-50 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
+                          >
+                            <ClipboardCheck className="w-3 h-3" /> Audit
+                          </button>
+                          <button
+                            onClick={() => { setRejectTarget(entry); setRejectError(""); }}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all"
+                          >
+                            <XCircle className="w-3 h-3" /> Tolak
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => openEditModal(entry)}
