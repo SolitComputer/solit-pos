@@ -42,6 +42,16 @@ interface LaptopUnit {
     };
 }
 
+// Aksesoris siap jual yang ditarik dari /api/accessories/ready — sudah difilter
+// HDD & RAM, dan stok-nya dihitung di server dari unit berstatus TERSEDIA.
+interface ReadyAccessory {
+    id: string;
+    name: string;
+    category: string;
+    sell_price: number;
+    stok: number;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
@@ -235,7 +245,7 @@ function ConditionViewModal({ unit, checks, checkedBy, checkedAt, loading, onClo
                                     Tes kondisi unit ini belum diisi oleh penanggung jawab.
                                 </p>
                             )}
-                            <ConditionChecklist value={checks} onChange={() => {}} readOnly />
+                            <ConditionChecklist value={checks} onChange={() => { }} readOnly />
                         </>
                     )}
                 </div>
@@ -498,6 +508,9 @@ function ExportButton({ label, colorClass, loading, disabled, noData, onClick }:
 
 function ReadyContent() {
     const [units, setUnits] = useState<LaptopUnit[]>([]);
+    // Aksesoris siap jual (HDD & RAM) — tampil per-MODEL (bukan per-SN) di tabel
+    // yang sama. Buat sales cukup nama, harga jual, dan stok tersedia.
+    const [accessories, setAccessories] = useState<ReadyAccessory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [exportingType, setExportingType] = useState<"sn" | "setor" | "official" | null>(null);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -561,7 +574,11 @@ function ReadyContent() {
     const fetchUnits = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch("/api/laptops/ready-units");
+            // Ambil laptop (per-unit) & aksesoris siap jual (per-model) paralel.
+            const [res, accRes] = await Promise.all([
+                fetch("/api/laptops/ready-units"),
+                fetch("/api/accessories/ready"),
+            ]);
             const result = await res.json();
             if (result.success) {
                 console.log("DEBUG ready-units raw:", (result.data || []).map((u: LaptopUnit) => ({
@@ -577,7 +594,10 @@ function ReadyContent() {
                     selling_price: Math.round(Number(u.selling_price) || 0),
                 })));
             }
-        } catch { setUnits([]); }
+            // Aksesoris: kalau gagal/403, daftar laptop tetap aman — cuma aksesoris kosong.
+            const accJson = await accRes.json().catch(() => null);
+            setAccessories(accJson?.success ? (accJson.data as ReadyAccessory[]) : []);
+        } catch { setUnits([]); setAccessories([]); }
         finally { setIsLoading(false); }
     };
 
@@ -853,7 +873,7 @@ function ReadyContent() {
         setSortBy("DEFAULT");
     };
 
-    const tableRows: InventoryRow[] = filtered.map(u => ({
+    const laptopRows: InventoryRow[] = filtered.map(u => ({
         id: u.id,
         laptop_name: u.laptop?.laptop_name ?? "—",
         cpu: u.laptop?.cpu ?? "",
@@ -869,6 +889,58 @@ function ReadyContent() {
         minus: 0,
         is_new: isNewArrival(u.created_at),
     }));
+
+    // ── Baris aksesoris (HDD & RAM) — per-MODEL, digabung ke tabel yang sama ──
+    // Sales cuma lihat Nama + Harga Jual + Stok (lewat kolom SJ). Tanpa SN/CPU/
+    // RAM/Storage → kolom itu dikosongkan. Karena id-nya BUKAN id unit laptop,
+    // baris ini otomatis tidak terpengaruh onRowClick & renderActions (lihat
+    // `filtered.find(...)` yang akan mengembalikan undefined → no-op).
+    const laptopFilterActive =
+        filterSN.trim() !== "" ||
+        filterStatus !== "ALL" ||
+        filterBrand !== "ALL" ||
+        filterRam !== "ALL" ||
+        filterPrepared !== "ALL";
+
+    const accessoryRows: InventoryRow[] = laptopFilterActive
+        ? [] // filter khusus laptop aktif → sembunyikan aksesoris biar hasil tidak campur
+        : accessories
+            .filter(a => {
+                if (search.trim()) {
+                    const t = search.toLowerCase();
+                    if (!a.name.toLowerCase().includes(t) && !a.category.toLowerCase().includes(t)) return false;
+                }
+                if (filterPriceRange !== "ALL") {
+                    const ranges: Record<string, [number, number]> = {
+                        "1-2": [1_000_000, 2_000_000],
+                        "2-3": [2_000_000, 3_000_000],
+                        "3-4": [3_000_000, 4_000_000],
+                        "4+": [4_000_000, Infinity],
+                    };
+                    const [min, max] = ranges[filterPriceRange] ?? [0, Infinity];
+                    if (!(a.sell_price >= min && a.sell_price < max)) return false;
+                }
+                return true;
+            })
+            .map(a => ({
+                id: a.id,
+                laptop_name: a.name,
+                category_name: a.category, // chip HDD/RAM di kolom Kategori
+                cpu: "",
+                ram: "",
+                storage: "",
+                harga_modal: null,
+                harga_jual: a.sell_price,
+                hide_official: true, // aksesoris tak punya konsep Harga Official
+                sumber: null,
+                tanggal_masuk: null,
+                sn: null,
+                stok_tersisa: a.stok,
+                siap_jual: a.stok, // kolom SJ = stok tersedia aksesoris
+                minus: 0,
+            }));
+
+    const tableRows: InventoryRow[] = [...laptopRows, ...accessoryRows];
 
     // Ikon panah untuk <select> custom (karena appearance-none)
     const SelectArrow = () => (
@@ -1098,7 +1170,7 @@ function ReadyContent() {
                     {/* ── Table ────────────────────────────────────────────────────────────── */}
                     {isLoading ? (
                         <SkeletonRows />
-                    ) : filtered.length === 0 ? (
+                    ) : tableRows.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] flex flex-col items-center justify-center py-16 sm:py-20 gap-3">
                             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gray-100 flex items-center justify-center">
                                 <Laptop size={32} className="text-gray-300" />
@@ -1195,9 +1267,9 @@ function ReadyContent() {
                             <div className="px-3 sm:px-4 py-3 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
                                 <p className="text-xs text-gray-400">
                                     Menampilkan{" "}
-                                    <span className="font-bold text-gray-600">{filtered.length}</span>
+                                    <span className="font-bold text-gray-600">{tableRows.length}</span>
                                     {" "}dari{" "}
-                                    <span className="font-bold text-gray-600">{units.length}</span>
+                                    <span className="font-bold text-gray-600">{units.length + accessories.length}</span>
                                     {" "}unit
                                     {hasActiveFilter && <span className="ml-1 text-gray-400">(difilter)</span>}
                                 </p>

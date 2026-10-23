@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, ChevronDown, Loader2, Plus, Table2, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Loader2, Pencil, Plus, Table2, Trash2, X } from "lucide-react";
 import { makeLocalId, type InsightSheet } from "@/lib/marketing-insight";
 
 export default function MarketingInsightBoard() {
@@ -11,6 +11,9 @@ export default function MarketingInsightBoard() {
   const [error, setError] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // Modal edit judul tabel
+  const [titleModalOpen, setTitleModalOpen] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const active = sheets.find((s) => s.id === activeId) ?? null;
@@ -145,6 +148,19 @@ export default function MarketingInsightBoard() {
 
   const renameSheet = (name: string) => mutateActive((s) => ({ ...s, name }));
 
+  const openTitleModal = () => {
+    if (!active) return;
+    setTitleDraft(active.name); // isi draft dari nama tabel aktif saat ini
+    setTitleModalOpen(true);
+  };
+
+  const saveTitleModal = () => {
+    const name = titleDraft.trim();
+    if (!name) return; // tolak judul kosong
+    renameSheet(name); // commit ke state + autosave (debounce 600ms yg sudah ada)
+    setTitleModalOpen(false);
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar: dropdown pilih/buat tabel + status simpan */}
@@ -193,14 +209,15 @@ export default function MarketingInsightBoard() {
               )}
             </div>
 
-            {/* Nama tabel (editable) */}
+            {/* Tombol edit judul (buka modal) */}
             {active && (
-              <input
-                value={active.name}
-                onChange={(e) => renameSheet(e.target.value)}
-                className="h-10 px-3 rounded-full bg-transparent border border-transparent hover:border-gray-200 focus:border-violet-300 focus:bg-white outline-none text-sm font-semibold text-gray-800 min-w-0 w-40 sm:w-56"
-                placeholder="Nama tabel"
-              />
+              <button
+                onClick={openTitleModal}
+                title="Edit judul tabel"
+                className="inline-flex items-center justify-center h-10 w-10 rounded-full text-gray-400 border border-gray-200 hover:text-violet-600 hover:border-violet-200 hover:bg-violet-50 shrink-0"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
             )}
           </div>
 
@@ -273,36 +290,36 @@ export default function MarketingInsightBoard() {
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-gray-50 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="w-10 border border-gray-200 px-1 py-2 text-[11px] text-gray-400 font-semibold">#</th>
+                  <th className="w-9 border border-gray-200 px-1 py-1.5 text-[11px] text-gray-400 font-semibold">#</th>
                   {active.columns.map((col) => (
-                    <th key={col.id} className="border border-gray-200 px-1.5 py-1.5 min-w-[160px]">
-                      <div className="flex items-center gap-1">
+                    <th key={col.id} className="border border-gray-200 px-1 py-1 min-w-[120px]">
+                      <div className="flex items-center gap-0.5">
                         <input
                           value={col.name}
                           onChange={(e) => renameColumn(col.id, e.target.value)}
-                          className="flex-1 min-w-0 px-2 py-1 rounded-md bg-transparent border border-transparent hover:border-gray-200 focus:border-violet-300 focus:bg-white outline-none text-xs font-bold text-gray-700"
+                          className="flex-1 min-w-0 px-1.5 py-0.5 rounded-md bg-transparent border border-transparent hover:border-gray-200 focus:border-violet-300 focus:bg-white outline-none text-[11px] font-bold text-gray-700"
                           placeholder="Nama kolom"
                         />
                         <button
                           onClick={() => deleteColumn(col.id)}
                           title="Hapus kolom"
-                          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50"
+                          className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-3 h-3" />
                         </button>
                       </div>
                     </th>
                   ))}
-                  <th className="w-12 border border-gray-200 px-1 py-1.5">
+                  <th className="w-10 border border-gray-200 px-1 py-1">
                     <button
                       onClick={addColumn}
                       title="Tambah kolom"
-                      className="w-8 h-8 mx-auto flex items-center justify-center rounded-lg text-violet-600 hover:bg-violet-50 border border-dashed border-violet-200"
+                      className="w-7 h-7 mx-auto flex items-center justify-center rounded-lg text-violet-600 hover:bg-violet-50 border border-dashed border-violet-200"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-3.5 h-3.5" />
                     </button>
                   </th>
                 </tr>
@@ -310,7 +327,7 @@ export default function MarketingInsightBoard() {
               <tbody>
                 {active.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={active.columns.length + 2} className="border border-gray-200 px-4 py-6 text-center text-xs text-gray-400">
+                     <td colSpan={active.columns.length + 2} className="border border-gray-200 px-4 py-6 text-center text-gray-400">
                       Belum ada baris. Klik “+ Baris” di bawah.
                     </td>
                   </tr>
@@ -324,7 +341,7 @@ export default function MarketingInsightBoard() {
                           title="Hapus baris"
                           className="hidden group-hover:flex items-center justify-center w-full h-full text-gray-300 hover:text-red-500"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       </td>
                       {active.columns.map((col) => (
@@ -332,7 +349,7 @@ export default function MarketingInsightBoard() {
                           <input
                             value={row.cells[col.id] ?? ""}
                             onChange={(e) => setCell(row.id, col.id, e.target.value)}
-                            className="w-full px-2.5 py-2 bg-transparent outline-none focus:bg-violet-50/50 text-gray-800"
+                            className="w-full px-2 py-1.5 bg-transparent outline-none focus:bg-violet-50/50 text-gray-800"
                           />
                         </td>
                       ))}
@@ -350,6 +367,56 @@ export default function MarketingInsightBoard() {
             >
               <Plus className="w-3.5 h-3.5" /> Baris
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal edit judul tabel */}
+      {titleModalOpen && active && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Overlay — klik di luar = batal (tidak menyimpan) */}
+          <div
+            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+            onClick={() => setTitleModalOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-3xl bg-white border border-gray-100 shadow-xl ring-1 ring-gray-100 p-5">
+            <div className="flex items-center gap-2.5 mb-4">
+              <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-sm shadow-violet-300/40">
+                <Pencil className="w-4 h-4 text-white" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-gray-900">Edit Judul Tabel</h3>
+                <p className="text-[11px] text-gray-400">Ubah nama tabel insight ini</p>
+              </div>
+            </div>
+
+            <input
+              autoFocus
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveTitleModal();
+                if (e.key === "Escape") setTitleModalOpen(false);
+              }}
+              placeholder="Nama tabel"
+              className="w-full h-11 px-3.5 rounded-xl bg-gray-50 border border-gray-200 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white text-sm font-semibold text-gray-800"
+            />
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => setTitleModalOpen(false)}
+                className="h-10 px-4 rounded-full text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200"
+              >
+                Batal
+              </button>
+              <button
+                onClick={saveTitleModal}
+                disabled={!titleDraft.trim()}
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full text-sm font-semibold bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-sm shadow-violet-300/40 hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Check className="w-4 h-4" /> Simpan
+              </button>
+            </div>
           </div>
         </div>
       )}
