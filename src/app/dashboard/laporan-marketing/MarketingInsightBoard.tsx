@@ -145,8 +145,9 @@ export default function MarketingInsightBoard() {
   const renameColumn = (colId: string, name: string) =>
     mutateActive((s) => ({ ...s, columns: s.columns.map((c) => (c.id === colId ? { ...c, name } : c)) }));
 
-  const setColumnAlign = (colId: string, align: InsightAlign) =>
-    mutateActive((s) => ({ ...s, columns: s.columns.map((c) => (c.id === colId ? { ...c, align } : c)) }));
+  // Set perataan SEMUA kolom sekaligus (kontrol global di header tabel).
+  const setAllAlign = (align: InsightAlign) =>
+    mutateActive((s) => ({ ...s, columns: s.columns.map((c) => ({ ...c, align })) }));
 
   const deleteColumn = (colId: string) => {
     if (!active) return;
@@ -388,8 +389,30 @@ export default function MarketingInsightBoard() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-gray-50 overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-bold text-gray-900 capitalize">{isDaily ? monthLabel : active.name}</h2>
+          <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <h2 className="text-sm font-bold text-gray-900 capitalize">{isDaily ? monthLabel : active.name}</h2>
+              {/* Rata semua kolom sekaligus */}
+              <div className="inline-flex items-center gap-0.5 bg-gray-50 border border-gray-200 rounded-lg p-0.5">
+                {([
+                  { key: "left" as const, Icon: AlignLeft, title: "Rata kiri semua kolom" },
+                  { key: "center" as const, Icon: AlignCenter, title: "Rata tengah semua kolom" },
+                  { key: "right" as const, Icon: AlignRight, title: "Rata kanan semua kolom" },
+                ]).map(({ key, Icon, title }) => {
+                  const allActive = active.columns.length > 0 && active.columns.every((c) => (c.align ?? "left") === key);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setAllAlign(key)}
+                      title={title}
+                      className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${allActive ? "bg-violet-600 text-white shadow-sm" : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"}`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <span className="text-[11px] text-gray-400">
               {isDaily ? `${dates.length} hari · total otomatis` : `${active.rows.length} baris`} · klik titik di pojok sel untuk warnai
             </span>
@@ -401,46 +424,25 @@ export default function MarketingInsightBoard() {
                   <th className="sticky left-0 z-10 bg-violet-600 text-white border border-violet-700 px-2 py-2 text-left font-bold min-w-[84px]">
                     {isDaily ? "Tanggal" : "#"}
                   </th>
-                  {active.columns.map((col) => {
-                    const align = col.align ?? "left";
-                    const alignOpts: { key: InsightAlign; Icon: typeof AlignLeft; title: string }[] = [
-                      { key: "left", Icon: AlignLeft, title: "Rata kiri" },
-                      { key: "center", Icon: AlignCenter, title: "Rata tengah" },
-                      { key: "right", Icon: AlignRight, title: "Rata kanan" },
-                    ];
-                    return (
-                      <th key={col.id} className="border border-gray-200 px-1 py-1 min-w-[120px]">
-                        <div className="flex items-center gap-0.5">
-                          <input
-                            value={col.name}
-                            onChange={(e) => renameColumn(col.id, e.target.value)}
-                            className={`flex-1 min-w-0 px-1.5 py-0.5 rounded-md bg-transparent border border-transparent hover:border-gray-200 focus:border-violet-300 focus:bg-white outline-none text-[11px] font-bold text-gray-700 ${INSIGHT_ALIGN_CLASS[align]}`}
-                            placeholder="Nama kolom"
-                          />
-                          <button
-                            onClick={() => deleteColumn(col.id)}
-                            title="Hapus kolom"
-                            className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                        {/* Pengaturan perataan kolom (kiri/tengah/kanan) */}
-                        <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                          {alignOpts.map(({ key, Icon, title }) => (
-                            <button
-                              key={key}
-                              onClick={() => setColumnAlign(col.id, key)}
-                              title={title}
-                              className={`w-5 h-5 flex items-center justify-center rounded ${align === key ? "bg-violet-100 text-violet-600" : "text-gray-300 hover:text-gray-500 hover:bg-gray-100"}`}
-                            >
-                              <Icon className="w-3 h-3" />
-                            </button>
-                          ))}
-                        </div>
-                      </th>
-                    );
-                  })}
+                  {active.columns.map((col) => (
+                    <th key={col.id} className="border border-gray-200 px-1 py-1 min-w-[120px]">
+                      <div className="flex items-center gap-0.5">
+                        <input
+                          value={col.name}
+                          onChange={(e) => renameColumn(col.id, e.target.value)}
+                          className={`flex-1 min-w-0 px-1.5 py-0.5 rounded-md bg-transparent border border-transparent hover:border-gray-200 focus:border-violet-300 focus:bg-white outline-none text-[11px] font-bold text-gray-700 ${INSIGHT_ALIGN_CLASS[col.align ?? "left"]}`}
+                          placeholder="Nama kolom"
+                        />
+                        <button
+                          onClick={() => deleteColumn(col.id)}
+                          title="Hapus kolom"
+                          className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </th>
+                  ))}
                   <th className="w-10 border border-gray-200 px-1 py-1">
                     <button
                       onClick={addColumn}
