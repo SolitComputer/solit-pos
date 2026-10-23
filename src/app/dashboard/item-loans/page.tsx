@@ -16,7 +16,7 @@ interface LoanRow {
     id: string; item_type: "LAPTOP" | "AKSESORIS"; item_id: string;
     unit_id: string | null; serial_number: string | null; item_name: string;
     borrower_id: string; borrower_name: string; notes: string | null;
-    status: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "SOLD";
+    status: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "SOLD" | "RETURN_PENDING";
     approved_by_name: string | null; approved_at: string | null; returned_at: string | null; created_at: string;
     sold_at: string | null; sold_invoice: string | null;
 }
@@ -27,6 +27,7 @@ const STATUS_META: Record<LoanRow["status"], { label: string; cls: string }> = {
     REJECTED: { label: "Ditolak",      cls: "bg-rose-50 text-rose-600 border-rose-200" },
     RETURNED: { label: "Dikembalikan", cls: "bg-zinc-100 text-zinc-500 border-zinc-200" },
     SOLD:     { label: "Terjual",      cls: "bg-blue-50 text-blue-700 border-blue-200" },
+    RETURN_PENDING: { label: "Menunggu Pengembalian", cls: "bg-orange-50 text-orange-700 border-orange-200" },
 };
 
 // Format tanggal+jam WIB untuk kolom waktu pinjam.
@@ -40,6 +41,7 @@ const fmtWaktu = (iso: string | null) => {
 export default function ItemLoansPage() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userName, setUserName] = useState("");
+    const [userId, setUserId] = useState("");
     const canApprove = hasAnyRole(userRoles, ITEM_LOAN_APPROVE_ROLES);
 
     const [snQuery, setSnQuery] = useState("");
@@ -73,6 +75,7 @@ export default function ItemLoansPage() {
                     ? (u as any).roles : u?.role ? [u.role] : [];
                 setUserRoles(roles as UserRole[]);
                 setUserName((u as any)?.name ?? "");
+                setUserId((u as any)?.id ?? "");
             } catch { setUserRoles([]); }
         })();
     }, []);
@@ -229,7 +232,7 @@ export default function ItemLoansPage() {
         } finally { setSubmitting(false); }
     };
 
-    const act = async (id: string, action: "approve" | "reject" | "return") => {
+    const act = async (id: string, action: "approve" | "reject" | "request-return" | "approve-return" | "reject-return") => {
         setActingId(id);
         try {
             const res = await fetch(`/api/item-loans/${id}`, {
@@ -238,7 +241,14 @@ export default function ItemLoansPage() {
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal memproses");
-            toast.success(action === "approve" ? "Pinjaman disetujui" : action === "reject" ? "Pinjaman ditolak" : "Barang dikembalikan");
+            const msg: Record<string, string> = {
+                "approve": "Pinjaman disetujui",
+                "reject": "Pinjaman ditolak",
+                "request-return": "Pengajuan pengembalian terkirim",
+                "approve-return": "Pengembalian disetujui — masuk Riwayat",
+                "reject-return": "Pengajuan pengembalian ditolak",
+            };
+            toast.success(msg[action] ?? "Berhasil diproses");
             fetchLoans();
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal memproses");
@@ -248,7 +258,7 @@ export default function ItemLoansPage() {
     const visibleLoans = loans.filter(l => {
         // Tab PENDING & APPROVED — tidak terpengaruh filter/search Riwayat.
         if (tab === "PENDING") return l.status === "PENDING";
-        if (tab === "APPROVED") return l.status === "APPROVED";
+        if (tab === "APPROVED") return l.status === "APPROVED" || l.status === "RETURN_PENDING";
 
         // Tab HISTORY (Riwayat): REJECTED / RETURNED / SOLD.
         const isHistory = l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD";
@@ -444,11 +454,24 @@ export default function ItemLoansPage() {
                                                                     <Ban size={12} /> Reject
                                                                 </button>
                                                             </div>
-                                                        ) : l.status === "APPROVED" && canApprove ? (
-                                                            <button onClick={() => act(l.id, "return")} disabled={actingId === l.id}
+                                                        ) : l.status === "APPROVED" && (canApprove || l.borrower_id === userId) ? (
+                                                            <button onClick={() => act(l.id, "request-return")} disabled={actingId === l.id}
                                                                 className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                <RotateCcw size={12} /> Kembalikan
+                                                                <RotateCcw size={12} /> Ajukan Pengembalian
                                                             </button>
+                                                        ) : l.status === "RETURN_PENDING" && canApprove ? (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <button onClick={() => act(l.id, "approve-return")} disabled={actingId === l.id}
+                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                    <Check size={12} /> Setujui
+                                                                </button>
+                                                                <button onClick={() => act(l.id, "reject-return")} disabled={actingId === l.id}
+                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                    <Ban size={12} /> Tolak
+                                                                </button>
+                                                            </div>
+                                                        ) : l.status === "RETURN_PENDING" ? (
+                                                            <span className="text-[11px] text-orange-600 font-medium">Menunggu ACC pengembalian</span>
                                                         ) : (
                                                             <span className="text-[11px] text-zinc-400">{l.approved_by_name ? `oleh ${l.approved_by_name}` : "-"}</span>
                                                         )}
