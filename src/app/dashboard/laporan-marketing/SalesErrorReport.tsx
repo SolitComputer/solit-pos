@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, Loader2, RefreshCw } from "lucide-react";
 import {
   currentPeriodWib,
   monthDates,
   INSIGHT_COLORS,
   INSIGHT_COLOR_BG,
+  INSIGHT_CELL_HEX,
 } from "@/lib/marketing-insight";
 import { todayWibDate } from "@/lib/marketing-report";
 
@@ -154,6 +155,91 @@ export default function SalesErrorReport() {
     return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
   }, [period]);
 
+  // ── Export Excel (bawa warna sel, status, subtotal) ──
+  const [exporting, setExporting] = useState(false);
+  const exportExcel = async () => {
+    if (rows.length === 0 || exporting) return;
+    try {
+      setExporting(true);
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Kesalahan Sales");
+
+      ws.addRow(["No", "Nama", ...COLS.map((c) => c.label)]);
+      rows.forEach((row, i) => {
+        const temuan = row.chat + row.salah + row.data;
+        ws.addRow([
+          i + 1, row.sales_name, row.akun_device || "",
+          row.total_lead, row.chat, row.salah, row.data,
+          temuan, statusOf(temuan).label, row.catatan || "",
+        ]);
+      });
+      ws.addRow(["", "SUBTOTAL", "", subtotal.total_lead, subtotal.chat, subtotal.salah, subtotal.data, subtotal.temuan, "", ""]);
+
+      const thin = { style: "thin" as const, color: { argb: "FFCBD5E1" } };
+      const allBorders = { top: thin, bottom: thin, left: thin, right: thin };
+      [6, 22, 22, 12, 16, 18, 16, 14, 18, 28].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+      ws.views = [{ state: "frozen", ySplit: 1 }];
+
+      // Header biru
+      const hr = ws.getRow(1);
+      hr.height = 26;
+      hr.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1D4ED8" } };
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        cell.border = allBorders;
+      });
+
+      // Baris data + warna manual + status berwarna
+      const lastRow = ws.rowCount;
+      for (let rIdx = 2; rIdx < lastRow; rIdx++) {
+        const row = rows[rIdx - 2];
+        const temuan = row.chat + row.salah + row.data;
+        ws.getRow(rIdx).eachCell((cell, col) => {
+          cell.border = allBorders;
+          cell.alignment = {
+            vertical: "middle",
+            horizontal: col === 2 || col === 3 || col === 10 ? "left" : "center",
+          };
+          const colKey = COLS[col - 3]?.key; // col 3..10 → COLS 0..7
+          const colorKey = colKey ? row.colors?.[colKey] : undefined;
+          if (colorKey && INSIGHT_CELL_HEX[colorKey]) {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + INSIGHT_CELL_HEX[colorKey] } };
+          }
+        });
+        // Status (kolom 9) diwarnai sesuai tingkat temuan, kecuali sudah diwarnai manual
+        if (!row.colors?.status) {
+          const hex = temuan === 0 ? "FFDCFCE7" : temuan <= 10 ? "FFFEF3C7" : "FFFEE2E2";
+          ws.getRow(rIdx).getCell(9).fill = { type: "pattern", pattern: "solid", fgColor: { argb: hex } };
+        }
+      }
+
+      // Baris SUBTOTAL
+      const sr = ws.getRow(lastRow);
+      sr.height = 22;
+      sr.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } };
+        cell.font = { bold: true, color: { argb: "FF1E3A8A" } };
+        cell.border = { ...allBorders, top: { style: "double", color: { argb: "FF1D4ED8" } } };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+      });
+
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Kesalahan Sales - ${activeDate}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setError("Gagal export Excel: " + (e?.message || e));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar: bulan + hari 1-31 */}
@@ -168,12 +254,21 @@ export default function SalesErrorReport() {
             />
             <span className="text-sm font-bold text-gray-900 capitalize">{monthLabel}</span>
           </div>
-          <button
-            onClick={load}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:bg-gray-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportExcel}
+              disabled={exporting || rows.length === 0}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-semibold bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Export Excel
+            </button>
+            <button
+              onClick={load}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </button>
+          </div>
         </div>
         {/* Tab hari 1..31 */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1">
