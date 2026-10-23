@@ -182,48 +182,68 @@ export default function MarketingInsightBoard() {
 
             // ── Styling ──
             const alignMap: Record<string, "left" | "center" | "right"> = { left: "left", center: "center", right: "right" };
-            ws.columns.forEach((col, i) => {
-                col.width = i === 0 ? 14 : 16;
-            });
-            // Header berwarna
+            const thin = { style: "thin" as const, color: { argb: "FFD1D5DB" } };
+            const allBorders = { top: thin, bottom: thin, left: thin, right: thin };
+
+            // Lebar kolom — WAJIB getColumn (ws.columns.forEach tidak reliabel di ExcelJS,
+            // itu sebabnya dulu cuma kolom A & B yang dapat lebar).
+            ws.getColumn(1).width = 16; // Tanggal
+            for (let c = 2; c <= active.columns.length + 1; c++) ws.getColumn(c).width = 18;
+
+            // Bekukan header + kolom tanggal, dan pasang filter di header.
+            ws.views = [{ state: "frozen", xSplit: 1, ySplit: 1 }];
+            ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: active.columns.length + 1 } };
+
+            // Header berwarna (argb WAJIB 8 hex "FF…" — 6 hex bikin alpha 00 = transparan).
             const headerRow = ws.getRow(1);
-            headerRow.height = 22;
+            headerRow.height = 26;
             headerRow.eachCell((cell, col) => {
                 const hex = col === 1 ? "7C3AED" : INSIGHT_HEADER_HEX[(col - 2) % INSIGHT_HEADER_HEX.length];
-                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: hex } };
-                cell.font = { bold: true, color: { argb: "FFFFFF" } };
-                cell.alignment = { vertical: "middle", horizontal: col === 1 ? "left" : "center" };
-                cell.border = { bottom: { style: "thin", color: { argb: "D1D5DB" } } };
+                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + hex } };
+                cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+                cell.alignment = { vertical: "middle", horizontal: col === 1 ? "left" : "center", wrapText: true };
+                cell.border = allBorders;
             });
-            // Sel data + warna penanda
-            const lastRow = ws.rowCount;
+
+            // Sel data + warna penanda + shading halus akhir pekan.
+            const lastRow = ws.rowCount; // baris TOTAL
             for (let rIdx = 2; rIdx < lastRow; rIdx++) {
                 const dr = displayRows[rIdx - 2];
                 const r = rowMap.get(dr?.id ?? "");
-                ws.getRow(rIdx).eachCell((cell, col) => {
-                    cell.border = {
-                        top: { style: "thin", color: { argb: "F3F4F6" } },
-                        bottom: { style: "thin", color: { argb: "F3F4F6" } },
-                        left: { style: "thin", color: { argb: "F3F4F6" } },
-                        right: { style: "thin", color: { argb: "F3F4F6" } },
+                const row = ws.getRow(rIdx);
+                row.height = 18;
+                row.eachCell((cell, col) => {
+                    cell.border = allBorders;
+                    cell.alignment = {
+                        vertical: "middle",
+                        horizontal: col === 1 ? "left" : alignMap[active.columns[col - 2]?.align ?? "left"],
                     };
                     if (col === 1) {
-                        cell.font = { bold: true, color: { argb: "374151" } };
+                        cell.font = { bold: true, color: { argb: dr?.sunday ? "FFDC2626" : "FF374151" }, size: 10 };
+                        if (dr?.weekend) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
                     } else {
                         const c = active.columns[col - 2];
-                        cell.alignment = { horizontal: alignMap[c?.align ?? "left"] };
                         const colorKey = r?.colors?.[c?.id ?? ""];
                         if (colorKey && INSIGHT_CELL_HEX[colorKey]) {
-                            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: INSIGHT_CELL_HEX[colorKey] } };
+                            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + INSIGHT_CELL_HEX[colorKey] } };
+                        } else if (dr?.weekend) {
+                            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFBFBFC" } };
                         }
                     }
                 });
             }
-            // Baris TOTAL
+
+            // Baris TOTAL — kolom Tanggal ungu pekat, sisanya ungu muda, garis atas double.
             const totalRow = ws.getRow(lastRow);
-            totalRow.eachCell((cell) => {
-                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "EDE9FE" } };
-                cell.font = { bold: true, color: { argb: "5B21B6" } };
+            totalRow.height = 22;
+            totalRow.eachCell((cell, col) => {
+                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: col === 1 ? "FF7C3AED" : "FFEDE9FE" } };
+                cell.font = { bold: true, color: { argb: col === 1 ? "FFFFFFFF" : "FF5B21B6" }, size: 11 };
+                cell.alignment = {
+                    vertical: "middle",
+                    horizontal: col === 1 ? "left" : alignMap[active.columns[col - 2]?.align ?? "left"],
+                };
+                cell.border = { ...allBorders, top: { style: "double", color: { argb: "FF7C3AED" } } };
             });
 
             const buf = await wb.xlsx.writeBuffer();
