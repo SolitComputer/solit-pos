@@ -13,6 +13,18 @@ function getSupabase() {
   );
 }
 
+// Konversi tanggal lokal Jakarta (YYYY-MM-DD) ke batas UTC untuk kolom timestamptz.
+// Jakarta = UTC+7 fixed (tanpa DST), jadi offset literal "+07:00" aman & deterministik.
+function jakartaStartUtc(ymd: string): string {
+  return new Date(`${ymd}T00:00:00+07:00`).toISOString();
+}
+// Awal hari BERIKUTNYA (dipakai dengan .lt → inklusif sampai akhir hari "to").
+function jakartaNextDayStartUtc(ymd: string): string {
+  const d = new Date(`${ymd}T00:00:00+07:00`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString();
+}
+
 async function getAuthedUser(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
   if (!token) return null;
@@ -39,18 +51,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Channel tidak valid." }, { status: 400 });
   }
 
+  // Filter tanggal opsional (lokal Jakarta, format YYYY-MM-DD). Abaikan kalau formatnya bukan tanggal.
+  const ymdRe = /^\d{4}-\d{2}-\d{2}$/;
+  const rawFrom = searchParams.get("from");
+  const rawTo = searchParams.get("to");
+  const dateFrom = rawFrom && ymdRe.test(rawFrom) ? rawFrom : null;
+  const dateTo = rawTo && ymdRe.test(rawTo) ? rawTo : null;
+
   const supabase = getSupabase();
 
   // Sumber 1: leads yang diinput manual langsung di halaman Audit Marketing
-  const { data: manualRows, error: manualError } = await fetchAllRows((from, to) =>
-    supabase
-      .from("audit_leads")
-      .select("*")
-      .eq("channel", channel)
+  const { data: manualRows, error: manualError } = await fetchAllRows((from, to) => {
+    let q = supabase.from("audit_leads").select("*").eq("channel", channel);
+    if (dateFrom) q = q.gte("created_at", jakartaStartUtc(dateFrom));
+    if (dateTo) q = q.lt("created_at", jakartaNextDayStartUtc(dateTo));
+    return q
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
-      .range(from, to)
-  );
+      .range(from, to);
+  });
 
   if (manualError) {
     console.error("API Error (GET /api/audit-leads, manual):", manualError);
@@ -58,16 +77,19 @@ export async function GET(request: NextRequest) {
   }
 
   // Sumber 2: leads yang diinput sales lewat Laporan Harian Sales
-  const { data: salesRows, error: salesError } = await fetchAllRows((from, to) =>
-    supabase
+  const { data: salesRows, error: salesError } = await fetchAllRows((from, to) => {
+    let q = supabase
       .from("sales_online_reports")
       .select("*")
       .eq("channel", channel)
-      .is("deleted_at", null)
+      .is("deleted_at", null);
+    if (dateFrom) q = q.gte("created_at", jakartaStartUtc(dateFrom));
+    if (dateTo) q = q.lt("created_at", jakartaNextDayStartUtc(dateTo));
+    return q
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
-      .range(from, to)
-  );
+      .range(from, to);
+  });
 
   if (salesError) {
     console.error("API Error (GET /api/audit-leads, sales_reports):", salesError);

@@ -25,6 +25,7 @@ import {
   ShoppingBag,
   UserCircle2,
   Wallet,
+  Calendar,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -112,6 +113,9 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   const [confirmSoftDeleteId, setConfirmSoftDeleteId] = useState<string | null>(null);
   const [confirmAuditId, setConfirmAuditId] = useState<string | null>(null);
   const [auditFilter, setAuditFilter] = useState<"all" | "audited" | "unaudited">("all");
+  // Filter rentang tanggal (format YYYY-MM-DD lokal). Kosong = tidak aktif.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const canInput = hasAnyRole(userRoles, AUDIT_LEADS_INPUT_ROLES);
   const canAudit = hasAnyRole(userRoles, AUDIT_LEADS_AUDIT_ROLES);
@@ -120,14 +124,19 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   const fetchRows = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/audit-leads?channel=${channel}`);
+      // Filter tanggal dikirim ke server (?from=&to=) supaya penyaringan terjadi
+      // di level query DB, bukan di frontend. Param kosong tidak ikut terkirim.
+      const qs = new URLSearchParams({ channel });
+      if (dateFrom) qs.set("from", dateFrom);
+      if (dateTo) qs.set("to", dateTo);
+      const res = await fetch(`/api/audit-leads?${qs.toString()}`);
       const json = await parseApiResponse(res);
       if (!json.success) throw new Error(json.message);
       setRows(json.data as LeadRow[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memuat data.");
     } finally { setLoading(false); }
-  }, [channel]);
+  }, [channel, dateFrom, dateTo]);
 
   // Ambil user + roles dari hook yang sama dipakai Sidebar (getAuthUser),
   // supaya cache-nya konsisten dan user multi-role tetap kedeteksi lewat
@@ -153,7 +162,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
       return;
     }
     setPage(1);
-  }, [auditFilter]);
+  }, [auditFilter, dateFrom, dateTo]);
 
   // Tulis halaman aktif ke URL (?page=). Kalau komponen remount / refetch,
   // posisi pagination tetap terbaca dari URL, tidak balik ke 1.
@@ -164,6 +173,8 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
+  // Status audit difilter di client (bukan request baru). Rentang tanggal sudah
+  // difilter di server lewat fetchRows (?from=&to=), jadi tidak diulang di sini.
   const filteredRows = useMemo(() => {
     if (auditFilter === "audited") return rows.filter((r) => r.audited);
     if (auditFilter === "unaudited") return rows.filter((r) => !r.audited);
@@ -306,10 +317,18 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
             <div />
           )}
 
-          {/* Filter status audit — biar ketauan berapa yang sudah & belum
-              diaudit tanpa scroll/hitung manual. Filter jalan di rows yang
-              sudah dimuat, tidak nambah request ke API. */}
-          <div className="inline-flex items-center gap-1 rounded-full bg-gray-100 p-1 self-start sm:self-auto overflow-x-auto">
+          {/* Kontrol filter kanan — filter tanggal + status audit dikelompokkan.
+              Keduanya komposabel (lihat filteredRows). */}
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <DateRangeFilter
+              from={dateFrom}
+              to={dateTo}
+              onChange={({ from, to }) => { setDateFrom(from); setDateTo(to); }}
+              onReset={() => { setDateFrom(""); setDateTo(""); }}
+            />
+
+            {/* Filter status audit — jalan di rows yang sudah dimuat, tidak nambah request API. */}
+            <div className="inline-flex items-center gap-1 rounded-full bg-gray-100 p-1 overflow-x-auto">
             <button
               onClick={() => setAuditFilter("all")}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
@@ -334,6 +353,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
             >
               Belum Diaudit <span className="tabular-nums">({stats.total - stats.audited})</span>
             </button>
+            </div>
           </div>
         </div>
 
@@ -694,6 +714,113 @@ function PriceRangeBadge({ value }: { value: string | null | undefined }) {
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100 tabular-nums">
       {label}
     </span>
+  );
+}
+
+// Label ringkas untuk tombol filter: "23 Okt", "01 Okt – 23 Okt", "≥ 01 Okt", dst.
+function formatRangeLabel(from: string, to: string): string {
+  const fmt = (ymd: string) =>
+    new Date(ymd + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
+  if (from && to) return from === to ? fmt(from) : `${fmt(from)} – ${fmt(to)}`;
+  if (from) return `≥ ${fmt(from)}`;
+  if (to) return `≤ ${fmt(to)}`;
+  return "Filter Tanggal";
+}
+
+function DateRangeFilter({
+  from,
+  to,
+  onChange,
+  onReset,
+}: {
+  from: string;
+  to: string;
+  onChange: (next: { from: string; to: string }) => void;
+  onReset: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const active = Boolean(from || to);
+
+  // Tutup popover kalau klik di luar area filter.
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${
+          active
+            ? "bg-violet-50 text-violet-700 border-violet-200"
+            : "bg-white text-gray-500 border-gray-200 hover:text-gray-700 hover:border-gray-300"
+        }`}
+      >
+        <Calendar className="w-3.5 h-3.5" />
+        {formatRangeLabel(from, to)}
+        {active && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onReset(); }}
+            className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-violet-200/60"
+            title="Hapus filter tanggal"
+          >
+            <X className="w-3 h-3" />
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-gray-100 shadow-xl p-4 z-30">
+          <p className="text-[11px] font-bold text-violet-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Calendar className="w-3 h-3" /> Filter berdasarkan tanggal
+          </p>
+          <div className="space-y-2.5">
+            <div>
+              <label className="text-[11px] font-medium text-gray-500 mb-1 block">Dari tanggal</label>
+              <input
+                type="date"
+                value={from}
+                max={to || undefined}
+                onChange={(e) => onChange({ from: e.target.value, to })}
+                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-gray-500 mb-1 block">Sampai tanggal</label>
+              <input
+                type="date"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => onChange({ from, to: e.target.value })}
+                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3.5">
+            <button
+              onClick={() => { onReset(); setOpen(false); }}
+              className="flex-1 py-2 rounded-lg text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="flex-1 py-2 rounded-lg text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+            >
+              Selesai
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
