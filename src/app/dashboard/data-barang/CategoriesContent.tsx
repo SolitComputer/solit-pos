@@ -362,8 +362,6 @@ function CategoryFormModal({
                         >
                             <option value="">Semua / Umum (Aksesoris)</option>
                             <option value="LAPTOP">Laptop</option>
-                            <option value="PC">PC</option>
-                            <option value="SPAREPART">Sparepart</option>
                         </select>
                         <p className="mt-1 text-[11px] text-gray-400">
                             Laptop &amp; PC menampilkan form spek (CPU/RAM/dll). Selain itu dianggap Aksesoris.
