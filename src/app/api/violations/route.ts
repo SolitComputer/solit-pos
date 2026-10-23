@@ -109,7 +109,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   }
 
   const body = await req.json();
-  const { violation_type, severity, area, shift, incident_date, reason, division, pelaku_ids, confirm_phk } = body;
+  const { violation_type, severity, area, shift, incident_date, reason, division, pelaku_ids, confirm_phk, bukti_foto_url } = body;
 
   if (!violation_type || !severity || !incident_date || !reason) {
     return NextResponse.json({ success: false, message: "Jenis, kategori, tanggal, dan alasan wajib diisi" }, { status: 400 });
@@ -146,7 +146,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       .insert({
         violation_type, severity, area: area ?? null, shift: shift ?? null,
         incident_date, reason, division: division ?? null,
-        status: "PHK", reported_by: user.id,
+        status: "PHK", reported_by: user.id, bukti_foto_url: bukti_foto_url ?? null,
       })
       .select("*").single();
     if (insErr) return NextResponse.json({ success: false, message: insErr.message }, { status: 500 });
@@ -172,7 +172,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     .insert({
       violation_type, severity, area: area ?? null, shift: shift ?? null,
       incident_date, reason, division: division ?? null,
-      status, reported_by: user.id, quiet_period_ends_at: quietEnds,
+      status, reported_by: user.id, quiet_period_ends_at: quietEnds, bukti_foto_url: bukti_foto_url ?? null,
     })
     .select("*").single();
   if (insErr) return NextResponse.json({ success: false, message: insErr.message }, { status: 500 });

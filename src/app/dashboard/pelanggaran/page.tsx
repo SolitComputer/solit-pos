@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode, type ChangeEvent } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import {
     Trophy, ChevronLeft, ChevronRight, Lock, Clock, Crown,
     AlertTriangle, Ban, Plus, X, Check, Send, UserPlus, Copy, Loader2,
     Boxes, Sparkles, UserCheck, ListChecks, CheckCircle2,
+    Image as ImageIcon, Upload, Trash2, Pencil,
     type LucideIcon,
 } from "lucide-react";
 
@@ -201,6 +202,7 @@ type VCase = {
     quiet_period_ends_at: string | null; escalated_at: string | null;
     warning_sent_at: string | null; warning_message: string | null; warning_target: string | null;
     warning_sent_by: string | null; warning_sent_by_name: string | null; penalties: VPenalty[]; created_at: string;
+    bukti_foto_url: string | null;
 };
 type NetRow = {
     user_id: string; name: string; role: string; quality_pct: number; kerja_score: number; base_points: number;
@@ -336,6 +338,87 @@ function UserMultiPicker({ users, selected, onToggle }: { users: SimpleUser[]; s
 }
 
 /* ============================================================
+   Bukti Foto — helper upload + field reusable (Tambah & Edit)
+   ============================================================ */
+const FOTO_MAX_MB = 10;
+const FOTO_ALLOWED = ["image/jpeg", "image/png", "image/webp"];
+
+async function uploadBuktiFoto(file: File): Promise<string> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch("/api/violations/upload", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message || "Upload bukti foto gagal");
+    return d.url as string;
+}
+
+function validateFoto(file: File): string | null {
+    if (!FOTO_ALLOWED.includes(file.type)) return "Format harus JPG, PNG, atau WEBP";
+    if (file.size > FOTO_MAX_MB * 1024 * 1024) return `Ukuran maksimal ${FOTO_MAX_MB}MB`;
+    return null;
+}
+
+function FotoBuktiField({
+    existingUrl, file, removed, onPick, onRemoveExisting, onUndoRemove,
+}: {
+    existingUrl: string | null;
+    file: File | null;
+    removed: boolean;
+    onPick: (f: File | null) => void;
+    onRemoveExisting: () => void;
+    onUndoRemove: () => void;
+}) {
+    const [err, setErr] = useState("");
+    const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+    useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+
+    const handlePick = (e: ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0] ?? null;
+        e.target.value = "";
+        if (!f) return;
+        const msg = validateFoto(f);
+        if (msg) { setErr(msg); return; }
+        setErr(""); onPick(f);
+    };
+
+    const showUrl = preview ?? (!removed ? existingUrl : null);
+
+    return (
+        <div className="space-y-2">
+            {showUrl ? (
+                <div className="relative group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={showUrl} alt="Bukti pelanggaran" className="w-full max-h-56 object-contain rounded-xl border border-gray-200 bg-gray-50" />
+                    <div className="absolute top-2 right-2 flex gap-1.5">
+                        <label className="w-8 h-8 rounded-lg bg-white/90 backdrop-blur border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-white shadow-sm" title="Ganti foto">
+                            <Upload className="w-3.5 h-3.5 text-gray-600" />
+                            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePick} className="hidden" />
+                        </label>
+                        <button type="button" onClick={() => { if (file) onPick(null); else onRemoveExisting(); }} className="w-8 h-8 rounded-lg bg-white/90 backdrop-blur border border-red-200 flex items-center justify-center hover:bg-red-50 shadow-sm" title="Hapus foto">
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </button>
+                    </div>
+                    {file && <span className="absolute bottom-2 left-2 text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full">Foto baru</span>}
+                </div>
+            ) : removed && existingUrl ? (
+                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-dashed border-red-200 bg-red-50/60">
+                    <span className="text-[11px] font-semibold text-red-500 flex items-center gap-1.5"><Trash2 className="w-3.5 h-3.5" /> Foto lama akan dihapus saat disimpan</span>
+                    <button type="button" onClick={onUndoRemove} className="text-[11px] font-bold text-gray-500 hover:text-gray-700 underline">Urungkan</button>
+                </div>
+            ) : (
+                <label className="flex flex-col items-center justify-center gap-1.5 py-6 rounded-xl border border-dashed border-gray-300 bg-gray-50/60 cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors">
+                    <ImageIcon className="w-6 h-6 text-gray-300" />
+                    <span className="text-[11px] font-semibold text-gray-500">Pilih foto bukti</span>
+                    <span className="text-[10px] text-gray-400">JPG / PNG / WEBP · maks {FOTO_MAX_MB}MB</span>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePick} className="hidden" />
+                </label>
+            )}
+            {err && <p className="text-[11px] font-semibold text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {err}</p>}
+        </div>
+    );
+}
+
+/* ============================================================
    Board utama (logika identik dgn batch sebelumnya)
    ============================================================ */
 function PelanggaranBoard({ currentUser }: { currentUser: any }) {
@@ -371,6 +454,19 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
     const [teguranText, setTeguranText] = useState("");
     const [teguranTarget, setTeguranTarget] = useState("");
     const [copied, setCopied] = useState(false);
+
+    const [cFoto, setCFoto] = useState<File | null>(null);
+
+    // ── State modal Edit ──
+    const [editCase, setEditCase] = useState<VCase | null>(null);
+    const [eType, setEType] = useState("");
+    const [eArea, setEArea] = useState("");
+    const [eShift, setEShift] = useState("");
+    const [eDate, setEDate] = useState("");
+    const [eDivision, setEDivision] = useState("");
+    const [eReason, setEReason] = useState("");
+    const [eFoto, setEFoto] = useState<File | null>(null);
+    const [eRemoveFoto, setERemoveFoto] = useState(false);
 
     const loadNet = useCallback(async (y: number, m: number) => {
         setLoadingNet(true);
@@ -409,7 +505,7 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
         setCalMonth(m); setCalYear(y);
     };
     const reloadAll = () => Promise.all([loadNet(calYear, calMonth), loadCases(calYear, calMonth)]);
-    const resetCreate = () => { setCType(""); setCSeverity("RINGAN"); setCArea(""); setCShift(""); setCDivision(""); setCReason(""); setCPelaku([]); setCDate(new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10)); };
+    const resetCreate = () => { setCType(""); setCSeverity("RINGAN"); setCArea(""); setCShift(""); setCDivision(""); setCReason(""); setCPelaku([]); setCFoto(null); setCDate(new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10)); };
 
     const submitCreate = async () => {
         if (!cType.trim() || !cDate || !cReason.trim()) { alert("Jenis, tanggal, dan alasan wajib diisi"); return; }
@@ -422,9 +518,14 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
         }
         setSubmitting(true);
         try {
+            let buktiUrl: string | null = null;
+            if (cFoto) {
+                try { buktiUrl = await uploadBuktiFoto(cFoto); }
+                catch (e: any) { alert(e.message || "Upload bukti foto gagal"); setSubmitting(false); return; }
+            }
             const r = await fetch("/api/violations", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ violation_type: cType.trim(), severity: cSeverity, area: cArea.trim() || null, shift: cShift || null, incident_date: cDate, reason: cReason.trim(), division: cDivision.trim() || null, pelaku_ids: cPelaku, confirm_phk: confirmPhk || undefined }),
+                body: JSON.stringify({ violation_type: cType.trim(), severity: cSeverity, area: cArea.trim() || null, shift: cShift || null, incident_date: cDate, reason: cReason.trim(), division: cDivision.trim() || null, pelaku_ids: cPelaku, confirm_phk: confirmPhk || undefined, bukti_foto_url: buktiUrl }),
             });
             const d = await r.json();
             if (d.success) { resetCreate(); setShowCreate(false); await reloadAll(); } else alert(d.message || "Gagal membuat pelanggaran");
@@ -463,6 +564,35 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
             const r = await fetch(`/api/violations/${teguranCase.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "teguran", warning_message: teguranText, warning_target: teguranTarget || null }) });
             const d = await r.json();
             if (d.success) { setTeguranCase(null); await loadCases(calYear, calMonth); } else alert(d.message || "Gagal menandai teguran");
+        } catch { alert("Terjadi kesalahan jaringan"); } finally { setSubmitting(false); }
+    };
+
+    const openEdit = (c: VCase) => {
+        setEditCase(c);
+        setEType(c.violation_type); setEArea(c.area || ""); setEShift(c.shift || "");
+        setEDate(c.incident_date); setEDivision(c.division || ""); setEReason(c.reason);
+        setEFoto(null); setERemoveFoto(false);
+    };
+    const submitEdit = async () => {
+        if (!editCase) return;
+        if (!eType.trim() || !eDate || !eReason.trim()) { alert("Jenis, tanggal, dan alasan wajib diisi"); return; }
+        setSubmitting(true);
+        try {
+            const payload: Record<string, any> = {
+                action: "edit",
+                violation_type: eType.trim(), area: eArea.trim() || null, shift: eShift || null,
+                incident_date: eDate, division: eDivision.trim() || null, reason: eReason.trim(),
+            };
+            // foto: ganti → upload URL baru; hapus → null; tidak diubah → tidak dikirim.
+            if (eFoto) {
+                try { payload.bukti_foto_url = await uploadBuktiFoto(eFoto); }
+                catch (e: any) { alert(e.message || "Upload bukti foto gagal"); setSubmitting(false); return; }
+            } else if (eRemoveFoto) {
+                payload.bukti_foto_url = null;
+            }
+            const r = await fetch(`/api/violations/${editCase.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            const d = await r.json();
+            if (d.success) { setEditCase(null); await loadCases(calYear, calMonth); } else alert(d.message || "Gagal menyimpan perubahan");
         } catch { alert("Terjadi kesalahan jaringan"); } finally { setSubmitting(false); }
     };
 
@@ -553,6 +683,7 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
                             const bisaTetapkan = isAdmin && c.severity !== "SANGAT_BERAT" && ["MENUNGGU_PENGAKUAN", "PERLU_TINDAKAN_ATASAN", "SELESAI_TEGURAN"].includes(c.status);
                             const bisaBatal = isAdmin && !["DIBATALKAN", "PHK"].includes(c.status);
                             const bisaTegur = canWarn && c.status === "PERLU_TINDAKAN_ATASAN";
+                            const bisaEdit = isAdmin && !["DIBATALKAN", "PHK"].includes(c.status);
                             const vm = vtypeMeta(c.violation_type);
                             const VIcon = vm.icon;
                             return (
@@ -565,6 +696,13 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
                                         <div className="flex items-center gap-1.5 flex-wrap justify-end"><SeverityBadge severity={c.severity} /><VStatusBadge status={c.status} /></div>
                                     </div>
                                     <p className="text-xs text-gray-600 leading-relaxed bg-gray-50/70 rounded-lg px-3 py-2">{c.reason}</p>
+                                    {c.bukti_foto_url && (
+                                        <a href={c.bukti_foto_url} target="_blank" rel="noopener noreferrer" className="block relative w-fit group">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={c.bukti_foto_url} alt="Bukti pelanggaran" className="h-24 w-auto rounded-lg border border-gray-200 object-cover" />
+                                            <span className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100"><ImageIcon className="w-5 h-5 text-white drop-shadow" /></span>
+                                        </a>
+                                    )}
                                     {activePelaku.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5">
                                             {activePelaku.map((p) => <span key={p.id} className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">{p.name} <span className="text-red-500">−{fmtNet(p.points_deducted)}</span></span>)}
@@ -575,6 +713,7 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
                                     <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-gray-50">
                                         <p className="text-[10px] text-gray-300">{c.reported_by_name ? `Dilaporkan oleh ${c.reported_by_name}` : "Pelapor —"}</p>
                                         <div className="flex items-center gap-1.5">
+                                            {bisaEdit && <button onClick={() => openEdit(c)} className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-100 active:scale-95 transition-all"><Pencil className="w-3 h-3" /> Edit</button>}
                                             {bisaTegur && <button onClick={() => openTeguran(c)} className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-full hover:bg-orange-100 active:scale-95 transition-all"><Send className="w-3 h-3" /> Tandai Teguran</button>}
                                             {bisaTetapkan && <button onClick={() => openAssign(c)} className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-600 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-full hover:bg-violet-100 active:scale-95 transition-all"><UserPlus className="w-3 h-3" /> {activePelaku.length > 0 ? "Ubah Pelaku" : "Tetapkan Pelaku"}</button>}
                                             {bisaBatal && <button onClick={() => cancelCase(c)} disabled={busyCaseId === c.id} className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-400 hover:text-red-600 border border-gray-200 hover:border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-full active:scale-95 transition-all disabled:opacity-50">{busyCaseId === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />} Batalkan</button>}
@@ -615,6 +754,10 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
                                 <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Divisi/Tujuan Teguran</label><input value={cDivision} onChange={(e) => setCDivision(e.target.value)} placeholder="Divisi Kebersihan…" className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
                             </div>
                             <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Alasan / Keterangan</label><textarea value={cReason} onChange={(e) => setCReason(e.target.value)} rows={2} placeholder="Wajib diisi…" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 block mb-1.5">Bukti Foto <span className="text-gray-400 font-normal">(opsional)</span></label>
+                                <FotoBuktiField existingUrl={null} file={cFoto} removed={false} onPick={setCFoto} onRemoveExisting={() => setCFoto(null)} onUndoRemove={() => {}} />
+                            </div>
                             <div>
                                 <label className="text-xs font-bold text-gray-500 block mb-1.5">Pelaku {cSeverity === "BERAT" || cSeverity === "SANGAT_BERAT" ? <span className="text-red-500">(wajib)</span> : <span className="text-gray-400 font-normal">(kosongkan → masa tenang 3 hari)</span>}</label>
                                 <UserMultiPicker users={users} selected={cPelaku} onToggle={(id) => setCPelaku((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])} />
@@ -662,6 +805,48 @@ function PelanggaranBoard({ currentUser }: { currentUser: any }) {
                         <div className="flex gap-2 pt-1">
                             <button onClick={() => setTeguranCase(null)} className="flex-1 h-10 rounded-xl text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">Batal</button>
                             <button onClick={submitTeguran} disabled={submitting} className="flex-1 h-10 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#1a1a2e] to-[#16213e] disabled:opacity-50 flex items-center justify-center gap-2">{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Tandai Sudah Ditegur"}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Modal: Edit Pelanggaran ── */}
+            {editCase && (
+                <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setEditCase(null)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[88vh] overflow-y-auto">
+                        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur px-6 pt-6 pb-4 border-b border-gray-100 flex items-center gap-3">
+                            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-600 flex items-center justify-center flex-shrink-0"><Pencil className="w-4 h-4" /></span>
+                            <h3 className="font-black text-gray-900 flex-1">Edit Pelanggaran</h3>
+                            <button onClick={() => setEditCase(null)} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-100"><X className="w-4 h-4 text-gray-500" /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-[11px] text-gray-400 bg-gray-50 rounded-lg px-3 py-2">Edit di sini tidak mengubah <strong>kategori berat</strong> maupun <strong>pelaku/potongan poin</strong> — gunakan tombol &quot;Tetapkan Pelaku&quot; untuk itu.</p>
+                            <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Jenis Pelanggaran</label><VTypeSelector value={eType} onChange={setEType} /></div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Tanggal</label><input type="date" value={eDate} onChange={(e) => setEDate(e.target.value)} className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Shift (opsional)</label><select value={eShift} onChange={(e) => setEShift(e.target.value)} className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"><option value="">—</option><option value="PAGI">Pagi</option><option value="SORE">Sore</option></select></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Area (opsional)</label><input value={eArea} onChange={(e) => setEArea(e.target.value)} placeholder="Gudang, Toko…" className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
+                                <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Divisi/Tujuan Teguran</label><input value={eDivision} onChange={(e) => setEDivision(e.target.value)} placeholder="Divisi Kebersihan…" className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
+                            </div>
+                            <div><label className="text-xs font-bold text-gray-500 block mb-1.5">Alasan / Keterangan</label><textarea value={eReason} onChange={(e) => setEReason(e.target.value)} rows={2} placeholder="Wajib diisi…" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" /></div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 block mb-1.5">Bukti Foto</label>
+                                <FotoBuktiField
+                                    existingUrl={editCase.bukti_foto_url}
+                                    file={eFoto}
+                                    removed={eRemoveFoto}
+                                    onPick={(f) => { setEFoto(f); if (f) setERemoveFoto(false); }}
+                                    onRemoveExisting={() => { if (confirm("Hapus foto bukti lama? Foto akan terhapus permanen setelah perubahan disimpan.")) setERemoveFoto(true); }}
+                                    onUndoRemove={() => setERemoveFoto(false)}
+                                />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <button onClick={() => setEditCase(null)} className="flex-1 h-10 rounded-xl text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">Batal</button>
+                                <button onClick={submitEdit} disabled={submitting || !eType.trim() || !eReason.trim()} className="flex-1 h-10 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#1a1a2e] to-[#16213e] disabled:opacity-50 flex items-center justify-center gap-2">{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Simpan Perubahan"}</button>
+                            </div>
                         </div>
                     </div>
                 </div>
