@@ -7,7 +7,7 @@ import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
 
 const ALLOWED_ROLES: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+    "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
     "TEKNISI", "KEPALA_TEKNISI",
 ];
 
