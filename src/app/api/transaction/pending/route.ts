@@ -129,5 +129,6 @@ export const GET = withAuth(handler, [
   "KEPALA_ONPOINT",
   "ONPOINT",
   "PENGELOLA_BARANG",        // + bisa lihat data Riwayat Pending
+  "KEPALA_ADMIN_BARANG",     // + bisa lihat data Riwayat Pending
   "KEPALA_PENGELOLA_BARANG", // + bisa lihat data Riwayat Pending
 ]);

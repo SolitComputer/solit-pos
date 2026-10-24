@@ -16,6 +16,7 @@ interface LoanRow {
     id: string; item_type: "LAPTOP" | "AKSESORIS"; item_id: string;
     unit_id: string | null; serial_number: string | null; item_name: string;
     borrower_id: string; borrower_name: string; notes: string | null;
+    category: "KEBUTUHAN" | "PESANAN";
     status: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "SOLD" | "RETURN_PENDING";
     approved_by_name: string | null; approved_at: string | null; returned_at: string | null; created_at: string;
     sold_at: string | null; sold_invoice: string | null;
@@ -49,6 +50,7 @@ export default function ItemLoansPage() {
     const [snOpen, setSnOpen] = useState(false);
     const [cart, setCart] = useState<SnResult[]>([]);
     const [notes, setNotes] = useState("");
+    const [category, setCategory] = useState<"KEBUTUHAN" | "PESANAN">("KEBUTUHAN");
     const [submitting, setSubmitting] = useState(false);
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const boxRef = useRef<HTMLDivElement>(null);
@@ -214,7 +216,7 @@ export default function ItemLoansPage() {
         };
     }, [scanOpen]);
 
-    const resetForm = () => { setCart([]); setSnQuery(""); setNotes(""); setSnResults([]); };
+    const resetForm = () => { setCart([]); setSnQuery(""); setNotes(""); setSnResults([]); setCategory("KEBUTUHAN"); };
 
     const submit = async () => {
         if (cart.length === 0) { toast.error("Pilih barang & SN dulu"); return; }
@@ -228,7 +230,7 @@ export default function ItemLoansPage() {
                             method: "POST", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                                 item_type: item.item_type, item_id: item.item_id, unit_id: item.unit_id,
-                                serial_number: item.serial_number, item_name: item.item_name, notes,
+                                serial_number: item.serial_number, item_name: item.item_name, notes, category,
                             }),
                         });
                         const json = await res.json();
@@ -402,6 +404,20 @@ export default function ItemLoansPage() {
                         )}
 
                         <div>
+                            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">Kategori</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {([
+                                    { k: "KEBUTUHAN", l: "Kebutuhan" },
+                                    { k: "PESANAN", l: "Pesanan" },
+                                ] as const).map(c => (
+                                    <button key={c.k} type="button" onClick={() => setCategory(c.k)}
+                                        className={`h-10 rounded-xl text-sm font-semibold border transition ${category === c.k ? "bg-zinc-900 text-white border-zinc-900" : "bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100"}`}>
+                                        {c.l}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
                             <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">Keterangan</label>
                             <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}
                                 placeholder="Tujuan pinjam, estimasi dikembalikan, dll"
@@ -476,7 +492,7 @@ export default function ItemLoansPage() {
                                 <table className="w-full text-sm">
                                     <thead className="sticky top-0 z-10">
                                         <tr className="bg-zinc-50 border-b border-zinc-100">
-                                            {["Peminjam", "Barang", "SN", "Waktu", "Keterangan", "Status", "Aksi"].map(h => (
+                                            {["Peminjam", "Barang", "Kategori", "SN", "Waktu", "Keterangan", "Status", "Aksi"].map(h => (
                                                 <th key={h} className="px-3 py-3 text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest whitespace-nowrap bg-zinc-50">{h}</th>
                                             ))}
                                         </tr>
@@ -488,6 +504,11 @@ export default function ItemLoansPage() {
                                                 <tr key={l.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
                                                     <td className="px-3 py-3 font-semibold text-zinc-800 whitespace-nowrap">{l.borrower_name}</td>
                                                     <td className="px-3 py-3 text-zinc-700">{l.item_name}</td>
+                                                    <td className="px-3 py-3">
+                                                        <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${l.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
+                                                            {l.category === "PESANAN" ? "Pesanan" : "Kebutuhan"}
+                                                        </span>
+                                                    </td>
                                                     <td className="px-3 py-3">
                                                         {l.serial_number ? <span className="font-mono text-[11px] text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">{l.serial_number}</span> : <span className="text-zinc-300">-</span>}
                                                     </td>

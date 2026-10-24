@@ -23,7 +23,7 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
 async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
   try {
     const body = await req.json();
-    const { item_type, item_id, unit_id, serial_number, item_name, notes } = body ?? {};
+    const { item_type, item_id, unit_id, serial_number, item_name, notes, category } = body ?? {};
 
     if (!item_type || !["LAPTOP", "AKSESORIS"].includes(item_type))
       return NextResponse.json({ success: false, message: "Tipe barang tidak valid" }, { status: 400 });
@@ -56,6 +56,7 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         borrower_id: user.id,
         borrower_name: user.name,
         notes: notes || null,
+        category: category === "PESANAN" ? "PESANAN" : "KEBUTUHAN",
         status: "PENDING",
       })
       .select()
