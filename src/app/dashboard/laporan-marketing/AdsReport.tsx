@@ -5,59 +5,59 @@ import { AlertTriangle, ChevronDown, Download, ImagePlus, Loader2, Plus, Table2,
 import { parseInsightNumber } from "@/lib/marketing-insight";
 
 type ColType = "text" | "num";
-interface Col { k: string; label: string; type: ColType; min?: number }
+interface Col { k: string; label: string; type: ColType; min?: number; rp?: boolean }
 interface Section { key: string; label: string; hasNo: boolean; cols: Col[] }
 
 const SECTIONS: Section[] = [
   { key: "ringkasan", label: "Ringkasan CEO", hasNo: false, cols: [
     { k: "sumber", label: "Sumber Iklan", type: "text", min: 180 },
-    { k: "spend", label: "Spend (Rp)", type: "num" },
+    { k: "spend", label: "Spend", type: "num", rp: true },
     { k: "leads", label: "Leads / Chat", type: "num" },
-    { k: "cpl", label: "CPL (Rp)", type: "num" },
+    { k: "cpl", label: "CPL", type: "num", rp: true },
     { k: "closing", label: "Closing", type: "num" },
-    { k: "omzet", label: "Omzet (Rp)", type: "num" },
+    { k: "omzet", label: "Omzet", type: "num", rp: true },
     { k: "roas", label: "ROAS", type: "text" },
   ]},
   { key: "fb_toko", label: "FB Toko (META)", hasNo: true, cols: [
     { k: "akun", label: "Akun / Toko", type: "text", min: 140 },
     { k: "barang", label: "Barang Diiklankan", type: "text", min: 180 },
-    { k: "anggaran", label: "Anggaran (Rp)", type: "num" },
+    { k: "anggaran", label: "Anggaran", type: "num", rp: true },
     { k: "durasi", label: "Durasi", type: "text" },
     { k: "jangkauan", label: "Jangkauan", type: "num" },
     { k: "impresi", label: "Impresi", type: "num" },
     { k: "klik", label: "Klik Tautan", type: "num" },
     { k: "ctr", label: "CTR", type: "text" },
     { k: "chat", label: "Chat Dimulai", type: "num" },
-    { k: "cpl", label: "CPL", type: "num" },
+    { k: "cpl", label: "CPL", type: "num", rp: true },
     { k: "closing", label: "Closing", type: "num" },
-    { k: "omzet", label: "Omzet (Rp)", type: "num" },
+    { k: "omzet", label: "Omzet", type: "num", rp: true },
     { k: "roas", label: "ROAS", type: "text" },
   ]},
   { key: "shopee", label: "Shopee Ads", hasNo: true, cols: [
     { k: "toko", label: "Toko", type: "text", min: 120 },
     { k: "periode", label: "Tanggal / Periode", type: "text", min: 140 },
     { k: "nama_iklan", label: "Nama Iklan / Produk", type: "text", min: 180 },
-    { k: "biaya", label: "Biaya Iklan (Rp)", type: "num" },
+    { k: "biaya", label: "Biaya Iklan", type: "num", rp: true },
     { k: "dilihat", label: "Dilihat", type: "num" },
     { k: "klik", label: "Jumlah Klik", type: "num" },
     { k: "ctr", label: "CTR", type: "text" },
     { k: "closing", label: "Closing", type: "num" },
-    { k: "omzet", label: "Omzet Iklan (Rp)", type: "num" },
+    { k: "omzet", label: "Omzet Iklan", type: "num", rp: true },
     { k: "roas", label: "ROAS", type: "text" },
     { k: "catatan", label: "Catatan", type: "text", min: 200 },
   ]},
   { key: "fb_pribadi", label: "FB Pribadi", hasNo: true, cols: [
     { k: "akun", label: "Akun FB", type: "text", min: 140 },
     { k: "barang", label: "Barang Diiklankan", type: "text", min: 180 },
-    { k: "harga", label: "Harga Satuan (Rp)", type: "num" },
-    { k: "budget", label: "Budget (Rp)", type: "num" },
+    { k: "harga", label: "Harga Satuan", type: "num", rp: true },
+    { k: "budget", label: "Budget", type: "num", rp: true },
     { k: "durasi", label: "Durasi (Hari)", type: "num" },
     { k: "klik", label: "Klik Tawaran", type: "num" },
     { k: "chat", label: "Chat Masuk", type: "num" },
-    { k: "cpl", label: "CPL (Rp)", type: "num" },
+    { k: "cpl", label: "CPL", type: "num", rp: true },
     { k: "persen_chat", label: "% Chat dari Klik", type: "text" },
     { k: "closing", label: "Closing", type: "num" },
-    { k: "omzet", label: "Omzet (Rp)", type: "num" },
+    { k: "omzet", label: "Omzet", type: "num", rp: true },
     { k: "roas", label: "ROAS", type: "text" },
   ]},
 ];
@@ -220,6 +220,8 @@ export default function AdsReport() {
         ws.getRow(r).eachCell((cell, col) => {
           cell.border = allBorders;
           cell.alignment = { vertical: "middle", horizontal: section.hasNo && col === 1 ? "center" : "left", wrapText: true };
+          const sc = section.cols[col - 1 - leadingNo];
+          if (sc?.rp && typeof cell.value === "number") cell.numFmt = '"Rp" #,##0';
         });
         const foto = row.data.foto;
         if (foto && foto.startsWith("data:image/")) {
@@ -318,11 +320,14 @@ export default function AdsReport() {
                     {section.hasNo && <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-400 font-semibold">{idx + 1}</td>}
                     {section.cols.map((c) => (
                       <td key={c.k} className="border border-gray-200 p-0">
-                        <input
-                          value={row.data[c.k] ?? ""}
-                          onChange={(e) => setCell(row.id, c.k, e.target.value)}
-                          className={`w-full px-2 py-1.5 bg-transparent outline-none focus:bg-violet-50/40 text-gray-800 ${c.type === "num" ? "text-right tabular-nums" : ""}`}
-                        />
+                        <div className="flex items-center">
+                          {c.rp && <span className="pl-2 text-[11px] font-semibold text-gray-400 shrink-0 select-none">Rp. </span>}
+                          <input
+                            value={row.data[c.k] ?? ""}
+                            onChange={(e) => setCell(row.id, c.k, e.target.value)}
+                            className={`w-full px-2 py-1.5 bg-transparent outline-none focus:bg-violet-50/40 text-gray-800 ${c.rp ? "text-left tabular-nums pl-1" : c.type === "num" ? "text-right tabular-nums" : ""}`}
+                          />
+                        </div>
                       </td>
                     ))}
                     {/* Foto */}
@@ -358,7 +363,7 @@ export default function AdsReport() {
                     {section.hasNo && <td className="border border-blue-200 px-2 py-2" />}
                     {section.cols.map((c, i) => (
                       <td key={c.k} className={`border border-blue-200 px-2 py-2 ${c.type === "num" ? "text-right tabular-nums" : ""}`}>
-                        {i === 0 ? "TOTAL" : c.type === "num" ? (totals[c.k] || 0).toLocaleString("id-ID") : ""}
+                        {i === 0 ? "TOTAL" : c.rp ? `Rp ${(totals[c.k] || 0).toLocaleString("id-ID")}` : c.type === "num" ? (totals[c.k] || 0).toLocaleString("id-ID") : ""}
                       </td>
                     ))}
                     <td className="border border-blue-200" />
