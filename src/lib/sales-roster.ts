@@ -6,21 +6,21 @@ export interface RosterEntry {
 }
 
 export const SALES_ROSTER: RosterEntry[] = [
-  { id: "4610906c-4bd5-4678-875f-749db0787de6", nama: "David" },   // David J. Sendouw
-  { id: "a6ece814-7a1b-487d-b6f9-482498cfbddc", nama: "Dani" },
-  { id: "ef9d91a6-a0c4-44ca-acc8-a9dfbb622067", nama: "Tasya" },   // Tasya (PKL_MARKETING)
-  { id: "6486de67-6866-4ec0-813c-6a71a0c6704c", nama: "Pawas" },
-  { id: "7ad1b8af-6864-4fe8-a1c2-03985bea3048", nama: "Atta" },    // Atha Diansyah (PKL_SALES)
-  { id: "3cdb5535-eb60-4f73-b6a2-77f8ba01b4ee", nama: "Davin" },
-  { id: "10985807-7aca-41a2-acef-89558a786e70", nama: "Andika" },
-  { id: "8517619c-4f29-4229-a006-17b2f1d10460", nama: "Rafi" },    // Rafi Pratama Febriansyah
-  { id: "6368c5ed-a372-4246-8818-a3fa99c2b51e", nama: "Tengku" },  // Tengku M. Faturrahman
-  { id: "5e5c4a80-0f3d-410c-9add-bd6f04b7ecb6", nama: "Seto" },
-  { id: "e250c179-34af-4208-9f16-4872ad2933ae", nama: "Sasa" },    // Putri Shaliha Yasarah (PKL_SALES)
-  { id: "b4f81ee7-1d9e-4578-bddb-c1ce86ee878e", nama: "Awan" },
-  { id: "a4f2ba9a-ef90-4123-b8a8-627e23b6f396", nama: "Randi" },   // Randy Al Fariz (PKL_SALES) — ganti kalau orangnya beda
-  { id: "11ca0428-656d-4ae3-a818-9acf2484ec4e", nama: "Bayu" },
-  { id: "8786ce16-c8d0-4272-8709-3a943707e29f", nama: "Dzaky" },
+    { id: "4610906c-4bd5-4678-875f-749db0787de6", nama: "David J. Sendouw" },
+    { id: "a6ece814-7a1b-487d-b6f9-482498cfbddc", nama: "Dani" },
+    { id: "a762ecd2-bdb7-4b42-b156-557b1d38a03c", nama: "Natasha" },
+    { id: "6486de67-6866-4ec0-813c-6a71a0c6704c", nama: "Pawas" },
+    { id: "7ad1b8af-6864-4fe8-a1c2-03985bea3048", nama: "Atha Diansyah" },
+    { id: "3cdb5535-eb60-4f73-b6a2-77f8ba01b4ee", nama: "Davin" },
+    { id: "10985807-7aca-41a2-acef-89558a786e70", nama: "Andika" },
+    { id: "8517619c-4f29-4229-a006-17b2f1d10460", nama: "Rafi Pratama Febriansyah" },
+    { id: "6368c5ed-a372-4246-8818-a3fa99c2b51e", nama: "Tengku M. Faturrahman" },
+    { id: "5e5c4a80-0f3d-410c-9add-bd6f04b7ecb6", nama: "Seto" },
+    { id: "e250c179-34af-4208-9f16-4872ad2933ae", nama: "Putri Shaliha Yasarah" },
+    { id: "b4f81ee7-1d9e-4578-bddb-c1ce86ee878e", nama: "Awan" },
+    { id: "a4f2ba9a-ef90-4123-b8a8-627e23b6f396", nama: "Randy Al Fariz" },
+    { id: "11ca0428-656d-4ae3-a818-9acf2484ec4e", nama: "Bayu" },
+    { id: "8786ce16-c8d0-4272-8709-3a943707e29f", nama: "Dzaky" },
 ];
 
 // Kunci penyimpanan (Akun/Device, catatan, warna) per orang — pakai ID kalau ada.
