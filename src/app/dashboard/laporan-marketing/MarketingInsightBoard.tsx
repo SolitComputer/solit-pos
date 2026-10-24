@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlignCenter, AlignLeft, AlignRight, AlertTriangle, CalendarDays, Check, ChevronDown, Download, List, Loader2, Pencil, Plus, Table2, Trash2, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, AlertTriangle, CalendarDays, Check, ChevronDown, Download, GripVertical, List, Loader2, Pencil, Plus, Table2, Trash2, X } from "lucide-react";
 import {
     currentPeriodWib,
     INSIGHT_ALIGN_CLASS,
@@ -26,6 +26,9 @@ export default function MarketingInsightBoard() {
     const [error, setError] = useState("");
     const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    // Urutan tabel di dropdown — bisa di-drag naik/turun. Disimpan per-device di localStorage.
+    const [sheetOrder, setSheetOrder] = useState<string[]>([]);
+    const [dragId, setDragId] = useState<string | null>(null);
     // Seleksi rentang sel (ala Excel). Koordinat = index: r = index displayRows, c = index kolom.
     const [selStart, setSelStart] = useState<{ r: number; c: number } | null>(null);
     const [selEnd, setSelEnd] = useState<{ r: number; c: number } | null>(null);
@@ -59,6 +62,36 @@ export default function MarketingInsightBoard() {
     useEffect(() => {
         load();
     }, [load]);
+
+    // Muat urutan dropdown dari localStorage (per-device).
+    useEffect(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem("insightSheetOrder") || "null");
+            if (Array.isArray(saved)) setSheetOrder(saved);
+        } catch { }
+    }, []);
+
+    // Sheets diurutkan sesuai sheetOrder; tabel baru / tak dikenal ditaruh paling bawah.
+    const orderedSheets = useMemo(() => {
+        if (sheetOrder.length === 0) return sheets;
+        const pos = new Map(sheetOrder.map((id, i) => [id, i] as const));
+        return [...sheets].sort(
+            (a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity)
+        );
+    }, [sheets, sheetOrder]);
+
+    const handleSheetDrop = (targetId: string) => {
+        if (!dragId || dragId === targetId) { setDragId(null); return; }
+        const ids = orderedSheets.map((s) => s.id);
+        const from = ids.indexOf(dragId);
+        const to = ids.indexOf(targetId);
+        if (from === -1 || to === -1) { setDragId(null); return; }
+        ids.splice(from, 1);
+        ids.splice(to, 0, dragId);
+        setSheetOrder(ids);
+        try { localStorage.setItem("insightSheetOrder", JSON.stringify(ids)); } catch { }
+        setDragId(null);
+    };
 
     // Autosave (debounce 600ms): kirim seluruh struktur sheet aktif.
     const scheduleSave = useCallback((sheet: InsightSheet) => {
@@ -446,18 +479,33 @@ export default function MarketingInsightBoard() {
                                     <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
                                     <div className="absolute z-20 mt-1.5 w-64 max-h-72 overflow-auto rounded-2xl bg-white border border-gray-100 shadow-xl ring-1 ring-gray-100 p-1.5">
                                         {sheets.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">Belum ada tabel</p>}
-                                        {sheets.map((s) => (
-                                            <button
+                                        {orderedSheets.map((s) => (
+                                            <div
                                                 key={s.id}
-                                                onClick={() => {
-                                                    setActiveId(s.id);
-                                                    setDropdownOpen(false);
-                                                }}
-                                                className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-left transition-colors ${s.id === activeId ? "bg-violet-50 text-violet-700 font-semibold" : "text-gray-700 hover:bg-gray-50"}`}
+                                                draggable
+                                                onDragStart={() => setDragId(s.id)}
+                                                onDragOver={(e) => e.preventDefault()}
+                                                onDrop={() => handleSheetDrop(s.id)}
+                                                onDragEnd={() => setDragId(null)}
+                                                className={`group/item flex items-center gap-1 rounded-xl transition-colors ${dragId === s.id ? "opacity-50 ring-2 ring-violet-300" : ""} ${s.id === activeId ? "bg-violet-50" : "hover:bg-gray-50"}`}
                                             >
-                                                <Table2 className="w-3.5 h-3.5 shrink-0" />
-                                                <span className="truncate">{s.name}</span>
-                                            </button>
+                                                <span
+                                                    title="Tahan & geser untuk ubah urutan"
+                                                    className="pl-2 py-2 text-gray-300 group-hover/item:text-gray-400 cursor-grab active:cursor-grabbing shrink-0"
+                                                >
+                                                    <GripVertical className="w-3.5 h-3.5" />
+                                                </span>
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveId(s.id);
+                                                        setDropdownOpen(false);
+                                                    }}
+                                                    className={`flex-1 min-w-0 flex items-center gap-2 pr-3 py-2 text-sm text-left ${s.id === activeId ? "text-violet-700 font-semibold" : "text-gray-700"}`}
+                                                >
+                                                    <Table2 className="w-3.5 h-3.5 shrink-0" />
+                                                    <span className="truncate">{s.name}</span>
+                                                </button>
+                                            </div>
                                         ))}
                                         <button
                                             onClick={createSheet}

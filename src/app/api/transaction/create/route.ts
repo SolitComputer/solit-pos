@@ -452,6 +452,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 pickup_method: body.pickup_method, pickup_date: body.pickup_date,
                 pickup_time: body.pickup_time, pickup_location: body.pickup_location,
                 source_platform: body.source_platform, notes: body.notes,
+                from_ads: Boolean(body.from_ads),
                 payment_photo: body.payment_photo, latitude: body.latitude, longitude: body.longitude,
 
                 is_ecommerce: isEcommerce,

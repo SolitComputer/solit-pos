@@ -1132,7 +1132,7 @@ function DesktopSkeletonTable({ canSeeModal }: { canSeeModal: boolean }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: canSeeModal ? "1960px" : "1835px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: canSeeModal ? "2060px" : "1935px" }}>
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               {headers.map((h) => (
@@ -1611,6 +1611,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
               )}
               <SortableTh label="Metode" sortKey="method" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[145px]`} />
               <SortableTh label="Sumber" sortKey="source" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[115px]`} />
+              <th className={`${HEAD} text-center w-[100px]`}>Dari Ads</th>
               <SortableTh label="Toko" sortKey="company" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[115px]`} />
               <th className={`${HEAD} text-center w-[130px]`}>Aksi</th>
             </tr>
@@ -1800,22 +1801,22 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
         <td className="px-4 py-3.5">{renderCpuCell()}</td>
         <td className="px-4 py-3.5 align-top w-[120px]">
           <div className="flex flex-col items-start gap-1 w-[120px] max-w-[120px]">
-          {(() => {
-            const grouped: any[] = item.grouped_items ?? [];
-            if (grouped.length > 1) {
-              return (
-                <div className="flex flex-col gap-1.5 w-full">
-                  {grouped.map((g: any, idx: number) => (
-                    <div key={idx} className="w-full">
-                      {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} restoredSerials={g.restored_serial_numbers} maxVisible={2} size="sm" stack /> : <span className="text-[9px] text-gray-300">—</span>}
-                    </div>
-                  ))}
-                </div>
-              );
-            }
-            const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
-            return <SerialNumberList serials={sns} maxVisible={3} size="sm" stack />;
-          })()}
+            {(() => {
+              const grouped: any[] = item.grouped_items ?? [];
+              if (grouped.length > 1) {
+                return (
+                  <div className="flex flex-col gap-1.5 w-full">
+                    {grouped.map((g: any, idx: number) => (
+                      <div key={idx} className="w-full">
+                        {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} restoredSerials={g.restored_serial_numbers} maxVisible={2} size="sm" stack /> : <span className="text-[9px] text-gray-300">—</span>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
+              return <SerialNumberList serials={sns} maxVisible={3} size="sm" stack />;
+            })()}
           </div>
         </td>
         <td className="px-4 py-3.5 text-right">
@@ -1926,6 +1927,15 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
               return ik ? <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${ik.color}`}>{ik.label}</span> : null;
             })()}
           </div>
+        </td>
+        <td className="px-4 py-3.5 text-center">
+          {item.from_ads === true ? (
+            <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200">Dari Ads</span>
+          ) : item.from_ads === false ? (
+            <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap bg-gray-100 text-gray-500">Tidak</span>
+          ) : (
+            <span className="text-[10px] text-gray-300">—</span>
+          )}
         </td>
         <td className="px-4 py-3.5 text-center">
           {(() => {

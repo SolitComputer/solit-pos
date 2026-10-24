@@ -75,6 +75,16 @@ function qtyCellClass(value: number, max: number): string {
   return "bg-violet-50 text-gray-800";
 }
 
+// Urutan default + definisi tiap tab (dipakai untuk render yang bisa di-drag).
+const DEFAULT_TAB_ORDER = ["barang", "range", "insight", "kesalahan", "ads"];
+const TAB_DEFS = {
+  barang: { label: "Laporan Barang", icon: BarChart3 },
+  range: { label: "Range Harga", icon: Hash },
+  insight: { label: "Insight", icon: Layers },
+  kesalahan: { label: "Kesalahan Sales", icon: AlertTriangle },
+  ads: { label: "Laporan Ads", icon: Megaphone },
+} as const;
+
 export default function LaporanMarketingPage() {
   // Filter tanggal pakai kalender InlineDateRange (sama dengan Cashflow).
   // Default: awal bulan ini s/d hari ini (WIB). Klik "Semua" di kalender = tanpa batas tanggal.
@@ -88,6 +98,29 @@ export default function LaporanMarketingPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight" | "kesalahan" | "ads">("barang");
   const [exporting, setExporting] = useState(false);
+
+  // Urutan tab — bisa di-drag, disimpan di localStorage biar tetap setelah reload.
+  const [tabOrder, setTabOrder] = useState<string[]>(DEFAULT_TAB_ORDER);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("laporanMarketingTabOrder") || "null");
+      if (Array.isArray(saved)) {
+        const valid = saved.filter((k: string) => DEFAULT_TAB_ORDER.includes(k));
+        // gabung: urutan tersimpan + tab baru yang belum ada di urutan lama
+        setTabOrder([...valid, ...DEFAULT_TAB_ORDER.filter((k) => !valid.includes(k))]);
+      }
+    } catch {}
+  }, []);
+  const handleTabDrop = (targetKey: string) => {
+    if (!dragKey || dragKey === targetKey) { setDragKey(null); return; }
+    const order = [...tabOrder];
+    order.splice(order.indexOf(dragKey), 1);
+    order.splice(order.indexOf(targetKey), 0, dragKey);
+    setTabOrder(order);
+    try { localStorage.setItem("laporanMarketingTabOrder", JSON.stringify(order)); } catch {}
+    setDragKey(null);
+  };
 
   // Abaikan response lama kalau user ganti filter cepat-cepat (race condition).
   const requestIdRef = useRef(0);
@@ -254,22 +287,24 @@ export default function LaporanMarketingPage() {
           </button>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex items-center gap-1 bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 rounded-full p-1 w-fit">
-          {([
-            { key: "barang", label: "Laporan Barang", icon: BarChart3 },
-            { key: "range", label: "Range Harga", icon: Hash },
-            { key: "insight", label: "Insight", icon: Layers },
-            { key: "kesalahan", label: "Kesalahan Sales", icon: AlertTriangle },
-            { key: "ads", label: "Laporan Ads", icon: Megaphone },
-          ] as const).map((t) => {
+        {/* Tab switcher — tahan & geser untuk mengatur urutan */}
+        <div className="flex items-center gap-1 bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 rounded-full p-1 w-fit max-w-full overflow-x-auto">
+          {tabOrder.map((key) => {
+            const t = TAB_DEFS[key as keyof typeof TAB_DEFS];
+            if (!t) return null;
             const Icon = t.icon;
-            const isActive = activeTab === t.key;
+            const isActive = activeTab === key;
             return (
               <button
-                key={t.key}
-                onClick={() => setActiveTab(t.key)}
-                className={`inline-flex items-center gap-1.5 px-3.5 sm:px-4 h-9 rounded-full text-xs sm:text-sm font-semibold transition-all focus:outline-none ${isActive ? "bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-sm shadow-violet-300/40" : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"}`}
+                key={key}
+                draggable
+                onDragStart={() => setDragKey(key)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleTabDrop(key)}
+                onDragEnd={() => setDragKey(null)}
+                onClick={() => setActiveTab(key as typeof activeTab)}
+                title="Tahan & geser untuk pindah urutan"
+                className={`inline-flex items-center gap-1.5 px-3.5 sm:px-4 h-9 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-grab active:cursor-grabbing select-none whitespace-nowrap focus:outline-none ${isActive ? "bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-sm shadow-violet-300/40" : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"} ${dragKey === key ? "opacity-50 ring-2 ring-violet-300" : ""}`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 {t.label}

@@ -199,6 +199,7 @@ export default function CreatePaymentPage() {
 
     const [sellerType, setSellerType] = useState<"USER" | "PEDAGANG">("USER");
     const [customerBirthDate, setCustomerBirthDate] = useState("");
+    const [fromAds, setFromAds] = useState<boolean | null>(null);
 
     const [paymentFlow, setPaymentFlow] = useState<"PENDING" | "DIRECT" | null>(null);
     const [pendingSubType, setPendingSubType] = useState<"ECOMMERCE" | "DP_AMBIL" | null>(null);
@@ -348,7 +349,7 @@ export default function CreatePaymentPage() {
         if (draft._splitTF) setSplitTF(draft._splitTF);
         if (draft._splitCash) setSplitCash(draft._splitCash);
         if (draft._customerBirthDate) setCustomerBirthDate(draft._customerBirthDate);
-
+        if (draft._fromAds !== undefined) setFromAds(draft._fromAds);
 
         setDraftRestored(true);
     }, []);
@@ -366,10 +367,11 @@ export default function CreatePaymentPage() {
             _tradeInValue: tradeInValue, _tradeInCash: tradeInCash,
             _splitTF: splitTF, _splitCash: splitCash,
             _customerBirthDate: customerBirthDate,
+            _fromAds: fromAds,
             _savedAt: new Date().toISOString(),
         });
     }, [watchedFields, step, customerType, sellerType, selectedUnits, selectedAccessories, rawDealPrice,
-        unitPrices, isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, isSubmitted]);
+        unitPrices, isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, fromAds, isSubmitted]);
 
     // ── Load unit dari scan ───────────────────────────────────────────────────
     useEffect(() => {
@@ -835,6 +837,7 @@ export default function CreatePaymentPage() {
                     latitude, longitude,
                     warranty_duration: warrantyDuration,
                     seller_type: sellerType,
+                    from_ads: fromAds,
                     payment_mode: paymentFlow === "PENDING" ? "PENDING" : "DIRECT",
                     dp_amount: pendingSubType === "DP_AMBIL" ? dpAmount : 0,
                     dp_status: pendingSubType === "DP_AMBIL" ? (dpAmount > 0 ? "RESERVED" : "HELD") : undefined,
@@ -1124,10 +1127,25 @@ export default function CreatePaymentPage() {
                                 </select>
                             </div>
 
+                            <div>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Tahu Solit dari Ads? *</label>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setFromAds(true)}
+                                        className={`flex-1 h-11 rounded-xl text-sm font-semibold border transition ${fromAds === true ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                                        Dari Ads
+                                    </button>
+                                    <button type="button" onClick={() => setFromAds(false)}
+                                        className={`flex-1 h-11 rounded-xl text-sm font-semibold border transition ${fromAds === false ? "bg-gray-700 text-white border-gray-700 shadow-sm" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                                        Tidak
+                                    </button>
+                                </div>
+                            </div>
+
                             <button type="button" onClick={() => {
                                 if (!watch("customer_name")) { alert("Isi nama customer dulu"); return; }
                                 if (!isEcommerce && !watch("customer_phone")) { alert("Isi nomor WhatsApp dulu"); return; }
                                 if (paymentFlow === "DIRECT" && !customerBirthDate) { alert("Isi tanggal lahir customer dulu"); return; }
+                                if (fromAds === null) { alert("Pilih dulu: Dari Ads atau Tidak"); return; }
                                 fromScan ? setStep(3) : setStep(2);
                             }} className={`w-full ${btnPrimary} inline-flex items-center justify-center gap-1.5`}>
                                 Lanjut <ChevronRight size={16} />
@@ -1794,7 +1812,7 @@ export default function CreatePaymentPage() {
                 </form>
 
                 {/* ── Modal Picker Kelompok MSJ ── */}
-                      {/* ── Modal Picker Kelompok MSJ (pilih kelompok → centang SN) ── */}
+                {/* ── Modal Picker Kelompok MSJ (pilih kelompok → centang SN) ── */}
                 {showGroupPicker && (
                     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
                         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeGroupPicker} />
