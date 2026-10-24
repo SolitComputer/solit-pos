@@ -250,13 +250,22 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
         return NextResponse.json({ success: false, message: updateErr.message }, { status: 500 });
     }
 
-    // ── Sinkronisasi ke fund_requests jika berasal dari PENGAJUAN_DANA ─────────
+     // ── Sinkronisasi ke fund_requests jika berasal dari PENGAJUAN_DANA ─────────
+    // realisasi_nominal = TOTAL seluruh baris realisasi pengajuan ini (bisa >1
+    // kategori), BUKAN cuma nominal baris yang barusan diedit. Query jalan SETELAH
+    // update entry di atas, jadi angka barunya sudah ikut kehitung.
     if (entry.source_type === "PENGAJUAN_DANA") {
         const fundId = entry.source_id;
         if (fundId) {
+            const { data: siblings } = await supabase
+                .from("cashflow_entries")
+                .select("nominal")
+                .eq("source_type", "PENGAJUAN_DANA")
+                .eq("source_id", fundId);
+            const totalRealisasi = (siblings ?? []).reduce((s, r) => s + Number(r.nominal || 0), 0);
             const { error: fundErr } = await supabase
                 .from("fund_requests")
-                .update({ realisasi_nominal: nom })
+                .update({ realisasi_nominal: totalRealisasi })
                 .eq("id", fundId);
             if (fundErr) {
                 console.error("[cashflow PUT sync fund_requests by id]", fundErr);

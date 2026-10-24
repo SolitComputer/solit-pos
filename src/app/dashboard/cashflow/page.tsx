@@ -1362,23 +1362,40 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
             const json = await res.json();
             if (!json.success) return setError(json.message || "Gagal menyimpan perubahan");
 
-            // ⬅️ BARU: kategori tambahan → entry baru (tanggal/keterangan/metode/foto sama)
+            // ⬅️ Kategori tambahan → entry baru (tanggal/keterangan/metode/foto sama).
+            // Untuk entry PENGAJUAN_DANA, baris tambahan HARUS masuk sbg bagian realisasi
+            // (endpoint PATCH realisasi → source_type PENGAJUAN_DANA, source_id sama),
+            // supaya ikut nambah realisasi_nominal pengajuan & nyatu di Jurnal Umum.
+            // Entry non-pengajuan-dana tetap lewat POST /api/cashflow seperti biasa.
             for (const it of extraItems) {
-                const r = await fetch("/api/cashflow", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        direction: entry.direction,
-                        category: it.category,
-                        nominal: Number(it.nominal),
-                        keterangan: keterangan.trim() || null,
-                        tanggal,
-                        payment_method: paymentMethod,
-                        photo_url: finalPhotoUrl,
-                        // ⬅️ BARU: baris tambahan Kasbon/Cicilan bawa karyawan yang sama
-                        target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null,
-                    }),
-                });
+                const r = isPengajuanDana
+                    ? await fetch(`/api/pengajuan-dana/${entry.source_id}/realisasi`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            category: it.category,
+                            nominal: Number(it.nominal),
+                            keterangan: keterangan.trim() || null,
+                            tanggal,
+                            payment_method: paymentMethod,
+                            photo_url: finalPhotoUrl,
+                            target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null,
+                        }),
+                    })
+                    : await fetch("/api/cashflow", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            direction: entry.direction,
+                            category: it.category,
+                            nominal: Number(it.nominal),
+                            keterangan: keterangan.trim() || null,
+                            tanggal,
+                            payment_method: paymentMethod,
+                            photo_url: finalPhotoUrl,
+                            target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null,
+                        }),
+                    });
                 const j = await r.json();
                 if (!j.success) {
                     dropSavedExtra();

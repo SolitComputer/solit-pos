@@ -376,11 +376,12 @@ type CashflowRow = {
   tanggal: string;
   payment_method: string | null;
   source_type: string;
+  source_id: string | null; // ⬅️ perekat group PENGAJUAN_DANA
   created_at: string | null;
 };
 
 const CASHFLOW_ROW_SELECT =
-  "id, direction, category, nama, nominal, keterangan, tanggal, payment_method, source_type, created_at";
+  "id, direction, category, nama, nominal, keterangan, tanggal, payment_method, source_type, source_id, created_at";
 
 // Jeda maksimal antar-baris (ms) supaya dianggap 1 submit form yang sama.
 const CASHFLOW_GROUP_WINDOW_MS = 10_000;
@@ -408,11 +409,23 @@ async function groupCashflowRows(
   rows: CashflowRow[]
 ): Promise<CashflowRow[][]> {
   const result: CashflowRow[][] = [];
+  const candidateGroups: CashflowRow[][] = [];
   const bySignature = new Map<string, CashflowRow[]>();
+  // PENGAJUAN_DANA: satu source_id = satu realisasi (bisa multi-kategori).
+  // Perekatnya adalah source_id-nya SENDIRI, bukan kecocokan tanggal/nama/
+  // keterangan — supaya tidak pecah di Jurnal Umum hanya karena salah satu
+  // baris keterangannya diubah. Entry lain tetap pakai signature + window waktu.
+  const byFundSource = new Map<string, CashflowRow[]>();
 
   for (const r of rows) {
     if (r.direction !== "OUT") {
       result.push([r]);
+      continue;
+    }
+    if (r.source_type === "PENGAJUAN_DANA" && r.source_id) {
+      const list = byFundSource.get(r.source_id) ?? [];
+      list.push(r);
+      byFundSource.set(r.source_id, list);
       continue;
     }
     const sig = cashflowGroupSignature(r);
@@ -421,8 +434,13 @@ async function groupCashflowRows(
     bySignature.set(sig, list);
   }
 
+  // Group pengajuan dana per source_id — langsung jadi kandidat, tanpa dipecah
+  // oleh window waktu 10 detik (baris tambahan bisa diinput menit/hari kemudian).
+  for (const list of byFundSource.values()) {
+    candidateGroups.push(list);
+  }
+
   // Pecah per signature berdasarkan jeda waktu created_at
-  const candidateGroups: CashflowRow[][] = [];
   for (const list of bySignature.values()) {
     list.sort(
       (a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.id.localeCompare(b.id)

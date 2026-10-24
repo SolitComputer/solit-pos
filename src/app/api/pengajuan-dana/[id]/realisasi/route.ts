@@ -228,8 +228,133 @@ export async function POST(
     return NextResponse.json({ success: true, data: updated }, { status: 201 });
 }
 
+// ── PATCH: tambah kategori ke realisasi yang SUDAH ada ────────────────────────
+// Dipanggil saat user klik "Tambah Kategori" di modal Edit entry Pengajuan Dana
+// (halaman Cashflow). Entry baru dibuat sbg PENGAJUAN_DANA dgn source_id yang SAMA
+// (bukan MANUAL) supaya ikut terhitung di realisasi_nominal & menyatu di Jurnal Umum.
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { id } = await params;
+    const userId = request.headers.get("x-user-id");
+    const userName = decodeURIComponent(request.headers.get("x-user-name") || "") || "—";
+    const roles = (request.headers.get("x-user-roles") || "").split(",").filter(Boolean);
+
+    if (!userId) {
+        return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
+    if (!FUND_EXECUTOR_IDS.includes(userId) && !roles.includes("ADMIN")) {
+        return NextResponse.json(
+            { success: false, message: "Anda tidak memiliki wewenang untuk mengisi realisasi" },
+            { status: 403 }
+        );
+    }
+
+    let body: {
+        category?: string; nominal?: number | string; keterangan?: string;
+        tanggal?: string; payment_method?: string; photo_url?: string | null;
+        target_user_id?: string | null;
+    };
+    try {
+        body = await request.json();
+    } catch {
+        return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
+    }
+
+    const nom = Math.round(Number(body.nominal));
+    if (!Number.isFinite(nom) || nom <= 0) {
+        return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
+    }
+    if (!body.category || !isValidCategory("OUT", body.category)) {
+        return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
+    }
+    const target = isKasbonCicilanCategory(body.category) ? (body.target_user_id ?? null) : null;
+    if (isKasbonCicilanCategory(body.category) && !target) {
+        return NextResponse.json({ success: false, message: "Pilih karyawan dulu untuk baris Kasbon/Cicilan" }, { status: 400 });
+    }
+
+    const supabase = db();
+
+    const { data: fundRequest, error: fetchErr } = await supabase
+        .from("fund_requests")
+        .select("id, purpose, realisasi_cashflow_id, executed_by_id, executed_by_name")
+        .eq("id", id)
+        .single();
+
+    if (fetchErr || !fundRequest) {
+        return NextResponse.json({ success: false, message: "Pengajuan tidak ditemukan" }, { status: 404 });
+    }
+    if (!fundRequest.realisasi_cashflow_id) {
+        return NextResponse.json({ success: false, message: "Pengajuan ini belum direalisasi" }, { status: 400 });
+    }
+    if (!roles.includes("ADMIN") && fundRequest.executed_by_id !== userId) {
+        return NextResponse.json(
+            { success: false, message: `Hanya ${fundRequest.executed_by_name ?? "eksekutor"} yang bisa mengubah realisasi pengajuan ini` },
+            { status: 403 }
+        );
+    }
+
+    // Guard unique index uniq_cashflow_source (source_type, source_id, category):
+    // 1 kategori cuma boleh sekali per pengajuan.
+    const { data: siblings } = await supabase
+        .from("cashflow_entries")
+        .select("category, nominal")
+        .eq("source_type", "PENGAJUAN_DANA")
+        .eq("source_id", id);
+
+    if ((siblings ?? []).some((e) => e.category === body.category)) {
+        return NextResponse.json(
+            { success: false, message: `Kategori "${body.category}" sudah ada di realisasi ini. Edit baris yang ada, jangan tambah baru.` },
+            { status: 400 }
+        );
+    }
+
+    const pm = body.payment_method === "SALDO" ? "SALDO" : "CASH";
+    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+
+    const { error: cfErr } = await supabase
+        .from("cashflow_entries")
+        .insert({
+            direction: "OUT",
+            category: body.category,
+            nama: userName,
+            nominal: nom,
+            modal: null,
+            keterangan: body.keterangan?.trim() || fundRequest.purpose || null,
+            tanggal: body.tanggal || jakartaToday,
+            source_type: "PENGAJUAN_DANA",
+            source_id: id,
+            payment_method: pm,
+            photo_url: body.photo_url ?? null,
+            target_user_id: target,
+            created_by: userId,
+            is_audited: false,
+        });
+
+    if (cfErr) {
+        return NextResponse.json({ success: false, message: cfErr.message }, { status: 500 });
+    }
+
+    // realisasi_nominal = TOTAL semua baris realisasi (termasuk yg baru)
+    const totalRealisasi = (siblings ?? []).reduce((s, e) => s + Number(e.nominal || 0), 0) + nom;
+
+    const { data: updated, error: updErr } = await supabase
+        .from("fund_requests")
+        .update({ realisasi_nominal: totalRealisasi })
+        .eq("id", id)
+        .select()
+        .single();
+
+    if (updErr) {
+        return NextResponse.json({ success: false, message: updErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data: updated }, { status: 201 });
+}
+
 // ── PUT: edit realisasi — SENGAJA DINONAKTIFKAN ───────────────────────────────
-// Realisasi tidak bisa DIEDIT isinya (nominal/kategori/tanggal) lewat method ini,
+// // Realisasi tidak bisa DIEDIT isinya (nominal/kategori/tanggal) lewat method ini,
 // berapa pun rolenya (termasuk ADMIN). Kalau realisasinya salah, gunakan DELETE
 // di bawah untuk MEMBATALKAN realisasi sepenuhnya (entry cashflow-nya dihapus,
 // status di fund_requests direset), lalu isi ulang dari awal lewat POST.
