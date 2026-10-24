@@ -11,6 +11,7 @@ const supabase = createClient(
 const RATE_MANAGERS = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+  "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG",
 ];
 
 // GET — ambil semua rates

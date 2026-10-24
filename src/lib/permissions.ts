@@ -1009,6 +1009,10 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
   KEPALA_PENGELOLA_BARANG: [
     "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "PKL_PENGELOLA_BARANG",
   ],
+  // Kepala Admin Barang = kepala sub-tim Admin Barang. Boleh set absensi,
+  // jadwal, lembur & ACC lembur bawahannya. Tambah/kurangi role di array ini
+  // sesuai struktur tim (ini keputusan struktur, bukan teknis).
+  KEPALA_ADMIN_BARANG: ["ADMIN_BARANG", "PKL_PENGELOLA_BARANG"],
   // CUSTOMER_SERVICE diperlakukan setara kepala divisi untuk bawahannya sendiri
   // (PKL_CUSTOMER_SERVICE): boleh atur jadwal/absensi/lembur mereka. Tidak bisa
   // mengatur role lain, dan dirinya sendiri tetap bawahan KEPALA_TEKNISI.
@@ -1161,7 +1165,8 @@ export function canViewOvertimePay(role: string): boolean {
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
     "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_PENYEDIA_BARANG", "KEPALA_ONPOINT", "KEPALA_SOTECH",
-    "KEPALA_PENGELOLA_BARANG",
+    "KEPALA_PENYEDIA_BARANG", "KEPALA_ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG",
   ];
   return (PAY_VIEW as string[]).includes(role);
 
@@ -1193,6 +1198,7 @@ export function getDivisionLabel(headRole: string): string {
     KEPALA_PENYEDIA_BARANG: "Divisi Penyedia Barang",
     KEPALA_SOTECH: "Divisi Sotech",
     KEPALA_PENGELOLA_BARANG: "Divisi Pengelola Barang",
+    KEPALA_ADMIN_BARANG: "Divisi Admin Barang",
     ADMIN: "Pengelola Barang",
   };
   return labels[headRole] ?? headRole.replace(/_/g, " ");
