@@ -17,7 +17,7 @@ interface LoanRow {
     id: string; item_type: "LAPTOP" | "AKSESORIS"; item_id: string;
     unit_id: string | null; serial_number: string | null; item_name: string;
     borrower_id: string; borrower_name: string; notes: string | null;
-    category: "KEBUTUHAN" | "PESANAN";
+    category: "KEBUTUHAN" | "PESANAN" | null;
     status: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "SOLD" | "RETURN_PENDING";
     approved_by_name: string | null; approved_at: string | null; returned_at: string | null; created_at: string;
     sold_at: string | null; sold_invoice: string | null;
@@ -507,9 +507,11 @@ export default function ItemLoansPage() {
                                                     <td className="px-3 py-3 font-semibold text-zinc-800 whitespace-nowrap">{l.borrower_name}</td>
                                                     <td className="px-3 py-3 text-zinc-700">{l.item_name}</td>
                                                     <td className="px-3 py-3">
-                                                        <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${l.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
-                                                            {l.category === "PESANAN" ? "Pesanan" : "Kebutuhan"}
-                                                        </span>
+                                                        {l.category ? (
+                                                            <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${l.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
+                                                                {l.category === "PESANAN" ? "Pesanan" : "Kebutuhan"}
+                                                            </span>
+                                                        ) : <span className="text-zinc-300">-</span>}
                                                     </td>
                                                     <td className="px-3 py-3">
                                                         {l.serial_number ? <span className="font-mono text-[11px] text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">{l.serial_number}</span> : <span className="text-zinc-300">-</span>}

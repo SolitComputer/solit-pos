@@ -8,7 +8,7 @@ export interface ItemLoanAlert {
   borrower_name: string;
   item_name: string;
   serial_number: string | null;
-  category: "KEBUTUHAN" | "PESANAN";
+  category: "KEBUTUHAN" | "PESANAN" | null;
   created_at: string;
 }
 
@@ -18,7 +18,7 @@ interface ItemLoanRow {
   borrower_name: string;
   item_name: string;
   serial_number: string | null;
-  category: "KEBUTUHAN" | "PESANAN";
+  category: "KEBUTUHAN" | "PESANAN" | null;
   status: string;
   created_at: string;
 }
@@ -202,7 +202,7 @@ export function useItemLoanNotify(enabled: boolean) {
             borrower_name: r.borrower_name,
             item_name: r.item_name,
             serial_number: r.serial_number ?? null,
-            category: r.category === "PESANAN" ? "PESANAN" : "KEBUTUHAN",
+            category: r.category === "PESANAN" ? "PESANAN" : r.category === "KEBUTUHAN" ? "KEBUTUHAN" : null,
             created_at: r.created_at,
           }));
 

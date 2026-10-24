@@ -30,7 +30,7 @@ interface ItemLoanNotifierProps {
 
 export default function ItemLoanNotifier({ userRoles }: ItemLoanNotifierProps) {
   const router = useRouter();
-  // Target notif = role yang boleh ACC peminjaman (ITEM_LOAN_APPROVE_ROLES).
+  // Target notif = NOTIFY_ROLES (Kepala Admin Barang & Admin Barang) — ADMIN sengaja tidak.
   const canReceiveNotif = hasAnyRole(userRoles as UserRole[], NOTIFY_ROLES);
   const { alerts, muted, volume, toggleMute, setVolume } = useItemLoanNotify(canReceiveNotif);
 
@@ -100,9 +100,11 @@ export default function ItemLoanNotifier({ userRoles }: ItemLoanNotifierProps) {
               <p className="text-xs text-slate-500 truncate mt-0.5">
                 {alert.item_name}{alert.serial_number ? ` · ${alert.serial_number}` : ""}
               </p>
-              <span className={`inline-flex mt-1.5 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${alert.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
-                {alert.category === "PESANAN" ? "Pesanan" : "Kebutuhan"}
-              </span>
+              {alert.category && (
+                <span className={`inline-flex mt-1.5 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${alert.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
+                  {alert.category === "PESANAN" ? "Pesanan" : "Kebutuhan"}
+                </span>
+              )}
             </div>
           </div>
         </button>
