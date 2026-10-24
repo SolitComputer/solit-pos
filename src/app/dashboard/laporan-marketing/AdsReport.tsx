@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ChevronDown, Download, ImagePlus, Loader2, Plus, Table2, Trash2, X } from "lucide-react";
+import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, ChevronDown, Download, ImagePlus, Loader2, Plus, Table2, Trash2, X } from "lucide-react";
 import { parseInsightNumber } from "@/lib/marketing-insight";
 
 type ColType = "text" | "num";
 interface Col { k: string; label: string; type: ColType; min?: number; rp?: boolean }
 interface Section { key: string; label: string; hasNo: boolean; cols: Col[] }
+type Align = "left" | "center" | "right";
+const ALIGN_CLASS: Record<Align, string> = { left: "text-left", center: "text-center", right: "text-right" };
 
 const SECTIONS: Section[] = [
   { key: "ringkasan", label: "Ringkasan CEO", hasNo: false, cols: [
@@ -93,6 +95,25 @@ export default function AdsReport() {
 
   const section = useMemo(() => SECTIONS.find((s) => s.key === sectionKey)!, [sectionKey]);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Perataan teks per-tabel (rata kiri/tengah/kanan) — seperti Insight.
+  // Disimpan per-device di localStorage. Kalau belum diset, pakai default pintar
+  // (Rp & teks = kiri, angka = kanan).
+  const [alignBySection, setAlignBySection] = useState<Record<string, Align>>({});
+  const align = alignBySection[sectionKey];
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("adsAlign") || "null");
+      if (saved && typeof saved === "object") setAlignBySection(saved);
+    } catch {}
+  }, []);
+  const setAlign = (a: Align) => {
+    setAlignBySection((prev) => {
+      const next = { ...prev, [sectionKey]: a };
+      try { localStorage.setItem("adsAlign", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     try {
@@ -219,8 +240,9 @@ export default function AdsReport() {
         const row = rows[r - 2];
         ws.getRow(r).eachCell((cell, col) => {
           cell.border = allBorders;
-          cell.alignment = { vertical: "middle", horizontal: section.hasNo && col === 1 ? "center" : "left", wrapText: true };
           const sc = section.cols[col - 1 - leadingNo];
+          const effX = section.hasNo && col === 1 ? "center" : (align ?? (sc?.rp ? "left" : sc?.type === "num" ? "right" : "left"));
+          cell.alignment = { vertical: "middle", horizontal: effX, wrapText: true };
           if (sc?.rp && typeof cell.value === "number") cell.numFmt = '"Rp" #,##0';
         });
         const foto = row.data.foto;
@@ -279,6 +301,18 @@ export default function AdsReport() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-0.5 bg-gray-50 border border-gray-200 rounded-lg p-0.5">
+            {([
+              { key: "left" as const, Icon: AlignLeft, title: "Rata kiri semua kolom" },
+              { key: "center" as const, Icon: AlignCenter, title: "Rata tengah semua kolom" },
+              { key: "right" as const, Icon: AlignRight, title: "Rata kanan semua kolom" },
+            ]).map(({ key, Icon, title }) => (
+              <button key={key} onClick={() => setAlign(key)} title={title}
+                className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${align === key ? "bg-violet-600 text-white shadow-sm" : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"}`}>
+                <Icon className="w-4 h-4" />
+              </button>
+            ))}
+          </div>
           <button onClick={exportExcel} disabled={exporting || rows.length === 0}
             className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-full text-sm font-semibold bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50">
             {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Export Excel
@@ -318,19 +352,21 @@ export default function AdsReport() {
                 ) : rows.map((row, idx) => (
                   <tr key={row.id} className="group hover:bg-blue-50/30">
                     {section.hasNo && <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-400 font-semibold">{idx + 1}</td>}
-                    {section.cols.map((c) => (
+                    {section.cols.map((c) => {
+                      const eff: Align = align ?? (c.rp ? "left" : c.type === "num" ? "right" : "left");
+                      return (
                       <td key={c.k} className="border border-gray-200 p-0">
                         <div className="flex items-center">
                           {c.rp && <span className="pl-2 text-[11px] font-semibold text-gray-400 shrink-0 select-none">Rp. </span>}
                           <input
                             value={row.data[c.k] ?? ""}
                             onChange={(e) => setCell(row.id, c.k, e.target.value)}
-                            className={`w-full px-2 py-1.5 bg-transparent outline-none focus:bg-violet-50/40 text-gray-800 ${c.rp ? "text-left tabular-nums pl-1" : c.type === "num" ? "text-right tabular-nums" : ""}`}
+                            className={`w-full px-2 py-1.5 bg-transparent outline-none focus:bg-violet-50/40 text-gray-800 ${ALIGN_CLASS[eff]} ${c.type === "num" ? "tabular-nums" : ""} ${c.rp ? "pl-1" : ""}`}
                           />
                         </div>
                       </td>
-                    ))}
-                    {/* Foto */}
+                      );
+                    })}                    {/* Foto */}
                     <td className="border border-gray-200 p-1 text-center">
                       {row.data.foto ? (
                         <div className="relative inline-block">
@@ -361,11 +397,14 @@ export default function AdsReport() {
                 <tfoot>
                   <tr className="bg-blue-50 font-bold text-blue-800">
                     {section.hasNo && <td className="border border-blue-200 px-2 py-2" />}
-                    {section.cols.map((c, i) => (
-                      <td key={c.k} className={`border border-blue-200 px-2 py-2 ${c.type === "num" ? "text-right tabular-nums" : ""}`}>
+                    {section.cols.map((c, i) => {
+                      const eff: Align = align ?? (c.rp ? "left" : c.type === "num" ? "right" : "left");
+                      return (
+                      <td key={c.k} className={`border border-blue-200 px-2 py-2 ${ALIGN_CLASS[eff]} ${c.type === "num" ? "tabular-nums" : ""}`}>
                         {i === 0 ? "TOTAL" : c.rp ? `Rp ${(totals[c.k] || 0).toLocaleString("id-ID")}` : c.type === "num" ? (totals[c.k] || 0).toLocaleString("id-ID") : ""}
                       </td>
-                    ))}
+                      );
+                    })}
                     <td className="border border-blue-200" />
                     <td className="border border-blue-200" />
                   </tr>
