@@ -7,6 +7,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { UserRole, hasAnyRole, ITEM_LOAN_APPROVE_ROLES } from "@/lib/permissions";
+import { notifyItemLoanResolved } from "@/hooks/useItemLoanNotify";
 
 interface SnResult {
     item_type: "LAPTOP" | "AKSESORIS";
@@ -275,6 +276,7 @@ export default function ItemLoansPage() {
                 "reject-return": "Pengajuan pengembalian ditolak",
             };
             toast.success(msg[action] ?? "Berhasil diproses");
+            notifyItemLoanResolved(id);
             fetchLoans();
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal memproses");
