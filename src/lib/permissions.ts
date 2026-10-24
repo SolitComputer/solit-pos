@@ -421,6 +421,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/laptops/edit": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG"],
   "/dashboard/units": [...ALL_UNITS_ROLES],
   "/api/item-outflows": [...ITEM_OUTFLOW_ROLES],
+  // Search SN aksesoris & laptop untuk modal Pengambilan Barang. Dulu TIDAK
+  // terdaftar di sini → middleware jatuh ke cabang dynamic-matrix (dyn.matched)
+  // dan memblok role non-ADMIN yang tidak ada di matrix (mis. KEPALA_ADMIN_BARANG),
+  // padahal mereka ada di ITEM_OUTFLOW_ROLES & tombolnya muncul. Disamakan dengan
+  // siapa yang boleh membuat pengambilan.
+  "/api/accessory-units": [...ITEM_OUTFLOW_ROLES],
+  "/api/units/search-sn-kebutuhan": [...ITEM_OUTFLOW_ROLES],
   // Peminjaman Barang — SEMUA role boleh buka & ajukan pinjam. `ALL_ROLES` tidak
   // bisa di-spread di sini (didefinisikan setelah ROUTE_PERMISSIONS), jadi ditulis
   // literal. Approve/reject tetap digate di handler pakai ITEM_LOAN_APPROVE_ROLES.
