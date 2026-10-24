@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { withAuth } from "@/lib/auth";
-import { PREPARATION_CREATE_ROLES } from "@/lib/permissions";
+import { PREPARATION_CREATE_ROLES, ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -172,4 +172,4 @@ export const GET = withAuth(async (req: NextRequest) => {
     const merged = [...laptopFormatted, ...accessoryFormatted].slice(0, 10);
 
     return NextResponse.json({ data: merged });
-}, PREPARATION_CREATE_ROLES);
+}, Array.from(new Set([...PREPARATION_CREATE_ROLES, ...ITEM_OUTFLOW_ROLES])));
