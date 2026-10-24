@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth } from "@/lib/auth";
-import { UserRole } from "@/lib/permissions";
+import { UserRole, ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
 
 const ALLOWED_ROLES: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -70,4 +70,4 @@ export const GET = withAuth(async (req: NextRequest) => {
     }));
 
     return NextResponse.json({ success: true, data: flattened });
-}, ALLOWED_ROLES);
+}, Array.from(new Set<UserRole>([...ALLOWED_ROLES, ...ITEM_OUTFLOW_ROLES])));
