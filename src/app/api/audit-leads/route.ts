@@ -104,6 +104,7 @@ export async function GET(request: NextRequest) {
     keterangan: r.keterangan,
     sumber: r.sumber ?? null,
     price_range: null as string | null, // input manual tidak punya range harga
+    nama_toko: null as string | null, // leads manual tidak punya nama toko (form-nya tidak ada field ini)
     transaksi: r.transaksi,
     ads: typeof r.ads === "string" ? r.ads : null, // tabel audit_leads bertipe boolean — jangan ikut
     audited: r.audited,    audited_by_name: r.audited_by_name,
@@ -121,6 +122,7 @@ export async function GET(request: NextRequest) {
     keterangan: r.keterangan,
     sumber: r.sumber ?? null,
     price_range: (r.price_range ?? null) as string | null, // laporan lama = null → UI tampil "—"
+    nama_toko: (r.nama_toko ?? null) as string | null, // dari sales_online_reports — inilah yang tadinya hilang
     transaksi: r.purchased,
     ads: r.ads ?? null, // teks bebas dari sales
     audited: r.audited,
