@@ -470,7 +470,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                       </td>
                       <td className="px-4 py-3.5 align-top text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.nama_toko || undefined}>{row.nama_toko || "—"}</td>
                       <td className="px-4 py-3.5 align-top text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words leading-snug hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
-                      <td className="px-4 py-3.5 align-top text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
+                       <td className="px-4 py-3.5 align-top text-gray-500 max-w-[280px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
                       <td className="px-4 py-3.5 text-center align-middle">
                         <TransaksiBadge value={row.transaksi} />
                       </td>
