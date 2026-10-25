@@ -21,7 +21,9 @@ async function getHandler(req: NextRequest) {
     if (!range.success) {
       return NextResponse.json({ success: false, message: range.error }, { status: 400 });
     }
-    const { startUtc, endUtc } = range.value;
+     const { startUtc, endUtc } = range.value;
+    // "" / "ALL" = tanpa filter toko (gabungan semua toko).
+    const storeFilter = (searchParams.get("store") ?? "").trim();
 
     // Hanya baris yang SUDAH diaudit yang dihitung.
     const { data: auditedData, error: auditedErr } = await fetchAllRows((from, to) => {
@@ -32,6 +34,7 @@ async function getHandler(req: NextRequest) {
         .eq("audited", true);
       if (startUtc) q = q.gte("created_at", startUtc);
       if (endUtc) q = q.lt("created_at", endUtc);
+      if (storeFilter && storeFilter !== "ALL") q = q.eq("nama_toko", storeFilter);
       return q.range(from, to);
     });
     if (auditedErr) throw new Error(auditedErr.message);
@@ -44,6 +47,7 @@ async function getHandler(req: NextRequest) {
       .eq("audited", false);
     if (startUtc) pendingQuery = pendingQuery.gte("created_at", startUtc);
     if (endUtc) pendingQuery = pendingQuery.lt("created_at", endUtc);
+    if (storeFilter && storeFilter !== "ALL") pendingQuery = pendingQuery.eq("nama_toko", storeFilter);
     const { count: pendingAuditCount, error: pendingErr } = await pendingQuery;
     if (pendingErr) throw new Error(pendingErr.message);
 

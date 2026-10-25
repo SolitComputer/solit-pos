@@ -1,17 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, ChevronDown, Download, ImagePlus, Loader2, Plus, Table2, Trash2, X } from "lucide-react";
-import { parseInsightNumber } from "@/lib/marketing-insight";
+import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, Calendar, ChevronDown, ChevronLeft, ChevronRight, Download, Hash, ImagePlus, Loader2, Megaphone, Plus, Table2, Trash2, X } from "lucide-react";
+import { currentPeriodWib, parseInsightNumber } from "@/lib/marketing-insight";
 
 type ColType = "text" | "num";
 interface Col { k: string; label: string; type: ColType; min?: number; rp?: boolean }
-interface Section { key: string; label: string; hasNo: boolean; cols: Col[] }
+// spendKey = kolom yang dianggap "biaya iklan" di tabel ini — dipakai kartu
+// ringkasan Total Spend (Task 5). Nama kolom beda per tabel (spend, anggaran,
+// biaya, budget), jadi ditunjuk eksplisit, bukan ditebak otomatis.
+interface Section { key: string; label: string; hasNo: boolean; cols: Col[]; spendKey: string }
 type Align = "left" | "center" | "right";
 const ALIGN_CLASS: Record<Align, string> = { left: "text-left", center: "text-center", right: "text-right" };
+// Maksimal foto per baris laporan Ads (Task 3).
+const MAX_FOTOS = 5;
 
 const SECTIONS: Section[] = [
-  { key: "ringkasan", label: "Ringkasan CEO", hasNo: false, cols: [
+  { key: "ringkasan", label: "Ringkasan CEO", hasNo: false, spendKey: "spend", cols: [
     { k: "sumber", label: "Sumber Iklan", type: "text", min: 180 },
     { k: "spend", label: "Spend", type: "num", rp: true },
     { k: "leads", label: "Leads / Chat", type: "num" },
@@ -19,8 +24,7 @@ const SECTIONS: Section[] = [
     { k: "closing", label: "Closing", type: "num" },
     { k: "omzet", label: "Omzet", type: "num", rp: true },
     { k: "roas", label: "ROAS", type: "text" },
-  ]},
-  { key: "fb_toko", label: "FB Toko (META)", hasNo: true, cols: [
+  ]},{ key: "fb_toko", label: "FB Toko (META)", hasNo: true, spendKey: "anggaran", cols: [
     { k: "akun", label: "Akun / Toko", type: "text", min: 140 },
     { k: "barang", label: "Barang Diiklankan", type: "text", min: 180 },
     { k: "anggaran", label: "Anggaran", type: "num", rp: true },
@@ -35,7 +39,7 @@ const SECTIONS: Section[] = [
     { k: "omzet", label: "Omzet", type: "num", rp: true },
     { k: "roas", label: "ROAS", type: "text" },
   ]},
-  { key: "shopee", label: "Shopee Ads", hasNo: true, cols: [
+{ key: "shopee", label: "Shopee Ads", hasNo: true, spendKey: "biaya", cols: [
     { k: "toko", label: "Toko", type: "text", min: 120 },
     { k: "periode", label: "Tanggal / Periode", type: "text", min: 140 },
     { k: "nama_iklan", label: "Nama Iklan / Produk", type: "text", min: 180 },
@@ -48,7 +52,7 @@ const SECTIONS: Section[] = [
     { k: "roas", label: "ROAS", type: "text" },
     { k: "catatan", label: "Catatan", type: "text", min: 200 },
   ]},
-  { key: "fb_pribadi", label: "FB Pribadi", hasNo: true, cols: [
+{ key: "fb_pribadi", label: "FB Pribadi", hasNo: true, spendKey: "budget", cols: [
     { k: "akun", label: "Akun FB", type: "text", min: 140 },
     { k: "barang", label: "Barang Diiklankan", type: "text", min: 180 },
     { k: "harga", label: "Harga Satuan", type: "num", rp: true },
@@ -64,7 +68,20 @@ const SECTIONS: Section[] = [
   ]},
 ];
 
-interface AdsRow { id: string; sort_order: number; data: Record<string, string> }
+interface AdsRow { id: string; sort_order: number; report_date: string; data: Record<string, string> }
+
+// Baca daftar foto 1 baris. Baris baru simpan JSON array di data.fotos.
+// Baris lama (1 foto, sebelum fitur ini) simpan base64 langsung di data.foto
+// — otomatis dibaca sebagai array 1 elemen, TANPA migrasi data di DB.
+function parseFotos(data: Record<string, string>): string[] {
+  if (data.fotos) {
+    try {
+      const arr = JSON.parse(data.fotos);
+      if (Array.isArray(arr)) return arr.filter((x): x is string => typeof x === "string" && x.length > 0);
+    } catch { /* data korup/format lama — jatuh ke fallback di bawah */ }
+  }
+  return data.foto ? [data.foto] : [];
+}
 
 // Kompres gambar ke JPEG kecil (data URL) biar ringan disimpan.
 async function compressImage(file: File, maxDim = 1000, quality = 0.7): Promise<string> {
@@ -92,9 +109,23 @@ export default function AdsReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
+  // Bulan aktif ("YYYY-MM") — sama seperti pola di Kesalahan Sales.
+  const [period, setPeriod] = useState(() => currentPeriodWib());
 
   const section = useMemo(() => SECTIONS.find((s) => s.key === sectionKey)!, [sectionKey]);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Geser "YYYY-MM" mundur/maju 1 bulan. Pakai Date.UTC lalu baca getUTC*
+  // supaya pergantian bulan tidak kena geser zona waktu browser.
+  const shiftMonth = (delta: number) => {
+    const [y, m] = period.split("-").map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+    setPeriod(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+  };
+  const monthLabel = useMemo(() => {
+    const [y, m] = period.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+  }, [period]);
 
   // Perataan teks per-tabel (rata kiri/tengah/kanan) — seperti Insight.
   // Disimpan per-device di localStorage. Kalau belum diset, pakai default pintar
@@ -118,12 +149,12 @@ export default function AdsReport() {
   const load = useCallback(async () => {
     try {
       setLoading(true); setError("");
-      const res = await fetch(`/api/ads-report?section=${sectionKey}`, { cache: "no-store" });
+      const res = await fetch(`/api/ads-report?section=${sectionKey}&month=${period}`, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat");
       setRows(json.data as AdsRow[]);
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
-  }, [sectionKey]);
+  }, [sectionKey, period]);
   useEffect(() => { load(); }, [load]);
 
   const saveRow = useCallback((id: string, data: Record<string, string>, immediate = false) => {
@@ -153,7 +184,7 @@ export default function AdsReport() {
 
   const addRow = async () => {
     try {
-      const res = await fetch(`/api/ads-report?section=${sectionKey}`, { method: "POST" });
+      const res = await fetch(`/api/ads-report?section=${sectionKey}&month=${period}`, { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "Gagal menambah baris");
       setRows((prev) => [...prev, json.data as AdsRow]);
@@ -170,10 +201,36 @@ export default function AdsReport() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const onPickPhoto = async (id: string, file: File | null) => {
+  // Tambah 1 foto ke baris (maks MAX_FOTOS). Merge & simpan dilakukan di
+  // dalam functional setRows — sama seperti pola setCell — supaya tidak
+  // menimpa text field lain yang mungkin barusan diketik user di baris sama.
+  const addFoto = async (id: string, file: File | null) => {
     if (!file) return;
-    try { setCell(id, "foto", await compressImage(file)); }
-    catch { setError("Gagal memproses foto"); }
+    const existing = rows.find((r) => r.id === id);
+    if (existing && parseFotos(existing.data).length >= MAX_FOTOS) {
+      setError(`Maksimal ${MAX_FOTOS} foto per baris`);
+      return;
+    }
+    try {
+      const compressed = await compressImage(file);
+      setRows((prev) => prev.map((r) => {
+        if (r.id !== id) return r;
+        const next = [...parseFotos(r.data), compressed].slice(0, MAX_FOTOS);
+        const data = { ...r.data, fotos: JSON.stringify(next) };
+        saveRow(id, data, true); // simpan langsung, sama seperti foto tunggal sebelumnya
+        return { ...r, data };
+      }));
+    } catch { setError("Gagal memproses foto"); }
+  };
+
+  const removeFoto = (id: string, index: number) => {
+    setRows((prev) => prev.map((r) => {
+      if (r.id !== id) return r;
+      const next = parseFotos(r.data).filter((_, i) => i !== index);
+      const data = { ...r.data, fotos: JSON.stringify(next) };
+      saveRow(id, data, true);
+      return { ...r, data };
+    }));
   };
 
   const totals = useMemo(() => {
@@ -184,6 +241,11 @@ export default function AdsReport() {
     }
     return t;
   }, [rows, section]);
+
+  // Ringkasan Task 5 — Total Spend pakai kolom spendKey tabel aktif,
+  // Total Ads = jumlah baris (terlepas dari jumlah foto per baris).
+  const totalSpend = totals[section.spendKey] ?? 0;
+  const totalAds = rows.length;
 
   // ── Export Excel (foto ter-embed di cell) ──
   const [exporting, setExporting] = useState(false);
@@ -222,7 +284,7 @@ export default function AdsReport() {
       let ci = 1;
       if (section.hasNo) ws.getColumn(ci++).width = 5;
       for (const c of section.cols) ws.getColumn(ci++).width = c.type === "num" ? 14 : Math.max(14, Math.round((c.min ?? 90) / 7));
-      ws.getColumn(ci).width = 14; // Foto
+      ws.getColumn(ci).width = 5 * MAX_FOTOS; // Foto — dilebarkan biar muat sampai 5 thumbnail
       ws.views = [{ state: "frozen", ySplit: 1 }];
 
       const hr = ws.getRow(1);
@@ -245,12 +307,17 @@ export default function AdsReport() {
           cell.alignment = { vertical: "middle", horizontal: effX, wrapText: true };
           if (sc?.rp && typeof cell.value === "number") cell.numFmt = '"Rp" #,##0';
         });
-        const foto = row.data.foto;
-        if (foto && foto.startsWith("data:image/")) {
-          const ext = foto.startsWith("data:image/png") ? "png" : "jpeg";
-          const imageId = wb.addImage({ base64: foto, extension: ext as "png" | "jpeg" });
+        const fotos = parseFotos(row.data);
+        if (fotos.length > 0) {
           ws.getRow(r).height = 60;
-          ws.addImage(imageId, { tl: { col: fotoColIdx + 0.1, row: (r - 1) + 0.1 }, ext: { width: 80, height: 56 } });
+          fotos.forEach((foto, i) => {
+            if (!foto.startsWith("data:image/")) return;
+            const ext = foto.startsWith("data:image/png") ? "png" : "jpeg";
+            const imageId = wb.addImage({ base64: foto, extension: ext as "png" | "jpeg" });
+            // Tiap foto digeser 0.2 kolom ke kanan supaya tidak numpuk dalam
+            // 1 kolom Foto yang sudah dilebarkan (lihat width di atas).
+            ws.addImage(imageId, { tl: { col: fotoColIdx + 0.05 + i * 0.2, row: (r - 1) + 0.1 }, ext: { width: 30, height: 56 } });
+          });
         }
       }
 
@@ -266,7 +333,7 @@ export default function AdsReport() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Laporan Ads - ${section.label}.xlsx`;
+      a.download = `Laporan Ads - ${section.label} - ${period}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {
@@ -278,6 +345,46 @@ export default function AdsReport() {
 
   return (
     <div className="space-y-4">
+      {/* Bulan aktif + ringkasan Total Spend/Total Ads (tabel yang sedang tampil) */}
+      <div className="rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-4 sm:px-6 sm:py-5">
+        <div className="flex flex-col-reverse lg:flex-row gap-4 lg:items-start">
+          <div className="flex-1 min-w-0 space-y-3">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-full">
+              <Calendar className="w-3 h-3" />
+              <span className="capitalize">{monthLabel}</span>
+            </span>
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 max-w-md">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-3 py-3 sm:px-4 sm:py-3.5">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-[10px] font-semibold tracking-wide text-gray-500 uppercase truncate">Total Spend</p>
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 text-emerald-600"><Hash className="w-3 h-3" /></span>
+                </div>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tabular-nums">Rp {totalSpend.toLocaleString("id-ID")}</p>
+                <p className="text-[11px] text-gray-400 mt-1 truncate">{section.label}</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-3 py-3 sm:px-4 sm:py-3.5">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-[10px] font-semibold tracking-wide text-gray-500 uppercase truncate">Total Ads</p>
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-violet-50 text-violet-600"><Megaphone className="w-3 h-3" /></span>
+                </div>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tabular-nums">{totalAds} laporan</p>
+                <p className="text-[11px] text-gray-400 mt-1 truncate">{section.label}</p>
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0 self-center lg:self-start flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full p-1">
+            <button onClick={() => shiftMonth(-1)} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-white hover:shadow-sm transition-all">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <input type="month" value={period} onChange={(e) => e.target.value && setPeriod(e.target.value)}
+              className="h-8 px-2 rounded-full bg-transparent text-xs font-semibold text-gray-700 outline-none" />
+            <button onClick={() => shiftMonth(1)} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-white hover:shadow-sm transition-all">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Dropdown pilih tabel */}
       <div className="rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-3.5 sm:px-5 sm:py-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="relative">
@@ -342,7 +449,7 @@ export default function AdsReport() {
                   {section.cols.map((c) => (
                     <th key={c.k} className="border border-blue-800 px-2 py-2 font-bold text-center" style={{ minWidth: c.min ?? 90 }}>{c.label}</th>
                   ))}
-                  <th className="border border-blue-800 px-2 py-2 font-bold text-center min-w-[90px]">Foto</th>
+                  <th className="border border-blue-800 px-2 py-2 font-bold text-center min-w-[220px]">Foto</th>
                   <th className="border border-blue-800 px-1 py-2 w-10"></th>
                 </tr>
               </thead>
@@ -366,23 +473,26 @@ export default function AdsReport() {
                         </div>
                       </td>
                       );
-                    })}                    {/* Foto */}
-                    <td className="border border-gray-200 p-1 text-center">
-                      {row.data.foto ? (
-                        <div className="relative inline-block">
-                          <img src={row.data.foto} alt="foto" onClick={() => setPreview(row.data.foto)}
-                            className="h-10 w-14 object-cover rounded cursor-pointer border border-gray-200" />
-                          <button onClick={() => setCell(row.id, "foto", "")} title="Hapus foto"
-                            className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center">
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="inline-flex items-center justify-center w-14 h-10 rounded border border-dashed border-violet-300 text-violet-500 hover:bg-violet-50 cursor-pointer">
-                          <ImagePlus className="w-4 h-4" />
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickPhoto(row.id, e.target.files?.[0] ?? null)} />
-                        </label>
-                      )}
+                    })}                    {/* Foto — maks MAX_FOTOS, bisa tambah/hapus per slot */}
+                    <td className="border border-gray-200 p-1">
+                      <div className="flex items-center gap-1 flex-wrap justify-center min-w-[120px]">
+                        {parseFotos(row.data).map((foto, i) => (
+                          <div key={i} className="relative inline-block">
+                            <img src={foto} alt={`foto ${i + 1}`} onClick={() => setPreview(foto)}
+                              className="h-10 w-14 object-cover rounded cursor-pointer border border-gray-200" />
+                            <button onClick={() => removeFoto(row.id, i)} title="Hapus foto"
+                              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center">
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {parseFotos(row.data).length < MAX_FOTOS && (
+                          <label className="inline-flex items-center justify-center w-14 h-10 rounded border border-dashed border-violet-300 text-violet-500 hover:bg-violet-50 cursor-pointer">
+                            <ImagePlus className="w-4 h-4" />
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { addFoto(row.id, e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                          </label>
+                        )}
+                      </div>
                     </td>
                     <td className="border border-gray-200 text-center">
                       <button onClick={() => deleteRow(row.id)} title="Hapus baris"

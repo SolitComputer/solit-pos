@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  ShoppingBag,
   Trophy,
   X,
 } from "lucide-react";
@@ -31,6 +32,7 @@ import MarketingPriceRangeReport from "./MarketingPriceRangeReport";
 import MarketingInsightBoard from "./MarketingInsightBoard";
 import SalesErrorReport from "./SalesErrorReport";
 import AdsReport from "./AdsReport";
+import BarangHasilAds from "./BarangHasilAds";
 
 // "2026-10-22" → "22 Okt 2026". Diparse manual (bukan new Date("YYYY-MM-DD"))
 // supaya tidak geser hari karena zona waktu.
@@ -76,14 +78,21 @@ function qtyCellClass(value: number, max: number): string {
 }
 
 // Urutan default + definisi tiap tab (dipakai untuk render yang bisa di-drag).
-const DEFAULT_TAB_ORDER = ["barang", "range", "insight", "kesalahan", "ads"];
+const DEFAULT_TAB_ORDER = ["barang", "range", "insight", "kesalahan", "ads", "ads_items"];
 const TAB_DEFS = {
   barang: { label: "Laporan Barang", icon: BarChart3 },
   range: { label: "Range Harga", icon: Hash },
   insight: { label: "Insight", icon: Layers },
   kesalahan: { label: "Kesalahan Sales", icon: AlertTriangle },
   ads: { label: "Laporan Ads", icon: Megaphone },
+  ads_items: { label: "Barang Hasil Ads", icon: ShoppingBag },
 } as const;
+
+// Filter toko di Rekap Kata Kunci & Rekap Range Harga — HARUS disamakan
+// dengan STORE_OPTIONS di src/app/api/sales-reports/route.ts (sumber data).
+const STORE_FILTER_OPTIONS = ["ALL", "Solit", "Sotech", "Onpoint", "Sultan Laptop"] as const;
+type StoreFilter = (typeof STORE_FILTER_OPTIONS)[number];
+const storeFilterLabel = (s: StoreFilter) => (s === "ALL" ? "Semua Toko" : s);
 
 export default function LaporanMarketingPage() {
   // Filter tanggal pakai kalender InlineDateRange (sama dengan Cashflow).
@@ -95,8 +104,9 @@ export default function LaporanMarketingPage() {
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [hideEmptyChannels, setHideEmptyChannels] = useState(false);
+  const [storeFilter, setStoreFilter] = useState<StoreFilter>("ALL");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight" | "kesalahan" | "ads">("barang");
+  const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight" | "kesalahan" | "ads" | "ads_items">("barang");
   const [exporting, setExporting] = useState(false);
 
   // Urutan tab — bisa di-drag, disimpan di localStorage biar tetap setelah reload.
@@ -135,6 +145,7 @@ export default function LaporanMarketingPage() {
       const params = new URLSearchParams();
       if (customFrom) params.set("from", customFrom);
       if (customTo) params.set("to", customTo);
+      if (storeFilter !== "ALL") params.set("store", storeFilter);
       const res = await fetch(`/api/marketing-report?${params.toString()}`, { cache: "no-store" });
       const json = await res.json();
       if (requestId !== requestIdRef.current) return;
@@ -147,7 +158,7 @@ export default function LaporanMarketingPage() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [customFrom, customTo]);
+  }, [customFrom, customTo, storeFilter]);
 
   useEffect(() => {
     fetchReport();
@@ -402,6 +413,19 @@ export default function LaporanMarketingPage() {
                 </div>
               </div>
 
+              {/* Tab filter Nama Toko — qty dihitung ulang dari backend sesuai toko aktif */}
+              <div className="px-4 sm:px-5 py-2.5 border-b border-gray-100 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+                {STORE_FILTER_OPTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStoreFilter(s)}
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/30 ${storeFilter === s ? "bg-violet-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}
+                  >
+                    {storeFilterLabel(s)}
+                  </button>
+                ))}
+              </div>
+
               {error && (
                 <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-4 sm:px-5 py-3">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -511,6 +535,7 @@ export default function LaporanMarketingPage() {
         {activeTab === "insight" && <MarketingInsightBoard />}
         {activeTab === "kesalahan" && <SalesErrorReport />}
         {activeTab === "ads" && <AdsReport />}
+        {activeTab === "ads_items" && <BarangHasilAds />}
       </div>
     </DashboardLayout>
   );

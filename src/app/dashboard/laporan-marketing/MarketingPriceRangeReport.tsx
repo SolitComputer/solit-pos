@@ -38,6 +38,12 @@ function getPeriodLabel(from: string, to: string): string {
   return `${from ? fmtTanggalShort(from) : "..."} — ${to ? fmtTanggalShort(to) : "..."}`;
 }
 
+// Filter toko — HARUS disamakan dengan STORE_FILTER_OPTIONS di
+// laporan-marketing/page.tsx & STORE_OPTIONS di api/sales-reports/route.ts.
+const STORE_FILTER_OPTIONS = ["ALL", "Solit", "Sotech", "Onpoint", "Sultan Laptop"] as const;
+type StoreFilter = (typeof STORE_FILTER_OPTIONS)[number];
+const storeFilterLabel = (s: StoreFilter) => (s === "ALL" ? "Semua Toko" : s);
+
 export default function MarketingPriceRangeReport() {
   const [customFrom, setCustomFrom] = useState(() => todayWibDate().slice(0, 8) + "01");
   const [customTo, setCustomTo] = useState(() => todayWibDate());
@@ -45,6 +51,7 @@ export default function MarketingPriceRangeReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hideEmptyChannels, setHideEmptyChannels] = useState(true);
+  const [storeFilter, setStoreFilter] = useState<StoreFilter>("ALL");
   const requestIdRef = useRef(0);
 
   const fetchReport = useCallback(async () => {
@@ -55,6 +62,7 @@ export default function MarketingPriceRangeReport() {
       const params = new URLSearchParams();
       if (customFrom) params.set("from", customFrom);
       if (customTo) params.set("to", customTo);
+      if (storeFilter !== "ALL") params.set("store", storeFilter);
       const res = await fetch(`/api/marketing-report/price-range?${params.toString()}`, { cache: "no-store" });
       const json = await res.json();
       if (requestId !== requestIdRef.current) return;
@@ -66,7 +74,7 @@ export default function MarketingPriceRangeReport() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [customFrom, customTo]);
+  }, [customFrom, customTo, storeFilter]);
 
   useEffect(() => {
     fetchReport();
@@ -166,6 +174,19 @@ export default function MarketingPriceRangeReport() {
             {hideEmptyChannels ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
             <span className="hidden sm:inline">Channel kosong</span>
           </button>
+        </div>
+
+        {/* Tab filter Nama Toko — sama seperti di tab Laporan Barang */}
+        <div className="px-4 sm:px-5 py-2.5 border-b border-gray-100 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+          {STORE_FILTER_OPTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setStoreFilter(s)}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/30 ${storeFilter === s ? "bg-violet-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}
+            >
+              {storeFilterLabel(s)}
+            </button>
+          ))}
         </div>
 
         {error && (

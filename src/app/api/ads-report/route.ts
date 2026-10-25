@@ -15,17 +15,36 @@ function canManage(user: AuthUser) {
   return hasAnyRole(getRoles(user), SALES_REPORT_AUDIT_ROLES);
 }
 
-// GET /api/ads-report?section=ringkasan
+// "2026-10" → { start: "2026-10-01", end: "2026-11-01" } (end eksklusif).
+// report_date bertipe `date` (bukan timestamptz) — jadi TIDAK perlu konversi
+// WIB, beda dengan created_at di tabel lain.
+function monthRangeUtc(month: string): { start: string; end: string } | null {
+  if (!/^\d{4}-\d{2}$/.test(month)) return null;
+  const [y, m] = month.split("-").map(Number);
+  const start = `${month}-01`;
+  const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+  return { start, end };
+}
+
+// GET /api/ads-report?section=ringkasan&month=YYYY-MM
 async function getHandler(req: NextRequest) {
   try {
-    const section = new URL(req.url).searchParams.get("section") || "";
+    const { searchParams } = new URL(req.url);
+    const section = searchParams.get("section") || "";
     if (!SECTIONS.includes(section)) {
       return NextResponse.json({ success: false, message: "section tidak valid" }, { status: 400 });
     }
+    // month kosong/invalid → fallback bulan berjalan, supaya endpoint tetap
+    // aman kalau ada client lama yang belum kirim parameter ini.
+    const monthParam = searchParams.get("month") || "";
+    const range = monthRangeUtc(monthParam) ?? monthRangeUtc(new Date().toISOString().slice(0, 7))!;
+
     const { data, error } = await supabaseAdmin
       .from(TABLE)
       .select("*")
       .eq("section", section)
+      .gte("report_date", range.start)
+      .lt("report_date", range.end)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
@@ -36,12 +55,18 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-// POST /api/ads-report?section=ringkasan  → baris baru kosong
+// POST /api/ads-report?section=ringkasan&month=YYYY-MM  → baris baru kosong
+// Baris baru di-tanggal-i tanggal 1 di bulan yang SEDANG DIBUKA di UI (bukan
+// hari ini), supaya "Baris Baru" saat browsing bulan lalu/depan tidak nyasar
+// ke bulan berjalan.
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     if (!canManage(user)) return NextResponse.json({ success: false, message: "Tidak diizinkan" }, { status: 403 });
-    const section = new URL(req.url).searchParams.get("section") || "";
+    const { searchParams } = new URL(req.url);
+    const section = searchParams.get("section") || "";
     if (!SECTIONS.includes(section)) return NextResponse.json({ success: false, message: "section tidak valid" }, { status: 400 });
+    const range = monthRangeUtc(searchParams.get("month") || "");
+    if (!range) return NextResponse.json({ success: false, message: "month tidak valid (format YYYY-MM)" }, { status: 400 });
 
     const { data: last } = await supabaseAdmin
       .from(TABLE).select("sort_order").eq("section", section)
@@ -49,7 +74,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     const sort_order = (last?.sort_order ?? -1) + 1;
 
     const { data, error } = await supabaseAdmin
-      .from(TABLE).insert({ section, sort_order, data: {} }).select().single();
+      .from(TABLE).insert({ section, sort_order, data: {}, report_date: range.start }).select().single();
     if (error) throw new Error(error.message);
     return NextResponse.json({ success: true, data });
   } catch (error: any) {

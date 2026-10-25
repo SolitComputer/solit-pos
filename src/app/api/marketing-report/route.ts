@@ -42,9 +42,11 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       return NextResponse.json({ success: false, message: range.error }, { status: 400 });
     }
     const { startUtc, endUtc } = range.value;
+    // "" / "ALL" = tanpa filter toko (gabungan semua toko).
+    const storeFilter = (searchParams.get("store") ?? "").trim();
 
     // 1) Laporan yang SUDAH diaudit → bahan rekap.
-    //    Cuma ambil 2 kolom yang dibutuhkan (hemat bandwidth).
+    //    Cuma ambil kolom yang dibutuhkan (hemat bandwidth).
     const { data, error } = await fetchAllRows((from, to) => {
       let q = supabaseAdmin
         .from(TABLE)
@@ -53,6 +55,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         .eq("audited", true);
       if (startUtc) q = q.gte("created_at", startUtc);
       if (endUtc) q = q.lt("created_at", endUtc);
+      if (storeFilter && storeFilter !== "ALL") q = q.eq("nama_toko", storeFilter);
       return q
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
@@ -69,6 +72,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       .eq("audited", false);
     if (startUtc) pendingQuery = pendingQuery.gte("created_at", startUtc);
     if (endUtc) pendingQuery = pendingQuery.lt("created_at", endUtc);
+    if (storeFilter && storeFilter !== "ALL") pendingQuery = pendingQuery.eq("nama_toko", storeFilter);
     const { count: pendingAuditCount, error: pendingError } = await pendingQuery;
     if (pendingError) throw new Error(pendingError.message);
 
