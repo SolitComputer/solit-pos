@@ -136,7 +136,9 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
     console.error("Barang Hasil Ads error:", error);
-    return NextResponse.json({ success: false, message: "Gagal memuat Barang Hasil Ads." }, { status: 500 });
+    // ⚠️ SEMENTARA untuk debug — tampilkan pesan error asli ke client.
+    // Revert ke pesan generik setelah bug ketemu & kefix.
+    return NextResponse.json({ success: false, message: "DEBUG: " + (error.message || String(error)) }, { status: 500 });
   }
 }
 
