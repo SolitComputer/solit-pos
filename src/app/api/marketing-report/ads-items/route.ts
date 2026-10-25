@@ -46,7 +46,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     let query = supabaseAdmin
       .from(TABLE)
-      .select("invoice_number, created_at, customer_name, sales_name, laptop_name, cpu, ram, storage, company_name, source_platform, status")
+      .select("invoice_number, created_at, customer_name, sales_name, laptop_name, laptop_id, company_name, source_platform, status")
       .ilike("source_platform", "%ADS%")
       .neq("status", "CANCELLED");
     if (startUtc) query = query.gte("created_at", startUtc);
@@ -70,7 +70,10 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       .in("invoice_number", invoiceNumbers);
     if (itemsErr) throw new Error(itemsErr.message);
 
-    const laptopIds = Array.from(new Set((items ?? []).map((it: any) => it.laptop_id).filter(Boolean)));
+     const laptopIds = Array.from(new Set([
+      ...(items ?? []).map((it: any) => it.laptop_id).filter(Boolean),
+      ...transactions.map((t: any) => t.laptop_id).filter(Boolean),
+    ]));
     const laptopMap = new Map<string, { name: string; cpu?: string; ram?: string; storage?: string }>();
     if (laptopIds.length > 0) {
       const { data: laptops, error: laptopsErr } = await supabaseAdmin
@@ -96,8 +99,14 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       const activeItems = allItems.filter((it: any) => !it.restored);
 
       if (allItems.length === 0) {
-        // Transaksi legacy tanpa baris transaction_items — pakai kolom lama.
-        const specs = [trx.cpu, trx.ram, trx.storage].filter(Boolean).join(", ");
+        // Transaksi legacy tanpa baris transaction_items — ambil spesifikasi
+        // dari tabel laptops lewat transactions.laptop_id.
+        // (trx.cpu/trx.ram/trx.storage TIDAK ADA di tabel transactions —
+        // itu penyebab error "column transactions.cpu does not exist" kemarin.)
+        const legacySpecs = laptopMap.get(trx.laptop_id ?? "");
+        const specs = legacySpecs
+          ? [legacySpecs.cpu, legacySpecs.ram, legacySpecs.storage].filter(Boolean).join(", ")
+          : "";
         return trx.laptop_name ? (specs ? `${trx.laptop_name} (${specs})` : trx.laptop_name) : "—";
       }
       if (activeItems.length === 0) {
@@ -136,9 +145,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
     console.error("Barang Hasil Ads error:", error);
-    // ⚠️ SEMENTARA untuk debug — tampilkan pesan error asli ke client.
-    // Revert ke pesan generik setelah bug ketemu & kefix.
-    return NextResponse.json({ success: false, message: "DEBUG: " + (error.message || String(error)) }, { status: 500 });
+    return NextResponse.json({ success: false, message: "Gagal memuat Barang Hasil Ads." }, { status: 500 });
   }
 }
 
