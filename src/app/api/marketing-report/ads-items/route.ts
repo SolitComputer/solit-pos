@@ -47,7 +47,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     let query = supabaseAdmin
       .from(TABLE)
       .select("invoice_number, created_at, customer_name, sales_name, laptop_name, cpu, ram, storage, company_name, source_platform, status")
-      .eq("from_ads", true)
+      .ilike("source_platform", "%ADS%")
       .neq("status", "CANCELLED");
     if (startUtc) query = query.gte("created_at", startUtc);
     if (endUtc) query = query.lt("created_at", endUtc);

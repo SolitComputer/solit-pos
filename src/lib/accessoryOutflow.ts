@@ -43,7 +43,11 @@ export async function recordOutflow(data: OutflowData) {
 async function restockActiveOutflows(outflows: { unit_id: string | null; accessory_id: string | null; qty: number }[]) {
   const unitIds = outflows.filter(o => o.unit_id).map(o => o.unit_id as string);
   if (unitIds.length > 0) {
-    await supabaseAdmin.from("accessory_units").update({ status: "TERSEDIA" }).in("id", unitIds);
+    // ✅ Setelah transaksi di-restore, unit aksesoris balik jadi BELUM_SIAP
+    // (bukan langsung TERSEDIA/Siap Jual) — supaya dicek dulu sebelum dijual
+    // lagi, konsisten dgn perilaku laptop. BELUM_SIAP tidak masuk daftar hidden
+    // di GET /api/accessory-units, jadi unit otomatis muncul lagi di Kelola Unit.
+    await supabaseAdmin.from("accessory_units").update({ status: "BELUM_SIAP" }).in("id", unitIds);
   }
 
   const qtyByAccessory = new Map<string, number>();

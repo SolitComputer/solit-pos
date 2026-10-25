@@ -18,10 +18,18 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
 
+    // Unit yang terikat transaksi PENDING (DP = RESERVED, Ambil Dulu = HELD,
+    // E-commerce = PACKING, atau PENDING) TIDAK boleh tampil di Kelola Unit —
+    // bukan stok yang bisa diproses selama transaksi aktif. SOLD sengaja TIDAK
+    // difilter (halaman masih hitung jumlah "Terjual"). Setelah transaksi
+    // di-restore, unit balik ke BELUM_SIAP sehingga otomatis muncul lagi.
+    const HIDDEN_WHILE_PENDING = ["RESERVED", "HELD", "PACKING", "PENDING"];
+
     const { data, error } = await supabase
       .from("laptop_units")
       .select("*")
       .eq("laptop_id", id)
+      .not("status", "in", `(${HIDDEN_WHILE_PENDING.join(",")})`)
       .order("serial_number", { ascending: true }); // ← konsisten dgn /api/units
 
     if (error) throw error;

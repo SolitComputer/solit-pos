@@ -23,7 +23,7 @@ type RestorableStatus = (typeof RESTORABLE_STATUSES)[number];
 // tidak nyangkut: tersembunyi dari Data Barang (msj_group_id terisi) tapi juga
 // tidak muncul di kelompok (status bukan MINUS_SIAP_JUAL).
 
-// Kembalikan unit laptop ke stok: unit MSJ → MINUS_SIAP_JUAL, unit biasa → SIAP_JUAL.
+// Kembalikan unit laptop ke stok: unit MSJ → MINUS_SIAP_JUAL, unit biasa → BELUM_SIAP.
 async function releaseLaptopUnitsToStock(
   unitIds: string[]
 ): Promise<{ error: string | null; msjGroupIds: string[] }> {
@@ -46,7 +46,10 @@ async function releaseLaptopUnitsToStock(
   if (normalIds.length > 0) {
     const { error } = await supabase
       .from("laptop_units")
-      .update({ status: "SIAP_JUAL", reserved_by: null, reserved_invoice: null })
+      // ✅ Setelah di-restore, unit jadi BELUM_SIAP (bukan langsung SIAP_JUAL) —
+      // supaya pengelola barang cek/validasi dulu sebelum dijual lagi. BELUM_SIAP
+      // tidak masuk daftar hidden di GET /units, jadi unit otomatis muncul lagi.
+      .update({ status: "BELUM_SIAP", reserved_by: null, reserved_invoice: null })
       .in("id", normalIds);
     if (error) return { error: error.message, msjGroupIds: [] };
   }
@@ -271,11 +274,26 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
 
       const newQty = siapUnits?.length ?? 0;
 
+      // ✅ Jangan buru-buru set "SOLD" saat tidak ada SIAP_JUAL — setelah restore
+      // unitnya BELUM_SIAP (masih aktif, belum terjual). Kalau masih ada unit
+      // non-SOLD, parent = BELUM_SIAP biar tidak desync & tidak hilang dari list.
+      let parentStatus = "SOLD";
+      if (newQty > 0) {
+        parentStatus = "SIAP_JUAL";
+      } else {
+        const { count: activeCount } = await supabase
+          .from("laptop_units")
+          .select("id", { count: "exact", head: true })
+          .eq("laptop_id", laptopId)
+          .neq("status", "SOLD");
+        if ((activeCount ?? 0) > 0) parentStatus = "BELUM_SIAP";
+      }
+
       await supabase
         .from("laptops")
         .update({
           qty: newQty,
-          status: newQty > 0 ? "SIAP_JUAL" : "SOLD",
+          status: parentStatus,
           ready_to_sell: newQty > 0,
         })
         .eq("id", laptopId);
@@ -554,9 +572,24 @@ async function handlePartialRestore({
         .eq("laptop_id", laptopId)
         .eq("status", "SIAP_JUAL");
       const newQty = siapUnits?.length ?? 0;
+
+      // ✅ Sama seperti full restore: tidak ada SIAP_JUAL tapi masih ada unit
+      // non-SOLD (mis. BELUM_SIAP hasil restore) → parent = BELUM_SIAP.
+      let parentStatus = "SOLD";
+      if (newQty > 0) {
+        parentStatus = "SIAP_JUAL";
+      } else {
+        const { count: activeCount } = await supabase
+          .from("laptop_units")
+          .select("id", { count: "exact", head: true })
+          .eq("laptop_id", laptopId)
+          .neq("status", "SOLD");
+        if ((activeCount ?? 0) > 0) parentStatus = "BELUM_SIAP";
+      }
+
       await supabase
         .from("laptops")
-        .update({ qty: newQty, status: newQty > 0 ? "SIAP_JUAL" : "SOLD", ready_to_sell: newQty > 0 })
+        .update({ qty: newQty, status: parentStatus, ready_to_sell: newQty > 0 })
         .eq("id", laptopId);
     }
 

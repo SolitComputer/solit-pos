@@ -29,13 +29,25 @@ export const GET = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthUs
         return NextResponse.json({ success: false, error: "accessory_id wajib diisi" }, { status: 400 });
     }
 
+    // Unit yang terikat transaksi PENDING (DP = RESERVED, Ambil Dulu = HELD,
+    // E-commerce = PACKING, atau PENDING) TIDAK boleh tampil di Kelola Unit
+    // selama transaksi masih aktif. KELUAR (diambil lewat Pengambilan Barang)
+    // juga disembunyikan — konsisten dgn filter frontend. TERJUAL sengaja TIDAK
+    // difilter (halaman masih hitung jumlah "Terjual"). Setelah transaksi
+    // di-restore, unit balik ke BELUM_SIAP sehingga otomatis muncul lagi.
+    const HIDDEN_WHILE_PENDING = ["RESERVED", "HELD", "PACKING", "PENDING", "KELUAR"];
+
     let query = supabaseAdmin
         .from("accessory_units")
         .select("*")
         .eq("accessory_id", accessoryId)
         .order("created_at", { ascending: false });
 
+    // Kalau pemanggil minta status spesifik (mis. ?status=RESERVED untuk
+    // keperluan lain), hormati itu & jangan paksa sembunyikan. Tanpa filter
+    // status eksplisit, baru kita sembunyikan unit pending/keluar.
     if (status) query = query.eq("status", status);
+    else query = query.not("status", "in", `(${HIDDEN_WHILE_PENDING.join(",")})`);
 
     const { data, error } = await query;
 

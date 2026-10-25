@@ -2402,4 +2402,4 @@ function SoHistoryModal({ unitId, unitLabel, onClose }: {
             </div>
         </div>
     );
-}
+} 
