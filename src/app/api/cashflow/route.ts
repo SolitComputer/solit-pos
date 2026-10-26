@@ -128,6 +128,7 @@ function buildTxPayload(t: any) {
         source_type: "TRANSACTION",
         source_id: t.invoice_number as string,
         payment_method: null,
+        branch: t.branch === "JOGJA" ? "JOGJA" : "UTAMA",
     };
 }
 
@@ -147,6 +148,7 @@ function buildSvcPayload(
         source_type: "SERVICE",
         source_id: opts.sourceId,
         payment_method: null,
+        branch: s.branch === "JOGJA" ? "JOGJA" : "UTAMA",
     };
 }
 
@@ -171,7 +173,7 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
         transactions = await fetchAllRows<any>((from, to) =>
             supabase
                 .from("transactions")
-                .select("id, invoice_number, customer_name, sales_name, laptop_name, deal_price, amount, created_at, paid_at, status")
+                .select("id, invoice_number, customer_name, sales_name, laptop_name, deal_price, amount, created_at, paid_at, status, branch")
                 .eq("status", "PAID")
                 .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`)
                 .order("id", { ascending: true })
@@ -403,7 +405,7 @@ async function syncServiceEntries(
         if (failed > 0) console.error(`[cashflow sync] ${failed} reconcile service GAGAL`);
     }
 }
-function buildPaymentPayload(p: any, customerName: string, salesName: string, laptopName: string) {
+function buildPaymentPayload(p: any, customerName: string, salesName: string, laptopName: string, branch: string) {
     return {
         direction: "IN",
         category: "PENJUALAN_LAPTOP",
@@ -415,6 +417,7 @@ function buildPaymentPayload(p: any, customerName: string, salesName: string, la
         source_type: "TRANSACTION_PAYMENT",
         source_id: p.id as string,
         payment_method: null,
+        branch: branch === "JOGJA" ? "JOGJA" : "UTAMA",
     };
 }
 
@@ -431,6 +434,7 @@ function buildDpPayload(t: any) {
         source_type: "TRANSACTION_DP",
         source_id: t.invoice_number as string,
         payment_method: null,
+        branch: t.branch === "JOGJA" ? "JOGJA" : "UTAMA",
     };
 }
 
@@ -451,7 +455,7 @@ async function syncLegacyDpEntries(supabase: SupabaseClient) {
         pendingTx = await fetchAllRows<any>((from, to) =>
             supabase
                 .from("transactions")
-                .select("id, invoice_number, customer_name, sales_name, laptop_name, dp_amount, status, created_at")
+                .select("id, invoice_number, customer_name, sales_name, laptop_name, dp_amount, status, created_at, branch")
                 .in("status", ["RESERVED", "HELD", "PACKING"])
                 .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`)
                 .order("id", { ascending: true })
@@ -576,7 +580,7 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
     const { rows: txRows, ok: okTx } = await selectInChunks<any>(invoiceNumbers, (chunk) =>
         supabase
             .from("transactions")
-            .select("invoice_number, customer_name, sales_name, laptop_name, created_at, deal_price, amount")
+            .select("invoice_number, customer_name, sales_name, laptop_name, created_at, deal_price, amount, branch")
             .in("invoice_number", chunk)
     );
     if (!okTx) return;
@@ -586,7 +590,7 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
     for (const p of missing) {
         const inv = p.invoice_number as string;
         const info = txInfoMap.get(inv);
-        const payload = buildPaymentPayload(p, info?.customer_name ?? "—", info?.sales_name ?? "Sales", info?.laptop_name ?? "");
+        const payload = buildPaymentPayload(p, info?.customer_name ?? "—", info?.sales_name ?? "Sales", info?.laptop_name ?? "", info?.branch ?? "UTAMA");
         if (payload.nominal <= 0 || payload.tanggal < CASHFLOW_START_DATE) continue;
 
         // ⬅️ BARU: total Cashflow satu invoice tidak boleh melebihi harga transaksi
@@ -750,6 +754,7 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
                     payment_status,
                     payment_confirmed_at,
                     total_tagihan,
+                    branch,
                     dikerjakan_by,
                     dikerjakan_by_user:users!service_orders_dikerjakan_by_fkey(id, name)
                 `)
@@ -768,7 +773,7 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
             const servicesFallback = await fetchAllRows<any>((from, to) =>
                 supabase
                     .from("service_orders")
-                    .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, tanggal_masuk, status, payment_status, payment_confirmed_at, total_tagihan, dikerjakan_by")
+                                      .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, tanggal_masuk, status, payment_status, payment_confirmed_at, total_tagihan, branch, dikerjakan_by")
                     .or("payment_status.eq.DP,status.eq.SUDAH_DIAMBIL,and(payment_status.eq.LUNAS,tanggal_masuk.gte.2026-09-28T17:00:00Z)")
                     .not("payment_amount", "is", null)
                     .gte("payment_amount", 0)   // ⬅️ FIX: sama seperti query utama di atas
@@ -831,6 +836,11 @@ export const GET = withAuth(async (req) => {
     const url = new URL(req.url);
     const skipSync = url.searchParams.get("skipSync") === "1";
     const forceSync = url.searchParams.get("forceSync") === "1";
+    // Filter cabang: "JOGJA" → eksklusif cabang Jogja. Selain itu (UTAMA/kosong)
+    // → konsolidasi: tampilkan SEMUA cabang. Jadi filter DB HANYA dipasang untuk
+    // Jogja; Utama sengaja tidak difilter supaya tetap jadi laporan gabungan.
+    const branchParam = url.searchParams.get("branch");
+    const branchFilter = branchParam === "JOGJA" ? "JOGJA" : null;
 
     if (!skipSync) {
         await runSyncThrottled(supabase, forceSync);
@@ -838,8 +848,8 @@ export const GET = withAuth(async (req) => {
     // fetchAllRows: hindari truncation 1000 baris yang bikin saldo salah hitung.
     let rawAll: any[];
     try {
-        rawAll = await fetchAllRows<any>((from, to) =>
-            supabase
+        rawAll = await fetchAllRows<any>((from, to) => {
+            let q = supabase
                 .from("cashflow_entries")
                 .select(`
                     *,
@@ -849,8 +859,10 @@ export const GET = withAuth(async (req) => {
                 .order("tanggal", { ascending: false })
                 .order("created_at", { ascending: false })
                 .order("id", { ascending: false })
-                .range(from, to)
-        );
+                .range(from, to);
+            if (branchFilter) q = q.eq("branch", branchFilter);
+            return q;
+        });
     } catch (error: any) {
         console.error("[cashflow GET]", error);
         return NextResponse.json({ success: false, message: error?.message ?? "Gagal memuat cashflow" }, { status: 500 });

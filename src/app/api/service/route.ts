@@ -60,6 +60,9 @@ export const POST = withAuth(async (req, _ctx, user) => {
     keluhan, hasil_analisa,
   } = body;
 
+  // Cabang — hanya terima nilai valid, selain itu jatuh ke UTAMA (fail-safe)
+  const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
+
   // Validasi field wajib
   if (!nama?.trim() || !no_hp?.trim() || !type_laptop?.trim() || !keluhan?.trim()) {
     return NextResponse.json(
@@ -83,6 +86,7 @@ export const POST = withAuth(async (req, _ctx, user) => {
       kelengkapan: kelengkapan?.trim() || null,
       keluhan: keluhan.trim(),
       hasil_analisa: hasil_analisa?.trim() || null,
+      branch, // ← cabang servis (UTAMA / JOGJA)
       status: "ANTRIAN",
       created_by: user.id,
       tanggal_masuk: new Date().toISOString(),

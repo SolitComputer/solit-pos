@@ -260,6 +260,9 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const accessoryUnitInventory = accessoryUnits.reduce((s, u) => s + (u.cost_price ?? 0), 0);
         const inventory_price = laptopInventory + accessoryInventory + accessoryUnitInventory;
 
+              // Cabang transaksi — hanya terima nilai valid, selain itu jatuh ke UTAMA
+        const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
+
         const payment_method = body.payment_method || "CASH";
         const is_trade_in = Boolean(body.is_trade_in);
         const trade_in_value = is_trade_in ? (Number(body.trade_in_value) || 0) : 0;
@@ -455,9 +458,11 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 from_ads: Boolean(body.from_ads),
                 payment_photo: body.payment_photo, latitude: body.latitude, longitude: body.longitude,
 
-                is_ecommerce: isEcommerce,
+                              is_ecommerce: isEcommerce,
                 ecommerce_platform: body.ecommerce_platform || null,
                 ecommerce_order_id: body.ecommerce_order_id || null,
+
+                branch, // ← cabang (UTAMA / JOGJA)
 
                 customer_birth_date: body.customer_birth_date || null,
                 status: txStatus,

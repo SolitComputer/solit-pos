@@ -21,6 +21,7 @@ const EMPTY_FORM = {
   kelengkapan: "",
   keluhan: "",
   hasil_analisa: "",
+  branch: "UTAMA" as "UTAMA" | "JOGJA", // ← cabang servis, default Utama
 };
 
 type FormData = typeof EMPTY_FORM;
@@ -151,6 +152,30 @@ export default function ServiceFormModal({ open, onClose, onSuccess }: ServiceFo
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {step === "form" ? (
             <div className="grid grid-cols-2 gap-4">
+              {/* ── Pilih Cabang (multi-branch) ── */}
+              <div className="col-span-2">
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Cabang <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: "UTAMA", label: "🏢 Cabang Utama", desc: "Pusat" },
+                    { value: "JOGJA", label: "📍 Cabang Jogja", desc: "Jogja" },
+                  ] as const).map(o => (
+                    <button key={o.value} type="button"
+                      onClick={() => handleChange("branch", o.value)}
+                      className={`flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl border text-left transition ${form.branch === o.value
+                        ? "border-[#1a1a2e] bg-[#1a1a2e]/5 ring-2 ring-[#1a1a2e]/15"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                        }`}
+                    >
+                      <span className={`text-sm font-semibold ${form.branch === o.value ? "text-[#1a1a2e]" : "text-gray-600"}`}>{o.label}</span>
+                      <span className="text-[10px] text-gray-400">{o.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Sections */}
               <div className="col-span-2">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
@@ -217,7 +242,10 @@ export default function ServiceFormModal({ open, onClose, onSuccess }: ServiceFo
             </div>
           ) : (
             /* STEP 2: Konfirmasi */
-            <div className="space-y-5">
+                 <div className="space-y-5">
+              <ConfirmSection title="Cabang" rows={[
+                { label: "Cabang", value: form.branch === "JOGJA" ? "📍 Cabang Jogja" : "🏢 Cabang Utama" },
+              ]} />
               <ConfirmSection title="Data Pelanggan" rows={[
                 { label: "Nama", value: form.nama },
                 { label: "No HP", value: form.no_hp },

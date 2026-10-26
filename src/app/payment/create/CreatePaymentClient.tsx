@@ -200,6 +200,8 @@ export default function CreatePaymentPage() {
     const [sellerType, setSellerType] = useState<"USER" | "PEDAGANG">("USER");
     const [customerBirthDate, setCustomerBirthDate] = useState("");
     const [fromAds, setFromAds] = useState<boolean | null>(null);
+    // ── Cabang (multi-branch) — UTAMA = cabang pusat, JOGJA = cabang baru ──
+    const [branch, setBranch] = useState<"UTAMA" | "JOGJA">("UTAMA");
 
     const [paymentFlow, setPaymentFlow] = useState<"PENDING" | "DIRECT" | null>(null);
     const [pendingSubType, setPendingSubType] = useState<"ECOMMERCE" | "DP_AMBIL" | null>(null);
@@ -350,6 +352,7 @@ export default function CreatePaymentPage() {
         if (draft._splitCash) setSplitCash(draft._splitCash);
         if (draft._customerBirthDate) setCustomerBirthDate(draft._customerBirthDate);
         if (draft._fromAds !== undefined) setFromAds(draft._fromAds);
+        if (draft._branch === "UTAMA" || draft._branch === "JOGJA") setBranch(draft._branch);
 
         setDraftRestored(true);
     }, []);
@@ -368,10 +371,11 @@ export default function CreatePaymentPage() {
             _splitTF: splitTF, _splitCash: splitCash,
             _customerBirthDate: customerBirthDate,
             _fromAds: fromAds,
+            _branch: branch,
             _savedAt: new Date().toISOString(),
         });
     }, [watchedFields, step, customerType, sellerType, selectedUnits, selectedAccessories, rawDealPrice,
-        unitPrices, isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, fromAds, isSubmitted]);
+        unitPrices, isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, fromAds, branch, isSubmitted]);
 
     // ── Load unit dari scan ───────────────────────────────────────────────────
     useEffect(() => {
@@ -844,6 +848,7 @@ export default function CreatePaymentPage() {
                     is_ecommerce: isEcommerce,
                     ecommerce_platform: isEcommerce ? ecommercePlatform : null,
                     ecommerce_order_id: isEcommerce ? ecommerceOrderId : null,
+                    branch, // ← cabang transaksi (UTAMA / JOGJA)
                     unit_prices: selectedUnits.map(u => ({
                         unit_id: u.unit_id,
                         deal_price: unitPrices[u.unit_id] || 0,
@@ -1086,6 +1091,29 @@ export default function CreatePaymentPage() {
                                         >
                                             <span className="text-xl">{o.icon}</span>
                                             <span className={`text-xs font-medium ${sellerType === o.value ? "text-gray-800" : "text-gray-600"}`}>{o.label}</span>
+                                            <span className="text-[9px] text-gray-400">{o.desc}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── Pilih Cabang (multi-branch) ── */}
+                            <div>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Cabang *</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { value: "UTAMA", label: "Cabang Utama", icon: <Store size={20} />, desc: "Pusat" },
+                                        { value: "JOGJA", label: "Cabang Jogja", icon: <MapPin size={20} />, desc: "Jogja" },
+                                    ].map(o => (
+                                        <button key={o.value} type="button"
+                                            onClick={() => setBranch(o.value as "UTAMA" | "JOGJA")}
+                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all duration-200 ${branch === o.value
+                                                ? "border-gray-600 bg-gray-50 ring-2 ring-gray-600/20"
+                                                : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            <span className="text-xl">{o.icon}</span>
+                                            <span className={`text-xs font-medium ${branch === o.value ? "text-gray-800" : "text-gray-600"}`}>{o.label}</span>
                                             <span className="text-[9px] text-gray-400">{o.desc}</span>
                                         </button>
                                     ))}

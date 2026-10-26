@@ -1783,11 +1783,17 @@ function SummaryCard({ label, value, sublabel, color, icon, loading }: {
 // auto  = sync di server tapi di-throttle 30 dtk (dipakai sync berkala)
 // force = paksa sync penuh (Segarkan manual & Export)
 type SyncMode = "none" | "auto" | "force";
-const CASHFLOW_URL: Record<SyncMode, string> = {
-    none: "/api/cashflow?skipSync=1",
-    auto: "/api/cashflow",
-    force: "/api/cashflow?forceSync=1",
-};
+// Bangun URL cashflow + sisipkan filter cabang. branchView "JOGJA" → ?branch=JOGJA,
+// "ALL" → tanpa param (konsolidasi semua cabang). Dipanggil per-fetch, bukan konstanta
+// lagi, karena URL-nya sekarang tergantung cabang yang dipilih.
+function buildCashflowUrl(sync: SyncMode, branchView: "ALL" | "JOGJA"): string {
+    const params = new URLSearchParams();
+    if (sync === "none") params.set("skipSync", "1");
+    if (sync === "force") params.set("forceSync", "1");
+    if (branchView === "JOGJA") params.set("branch", "JOGJA");
+    const qs = params.toString();
+    return qs ? `/api/cashflow?${qs}` : "/api/cashflow";
+}
 const FULL_SYNC_INTERVAL_MS = 120_000;
 // ⬅️ PERF: dulu polling tiap 10 dtk (download & render ULANG seluruh data). 30 dtk sudah
 // cukup "live" untuk Cashflow, dan respons yang isinya sama persis tidak di-render ulang.
@@ -1855,6 +1861,9 @@ export default function CashflowPage() {
     const [allowed, setAllowed] = useState<boolean | null>(null);
     const [canAuditOut, setCanAuditOut] = useState(false);
     const [canManageAuditAccess, setCanManageAuditAccess] = useState(false);
+    // ── Multi-cabang: "ALL" = Semua Cabang (konsolidasi/Utama), "JOGJA" = eksklusif Jogja ──
+    const [branchView, setBranchView] = useState<"ALL" | "JOGJA">("ALL");
+    const [canSwitchBranch, setCanSwitchBranch] = useState(false); // hanya Admin & Accounting
     const [showAuditAccessModal, setShowAuditAccessModal] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(() => (cashflowCache ? new Date(cashflowCache.at) : null));
     const ITEMS_PER_PAGE = 70;
@@ -1872,6 +1881,8 @@ export default function CashflowPage() {
             setAllowed(isAllowed);
             setCanAuditOut(roles.some((x) => (CASHFLOW_AUDIT_OUT_ROLES as string[]).includes(x)));
             setCanManageAuditAccess(roles.some((x) => (CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES as string[]).includes(x)));
+            // Switcher cabang sementara hanya untuk Admin & Accounting
+            setCanSwitchBranch(roles.some((x) => ["ADMIN", "ACCOUNTING"].includes(x)));
 
             if (!isAllowed) return;
             // /api/cashflow/audit-access adalah sumber kebenaran final: Admin/Programmer bisa
@@ -1910,14 +1921,14 @@ export default function CashflowPage() {
     const fetchData = useCallback(async (silent = false, sync: SyncMode = "none") => {
         if (!silent) setLoadingData(true);
         try {
-            const res = await fetch(CASHFLOW_URL[sync], { cache: "no-store" });
+            const res = await fetch(buildCashflowUrl(sync, branchView), { cache: "no-store" });
             applyCashflowRaw(await res.text());
         } catch (err) {
             console.error("[cashflow] fetchData error:", err);
         } finally {
             if (!silent) setLoadingData(false);
         }
-    }, [applyCashflowRaw]);
+    }, [applyCashflowRaw, branchView]);
 
     // ⬅️ PERF: fetch data DIMULAI SAAT HALAMAN DIBUKA, paralel dengan cek akses user.
     // Dulu nunggu getAuthUser() selesai dulu baru fetch (dua request berurutan).
@@ -1934,6 +1945,17 @@ export default function CashflowPage() {
         })();
         return () => { cancelled = true; };
     }, [fetchData]);
+
+    // Ganti cabang → paksa muat ulang data cabang itu. Cache lama (raw) dikosongkan
+    // supaya applyCashflowRaw tidak meng-skip respons cabang baru yang kebetulan
+    // ukurannya sama. loadingData true dulu biar tabel tidak nampilin data cabang lama.
+    const isFirstBranchRender = useRef(true);
+    useEffect(() => {
+        if (isFirstBranchRender.current) { isFirstBranchRender.current = false; return; }
+        if (cashflowCache) cashflowCache.raw = "";
+        setLoadingData(true);
+        fetchData(false, "auto");
+    }, [branchView, fetchData]);
 
     // ⬅️ PERF: refresh di belakang layar yang di-"debounce" — kalau user audit 10 entry
     // beruntun, cukup 1x fetch setelah dia berhenti klik (bukan 10x fetch data penuh).
@@ -1991,7 +2013,7 @@ export default function CashflowPage() {
             // lihat. Sekarang Export SELALU fetch data paling baru dulu, lalu
             // menyamakan juga angka yang tampil di layar ke snapshot yang sama —
             // supaya card "Masuk/Keluar/Saldo" dan file Excel dijamin identik.
-            const res = await fetch(CASHFLOW_URL.force, { cache: "no-store" });
+            const res = await fetch(buildCashflowUrl("force", branchView), { cache: "no-store" });
             const json = await res.json();
             if (!json.success) {
                 alert(json.message || "Gagal mengambil data terbaru untuk export");
@@ -2393,7 +2415,22 @@ export default function CashflowPage() {
 
                 {/* Tab + Filter + CTA */}
                 <div className={`${CARD_BASE} p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap`}>
-                    <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                        {canSwitchBranch && (
+                            <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
+                                {([
+                                    { key: "ALL", label: "🏢 Semua Cabang", title: "Konsolidasi — Cabang Utama + Jogja" },
+                                    { key: "JOGJA", label: "📍 Cabang Jogja", title: "Eksklusif transaksi Cabang Jogja" },
+                                ] as const).map((b) => (
+                                    <button key={b.key} onClick={() => setBranchView(b.key)} title={b.title}
+                                        className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all ${branchView === b.key
+                                            ? "bg-[#1a1545] text-white shadow-sm"
+                                            : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
+                                        {b.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
                             {(["IN", "OUT"] as const).map((t) => (
                                 <button key={t} onClick={() => { setTab(t); setStaleOnly(false); }} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm shadow-emerald-500/30" : "bg-red-600 text-white shadow-sm shadow-red-500/30" : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
