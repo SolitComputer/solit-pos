@@ -1101,7 +1101,8 @@ export default function LaporanHarianSalesPage() {
                       )}
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Nama / Kontak</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Minat</th>
-                      <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Range Harga</th>
+                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Range Harga</th>
+                      <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Nama Toko</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Keterangan</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Sumber</th>
                       <th className="border border-gray-200 px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Ads</th>
@@ -1140,6 +1141,7 @@ export default function LaporanHarianSalesPage() {
                         <td className="border border-gray-200 px-4 py-3 whitespace-nowrap">
                           <PriceRangeBadge value={entry.price_range} />
                         </td>
+                        <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={entry.nama_toko || undefined}>{entry.nama_toko || "—"}</td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden md:table-cell" title={entry.keterangan || undefined}>{entry.keterangan || "—"}</td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[160px] truncate hidden lg:table-cell" title={entry.sumber || undefined}>{entry.sumber || "—"}</td>
                         <td className="border border-gray-200 px-4 py-3 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={displayAds(entry.ads) || undefined}>{displayAds(entry.ads) || "—"}</td>
@@ -1222,6 +1224,11 @@ export default function LaporanHarianSalesPage() {
                         {channelLabels[entry.channel]}
                       </span>
                       {getPriceRangeLabel(entry.price_range) && <PriceRangeBadge value={entry.price_range} />}
+                      {entry.nama_toko && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-100">
+                          <Building2 className="w-2.5 h-2.5" /> {entry.nama_toko}
+                        </span>
+                      )}
                       {entry.audited && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-fuchsia-50 text-fuchsia-600 ring-1 ring-inset ring-fuchsia-100">
                           <ShieldCheck className="w-2.5 h-2.5" /> Terverifikasi
