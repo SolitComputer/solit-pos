@@ -120,6 +120,45 @@ async function reopenMsjGroups(groupIds: string[]) {
   if (error) console.error("[RESTORE] buka ulang kelompok MSJ gagal:", error.message);
 }
 
+// ✅ FALLBACK aksesori BIASA (non-MSJ). Sebagian aksesori ber-SN dijual lewat
+// jalur yang menandai unit langsung jadi PACKING/RESERVED/HELD/PENDING (mis.
+// transaksi e-commerce) TANPA menulis baris accessory_outflows. Akibatnya saat
+// transaksi di-restore, cancelOutflowByInvoice() tidak punya baris untuk
+// dibalikin → unit nyangkut di status pending-nya dan HILANG dari Data Barang
+// (persis kasus PIN 3-0350 yang nyangkut PACKING). Di sini unit di-resolve
+// LANGSUNG dari serial_number di transaction_items, lalu status pending apa pun
+// (termasuk KELUAR) dikembalikan ke BELUM_SIAP. Unit MSJ (msj_group_id terisi)
+// dilewati — sudah diurus restoreMsjAccessoryUnits().
+const ACCESSORY_PENDING_STATUSES = ["PACKING", "RESERVED", "HELD", "PENDING", "KELUAR"] as const;
+
+async function restoreStuckAccessoryUnits(invoice: string) {
+  const { data: accItems } = await supabase
+    .from("transaction_items")
+    .select("serial_number")
+    .eq("invoice_number", invoice)
+    .eq("item_type", "accessory");
+
+  const sns = [
+    ...new Set(
+      (accItems ?? [])
+        .map((it: any) => (it.serial_number ?? "").toString().trim())
+        .filter((s: string) => s && s !== "-")
+    ),
+  ];
+  if (sns.length === 0) return;
+
+  const { error } = await supabase
+    .from("accessory_units")
+    .update({ status: "BELUM_SIAP" })
+    .in("serial_number", sns)
+    .in("status", ACCESSORY_PENDING_STATUSES as unknown as string[])
+    .is("msj_group_id", null);
+
+  if (error) {
+    console.error("[RESTORE] fallback kembalikan aksesori nyangkut gagal:", error.message);
+  }
+}
+
 async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { invoice } = await props.params;
@@ -452,6 +491,15 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     // 5b. Batalkan catatan outflow aksesoris jika ada
     await cancelOutflowByInvoice(invoice);
+
+    // 5b1. ✅ JARING PENGAMAN: aksesori ber-SN yang nyangkut status pending
+    // (PACKING/RESERVED/HELD/PENDING/KELUAR) tapi tidak punya baris
+    // accessory_outflows dibalikin langsung via serial_number. Non-fatal.
+    try {
+      await restoreStuckAccessoryUnits(invoice);
+    } catch (accErr: any) {
+      console.error("[RESTORE] fallback aksesori nyangkut gagal (non-fatal):", accErr?.message ?? accErr);
+    }
 
     // 5c. ✅ MSJ: aksesori ber-SN dari kelompok balik ke MINUS_SIAP_JUAL, lalu
     // kelompok yang sudah SOLD dibuka lagi. Non-fatal: restore tetap sukses.
