@@ -47,6 +47,7 @@ export async function POST(
         photo_url?: string | null;
         items?: { category: string; nominal: number | string; target_user_id?: string | null }[]; // ⬅️ BARU
         target_user_id?: string | null; // ⬅️ BARU: fallback target
+        branch?: string; // ← cabang realisasi (UTAMA / JOGJA)
     };
     try {
         body = await request.json();
@@ -55,6 +56,8 @@ export async function POST(
     }
 
     const { keterangan, tanggal, payment_method, photo_url } = body;
+    // Cabang realisasi — fail-safe ke UTAMA kalau nilai tak valid
+    const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
 
     // ⬅️ BARU: dukung multi-kategori (items[]) — tombol "+" di modal Realisasi
     // bisa nambah berapa pun baris Kategori+Nominal. Tetap backward-compatible:
@@ -165,6 +168,7 @@ export async function POST(
                 payment_method: pm,
                 photo_url: photo_url ?? null,
                 target_user_id: it.target_user_id, // ⬅️ BARU
+                branch, // ← cabang realisasi (UTAMA / JOGJA)
                 created_by: userId,
                 is_audited: false,
             }))
@@ -255,6 +259,7 @@ export async function PATCH(
         category?: string; nominal?: number | string; keterangan?: string;
         tanggal?: string; payment_method?: string; photo_url?: string | null;
         target_user_id?: string | null;
+        branch?: string; // ← cabang realisasi (UTAMA / JOGJA)
     };
     try {
         body = await request.json();
@@ -273,6 +278,8 @@ export async function PATCH(
     if (isKasbonCicilanCategory(body.category) && !target) {
         return NextResponse.json({ success: false, message: "Pilih karyawan dulu untuk baris Kasbon/Cicilan" }, { status: 400 });
     }
+    // Cabang — fail-safe ke UTAMA
+    const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
 
     const supabase = db();
 
@@ -328,6 +335,7 @@ export async function PATCH(
             payment_method: pm,
             photo_url: body.photo_url ?? null,
             target_user_id: target,
+            branch, // ← cabang realisasi (UTAMA / JOGJA)
             created_by: userId,
             is_audited: false,
         });

@@ -764,6 +764,7 @@ function RealisasiModal({
   const [keterangan, setKeterangan] = useState(fundRequest.purpose);
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(fundRequest.payment_method);
+  const [branch, setBranch] = useState<"UTAMA" | "JOGJA">("UTAMA"); // ← cabang realisasi
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
@@ -813,6 +814,7 @@ function RealisasiModal({
           keterangan: keterangan.trim() || fundRequest.purpose,
           tanggal,
           payment_method: paymentMethod,
+          branch, // ← cabang realisasi
           ...(photoUrl ? { photo_url: photoUrl } : {}),
         }),
       });
@@ -844,6 +846,19 @@ function RealisasiModal({
           <button onClick={onClose} className={`w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition ${FOCUS_RING}`}><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2">Cabang <span className="text-red-500">*</span></label>
+            <div className="inline-flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
+              {([
+                { value: "UTAMA", label: "🏢 Cabang Utama" },
+                { value: "JOGJA", label: "📍 Cabang Jogja" },
+              ] as const).map((b) => (
+                <button key={b.value} type="button" onClick={() => setBranch(b.value)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold transition ${FOCUS_RING} ${branch === b.value ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-600"}`}>
+                  {b.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2">Metode Pembayaran <span className="text-red-500">*</span></label>
             <div className="inline-flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
