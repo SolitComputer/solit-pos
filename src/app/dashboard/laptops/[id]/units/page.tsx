@@ -265,6 +265,8 @@ export default function UnitsPage() {
     const [userId, setUserId] = useState<string | null>(null);
     const [borrowedUnitIds, setBorrowedUnitIds] = useState<Set<string>>(new Set());
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
+    // Admin Barang boleh kelola unit TAPI tidak boleh hapus; role lain tetap seperti semula.
+    const canDelete = canManageUnits && !userRoles.some(r => r === "ADMIN_BARANG");
     const canAuditUnits = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canSOUnits = hasAnyRole(userRoles, SO_ROLES);
     // Barcode per unit — sama seperti halaman Kelola Unit Aksesoris.
@@ -1388,7 +1390,7 @@ export default function UnitsPage() {
                                                     Tes Kondisi
                                                 </button>
                                             )}
-                                            {canManageUnits && (
+                                            {canDelete && (
                                                 <button onClick={() => handleDelete(u)}
                                                     className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
                                                     <Trash2 className="w-4 h-4" />

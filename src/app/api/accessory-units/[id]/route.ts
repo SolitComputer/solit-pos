@@ -101,8 +101,13 @@ export const PATCH = withAuth(async (
 
 export const DELETE = withAuth(async (
     _req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: Promise<{ id: string }> },
+    user: AuthUser
 ) => {
+    // Admin Barang tidak boleh hapus unit; role lain tetap boleh.
+    if ((user.roles ?? [user.role]).includes("ADMIN_BARANG")) {
+        return NextResponse.json({ success: false, error: "Role Anda tidak boleh menghapus unit" }, { status: 403 });
+    }
     const { id } = await params;
 
     const { data: unit } = await supabaseAdmin

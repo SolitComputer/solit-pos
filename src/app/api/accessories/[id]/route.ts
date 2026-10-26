@@ -73,6 +73,10 @@ async function patchHandler(req: NextRequest, { params }: { params: Promise<{ id
 export const PATCH = withAuth(patchHandler);
 
 async function deleteHandler(_req: NextRequest, { params }: { params: Promise<{ id: string }> }, user: AuthUser) {
+    // Admin Barang tidak boleh hapus; role lain tetap seperti semula.
+    if ((user.roles ?? [user.role]).includes("ADMIN_BARANG")) {
+        return NextResponse.json({ success: false, error: "Role Anda tidak boleh menghapus barang" }, { status: 403 });
+    }
     if (!(await hasEditAccess(user, "delete"))) {
         return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }

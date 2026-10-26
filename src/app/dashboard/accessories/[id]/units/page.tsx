@@ -1548,6 +1548,8 @@ export default function AccessoryUnitsPage() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
+    // Admin Barang boleh kelola unit TAPI tidak boleh hapus; role lain tetap seperti semula.
+    const canDelete = canManageUnits && !userRoles.some(r => r === "ADMIN_BARANG");
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     // Audit per-unit aksesoris DIPISAH dari SO: Accounting (lewat
@@ -2162,6 +2164,7 @@ export default function AccessoryUnitsPage() {
                                         )}
                                     </button>
                                 )}
+                                {canDelete && (
                                 <button onClick={handleBulkDelete} disabled={bulkDeleting}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50">
                                     {bulkDeleting
@@ -2171,6 +2174,7 @@ export default function AccessoryUnitsPage() {
                                         </svg>Hapus {selectedIds.size} Unit</>
                                     }
                                 </button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -2362,9 +2366,8 @@ export default function AccessoryUnitsPage() {
                                                                     Edit
                                                                 </button>
                                                             )}
-                                                            {unit.status !== "TERJUAL" && canManageUnits && (
-                                                                <button onClick={() => handleDelete(unit)}
-                                                                    className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
+                                                            {unit.status !== "TERJUAL" && canDelete && (
+                                                                <button onClick={() => handleDelete(unit)}                                                                    className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                                     </svg>
