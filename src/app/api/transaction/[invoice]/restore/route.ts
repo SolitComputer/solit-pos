@@ -8,6 +8,7 @@ import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { cancelOutflowByInvoice, recordOutflow } from "@/lib/accessoryOutflow";
+import { revertLoansOnCancel } from "@/lib/itemLoanSync";
 
 interface Props {
   params: Promise<{ invoice: string }>;
@@ -501,6 +502,9 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       console.error("[RESTORE] fallback aksesori nyangkut gagal (non-fatal):", accErr?.message ?? accErr);
     }
 
+    // 5b2. ✅ Peminjaman: pinjaman yang "DIPESAN" karena transaksi ini balik "Dipinjam".
+    try { await revertLoansOnCancel(supabase, invoice); } catch { /* best-effort */ }
+
     // 5c. ✅ MSJ: aksesori ber-SN dari kelompok balik ke MINUS_SIAP_JUAL, lalu
     // kelompok yang sudah SOLD dibuka lagi. Non-fatal: restore tetap sukses.
     try {
@@ -736,6 +740,9 @@ async function handlePartialRestore({
     if (updateTxError) {
       return NextResponse.json({ success: false, message: updateTxError.message }, { status: 400 });
     }
+
+    // ✅ Peminjaman: pinjaman "DIPESAN" untuk unit yang direstore sebagian balik "Dipinjam".
+    try { await revertLoansOnCancel(supabase, invoice, selectedUnitIds); } catch { /* best-effort */ }
 
     // 5c. Sinkronkan ulang outflow aksesoris.
     // Partial restore meng-update ulang baris transaksi tanpa menghitung aksesoris,

@@ -7,7 +7,7 @@ import { logActivity } from "@/lib/activityLogger";
 import { recordOutflow } from "@/lib/accessoryOutflow";
 import { ACCESSORY_ONLY_SALES_ROLES, UserRole } from "@/lib/permissions";
 import { buildLineItemsFromTxItems } from "@/lib/receiptItems";
-import { markLoansSoldOnSale } from "@/lib/itemLoanSync";
+import { markLoansSoldOnSale, markLoansOrderedOnPending } from "@/lib/itemLoanSync";
 
 function toNumber(value: any): number {
     if (value === null || value === undefined) return 0;
@@ -700,6 +700,13 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 ...accessoryUnits.map(u => u.unit_id),
             ];
             try { await markLoansSoldOnSale(supabase, soldUnitIds, invoice_number); } catch { /* best-effort */ }
+        } else {
+            // ✅ Pending (DP/Ambil Dulu/Packing): unit yang LAGI DIPINJAM → pinjaman "DIPESAN".
+            const orderedUnitIds = [
+                ...laptopUnitIds,
+                ...accessoryUnits.map(u => u.unit_id),
+            ];
+            try { await markLoansOrderedOnPending(supabase, orderedUnitIds, invoice_number); } catch { /* best-effort */ }
         }
 
         // 10. Seller follow-up — SKIP untuk E-Commerce (PACKING), biar tidak masuk Manajemen Seller

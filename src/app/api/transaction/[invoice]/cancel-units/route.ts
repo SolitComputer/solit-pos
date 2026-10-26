@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
+import { revertLoansOnCancel } from "@/lib/itemLoanSync";
 
 interface Props {
     params: Promise<{ invoice: string }>;
@@ -164,6 +165,9 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
         if (updateTxErr) {
             return NextResponse.json({ success: false, message: updateTxErr.message }, { status: 400 });
         }
+
+        // ✅ Peminjaman: pinjaman "DIPESAN" untuk unit yang dibatalkan balik "Dipinjam".
+        try { await revertLoansOnCancel(supabase, invoice, cancelledUnitIds); } catch { /* best-effort */ }
 
         // 8. Log aktivitas
         await logActivity({

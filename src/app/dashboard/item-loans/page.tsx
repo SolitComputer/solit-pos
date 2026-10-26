@@ -18,7 +18,7 @@ interface LoanRow {
     unit_id: string | null; serial_number: string | null; item_name: string;
     borrower_id: string; borrower_name: string; notes: string | null;
     category: "KEBUTUHAN" | "PESANAN" | null;
-    status: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "SOLD" | "RETURN_PENDING";
+    status: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "SOLD" | "RETURN_PENDING" | "DIPESAN";
     approved_by_name: string | null; approved_at: string | null; returned_at: string | null; created_at: string;
     sold_at: string | null; sold_invoice: string | null;
 }
@@ -30,6 +30,7 @@ const STATUS_META: Record<LoanRow["status"], { label: string; cls: string }> = {
     RETURNED: { label: "Dikembalikan", cls: "bg-zinc-100 text-zinc-500 border-zinc-200" },
     SOLD: { label: "Terjual", cls: "bg-blue-50 text-blue-700 border-blue-200" },
     RETURN_PENDING: { label: "Menunggu Pengembalian", cls: "bg-orange-50 text-orange-700 border-orange-200" },
+    DIPESAN: { label: "Di Pesan", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
 };
 
 // Format tanggal+jam WIB untuk kolom waktu pinjam.
@@ -63,7 +64,7 @@ export default function ItemLoansPage() {
 
     const [loans, setLoans] = useState<LoanRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState<"PENDING" | "APPROVED" | "HISTORY">("PENDING");
+    const [tab, setTab] = useState<"PENDING" | "APPROVED" | "DIPESAN" | "HISTORY">("PENDING");
     const [actingId, setActingId] = useState<string | null>(null);
     const [expandedKey, setExpandedKey] = useState<string | null>(null); // kelompok yang sedang dibuka detailnya
     const [bulkBusyKey, setBulkBusyKey] = useState<string | null>(null);  // penanda aksi massal sedang berjalan
@@ -71,6 +72,9 @@ export default function ItemLoansPage() {
     // Filter & search khusus tab Riwayat (HISTORY)
     const [historyFilter, setHistoryFilter] = useState<"ALL" | "SOLD" | "RETURNED">("ALL");
     const [historySearch, setHistorySearch] = useState("");
+
+    // Search khusus tab Sedang Dipinjam (APPROVED)
+    const [approvedSearch, setApprovedSearch] = useState("");
 
     useEffect(() => {
         (async () => {
@@ -359,13 +363,27 @@ export default function ItemLoansPage() {
         if (l.status === "RETURN_PENDING") {
             return <span className="text-[11px] text-orange-600 font-medium">Menunggu ACC pengembalian</span>;
         }
+        if (l.status === "DIPESAN") {
+            return <span className="text-[11px] text-indigo-600 font-medium">Dipesan (di Riwayat Pending)</span>;
+        }
         return <span className="text-[11px] text-zinc-400">{l.approved_by_name ? `oleh ${l.approved_by_name}` : "-"}</span>;
     };
 
     const visibleLoans = loans.filter(l => {
-        // Tab PENDING & APPROVED — tidak terpengaruh filter/search Riwayat.
+        // Tab PENDING — tampil apa adanya.
         if (tab === "PENDING") return l.status === "PENDING";
-        if (tab === "APPROVED") return l.status === "APPROVED" || l.status === "RETURN_PENDING";
+        // Tab APPROVED (Sedang Dipinjam) — bisa dicari peminjam/barang/SN/keterangan.
+        if (tab === "APPROVED") {
+            if (l.status !== "APPROVED" && l.status !== "RETURN_PENDING") return false;
+            const q = approvedSearch.trim().toLowerCase();
+            if (q) {
+                const hay = [l.borrower_name, l.item_name, l.serial_number ?? "", l.notes ?? ""]
+                    .join(" ").toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        }
+        if (tab === "DIPESAN") return l.status === "DIPESAN";
 
         // Tab HISTORY (Riwayat): REJECTED / RETURNED / SOLD.
         const isHistory = l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD";
@@ -536,6 +554,7 @@ export default function ItemLoansPage() {
                             {([
                                 { k: "PENDING", l: "Menunggu" },
                                 { k: "APPROVED", l: "Sedang Dipinjam" },
+                                { k: "DIPESAN", l: "Di Pesan" },
                                 { k: "HISTORY", l: "Riwayat" },
                             ] as const).map(t => (
                                 <button key={t.k} onClick={() => setTab(t.k)}
@@ -544,6 +563,22 @@ export default function ItemLoansPage() {
                                 </button>
                             ))}
                         </div>
+
+                        {tab === "APPROVED" && (
+                            <div className="px-3 py-3 border-b border-zinc-100">
+                                <div className="relative">
+                                    <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 pointer-events-none" />
+                                    <input value={approvedSearch} onChange={e => setApprovedSearch(e.target.value)}
+                                        placeholder="Cari peminjam, barang, SN, keterangan..."
+                                        className="w-full h-9 border border-zinc-200 rounded-xl pl-9 pr-8 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+                                    {approvedSearch && (
+                                        <button onClick={() => setApprovedSearch("")} className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-600">
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {tab === "HISTORY" && (
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 px-3 py-3 border-b border-zinc-100">
