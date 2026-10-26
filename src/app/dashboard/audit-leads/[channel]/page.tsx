@@ -26,7 +26,6 @@ import {
   UserCircle2,
   Wallet,
   Calendar,
-  Building2,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -48,14 +47,22 @@ interface LeadRow {
   sumber: string | null;
   // Hanya terisi untuk source "sales_report"; input manual & laporan lama = null.
   price_range: string | null;
-  // Sama seperti price_range — hanya terisi untuk source "sales_report".
-  nama_toko: string | null;
   transaksi: boolean; ads: string | null; audited: boolean; audited_by_name: string | null;
+  // Hanya relevan untuk source "sales_report"; manual selalu false/null.
+  rejected: boolean; reject_reason: string | null;
   created_by: string; created_by_name: string; created_at: string;
   source: "manual" | "sales_report";
 }
 
 const PAGE_SIZE = 10;
+
+// Alasan penolakan — sengaja disamakan dengan value lama di Laporan Harian
+// Sales supaya isi kolom reject_reason tetap konsisten lintas halaman.
+const REJECT_REASONS = [
+  { value: "CHAT_TIDAK_TERBALAS", label: "Chat Tidak Terbalas" },
+  { value: "SALAH_INPUT", label: "Salah Input Keterangan" },
+  { value: "DATA_TIDAK_SESUAI", label: "Data Tidak Sesuai" },
+] as const;
 
 // Label & warna badge untuk menandai asal data — dua sumber digabung di
 // halaman ini (lihat GET /api/audit-leads): input manual di sini, atau
@@ -115,6 +122,9 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmSoftDeleteId, setConfirmSoftDeleteId] = useState<string | null>(null);
   const [confirmAuditId, setConfirmAuditId] = useState<string | null>(null);
+  // Laporan sales yang sedang ditolak (buka modal pilih alasan). null = tertutup.
+  const [rejectTarget, setRejectTarget] = useState<LeadRow | null>(null);
+  const [rejecting, setRejecting] = useState(false);
   const [auditFilter, setAuditFilter] = useState<"all" | "audited" | "unaudited">("all");
   // Filter rentang tanggal (format YYYY-MM-DD lokal). Kosong = tidak aktif.
   const [dateFrom, setDateFrom] = useState("");
@@ -209,6 +219,24 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
       await fetchRows();
     } catch (err) { setError(err instanceof Error ? err.message : "Gagal audit data."); }
     finally { setConfirmAuditId(null); }
+  }
+
+  // Tolak laporan sales (hanya source "sales_report"). Reuse endpoint lama:
+  // set rejected=true + reject_reason di sales_online_reports, data TIDAK
+  // dihapus (riwayat tetap ada). Setelah sukses, refetch supaya badge & guard
+  // tombol langsung ikut update.
+  async function handleReject(id: string, reason: string) {
+    try {
+      setRejecting(true);
+      const res = await fetch("/api/sales-reports/reject", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, reason }),
+      });
+      const json = await parseApiResponse(res);
+      if (!json.success) throw new Error(json.message);
+      await fetchRows();
+      setRejectTarget(null);
+    } catch (err) { setError(err instanceof Error ? err.message : "Gagal menolak laporan."); }
+    finally { setRejecting(false); }
   }
 
   async function handleDelete(id: string) {
@@ -387,9 +415,6 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                     <span className="inline-flex items-center gap-1.5"><Wallet className="w-3 h-3" /> Range Harga</span>
                   </th>
                   <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
-                    <span className="inline-flex items-center gap-1.5"><Building2 className="w-3 h-3" /> Nama Toko</span>
-                  </th>
-                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><MessageSquare className="w-3 h-3" /> Keterangan</span>
                   </th>
                   <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
@@ -416,7 +441,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                 {loading && rows.length === 0 ? (
                   [1, 2, 3].map((i) => (
                     <tr key={i} className="border-b border-gray-50 last:border-0">
-                      <td colSpan={12} className="px-4 py-3.5">
+                      <td colSpan={11} className="px-4 py-3.5">
                         <div className="flex items-center gap-3 animate-pulse">
                           <div className="h-3 w-5 bg-gray-100 rounded-full" />
                           <div className="h-3 flex-1 max-w-[160px] bg-gray-100 rounded-full" />
@@ -428,7 +453,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                   ))
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-12">
+                    <td colSpan={11} className="px-4 py-12">
                       <div className="flex flex-col items-center text-center">
                         <div className="w-11 h-11 rounded-full bg-violet-50 flex items-center justify-center mb-3">
                           <Inbox className="w-5 h-5 text-violet-300" />
@@ -465,12 +490,11 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                         </span>
                       </td>
                       <td className="px-4 py-3.5 align-top text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words leading-snug" title={row.minat}>{row.minat}</td>
-                         <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                      <td className="px-4 py-3.5 align-top whitespace-nowrap">
                         <PriceRangeBadge value={row.price_range} />
                       </td>
-                      <td className="px-4 py-3.5 align-top text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.nama_toko || undefined}>{row.nama_toko || "—"}</td>
                       <td className="px-4 py-3.5 align-top text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words leading-snug hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
-                       <td className="px-4 py-3.5 align-top text-gray-500 max-w-[280px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
+                      <td className="px-4 py-3.5 align-top text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
                       <td className="px-4 py-3.5 text-center align-middle">
                         <TransaksiBadge value={row.transaksi} />
                       </td>
@@ -485,13 +509,31 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                           >
                             <ShieldCheck className="w-3 h-3" /> {row.audited_by_name}
                           </span>
-                        ) : canAudit ? (
-                          <button
-                            onClick={() => setConfirmAuditId(row.id)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-violet-600 text-white hover:bg-violet-700 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+                        ) : row.rejected ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-600 ring-1 ring-inset ring-red-100"
+                            title={row.reject_reason ?? undefined}
                           >
-                            <ClipboardCheck className="w-3 h-3" /> Audit
-                          </button>
+                            <XCircle className="w-3 h-3" /> Ditolak
+                          </span>
+                        ) : canAudit ? (
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => setConfirmAuditId(row.id)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-violet-600 text-white hover:bg-violet-700 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+                            >
+                              <ClipboardCheck className="w-3 h-3" /> Audit
+                            </button>
+                            {row.source === "sales_report" && (
+                              <button
+                                onClick={() => setRejectTarget(row)}
+                                title="Tolak laporan"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white text-red-600 border border-red-200 hover:bg-red-50 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30"
+                              >
+                                <XCircle className="w-3 h-3" /> Tolak
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-[11px] text-gray-300 font-medium">Belum</span>
                         )}
@@ -590,11 +632,6 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                   </div>
                   <p className="text-xs text-gray-600 leading-relaxed">{row.minat}</p>
                   {getPriceRangeLabel(row.price_range) && <PriceRangeBadge value={row.price_range} />}
-                  {row.nama_toko && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-100">
-                      <Building2 className="w-2.5 h-2.5" /> {row.nama_toko}
-                    </span>
-                  )}
                   {row.keterangan && <p className="text-[11px] text-gray-400 leading-relaxed">{row.keterangan}</p>}
                   {row.sumber && <p className="text-[11px] text-gray-400">Sumber: {row.sumber}</p>}
                   <div className="flex items-center gap-2 pt-0.5">
@@ -611,17 +648,29 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600">
                         <ShieldCheck className="w-2.5 h-2.5" /> {row.audited_by_name}
                       </span>
+                    ) : row.rejected ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-600 ring-1 ring-inset ring-red-100">
+                        <XCircle className="w-2.5 h-2.5" /> Ditolak
+                      </span>
                     ) : (
                       <span className="text-[10px] text-gray-400 font-medium">Belum diaudit</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 pt-1">
-                    {!row.audited && canAudit && (
+                    {!row.audited && !row.rejected && canAudit && (
                       <button
                         onClick={() => setConfirmAuditId(row.id)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-violet-200 text-violet-600 hover:bg-violet-50 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
                       >
                         <ClipboardCheck className="w-3 h-3" /> Audit
+                      </button>
+                    )}
+                    {!row.audited && !row.rejected && row.source === "sales_report" && canAudit && (
+                      <button
+                        onClick={() => setRejectTarget(row)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all"
+                      >
+                        <XCircle className="w-3 h-3" /> Tolak
                       </button>
                     )}
                     {!row.audited && row.source === "manual" && (
@@ -643,7 +692,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                     {row.source === "sales_report" && canDeleteSalesReport && (
                       <button
                         onClick={() => setConfirmSoftDeleteId(row.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-red-100 text-red-500 hover:bg-red-50 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30"
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-red-100 text-red-500 hover:bg-red-50 active:scale-[0.98] transition-all"
                       >
                         <Trash2 className="w-3 h-3" /> Hapus
                       </button>
@@ -698,6 +747,14 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
             description="Laporan dipindah ke Riwayat Hapus dan tidak dihitung lagi (poin & audit). Bisa di-restore kapan saja."
             tone="red" icon={AlertTriangle}
             onCancel={() => setConfirmSoftDeleteId(null)} onConfirm={() => handleSoftDelete(confirmSoftDeleteId)} />
+        )}
+        {rejectTarget && (
+          <RejectModal
+            target={rejectTarget}
+            rejecting={rejecting}
+            onCancel={() => { if (!rejecting) setRejectTarget(null); }}
+            onReject={(reason) => handleReject(rejectTarget.id, reason)}
+          />
         )}
       </div>
     </DashboardLayout>
@@ -836,6 +893,56 @@ function DateRangeFilter({
   );
 }
 
+function RejectModal({
+  target,
+  rejecting,
+  onCancel,
+  onReject,
+}: {
+  target: LeadRow;
+  rejecting: boolean;
+  onCancel: () => void;
+  onReject: (reason: string) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm" onClick={onCancel}>
+      <div className="relative w-full max-w-sm rounded-3xl bg-white border border-gray-100 shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2.5 mb-3">
+          <span className="w-9 h-9 rounded-2xl bg-red-500 flex items-center justify-center shrink-0 shadow-sm">
+            <XCircle className="w-4 h-4 text-white" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-gray-900">Tolak Laporan</h3>
+            <p className="text-[11px] text-gray-400">Pilih alasan penolakan — laporan ditandai sebagai temuan, datanya tetap tersimpan.</p>
+          </div>
+        </div>
+        <p className="text-[11px] text-gray-500 mb-3">
+          Sales: <span className="font-semibold text-gray-700">{target.created_by_name}</span> · Minat: <span className="font-semibold text-gray-700">{target.minat}</span>
+        </p>
+        <div className="space-y-2">
+          {REJECT_REASONS.map((r) => (
+            <button
+              key={r.value}
+              disabled={rejecting}
+              onClick={() => onReject(r.value)}
+              className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
+            >
+              {r.label}
+              {rejecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 opacity-40" />}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={onCancel}
+          disabled={rejecting}
+          className="w-full mt-3 h-10 rounded-full text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+        >
+          Batal
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ConfirmModal({
   title,

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { toast } from "sonner";
-import { Search, X, Check, Ban, RotateCcw, Laptop as LaptopIcon, Wrench, Package, HandHelping, Camera } from "lucide-react";
+import { Search, X, Check, Ban, RotateCcw, Laptop as LaptopIcon, Wrench, Package, HandHelping, Camera, ChevronDown, ChevronUp } from "lucide-react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -14,7 +14,7 @@ interface SnResult {
     item_id: string; unit_id: string | null; serial_number: string | null; item_name: string; status: string;
 }
 interface LoanRow {
-    id: string; item_type: "LAPTOP" | "AKSESORIS"; item_id: string;
+    id: string; batch_id: string | null; item_type: "LAPTOP" | "AKSESORIS"; item_id: string;
     unit_id: string | null; serial_number: string | null; item_name: string;
     borrower_id: string; borrower_name: string; notes: string | null;
     category: "KEBUTUHAN" | "PESANAN" | null;
@@ -65,6 +65,8 @@ export default function ItemLoansPage() {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<"PENDING" | "APPROVED" | "HISTORY">("PENDING");
     const [actingId, setActingId] = useState<string | null>(null);
+    const [expandedKey, setExpandedKey] = useState<string | null>(null); // kelompok yang sedang dibuka detailnya
+    const [bulkBusyKey, setBulkBusyKey] = useState<string | null>(null);  // penanda aksi massal sedang berjalan
 
     // Filter & search khusus tab Riwayat (HISTORY)
     const [historyFilter, setHistoryFilter] = useState<"ALL" | "SOLD" | "RETURNED">("ALL");
@@ -223,7 +225,9 @@ export default function ItemLoansPage() {
         if (cart.length === 0) { toast.error("Pilih barang & SN dulu"); return; }
         setSubmitting(true);
         try {
-            // Kirim paralel — tiap barang = 1 pengajuan = 1 baris di tabel.
+            // 1 kali submit = 1 batch_id → semua barang di keranjang terikat dalam satu transaksi peminjaman.
+            const batchId = crypto.randomUUID();
+            // Kirim paralel — tiap barang = 1 baris, tapi berbagi batch_id yang sama.
             const outcomes = await Promise.all(
                 cart.map(async (item) => {
                     try {
@@ -232,6 +236,7 @@ export default function ItemLoansPage() {
                             body: JSON.stringify({
                                 item_type: item.item_type, item_id: item.item_id, unit_id: item.unit_id,
                                 serial_number: item.serial_number, item_name: item.item_name, notes, category,
+                                batch_id: batchId,
                             }),
                         });
                         const json = await res.json();
@@ -283,6 +288,80 @@ export default function ItemLoansPage() {
         } finally { setActingId(null); }
     };
 
+    // Jalankan 1 action untuk banyak barang sekaligus (aksi massal per kelompok).
+    // Memakai endpoint [id] yang sudah ada — backend tidak perlu diubah.
+    const actMany = async (ids: string[], action: Parameters<typeof act>[1]) => {
+        if (ids.length === 0) return;
+        setBulkBusyKey(action + ids.join(","));
+        try {
+            const results = await Promise.all(ids.map(async (id) => {
+                try {
+                    const res = await fetch(`/api/item-loans/${id}`, {
+                        method: "PATCH", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action }),
+                    });
+                    const json = await res.json();
+                    return json.success === true;
+                } catch { return false; }
+            }));
+            const ok = results.filter(Boolean).length;
+            if (ok > 0) toast.success(`${ok} barang diproses`);
+            if (ok < ids.length) toast.error(`${ids.length - ok} barang gagal diproses`);
+            ids.forEach(id => notifyItemLoanResolved(id));
+            fetchLoans();
+        } finally { setBulkBusyKey(null); }
+    };
+
+    // Status gabungan 1 kelompok: kalau semua barang sama → status itu; kalau campur → "MIXED".
+    const groupStatus = (items: LoanRow[]): LoanRow["status"] | "MIXED" => {
+        const uniq = Array.from(new Set(items.map(i => i.status)));
+        return uniq.length === 1 ? uniq[0] : "MIXED";
+    };
+
+    // Tombol aksi untuk SATU barang — dipakai ulang di dalam panel detail.
+    const renderItemActions = (l: LoanRow) => {
+        if (l.status === "PENDING" && canApprove) {
+            return (
+                <div className="flex items-center gap-1.5">
+                    <button onClick={() => act(l.id, "approve")} disabled={actingId === l.id}
+                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
+                        <Check size={12} /> Approve
+                    </button>
+                    <button onClick={() => act(l.id, "reject")} disabled={actingId === l.id}
+                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
+                        <Ban size={12} /> Reject
+                    </button>
+                </div>
+            );
+        }
+        if (l.status === "APPROVED" && (canApprove || l.borrower_id === userId)) {
+            return (
+                <button onClick={() => act(l.id, "request-return")} disabled={actingId === l.id}
+                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
+                    <RotateCcw size={12} /> Ajukan Pengembalian
+                </button>
+            );
+        }
+        if (l.status === "RETURN_PENDING" && canApprove) {
+            return (
+                <div className="flex items-center gap-1.5">
+                    <button onClick={() => act(l.id, "approve-return")} disabled={actingId === l.id}
+                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
+                        <Check size={12} /> Setujui
+                    </button>
+                    <button onClick={() => act(l.id, "reject-return")} disabled={actingId === l.id}
+                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
+                        <Ban size={12} /> Tolak
+                    </button>
+                </div>
+            );
+        }
+        if (l.status === "RETURN_PENDING") {
+            return <span className="text-[11px] text-orange-600 font-medium">Menunggu ACC pengembalian</span>;
+        }
+        return <span className="text-[11px] text-zinc-400">{l.approved_by_name ? `oleh ${l.approved_by_name}` : "-"}</span>;
+    };
+
     const visibleLoans = loans.filter(l => {
         // Tab PENDING & APPROVED — tidak terpengaruh filter/search Riwayat.
         if (tab === "PENDING") return l.status === "PENDING";
@@ -305,6 +384,24 @@ export default function ItemLoansPage() {
         }
         return true;
     });
+
+    // Kelompokkan baris yang SUDAH difilter per-tab berdasarkan batch_id.
+    // Baris lama (batch_id null) → jadi kelompok sendiri pakai id-nya.
+    // 1 user + 1 transaksi = 1 baris; barang-barangnya jadi anak kelompok.
+    const groupedLoans = Object.values(
+        visibleLoans.reduce<Record<string, {
+            key: string; borrower_name: string; borrower_id: string;
+            category: LoanRow["category"]; created_at: string; items: LoanRow[];
+        }>>((acc, l) => {
+            const key = l.batch_id ?? l.id;
+            if (!acc[key]) acc[key] = {
+                key, borrower_name: l.borrower_name, borrower_id: l.borrower_id,
+                category: l.category, created_at: l.created_at, items: [],
+            };
+            acc[key].items.push(l);
+            return acc;
+        }, {}),
+    ).sort((a, b) => b.created_at.localeCompare(a.created_at));
 
     return (
         <DashboardLayout>
@@ -494,74 +591,124 @@ export default function ItemLoansPage() {
                                 <table className="w-full text-sm">
                                     <thead className="sticky top-0 z-10">
                                         <tr className="bg-zinc-50 border-b border-zinc-100">
-                                            {["Peminjam", "Barang", "Kategori", "SN", "Waktu", "Keterangan", "Status", "Aksi"].map(h => (
+                                            {["Peminjam", "Barang", "Kategori", "Waktu", "Status", "Aksi"].map(h => (
                                                 <th key={h} className="px-3 py-3 text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest whitespace-nowrap bg-zinc-50">{h}</th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {visibleLoans.map(l => {
-                                            const s = STATUS_META[l.status];
+                                        {groupedLoans.map(g => {
+                                            const gs = groupStatus(g.items);
+                                            const meta = gs === "MIXED" ? null : STATUS_META[gs];
+                                            const isOpen = expandedKey === g.key;
+                                            // id barang per status → untuk aksi massal
+                                            const pendingIds = g.items.filter(i => i.status === "PENDING").map(i => i.id);
+                                            const approvedIds = g.items.filter(i => i.status === "APPROVED").map(i => i.id);
+                                            const returnPendingIds = g.items.filter(i => i.status === "RETURN_PENDING").map(i => i.id);
+                                            const busy = bulkBusyKey !== null;
                                             return (
-                                                <tr key={l.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-                                                    <td className="px-3 py-3 font-semibold text-zinc-800 whitespace-nowrap">{l.borrower_name}</td>
-                                                    <td className="px-3 py-3 text-zinc-700">{l.item_name}</td>
-                                                    <td className="px-3 py-3">
-                                                        {l.category ? (
-                                                            <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${l.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
-                                                                {l.category === "PESANAN" ? "Pesanan" : "Kebutuhan"}
-                                                            </span>
-                                                        ) : <span className="text-zinc-300">-</span>}
-                                                    </td>
-                                                    <td className="px-3 py-3">
-                                                        {l.serial_number ? <span className="font-mono text-[11px] text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">{l.serial_number}</span> : <span className="text-zinc-300">-</span>}
-                                                    </td>
-                                                    <td className="px-3 py-3 text-[11px] text-zinc-500 whitespace-nowrap tabular-nums">
-                                                        {l.status === "SOLD"
-                                                            ? <span title={l.sold_invoice ? `Terjual via ${l.sold_invoice}` : ""}>{fmtWaktu(l.sold_at)}</span>
-                                                            : l.status === "RETURNED"
-                                                                ? fmtWaktu(l.returned_at)
-                                                                : fmtWaktu(l.created_at)}
-                                                    </td>
-                                                    <td className="px-3 py-3 text-xs text-zinc-500 max-w-[200px] truncate" title={l.notes ?? ""}>{l.notes || <span className="text-zinc-300">-</span>}</td>
-                                                    <td className="px-3 py-3">
-                                                        <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold border ${s.cls}`}>{s.label}</span>
-                                                    </td>
-                                                    <td className="px-3 py-3">
-                                                        {l.status === "PENDING" && canApprove ? (
-                                                            <div className="flex items-center gap-1.5">
-                                                                <button onClick={() => act(l.id, "approve")} disabled={actingId === l.id}
-                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                    <Check size={12} /> Approve
-                                                                </button>
-                                                                <button onClick={() => act(l.id, "reject")} disabled={actingId === l.id}
-                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                    <Ban size={12} /> Reject
-                                                                </button>
+                                                <Fragment key={g.key}>
+                                                    <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+                                                        <td className="px-3 py-3 font-semibold text-zinc-800 whitespace-nowrap align-top">{g.borrower_name}</td>
+                                                        <td className="px-3 py-3 align-top">
+                                                            <div className="flex flex-col gap-1">
+                                                                {g.items.map(it => (
+                                                                    <div key={it.id} className="flex items-center gap-1.5">
+                                                                        {it.item_type === "LAPTOP"
+                                                                            ? <LaptopIcon size={13} className="text-zinc-400 flex-shrink-0" />
+                                                                            : <Wrench size={13} className="text-zinc-400 flex-shrink-0" />}
+                                                                        <span className="text-[13px] text-zinc-700">{it.item_name}</span>
+                                                                        {it.serial_number && <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{it.serial_number}</span>}
+                                                                    </div>
+                                                                ))}
                                                             </div>
-                                                        ) : l.status === "APPROVED" && (canApprove || l.borrower_id === userId) ? (
-                                                            <button onClick={() => act(l.id, "request-return")} disabled={actingId === l.id}
-                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                <RotateCcw size={12} /> Ajukan Pengembalian
+                                                        </td>
+                                                        <td className="px-3 py-3 align-top">
+                                                            {g.category ? (
+                                                                <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${g.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
+                                                                    {g.category === "PESANAN" ? "Pesanan" : "Kebutuhan"}
+                                                                </span>
+                                                            ) : <span className="text-zinc-300">-</span>}
+                                                        </td>
+                                                        <td className="px-3 py-3 text-[11px] text-zinc-500 whitespace-nowrap tabular-nums align-top">{fmtWaktu(g.created_at)}</td>
+                                                        <td className="px-3 py-3 align-top whitespace-nowrap">
+                                                            {meta
+                                                                ? <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold border ${meta.cls}`}>{meta.label}</span>
+                                                                : <span className="inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold border bg-zinc-100 text-zinc-600 border-zinc-200">Campuran</span>}
+                                                            <span className="ml-1.5 text-[10px] text-zinc-400">{g.items.length} barang</span>
+                                                        </td>
+                                                        <td className="px-3 py-3 align-top">
+                                                            <button onClick={() => setExpandedKey(isOpen ? null : g.key)}
+                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition flex items-center gap-1">
+                                                                {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Detail
                                                             </button>
-                                                        ) : l.status === "RETURN_PENDING" && canApprove ? (
-                                                            <div className="flex items-center gap-1.5">
-                                                                <button onClick={() => act(l.id, "approve-return")} disabled={actingId === l.id}
-                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                    <Check size={12} /> Setujui
-                                                                </button>
-                                                                <button onClick={() => act(l.id, "reject-return")} disabled={actingId === l.id}
-                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                    <Ban size={12} /> Tolak
-                                                                </button>
-                                                            </div>
-                                                        ) : l.status === "RETURN_PENDING" ? (
-                                                            <span className="text-[11px] text-orange-600 font-medium">Menunggu ACC pengembalian</span>
-                                                        ) : (
-                                                            <span className="text-[11px] text-zinc-400">{l.approved_by_name ? `oleh ${l.approved_by_name}` : "-"}</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
+                                                        </td>
+                                                    </tr>
+
+                                                    {isOpen && (
+                                                        <tr className="bg-zinc-50/60 border-b border-zinc-100">
+                                                            <td colSpan={6} className="px-3 py-3">
+                                                                {/* ── Aksi massal (per status yang relevan) ── */}
+                                                                <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                                                                    {canApprove && pendingIds.length > 0 && (
+                                                                        <>
+                                                                            <button onClick={() => actMany(pendingIds, "approve")} disabled={busy}
+                                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                                <Check size={12} /> Approve Semua
+                                                                            </button>
+                                                                            <button onClick={() => actMany(pendingIds, "reject")} disabled={busy}
+                                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                                <Ban size={12} /> Reject Semua
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                    {(canApprove || g.borrower_id === userId) && approvedIds.length > 0 && (
+                                                                        <button onClick={() => actMany(approvedIds, "request-return")} disabled={busy}
+                                                                            className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                            <RotateCcw size={12} /> Ajukan Pengembalian Semua
+                                                                        </button>
+                                                                    )}
+                                                                    {canApprove && returnPendingIds.length > 0 && (
+                                                                        <>
+                                                                            <button onClick={() => actMany(returnPendingIds, "approve-return")} disabled={busy}
+                                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                                <Check size={12} /> Setujui Semua
+                                                                            </button>
+                                                                            <button onClick={() => actMany(returnPendingIds, "reject-return")} disabled={busy}
+                                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                                <Ban size={12} /> Tolak Semua
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* ── Detail per barang (aksi tetap per-barang) ── */}
+                                                                <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white">
+                                                                    {g.items.map((it, idx) => {
+                                                                        const im = STATUS_META[it.status];
+                                                                        return (
+                                                                            <div key={it.id} className={`flex flex-wrap items-center gap-2 px-3 py-2 ${idx > 0 ? "border-t border-zinc-100" : ""}`}>
+                                                                                {it.item_type === "LAPTOP"
+                                                                                    ? <LaptopIcon size={14} className="text-zinc-500 flex-shrink-0" />
+                                                                                    : <Wrench size={14} className="text-zinc-500 flex-shrink-0" />}
+                                                                                <span className="text-xs text-zinc-700 flex-1 min-w-[120px]">{it.item_name}</span>
+                                                                                {it.serial_number
+                                                                                    ? <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{it.serial_number}</span>
+                                                                                    : <span className="text-[10px] font-semibold text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">tanpa SN</span>}
+                                                                                <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold border ${im.cls}`}>{im.label}</span>
+                                                                                {(it.returned_at || it.sold_at) && (
+                                                                                    <span className="text-[10px] text-zinc-400 tabular-nums">{fmtWaktu(it.returned_at ?? it.sold_at)}</span>
+                                                                                )}
+                                                                                {it.notes && <span className="text-[11px] text-zinc-400 italic truncate max-w-[160px]" title={it.notes}>{it.notes}</span>}
+                                                                                <div className="ml-auto">{renderItemActions(it)}</div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </Fragment>
                                             );
                                         })}
                                     </tbody>
