@@ -1,4 +1,5 @@
 export const CAREER_LEVELS = [
+    "-",
     "NEWBIE",
     "BASIC 3",
     "BASIC 2",
@@ -12,6 +13,7 @@ export const CAREER_LEVELS = [
 export type CareerLevel = typeof CAREER_LEVELS[number];
 
 export const CAREER_LEVEL_META: Record<CareerLevel, { bg: string; color: string; border: string }> = {
+    "-": { bg: "bg-slate-50", color: "text-slate-400", border: "border-slate-200" },
     "NEWBIE": { bg: "bg-slate-100", color: "text-slate-600", border: "border-slate-200" },
     "BASIC 3": { bg: "bg-sky-50", color: "text-sky-600", border: "border-sky-200" },
     "BASIC 2": { bg: "bg-sky-100", color: "text-sky-700", border: "border-sky-300" },
