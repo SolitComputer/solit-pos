@@ -104,10 +104,10 @@ export async function GET(request: NextRequest) {
     keterangan: r.keterangan,
     sumber: r.sumber ?? null,
     price_range: null as string | null, // input manual tidak punya range harga
-    nama_toko: null as string | null,   // input manual tidak punya nama toko
+    nama_toko: (r.nama_toko ?? null) as string | null, // terisi setelah diaudit
     transaksi: r.transaksi,
     ads: typeof r.ads === "string" ? r.ads : null, // tabel audit_leads bertipe boolean — jangan ikut
-    audited: r.audited,    audited_by_name: r.audited_by_name,
+    audited: r.audited, audited_by_name: r.audited_by_name,
     rejected: false,                 // leads manual tidak punya konsep tolak
     reject_reason: null as string | null,
     created_by: r.created_by,

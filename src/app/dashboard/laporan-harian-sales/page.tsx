@@ -155,10 +155,6 @@ const NO_ADD_ROLES = ["MARKETING", "KEPALA_MARKETING", "PKL_MARKETING"];
 const WA_SUMBER_OPTIONS = ["SOLIT", "SOTECH", "ONPOINT", "ZENIT"] as const;
 type WaSumberFilter = "ALL" | (typeof WA_SUMBER_OPTIONS)[number];
 
-// Pilihan Nama Toko di form laporan — HARUS disamakan dengan STORE_OPTIONS
-// di src/app/api/sales-reports/route.ts (validasi server-side).
-const STORE_OPTIONS = ["Solit", "Sotech", "Onpoint", "Sultan Laptop"] as const;
-
 interface SalesReportEntry {
   id: string;
   channel: Channel;
@@ -287,7 +283,6 @@ export default function LaporanHarianSalesPage() {
   const [partnerName, setPartnerName] = useState("");
   const [interest, setInterest] = useState("");
   const [priceRange, setPriceRange] = useState(""); // "" = belum dipilih
-  const [namaToko, setNamaToko] = useState("");     // "" = belum dipilih
   const [keterangan, setKeterangan] = useState("");
   const [sumber, setSumber] = useState("");
   const [purchased, setPurchased] = useState(false);
@@ -419,7 +414,6 @@ export default function LaporanHarianSalesPage() {
     setPartnerName("");
     setInterest("");
     setPriceRange("");
-    setNamaToko("");
     setKeterangan("");
     setSumber("");
     setAds("");
@@ -442,7 +436,6 @@ export default function LaporanHarianSalesPage() {
     setInterest(entry.interest);
     // Laporan lama (NULL) → dropdown kosong, sales wajib pilih saat edit.
     setPriceRange(isPriceRange(entry.price_range) ? entry.price_range : "");
-    setNamaToko(entry.nama_toko ?? "");
     setKeterangan(entry.keterangan ?? "");
     setSumber(entry.sumber ?? "");
     setPurchased(entry.purchased);
@@ -471,10 +464,6 @@ export default function LaporanHarianSalesPage() {
       setFormError("Range harga wajib dipilih");
       return;
     }
-    if (!(STORE_OPTIONS as readonly string[]).includes(namaToko)) {
-      setFormError("Nama toko wajib dipilih");
-      return;
-    }
     if (isNoPhoneChannel && !partnerName.trim()) {
       setFormError(contactMode === "username" ? "Username wajib diisi" : "Nama mitra/reseller wajib diisi");
       return;
@@ -499,7 +488,6 @@ export default function LaporanHarianSalesPage() {
             partner_name: isNoPhoneChannel ? partnerName.trim() : "",
             interest: interest.trim(),
             price_range: priceRange,
-            nama_toko: namaToko,
             keterangan: keterangan.trim(),
             sumber: sumber.trim(),
             purchased,
@@ -714,28 +702,7 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
-                {/* Nama Toko (wajib) — disimpan ke kolom nama_toko,
-                    opsi dari STORE_OPTIONS. */}
-                <div>
-                  <label htmlFor="nama-toko" className="text-xs font-medium text-gray-600 mb-1 block">Nama Toko</label>
-                  <div className="relative">
-                    <Building2 className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <select
-                      id="nama-toko"
-                      value={namaToko}
-                      onChange={(e) => setNamaToko(e.target.value)}
-                      className={`w-full appearance-none cursor-pointer pl-8 pr-9 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors ${namaToko ? "text-gray-900" : "text-gray-400"}`}
-                    >
-                      <option value="" disabled>Pilih nama toko</option>
-                      {STORE_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt} className="text-gray-900">{opt}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                </div>
-
-                {isNoPhoneChannel ? (
+                 {isNoPhoneChannel ? (
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">
                       {contactFieldConfig[contactMode as "username" | "partner"].label}

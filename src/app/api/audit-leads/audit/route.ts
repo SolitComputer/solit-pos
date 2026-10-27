@@ -11,6 +11,10 @@ function getSupabase() {
   );
 }
 
+// Pilihan toko yang sah — HARUS disamakan dengan STORE_OPTIONS di halaman
+// Audit Marketing (audit-leads/[channel]/page.tsx).
+const STORE_OPTIONS = ["Solit", "Sotech", "Onpoint", "Sultan Laptop"];
+
 async function getAuthedUser(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
   if (!token) return null;
@@ -37,6 +41,12 @@ export async function POST(request: NextRequest) {
   const { id } = body;
   if (!id) {
     return NextResponse.json({ success: false, message: "ID tidak ditemukan." }, { status: 400 });
+  }
+
+  // Toko dipilih saat audit (sama seperti baris dari Laporan Sales).
+  const nama_toko = (body.nama_toko ?? "").toString().trim();
+  if (!STORE_OPTIONS.includes(nama_toko)) {
+    return NextResponse.json({ success: false, message: "Nama toko wajib dipilih" }, { status: 400 });
   }
 
   const supabase = getSupabase();
@@ -66,6 +76,7 @@ export async function POST(request: NextRequest) {
       audited: true,
       audited_by: user.id,
       audited_by_name: userData?.name ?? "Unknown",
+      nama_toko,
     })
     .eq("id", id)
     .select()

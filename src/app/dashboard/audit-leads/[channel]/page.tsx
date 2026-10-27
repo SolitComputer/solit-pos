@@ -27,6 +27,7 @@ import {
   Wallet,
   Calendar,
   Building2,
+  ChevronDown,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -58,6 +59,10 @@ interface LeadRow {
 }
 
 const PAGE_SIZE = 10;
+
+// Pilihan toko yang dipilih marketing saat mengaudit — HARUS disamakan dengan
+// STORE_OPTIONS di endpoint audit (sales-reports/audit & audit-leads/audit).
+const STORE_OPTIONS = ["Solit", "Sotech", "Onpoint", "Sultan Laptop"] as const;
 
 // Alasan penolakan — sengaja disamakan dengan value lama di Laporan Harian
 // Sales supaya isi kolom reject_reason tetap konsisten lintas halaman.
@@ -124,7 +129,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   const [editingRow, setEditingRow] = useState<LeadRow | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmSoftDeleteId, setConfirmSoftDeleteId] = useState<string | null>(null);
-  const [confirmAuditId, setConfirmAuditId] = useState<string | null>(null);
+  const [auditTarget, setAuditTarget] = useState<LeadRow | null>(null);
   // Laporan sales yang sedang ditolak (buka modal pilih alasan). null = tertutup.
   const [rejectTarget, setRejectTarget] = useState<LeadRow | null>(null);
   const [rejecting, setRejecting] = useState(false);
@@ -210,18 +215,18 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
     return { total, transaksi, audited, convRate };
   }, [rows]);
 
-  async function handleAudit(id: string) {
+  async function handleAudit(id: string, namaToko: string) {
     try {
       const target = rows.find((r) => r.id === id);
       const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" : "/api/audit-leads/audit";
       const res = await fetch(endpoint, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, nama_toko: namaToko }),
       });
       const json = await parseApiResponse(res);
       if (!json.success) throw new Error(json.message);
       await fetchRows();
     } catch (err) { setError(err instanceof Error ? err.message : "Gagal audit data."); }
-    finally { setConfirmAuditId(null); }
+    finally { setAuditTarget(null); }
   }
 
   // Tolak laporan sales (hanya source "sales_report"). Reuse endpoint lama:
@@ -526,7 +531,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                         ) : canAudit ? (
                           <div className="inline-flex items-center gap-1">
                             <button
-                              onClick={() => setConfirmAuditId(row.id)}
+                              onClick={() => setAuditTarget(row)}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-violet-600 text-white hover:bg-violet-700 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
                             >
                               <ClipboardCheck className="w-3 h-3" /> Audit
@@ -671,7 +676,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                   <div className="flex items-center gap-2 pt-1">
                     {!row.audited && !row.rejected && canAudit && (
                       <button
-                        onClick={() => setConfirmAuditId(row.id)}
+                        onClick={() => setAuditTarget(row)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-violet-200 text-violet-600 hover:bg-violet-50 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
                       >
                         <ClipboardCheck className="w-3 h-3" /> Audit
@@ -744,10 +749,12 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
           <LeadFormModal channel={channel} editingRow={editingRow} onClose={() => setShowForm(false)}
             onSaved={() => { setShowForm(false); fetchRows(); }} />
         )}
-        {confirmAuditId && (
-          <ConfirmModal title="Audit leads ini?" description="Setelah diaudit, data ini terkunci dan tidak bisa diedit/dihapus tim sales."
-            tone="violet" icon={ShieldCheck}
-            onCancel={() => setConfirmAuditId(null)} onConfirm={() => handleAudit(confirmAuditId)} />
+        {auditTarget && (
+          <AuditModal
+            target={auditTarget}
+            onCancel={() => setAuditTarget(null)}
+            onConfirm={(namaToko) => handleAudit(auditTarget.id, namaToko)}
+          />
         )}
         {confirmDeleteId && (
           <ConfirmModal title="Hapus leads ini?" description="Data yang dihapus tidak bisa dikembalikan."
@@ -951,6 +958,84 @@ function RejectModal({
         >
           Batal
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Modal Audit — marketing wajib memilih salah satu dari 4 toko dulu sebelum
+// laporan dikunci. Toko dikirim ke endpoint audit (lihat handleAudit) dan
+// disimpan di kolom nama_toko, menggantikan input toko yang dulu ada di form
+// Laporan Harian Sales.
+function AuditModal({
+  target,
+  onCancel,
+  onConfirm,
+}: {
+  target: LeadRow;
+  onCancel: () => void;
+  onConfirm: (namaToko: string) => void;
+}) {
+  const [store, setStore] = useState("");
+  const [err, setErr] = useState("");
+
+  function submit() {
+    if (!(STORE_OPTIONS as readonly string[]).includes(store)) {
+      setErr("Pilih toko dulu sebelum mengaudit.");
+      return;
+    }
+    onConfirm(store);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="w-11 h-11 rounded-full bg-violet-50 flex items-center justify-center mb-3">
+          <ShieldCheck className="w-5 h-5 text-violet-600" />
+        </div>
+        <h3 className="font-semibold text-sm text-gray-900">Audit leads ini?</h3>
+        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+          Pilih toko yang terkait dengan laporan <span className="font-medium text-gray-700">{target.nama}</span>. Setelah diaudit, data terkunci dan tidak bisa diedit/dihapus tim sales.
+        </p>
+
+        <div className="mt-4">
+          <label htmlFor="audit-nama-toko" className="text-xs font-medium text-gray-600 mb-1 block">Nama Toko</label>
+          <div className="relative">
+            <Building2 className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              id="audit-nama-toko"
+              value={store}
+              onChange={(e) => { setStore(e.target.value); setErr(""); }}
+              className={`w-full appearance-none cursor-pointer pl-8 pr-9 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors ${store ? "text-gray-900" : "text-gray-400"}`}
+            >
+              <option value="" disabled>Pilih nama toko</option>
+              {STORE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt} className="text-gray-900">{opt}</option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+          {err && (
+            <p className="flex items-center gap-1.5 text-xs text-red-600 mt-2">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {err}
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30"
+          >
+            Batal
+          </button>
+          <button
+            onClick={submit}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 transition-all active:scale-[0.99] shadow-sm shadow-violet-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+          >
+            Ya, audit
+          </button>
+        </div>
       </div>
     </div>
   );
