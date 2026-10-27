@@ -91,6 +91,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     source_id: d.source_id,
     source_category: d.source_category,
     total: d.total,
+    branch: d.branch ?? "UTAMA", // ⬅️ BARU — tag cabang ke journal_entries
     created_by: user.id,
     created_at: d.sort_ts,
   }));
@@ -132,6 +133,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       source_id: d.source_id,
       source_category: d.source_category,
       total: d.total,
+      branch: d.branch ?? "UTAMA", // ⬅️ BARU
       created_by: user.id,
       created_at: d.sort_ts,
     }));

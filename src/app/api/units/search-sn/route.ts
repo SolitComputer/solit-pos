@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { withAuth } from "@/lib/auth";
-import { PREPARATION_CREATE_ROLES, ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
+import { PREPARATION_CREATE_ROLES, PREPARATION_DONE_ROLES, ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,20 +26,20 @@ export const GET = withAuth(async (req: NextRequest) => {
         supabase
             .from("laptop_units")
             .select(`
-                id,
-                serial_number,
-                grade,
-                purchase_price,
-                selling_price,
-                condition_note,
-                status,
-                laptops (
                     id,
-                    laptop_name,
-                    charger_price,
-                    laptop_bag_price
-                )
-            `)
+                    serial_number,
+                    grade,
+                    purchase_price,
+                    selling_price,
+                    condition_note,
+                    status,
+                    laptops (
+                        id,
+                        laptop_name,
+                        charger_price,
+                        laptop_bag_price
+                    )
+                `)
             .ilike("serial_number", `%${q}%`)
             // Unit yang statusnya sudah terjual/diproses via jalur transaksi
             // (SOLD/RESERVED/HELD/PACKING) tidak ditampilkan — sisanya
@@ -59,21 +59,21 @@ export const GET = withAuth(async (req: NextRequest) => {
         supabase
             .from("accessory_units")
             .select(`
-                id,
-                serial_number,
-                condition,
-                buy_price,
-                selling_price,
-                status,
-                notes,
-                accessories (
                     id,
-                    name,
-                    category,
-                    brand,
-                    spec
-                )
-            `)
+                    serial_number,
+                    condition,
+                    buy_price,
+                    selling_price,
+                    status,
+                    notes,
+                    accessories (
+                        id,
+                        name,
+                        category,
+                        brand,
+                        spec
+                    )
+                `)
             .ilike("serial_number", `%${q}%`)
             .eq("status", "TERSEDIA")
             .limit(8)
@@ -172,4 +172,4 @@ export const GET = withAuth(async (req: NextRequest) => {
     const merged = [...laptopFormatted, ...accessoryFormatted].slice(0, 10);
 
     return NextResponse.json({ data: merged });
-}, Array.from(new Set([...PREPARATION_CREATE_ROLES, ...ITEM_OUTFLOW_ROLES])));
+}, Array.from(new Set([...PREPARATION_CREATE_ROLES, ...PREPARATION_DONE_ROLES, ...ITEM_OUTFLOW_ROLES])));

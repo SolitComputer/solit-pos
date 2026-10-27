@@ -48,6 +48,7 @@ interface JournalEntry {
     ref: string | null;
     source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN";
     source_id: string | null;
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU — tag cabang dari journal_entries
     total: number;
     is_edited: boolean;
     sync_available?: boolean;
@@ -73,6 +74,7 @@ interface JournalEntry {
 interface PendingDraft {
     source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "KEBUTUHAN";
     source_id: string;
+    branch?: "UTAMA" | "JOGJA"; // ⬅️ BARU — tag cabang dari draft
     tanggal: string;
     sort_ts: string;
     keterangan: string;
@@ -293,8 +295,16 @@ function getCompanyBadge(company?: string | null): { label: string; color: strin
     if (cn.includes("zenit")) return { label: "Zenit", color: "bg-teal-50 text-teal-700 border-teal-200" };
     return { label: company.trim(), color: "bg-gray-50 text-gray-600 border-gray-200" };
 }
+
+// Badge cabang — hanya muncul untuk JOGJA. UTAMA/null → null (tidak ditampilkan,
+// biar tampilan gabungan tidak penuh badge di tiap baris Cabang Utama).
+function getBranchBadge(branch?: string | null): { label: string; color: string } | null {
+    return branch === "JOGJA"
+        ? { label: "📍 Jogja", color: "bg-rose-50 text-rose-700 border-rose-200" }
+        : null;
+}
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function JurnalUmum({ period }: { period: string }) {
+export default function JurnalUmum({ period, branch = "ALL" }: { period: string; branch?: "ALL" | "JOGJA" }) {
     const [entries, setEntries] = useState<JournalEntry[]>([]);
     const [pending, setPending] = useState<PendingDraft[]>([]);
     const [pendingSummary, setPendingSummary] = useState<{
@@ -374,8 +384,11 @@ export default function JurnalUmum({ period }: { period: string }) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 25000);
         try {
+            const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
             const [jRes, pRes] = await Promise.all([
-                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}`, { signal: controller.signal }),
+                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}${branchQS}`, { signal: controller.signal }),
+                // Pending sengaja TIDAK difilter cabang — biar semua draft yang perlu
+                // dikonfirmasi tetap kelihatan apa pun cabang yang sedang dipilih.
                 fetch(`/api/akutansi/jurnal/pending?period=${period}`, { signal: controller.signal }),
             ]);
             const j = await jRes.json();
@@ -396,7 +409,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             clearTimeout(timeoutId);
             if (showLoader) setLoading(false);
         }
-    }, [period, sortOrder]);
+    }, [period, sortOrder, branch]);
 
     useEffect(() => { load(); }, [load]);
     useEffect(() => {
@@ -544,7 +557,7 @@ export default function JurnalUmum({ period }: { period: string }) {
     const handleAfterSync = useCallback((entryId: string) => {
         setPendingScrollId(entryId);
     }, []);
-        const handleToggleWarningState = useCallback((entryId: string, hasWarn: boolean) => {
+    const handleToggleWarningState = useCallback((entryId: string, hasWarn: boolean) => {
         setEntries((prev) =>
             prev.map((e) => (e.id === entryId ? { ...e, has_warning: hasWarn } : e))
         );
@@ -1156,6 +1169,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${badge.color}`}>
                                                 {badge.label}
                                             </span>
+                                            {d.branch === "JOGJA" && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-rose-50 text-rose-700 border-rose-200">
+                                                    📍 Jogja
+                                                </span>
+                                            )}
                                             {d.meta?.source_type === "PENGAJUAN_DANA" && (
                                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-teal-50 text-teal-700 border-teal-200">
                                                     Pengajuan Dana
@@ -3122,6 +3140,7 @@ interface JournalEntryRowProps {
 function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<string>) {
     const badge = SOURCE_BADGE[badgeKeyOf(entry)] ?? SOURCE_BADGE[entry.source_type];
     const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
+    const branchBadge = getBranchBadge(entry.branch); // ⬅️ BARU
     const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
     const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
     const cashflowNama = entry.source_type === "CASHFLOW" ? entry.trx_meta?.nama ?? null : null;
@@ -3165,7 +3184,7 @@ function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<stri
     const entryJam = useMemo(() => fmtJam(entry.created_at), [entry.created_at]);
 
     return {
-        badge, companyBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
+        badge, companyBadge, branchBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
         displayLines, linesToRender, validLinesForCheck, isEntryChecked, latestCheckedAt,
         checkedByName, entryJam,
     };
@@ -3191,7 +3210,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     setToast,
 }: JournalEntryRowProps) {
     const {
-        badge, companyBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
+        badge, companyBadge, branchBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
         linesToRender, isEntryChecked, latestCheckedAt, checkedByName, entryJam,
     } = useJournalEntryDerived(entry, accountCodeFilter);
 
@@ -3263,6 +3282,9 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                         <>
                                             <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>{badge.label}</span>
+                                                {branchBadge && (
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${branchBadge.color}`}>{branchBadge.label}</span>
+                                                )}
                                                 {companyBadge && (
                                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>{companyBadge.label}</span>
                                                 )}
@@ -3381,7 +3403,7 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
     setToast,
 }: Omit<JournalEntryRowProps, "index" | "isDraggingGroup">) {
     const {
-        badge, companyBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
+        badge, companyBadge, branchBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
         linesToRender, isEntryChecked, latestCheckedAt, checkedByName, entryJam,
     } = useJournalEntryDerived(entry, accountCodeFilter);
 
@@ -3419,6 +3441,9 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
                     </div>
                     <div className="flex items-center gap-1.5 mb-1 mt-1 flex-wrap">
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>{badge.label}</span>
+                        {branchBadge && (
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${branchBadge.color}`}>{branchBadge.label}</span>
+                        )}
                         {companyBadge && (
                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>{companyBadge.label}</span>
                         )}

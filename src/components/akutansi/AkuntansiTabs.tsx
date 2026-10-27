@@ -1,8 +1,9 @@
 "use client";
 // src/components/akutansi/AkuntansiTabs.tsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { getAuthUser } from "@/hooks/useAuthUser";
 import { periodLabel } from "@/lib/accounting";
 import JurnalUmum from "./JurnalUmum";
 import BukuBesar from "./BukuBesar";
@@ -25,6 +26,18 @@ export default function AkuntansiTabs({ period }: { period: string }) {
   const [tab, setTab] = useState<TabKey>("jurnal");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  // Multi-cabang: "ALL" = gabungan semua cabang, "JOGJA" = eksklusif Jogja.
+  const [branch, setBranch] = useState<"ALL" | "JOGJA">("ALL");
+  const [canSwitchBranch, setCanSwitchBranch] = useState(false); // hanya Admin & Accounting
+
+  useEffect(() => {
+    getAuthUser()
+      .then((u: any) => {
+        const roles: string[] = u?.roles?.length ? (u.roles as string[]) : [u?.role as string].filter(Boolean);
+        setCanSwitchBranch(roles.some((r) => ["ADMIN", "ACCOUNTING"].includes(r)));
+      })
+      .catch(() => setCanSwitchBranch(false));
+  }, []);
 
   // Navigasi periode bulan (sebelumnya / berikutnya)
   const [y, m] = period.split("-").map(Number);
@@ -118,20 +131,39 @@ export default function AkuntansiTabs({ period }: { period: string }) {
           </div>
         </div>
 
-        {/* Export Excel Button */}
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          title="Export seluruh akuntansi ke 1 file Excel"
-          className="h-10 px-4 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] text-white text-xs font-semibold shadow-xs hover:shadow transition-all disabled:opacity-40 shrink-0 whitespace-nowrap"
-        >
-          {exporting ? (
-            <span className="inline-block animate-spin">⟳</span>
-          ) : (
-            <FileSpreadsheet className="w-4 h-4" />
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {/* Filter cabang — dropdown (BUKAN tab), hanya Admin & Accounting, bukan di tab Kelola Akun.
+              Sengaja berbentuk <select> biar jelas kebaca sebagai filter, bukan switch tab/mode. */}
+          {canSwitchBranch && tab !== "akun" && (
+            <label className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">Cabang:</span>
+              <select
+                value={branch}
+                onChange={(e) => setBranch(e.target.value as "ALL" | "JOGJA")}
+                title="Filter data akuntansi per cabang"
+                className={`h-10 rounded-xl border px-3 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all ${branch === "JOGJA" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"}`}
+              >
+                <option value="ALL">🏢 Semua Cabang</option>
+                <option value="JOGJA">📍 Cabang Jogja</option>
+              </select>
+            </label>
           )}
-          {exporting ? "Exporting..." : "Export Excel"}
-        </button>
+
+          {/* Export Excel Button */}
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            title="Export seluruh akuntansi ke 1 file Excel"
+            className="h-10 px-4 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] text-white text-xs font-semibold shadow-xs hover:shadow transition-all disabled:opacity-40 whitespace-nowrap"
+          >
+            {exporting ? (
+              <span className="inline-block animate-spin">⟳</span>
+            ) : (
+              <FileSpreadsheet className="w-4 h-4" />
+            )}
+            {exporting ? "Exporting..." : "Export Excel"}
+          </button>
+        </div>
       </div>
 
       {/* Error export */}
@@ -163,13 +195,13 @@ export default function AkuntansiTabs({ period }: { period: string }) {
       {/* Main Content Container */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 sm:p-6">
         {tab === "jurnal" ? (
-          <JurnalUmum period={period} />
+          <JurnalUmum period={period} branch={branch} />
         ) : tab === "buku-besar" ? (
-          <BukuBesar period={period} />
+          <BukuBesar period={period} branch={branch} />
         ) : tab === "neraca" ? (
-          <Neraca key={`neraca-${period}`} period={period} />
+          <Neraca key={`neraca-${period}-${branch}`} period={period} branch={branch} />
         ) : tab === "laba-rugi" ? (
-          <LabaRugi period={period} />
+          <LabaRugi period={period} branch={branch} />
         ) : tab === "akun" ? (
           <AkunManager />
         ) : (

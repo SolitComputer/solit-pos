@@ -27,11 +27,18 @@ export interface JournalDraft {
   ref: string | null;
   lines: DraftLine[];
   total: number;
+  branch?: "UTAMA" | "JOGJA"; // ⬅️ BARU — cabang asal (default UTAMA saat confirm); dipakai filter cabang di Akuntansi
   meta: Record<string, unknown>;   // untuk badge di UI (status, invoice, dll)
 }
 
 export function draftKey(s: { source_type: string; source_id: string }): string {
   return `${s.source_type}:${s.source_id}`;
+}
+
+/** Normalisasi nilai cabang dari sumber (transactions/service_orders/cashflow_entries)
+ *  jadi "UTAMA" | "JOGJA". Apa pun selain "JOGJA" (termasuk null & data lama) → "UTAMA". */
+function asBranch(b: unknown): "UTAMA" | "JOGJA" {
+  return b === "JOGJA" ? "JOGJA" : "UTAMA";
 }
 
 export interface TransactionMeta {
@@ -231,7 +238,7 @@ export async function getTransactionSyncDraftsByInvoices(
     const { data, error } = await supabase
       .from("transactions")
       .select(
-        "invoice_number, status, deal_price, amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, item_kind, customer_name, laptop_name, serial_number"
+        "invoice_number, status, deal_price, amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, item_kind, customer_name, laptop_name, serial_number, branch"
       )
       .in("invoice_number", batch);
     if (error) {
@@ -308,13 +315,16 @@ export async function getTransactionSyncDraftsByInvoices(
     const isSplitPayment = !!m2 && a1 > 0 && a2 > 0;
 
     if (isSplitPayment) {
-      const account2 = kasAccountFromPaymentMethod(m2);
-      const account1 = account2 === AKUN.KAS_CASH ? AKUN.KAS_SALDO : AKUN.KAS_CASH;
+      // Tiap metode dihitung akun kas-nya sendiri + cabang: cash Jogja → 121,
+      // cash Utama → 120, transfer/QRIS → 110 (shared). Jadi split cash+transfer
+      // Jogja = 121 (bagian cash) + 110 (bagian transfer).
+      const account1 = kasAccountFromPaymentMethod(t.payment_method, t.branch);
+      const account2 = kasAccountFromPaymentMethod(m2, t.branch);
       const a2Final = deal - a1;
       lines.push({ account_code: account1, side: "DEBIT", nominal: a1 });
       if (a2Final > 0) lines.push({ account_code: account2, side: "DEBIT", nominal: a2Final });
     } else {
-      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
+      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method, t.branch), side: "DEBIT", nominal: deal });
     }
 
     if (effectiveItemKind === "accessory") {
@@ -375,13 +385,14 @@ type CashflowRow = {
   keterangan: string | null;
   tanggal: string;
   payment_method: string | null;
+  branch: string | null; // ⬅️ BARU — cabang entry (UTAMA/JOGJA): nentuin kas cash 120 vs 121
   source_type: string;
   source_id: string | null; // ⬅️ perekat group PENGAJUAN_DANA
   created_at: string | null;
 };
 
 const CASHFLOW_ROW_SELECT =
-  "id, direction, category, nama, nominal, keterangan, tanggal, payment_method, source_type, source_id, created_at";
+  "id, direction, category, nama, nominal, keterangan, tanggal, payment_method, branch, source_type, source_id, created_at";
 
 // Jeda maksimal antar-baris (ms) supaya dianggap 1 submit form yang sama.
 const CASHFLOW_GROUP_WINDOW_MS = 10_000;
@@ -501,7 +512,7 @@ function cashflowGroupLines(group: CashflowRow[]): DraftLine[] {
     const nominal = Math.round(Number(e.nominal ?? 0));
     if (nominal <= 0) continue;
 
-    const kasAccount = kasAccountFromCashflow(e.payment_method);
+       const kasAccount = kasAccountFromCashflow(e.payment_method, e.branch);
     if (e.direction === "OUT") {
       lines.push({ account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal });
       lines.push({ account_code: kasAccount, side: "KREDIT", nominal });
@@ -680,7 +691,7 @@ export async function getServiceSyncDraftsByIds(
   for (const batch of chunkArray(eligibleIds, 150)) {
     const { data, error } = await supabase
       .from("service_orders")
-      .select("id, payment_amount, payment_method, nama, type_laptop")
+      .select("id, payment_amount, payment_method, nama, type_laptop, branch")
       .in("id", batch);
     if (error) {
       console.error("[akuntansi] fetch service_orders (sync):", error.message);
@@ -703,7 +714,7 @@ export async function getServiceSyncDraftsByIds(
       }));
 
     const lines: DraftLine[] = [
-      { account_code: kasAccountFromPaymentMethod(s.payment_method), side: "DEBIT", nominal: bayar },
+      { account_code: kasAccountFromPaymentMethod(s.payment_method, s.branch), side: "DEBIT", nominal: bayar },
       { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: bayar },
       ...sparepartLines,
     ];
@@ -724,7 +735,7 @@ async function buildTransactionDrafts(
   const { data: trxs, error } = await supabase
     .from("transactions")
     .select(
-      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, dp_amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, created_at, paid_at, company_name, laptop_id, item_kind"
+      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, dp_amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, created_at, paid_at, company_name, laptop_id, item_kind, branch"
     )
     .eq("status", "PAID")
     .not("paid_at", "is", null)
@@ -885,8 +896,9 @@ async function buildTransactionDrafts(
     const isSplitPayment = !!m2 && a1 > 0 && a2 > 0;
 
     if (isSplitPayment) {
-      const account2 = kasAccountFromPaymentMethod(m2);
-      const account1 = account2 === AKUN.KAS_CASH ? AKUN.KAS_SALDO : AKUN.KAS_CASH;
+      // cash Jogja → 121, cash Utama → 120, transfer/QRIS → 110 (shared).
+      const account1 = kasAccountFromPaymentMethod(t.payment_method, t.branch);
+      const account2 = kasAccountFromPaymentMethod(m2, t.branch);
 
       const a2Final = deal - a1;
       lines.push({ account_code: account1, side: "DEBIT", nominal: a1 });
@@ -894,7 +906,7 @@ async function buildTransactionDrafts(
         lines.push({ account_code: account2, side: "DEBIT", nominal: a2Final });
       }
     } else {
-      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
+      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method, t.branch), side: "DEBIT", nominal: deal });
     }
 
     // (fix) Kredit akun pendapatan sesuai jenis barang — sebelumnya SELALU
@@ -932,6 +944,7 @@ async function buildTransactionDrafts(
       ref: null,
       lines: merged,
       total: totalOf(merged),
+      branch: asBranch(t.branch), // ⬅️ BARU
       meta: {
         status: t.status,
         invoice: t.invoice_number,
@@ -962,7 +975,7 @@ async function buildTransactionAccrualDrafts(
   const { data: trxs, error } = await supabase
     .from("transactions")
     .select(
-      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, unit_id, unit_ids, created_at, company_name, laptop_id, item_kind"
+      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, unit_id, unit_ids, created_at, company_name, laptop_id, item_kind, branch"
     )
     .in("status", ["RESERVED", "HELD", "PACKING"])
     .gte("created_at", startISO)
@@ -1111,6 +1124,7 @@ async function buildTransactionAccrualDrafts(
       ref: null,
       lines: merged,
       total: totalOf(merged),
+      branch: asBranch(t.branch), // ⬅️ BARU
       meta: {
         status: t.status,
         invoice: t.invoice_number,
@@ -1178,12 +1192,13 @@ async function buildTransactionPaymentDrafts(
       serial_number: string | null;
       unit_id: string | null;
       unit_ids: string[] | null;
+      branch: string | null; // ⬅️ BARU
     }
   >();
   for (const batch of chunkArray(invoiceNumbers, 150)) {
     const { data: trxs } = await supabase
       .from("transactions")
-      .select("invoice_number, customer_name, laptop_name, payment_method, company_name, status, serial_number, unit_id, unit_ids")
+      .select("invoice_number, customer_name, laptop_name, payment_method, company_name, status, serial_number, unit_id, unit_ids, branch")
       .in("invoice_number", batch);
     for (const t of trxs ?? []) {
       trxMap.set(t.invoice_number as string, {
@@ -1195,6 +1210,7 @@ async function buildTransactionPaymentDrafts(
         serial_number: (t.serial_number as string) ?? null,
         unit_id: (t.unit_id as string) ?? null,
         unit_ids: Array.isArray(t.unit_ids) ? t.unit_ids : null,
+        branch: (t.branch as string) ?? null, // ⬅️ BARU
       });
     }
   }
@@ -1254,7 +1270,7 @@ async function buildTransactionPaymentDrafts(
     const paymentMethod = p.payment_method || trx?.payment_method || "CASH";
 
     const lines = mergeLines([
-      { account_code: kasAccountFromPaymentMethod(paymentMethod), side: "DEBIT", nominal: amount },
+      { account_code: kasAccountFromPaymentMethod(paymentMethod, trx?.branch), side: "DEBIT", nominal: amount },
       { account_code: AKUN.PIUTANG, side: "KREDIT", nominal: amount },
     ]);
 
@@ -1268,6 +1284,7 @@ async function buildTransactionPaymentDrafts(
       ref: p.invoice_number as string,
       lines,
       total: totalOf(lines),
+      branch: asBranch(trx?.branch), // ⬅️ BARU (trx = trxMap.get(invoice) di atas)
       meta: {
         invoice: p.invoice_number,
         payment_type: p.payment_type,
@@ -1304,7 +1321,7 @@ async function buildServiceDrafts(
   const { data: svcs, error } = await supabase
     .from("service_orders")
     .select(
-      "id, nama, type_laptop, payment_amount, payment_status, payment_method, payment_confirmed_at, status, tanggal_masuk, tanggal_selesai, tanggal_diambil"
+      "id, nama, type_laptop, payment_amount, payment_status, payment_method, payment_confirmed_at, status, tanggal_masuk, tanggal_selesai, tanggal_diambil, branch"
     )
     .not("payment_amount", "is", null)
     .gt("payment_amount", 0)
@@ -1451,7 +1468,7 @@ async function buildServiceDrafts(
     const tanggal = jakartaDate(refDate);
 
     const lines: DraftLine[] = [
-      { account_code: kasAccountFromPaymentMethod(s.payment_method), side: "DEBIT", nominal: delta },
+      { account_code: kasAccountFromPaymentMethod(s.payment_method, s.branch), side: "DEBIT", nominal: delta },
       { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: delta },
     ];
 
@@ -1487,9 +1504,10 @@ async function buildServiceDrafts(
       tanggal,
       sort_ts: sortTs,
       keterangan: `Service · ${s.type_laptop ?? "—"} - ${s.nama ?? "—"}${keteranganSuffix}`,
-      ref: idStr,
+       ref: idStr,
       lines: merged,
       total: totalOf(merged),
+      branch: asBranch(s.branch), // ⬅️ BARU
       meta: { status: s.status, bayar, sparepart, payment_status: s.payment_status, is_dp: isDpOnly },
     });
   }
@@ -1548,6 +1566,7 @@ async function buildCashflowDrafts(
       ref: null,
       lines: merged,
       total: totalOf(merged),
+      branch: asBranch(primary.branch), // ⬅️ BARU — dari cashflow_entries.branch
       meta: {
         category: primary.category,
         payment_method: primary.payment_method,
@@ -1582,7 +1601,7 @@ async function buildTransactionReversalDrafts(
 ): Promise<JournalDraft[]> {
   const { data: trxs, error } = await supabase
     .from("transactions")
-    .select("invoice_number, customer_name, laptop_name, serial_number, serial_numbers, unit_id, unit_ids, restored_at")
+    .select("invoice_number, customer_name, laptop_name, serial_number, serial_numbers, unit_id, unit_ids, restored_at, branch")
     .eq("status", "CANCELLED")
     .not("restored_at", "is", null)
     .gte("restored_at", startISO)
@@ -1689,6 +1708,7 @@ async function buildTransactionReversalDrafts(
       ref: invoice,
       lines: merged,
       total: totalOf(merged),
+      branch: asBranch(t.branch), // ⬅️ BARU — pembatalan penjualan Jogja ikut ketandai Jogja
       meta: { invoice, is_reversal: true, modal_missing: false, company_name: null },
     });
   }

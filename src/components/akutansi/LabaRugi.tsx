@@ -34,7 +34,7 @@ const rp = (n: number) => {
     return `${v < 0 ? "-" : ""}Rp${Math.abs(v).toLocaleString("id-ID")}`;
 };
 
-export default function LabaRugi({ period }: { period: string }) {
+export default function LabaRugi({ period, branch = "ALL" }: { period: string; branch?: "ALL" | "JOGJA" }) {
     const [data, setData] = useState<LabaRugiData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -43,7 +43,8 @@ export default function LabaRugi({ period }: { period: string }) {
         setLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/akutansi/laba-rugi?period=${period}`);
+                       const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
+            const res = await fetch(`/api/akutansi/laba-rugi?period=${period}${branchQS}`);
             const json = await res.json();
             if (!json.success) {
                 setError(json.message ?? "Gagal memuat laba rugi");
@@ -57,7 +58,7 @@ export default function LabaRugi({ period }: { period: string }) {
         } finally {
             setLoading(false);
         }
-    }, [period]);
+    }, [period, branch]);
 
     useEffect(() => {
         load();
