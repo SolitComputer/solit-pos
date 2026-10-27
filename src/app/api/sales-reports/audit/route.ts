@@ -5,7 +5,11 @@ import { hasAnyRole, SALES_REPORT_AUDIT_ROLES } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
-// POST /api/sales-reports/audit  { id: string }
+// Pilihan toko yang sah — HARUS disamakan dengan STORE_OPTIONS di halaman
+// Audit Marketing (audit-leads/[channel]/page.tsx).
+const STORE_OPTIONS = ["Solit", "Sotech", "Onpoint", "Sultan Laptop"];
+
+// POST /api/sales-reports/audit  { id: string, nama_toko: string }
 // Menandai 1 laporan sebagai sudah diaudit. Dipakai di 2 tempat:
 //   - Laporan Harian Sales
 //   - Audit Marketing (baris ber-source "sales_report")
@@ -31,6 +35,12 @@ export const POST = withAuth(async (req, _ctx, user) => {
       return NextResponse.json({ success: false, message: "id wajib diisi" }, { status: 400 });
     }
 
+    // Toko dipilih saat audit (menggantikan input toko di form Laporan Sales).
+    const nama_toko = (body.nama_toko ?? "").toString().trim();
+    if (!STORE_OPTIONS.includes(nama_toko)) {
+      return NextResponse.json({ success: false, message: "Nama toko wajib dipilih" }, { status: 400 });
+    }
+
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from("sales_online_reports")
       .select("id, audited")
@@ -51,6 +61,7 @@ export const POST = withAuth(async (req, _ctx, user) => {
         audited_by: user.id,
         audited_by_name: user.name,
         audited_at: new Date().toISOString(),
+        nama_toko,
       })
       .eq("id", id)
       .select()

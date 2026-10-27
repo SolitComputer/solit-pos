@@ -19,7 +19,7 @@ import { isPrepSilent } from "@/lib/prepAlarm";
 import { expandRolesWithParents } from "@/lib/permissions";
 import PengajuanDanaNotifier from "@/components/layout/PengajuanDanaNotifier";
 import ItemLoanNotifier from "@/components/layout/ItemLoanNotifier";
-
+import VehiclePendingNotifier from "@/components/layout/VehiclePendingNotifier";
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -102,6 +102,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <PatchNoteFab />
         <PengajuanDanaNotifier userRoles={authUserRoles} userId={soundUserId} />
         <ItemLoanNotifier userRoles={authUserRoles} userId={soundUserId} />
+        {/* Notifikasi ACC kendaraan — self-gate ke Kepala Sales di dalam komponen.
+            Sengaja TIDAK dibungkus !isSilentAdmin karena Kepala Sales bukan role
+            yang dibisukan global. */}
+        <VehiclePendingNotifier userRoles={authUserRoles} />
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}
           <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0 sticky top-0 z-30">

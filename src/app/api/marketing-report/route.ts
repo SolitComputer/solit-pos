@@ -72,7 +72,9 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       .eq("audited", false);
     if (startUtc) pendingQuery = pendingQuery.gte("created_at", startUtc);
     if (endUtc) pendingQuery = pendingQuery.lt("created_at", endUtc);
-    if (storeFilter && storeFilter !== "ALL") pendingQuery = pendingQuery.eq("nama_toko", storeFilter);
+    // Laporan yang BELUM diaudit belum punya nama_toko (toko dipilih saat audit),
+    // jadi sengaja TIDAK difilter per toko — biar jumlah "Menunggu Audit" tetap
+    // akurat walau tab toko tertentu sedang dipilih.
     const { count: pendingAuditCount, error: pendingError } = await pendingQuery;
     if (pendingError) throw new Error(pendingError.message);
 
