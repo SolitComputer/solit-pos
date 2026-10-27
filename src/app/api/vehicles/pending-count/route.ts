@@ -6,7 +6,7 @@ import { supabaseVehicles, getRequester } from "@/lib/vehicles";
 export async function GET(request: NextRequest) {
   const me = await getRequester(request);
   if (!me) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  if (!me.isAdmin) return NextResponse.json({ success: true, count: 0 });
+  if (!me.canApprove) return NextResponse.json({ success: true, count: 0 });
 
   const { count, error } = await supabaseVehicles
     .from("vehicle_borrow_requests")
