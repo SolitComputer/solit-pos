@@ -40,6 +40,7 @@ export default function CCLaporanPage() {
   const [creating, setCreating] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -121,6 +122,28 @@ export default function CCLaporanPage() {
       }
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: string, judul: string) => {
+    if (deletingId) return;
+    const ok = window.confirm(`Apakah Anda yakin ingin menghapus laporan "${judul}"?`);
+    if (!ok) return;
+
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/cc-reports/${id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({ success: false }));
+      if (res.ok && json.success) {
+        if (activeId === id) setActiveId(null); // tutup modal kalau yg dihapus sedang dibuka
+        await load();                            // refresh tabel otomatis, tanpa reload halaman
+      } else {
+        alert(json.error ?? "Gagal menghapus laporan");
+      }
+    } catch {
+      alert("Terjadi kesalahan jaringan saat menghapus laporan");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -268,20 +291,21 @@ export default function CCLaporanPage() {
                     <th className="px-4 py-3 text-center">Platform</th>
                     <th className="px-4 py-3 text-center">Selesai</th>
                     <th className="px-5 py-3">Dibuat</th>
+                    {canManage && <th className="px-4 py-3 text-center">Aksi</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     [...Array(5)].map((_, i) => (
                       <tr key={i} className="border-b border-gray-50">
-                        <td colSpan={9} className="px-5 py-4">
+                        <td colSpan={canManage ? 10 : 9} className="px-5 py-4">
                           <div className="h-4 animate-pulse rounded bg-gray-100" />
                         </td>
                       </tr>
                     ))
                   ) : withStatus.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-5 py-16 text-center text-sm text-gray-400">
+                      <td colSpan={canManage ? 10 : 9} className="px-5 py-16 text-center text-sm text-gray-400">
                         {debouncedQ || filter !== "ALL" || brand !== "ALL"
                           ? "Tidak ada konten yang cocok dengan filter."
                           : "Belum ada konten. Tambah judul di atas untuk mulai."}
@@ -318,6 +342,23 @@ export default function CCLaporanPage() {
                           </td>
                           <td className="px-4 py-3.5 text-center"><Dot done={Boolean(r.posting_done)} /></td>
                           <td className="whitespace-nowrap px-5 py-3.5 text-gray-400">{fmtDateTime(r.created_at)}</td>
+                          {canManage && (
+                            <td className="px-4 py-3.5 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(r.id, r.title);
+                                }}
+                                disabled={deletingId === r.id}
+                                title="Hapus laporan"
+                                aria-label="Hapus laporan"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                              >
+                                <TrashIcon />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })
@@ -373,5 +414,19 @@ function Dot({ done }: { done: boolean }) {
     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-50 text-xs font-black text-gray-300">
       —
     </span>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    >
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
   );
 }
