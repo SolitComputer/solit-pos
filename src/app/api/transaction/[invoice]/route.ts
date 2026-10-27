@@ -782,9 +782,11 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.pickup_location !== undefined) allowedFields.pickup_location = body.pickup_location;
     if (body.software_request !== undefined) allowedFields.software_request = body.software_request;
     if (body.source_platform !== undefined) allowedFields.source_platform = body.source_platform;
-    if (body.status !== undefined) allowedFields.status = body.status;
+      if (body.status !== undefined) allowedFields.status = body.status;
     if (body.notes !== undefined) allowedFields.notes = body.notes;
     if (body.customer_type !== undefined) allowedFields.customer_type = body.customer_type;
+    // Cabang — hanya terima nilai valid (fail-safe ke UTAMA kalau dikirim nilai aneh)
+    if (body.branch !== undefined) allowedFields.branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
     if (body.payment_method_2 !== undefined) allowedFields.payment_method_2 = body.payment_method_2;
     if (body.amount_method_1 !== undefined) allowedFields.amount_method_1 = Number(body.amount_method_1);
     if (body.amount_method_2 !== undefined) allowedFields.amount_method_2 = Number(body.amount_method_2);

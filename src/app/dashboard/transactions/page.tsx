@@ -358,6 +358,13 @@ function getCompanyBadge(company: string): { label: string; color: string } {
   return { label: company.trim(), color: "bg-gray-50 text-gray-600 ring-1 ring-gray-200" };
 }
 
+// ── Badge Cabang (multi-branch) — data lama tanpa branch dianggap UTAMA ──
+function getBranchBadge(branch: string | null | undefined): { label: string; color: string } {
+  return branch === "JOGJA"
+    ? { label: "📍 Jogja", color: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" }
+    : { label: "🏢 Utama", color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" };
+}
+
 function getItemKindBadge(kind: string | undefined): { label: string; color: string } | null {
   if (kind === "accessory") return { label: " Aksesoris", color: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" };
   if (kind === "mixed") return { label: " Laptop+Aksesoris", color: "bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-200" };
@@ -1272,6 +1279,10 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           {item.sales_name && (
             <span className="px-2 py-0.5 rounded-lg font-semibold text-[10px] bg-gray-100 text-gray-700 whitespace-nowrap"> {item.sales_name}</span>
           )}
+          {(() => {
+            const badge = getBranchBadge(item.branch);
+            return <span className={`px-2 py-0.5 rounded-lg font-semibold text-[10px] whitespace-nowrap ${badge.color}`}>{badge.label}</span>;
+          })()}
         </div>
 
         {/* Laptop */}
@@ -1592,7 +1603,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto" style={{ maxHeight: "calc(100dvh - 200px)", overflowY: "auto" }}>
-        <table className="w-full border-collapse" style={{ minWidth: canSeeModal ? "1960px" : "1835px" }}>
+         <table className="w-full border-collapse" style={{ minWidth: canSeeModal ? "2070px" : "1945px" }}>
           <thead>
             <tr>
               <th className={`${HEAD} text-center w-[60px]`}>No</th>
@@ -1613,6 +1624,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
               <SortableTh label="Sumber" sortKey="source" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[115px]`} />
               <th className={`${HEAD} text-center w-[100px]`}>Dari Ads</th>
               <SortableTh label="Toko" sortKey="company" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[115px]`} />
+              <th className={`${HEAD} text-center w-[110px]`}>Cabang</th>
               <th className={`${HEAD} text-center w-[130px]`}>Aksi</th>
             </tr>
           </thead>
@@ -1940,6 +1952,12 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
         <td className="px-4 py-3.5 text-center">
           {(() => {
             const badge = getCompanyBadge(item.company_name ?? "");
+            return <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${badge.color}`}>{badge.label}</span>;
+          })()}
+        </td>
+        <td className="px-4 py-3.5 text-center">
+          {(() => {
+            const badge = getBranchBadge(item.branch);
             return <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${badge.color}`}>{badge.label}</span>;
           })()}
         </td>
@@ -2448,6 +2466,8 @@ function EditTransactionModal({
   const [dpAmount, setDpAmount] = useState<string>(() => String(item.dp_amount || 0));
   const [customerName, setCustomerName] = useState(item.customer_name || "");
   const [customerPhone, setCustomerPhone] = useState(item.customer_phone || "");
+  // Cabang — prefill dari transaksi (data lama tanpa branch → UTAMA)
+  const [branch, setBranch] = useState<"UTAMA" | "JOGJA">(item.branch === "JOGJA" ? "JOGJA" : "UTAMA");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -2692,6 +2712,7 @@ function EditTransactionModal({
         amount: computedTotalDeal,
         customer_name: customerName.trim() || item.customer_name,
         customer_phone: customerPhone.trim() || null,
+        branch, // ← cabang (koreksi kalau salah input saat payment)
         edit_reason: reason.trim(),
         accessories: accessories.map((a) => ({
           accessory_id: a.accessory_id,
@@ -3099,6 +3120,24 @@ function EditTransactionModal({
                 placeholder="08..."
                 className="w-full h-9 border border-gray-300 rounded-xl px-3 text-xs text-gray-800 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition"
               />
+            </div>
+          </div>
+
+          {/* Cabang — koreksi kalau salah input saat payment */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+              Cabang
+            </label>
+            <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
+              {([
+                { value: "UTAMA", label: "🏢 Cabang Utama" },
+                { value: "JOGJA", label: "📍 Cabang Jogja" },
+              ] as const).map((b) => (
+                <button key={b.value} type="button" onClick={() => setBranch(b.value)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition ${branch === b.value ? "bg-[#0f0c29] text-white shadow-sm" : "text-gray-400 hover:text-gray-600"}`}>
+                  {b.label}
+                </button>
+              ))}
             </div>
           </div>
 
