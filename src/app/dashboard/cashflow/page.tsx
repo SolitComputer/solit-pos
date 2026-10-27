@@ -1143,6 +1143,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     const [keterangan, setKeterangan] = useState("");
     const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
     const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
+    const [branch, setBranch] = useState<"UTAMA" | "JOGJA">("UTAMA"); // ← cabang entry manual
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
@@ -1177,7 +1178,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             for (const it of items) {
                 const res = await fetch("/api/cashflow", {
                     method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ direction: "OUT", category: it.category, nominal: Number(it.nominal), keterangan: keterangan.trim() || null, tanggal, payment_method: paymentMethod, photo_url: photoUrl, target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null }),
+                    body: JSON.stringify({ direction: "OUT", category: it.category, nominal: Number(it.nominal), keterangan: keterangan.trim() || null, tanggal, payment_method: paymentMethod, photo_url: photoUrl, target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null, branch }),
                 });
                 const json = await res.json();
                 if (!json.success) return setError(json.message || "Gagal menyimpan");
@@ -1205,7 +1206,20 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     </div>
                     <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
-                <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                              <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Cabang <span className="text-red-500">*</span></label>
+                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
+                            {([
+                                { value: "UTAMA", label: "🏢 Cabang Utama" },
+                                { value: "JOGJA", label: "📍 Cabang Jogja" },
+                            ] as const).map((b) => (
+                                <button key={b.value} type="button" onClick={() => setBranch(b.value)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${branch === b.value ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
+                                    {b.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
                         <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
@@ -1599,6 +1613,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     // ⬅️ FIX: pakai tanggal WIB (dulu toISOString() = UTC, salah hari kalau input sebelum jam 07.00 WIB)
     const [tanggal, setTanggal] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }));
     const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
+    const [branch, setBranch] = useState<"UTAMA" | "JOGJA">("UTAMA"); // ← cabang entry manual
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
@@ -1651,6 +1666,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                         payment_method: paymentMethod,
                         photo_url: photoUrl,
                         target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null, // ⬅️ BARU
+                        branch, // ← cabang
                     }),
                 });
                 const json = await res.json();
@@ -1689,6 +1705,19 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                     <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Cabang <span className="text-red-500">*</span></label>
+                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
+                            {([
+                                { value: "UTAMA", label: "🏢 Cabang Utama" },
+                                { value: "JOGJA", label: "📍 Cabang Jogja" },
+                            ] as const).map((b) => (
+                                <button key={b.value} type="button" onClick={() => setBranch(b.value)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${branch === b.value ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
+                                    {b.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
                         <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
@@ -2415,7 +2444,7 @@ export default function CashflowPage() {
 
                 {/* Tab + Filter + CTA */}
                 <div className={`${CARD_BASE} p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap`}>
-                                  <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                         {canSwitchBranch && (
                             <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
                                 {([

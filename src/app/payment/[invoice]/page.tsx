@@ -61,6 +61,7 @@ interface Transaction {
   created_at: string;
   last_edited_by: string;
   last_edited_at: string;
+  branch?: "UTAMA" | "JOGJA";
 }
 
 interface ReadyUnit {
@@ -573,6 +574,7 @@ export default function EditTransactionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
+          branch: formData.branch === "JOGJA" ? "JOGJA" : "UTAMA", // ← cabang (fail-safe)
           deal_price: totalDeal,
           amount: totalDeal,
           serial_numbers: sns,
@@ -1105,6 +1107,31 @@ export default function EditTransactionPage() {
                 ))}
               </datalist>
             </Field>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-400 mb-2">
+                Cabang
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: "UTAMA", label: "Cabang Utama", icon: "🏢" },
+                  { value: "JOGJA", label: "Cabang Jogja", icon: "📍" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => ({ ...prev, branch: opt.value as "UTAMA" | "JOGJA" }));
+                      setHasChanges(true);
+                    }}
+                    className={`ctype-btn text-[11px] sm:text-[13px] ${(formData.branch ?? "UTAMA") === opt.value ? "active" : ""}`}
+                  >
+                    <span>{opt.icon}</span>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="section-divider" />
