@@ -2343,7 +2343,28 @@ export default function CashflowPage() {
                             <span className="hidden sm:inline text-sm">Segarkan</span>
                         </button>
                     </div>
-                </div>
+                              </div>
+
+                {/* Switcher Cabang — dipindah ke baris sendiri di bawah header biar jelas
+                    "lagi lihat data cabang mana" & toolbar bawah nggak sesak. Fungsi sama persis. */}
+                {canSwitchBranch && (
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Tampilan</span>
+                        <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
+                            {([
+                                { key: "ALL", label: "🏢 Semua Cabang", title: "Konsolidasi — Cabang Utama + Jogja" },
+                                { key: "JOGJA", label: "📍 Cabang Jogja", title: "Eksklusif transaksi Cabang Jogja" },
+                            ] as const).map((b) => (
+                                <button key={b.key} onClick={() => setBranchView(b.key)} title={b.title}
+                                    className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all ${branchView === b.key
+                                        ? "bg-[#1a1545] text-white shadow-sm"
+                                        : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
+                                    {b.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Saldo Utama — kartu saldo bergaya "balance card" fintech: latar gradient gelap
                     navy-violet (identitas brand), bukan cuma kartu putih dengan garis aksen tipis.
@@ -2444,22 +2465,7 @@ export default function CashflowPage() {
 
                 {/* Tab + Filter + CTA */}
                 <div className={`${CARD_BASE} p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap`}>
-                    <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-                        {canSwitchBranch && (
-                            <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
-                                {([
-                                    { key: "ALL", label: "🏢 Semua Cabang", title: "Konsolidasi — Cabang Utama + Jogja" },
-                                    { key: "JOGJA", label: "📍 Cabang Jogja", title: "Eksklusif transaksi Cabang Jogja" },
-                                ] as const).map((b) => (
-                                    <button key={b.key} onClick={() => setBranchView(b.key)} title={b.title}
-                                        className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all ${branchView === b.key
-                                            ? "bg-[#1a1545] text-white shadow-sm"
-                                            : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
-                                        {b.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                                      <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                         <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
                             {(["IN", "OUT"] as const).map((t) => (
                                 <button key={t} onClick={() => { setTab(t); setStaleOnly(false); }} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm shadow-emerald-500/30" : "bg-red-600 text-white shadow-sm shadow-red-500/30" : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
