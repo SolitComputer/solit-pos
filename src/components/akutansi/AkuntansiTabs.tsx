@@ -132,23 +132,21 @@ export default function AkuntansiTabs({ period }: { period: string }) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          {/* Switcher cabang — hanya Admin & Accounting, dan tab yang relevan (bukan Kelola Akun) */}
+          {/* Filter cabang — dropdown (BUKAN tab), hanya Admin & Accounting, bukan di tab Kelola Akun.
+              Sengaja berbentuk <select> biar jelas kebaca sebagai filter, bukan switch tab/mode. */}
           {canSwitchBranch && tab !== "akun" && (
-            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100/80 p-1 gap-0.5">
-              {([
-                { key: "ALL", label: "🏢 Semua Cabang", title: "Gabungan Cabang Utama + Jogja" },
-                { key: "JOGJA", label: "📍 Cabang Jogja", title: "Eksklusif transaksi Cabang Jogja" },
-              ] as const).map((b) => (
-                <button
-                  key={b.key}
-                  onClick={() => setBranch(b.key)}
-                  title={b.title}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${branch === b.key ? "bg-[#1a1545] text-white shadow-sm" : "text-slate-500 hover:bg-white hover:shadow-sm"}`}
-                >
-                  {b.label}
-                </button>
-              ))}
-            </div>
+            <label className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">Cabang:</span>
+              <select
+                value={branch}
+                onChange={(e) => setBranch(e.target.value as "ALL" | "JOGJA")}
+                title="Filter data akuntansi per cabang"
+                className={`h-10 rounded-xl border px-3 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all ${branch === "JOGJA" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"}`}
+              >
+                <option value="ALL">🏢 Semua Cabang</option>
+                <option value="JOGJA">📍 Cabang Jogja</option>
+              </select>
+            </label>
           )}
 
           {/* Export Excel Button */}
