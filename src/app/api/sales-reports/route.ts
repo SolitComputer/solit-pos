@@ -30,10 +30,6 @@ function hasNoAddRole(user: AuthUser): boolean {
   return roles.some((r) => NO_ADD_ROLES.includes(r));
 }
 
-// Pilihan Nama Toko — sumber kebenaran server-side. HARUS disamakan dengan
-// STORE_OPTIONS di halaman UI (laporan-harian-sales/page.tsx).
-const STORE_OPTIONS = ["Solit", "Sotech", "Onpoint", "Sultan Laptop"];
-
 // Bentuk data yang sudah divalidasi & siap insert/update ke tabel.
 interface NormalizedReport {
   channel: string;
@@ -45,7 +41,6 @@ interface NormalizedReport {
   ads: string | null;
   purchased: boolean;
   price_range: PriceRange;
-  nama_toko: string;
 }
 // Discriminated union (pakai flag `success`) supaya TypeScript bisa menyempitkan
 // (narrow) tipe `value` menjadi PASTI ada begitu `success === true` dicek —
@@ -86,14 +81,11 @@ function validateAndNormalize(body: any): ValidationResult {
   const purchased = Boolean(body.purchased);
   const ads = (body.ads ?? "").toString().trim(); // teks bebas, opsional (seperti sumber)
   const price_range = (body.price_range ?? "").toString().trim();
-  const nama_toko = (body.nama_toko ?? "").toString().trim();
   const isNoPhone = NO_PHONE_CHANNELS.includes(channel);
 
   if (!interest) return { success: false, error: "Minat wajib diisi" };
   // Wajib & harus salah satu opsi resmi — tolak nilai kosong/asal dari client.
   if (!isPriceRange(price_range)) return { success: false, error: "Range harga wajib dipilih" };
-  // Nama toko wajib & harus salah satu opsi resmi.
-  if (!STORE_OPTIONS.includes(nama_toko)) return { success: false, error: "Nama toko wajib dipilih" };
   if (isNoPhone && !partner_name) {
     const message = USERNAME_CHANNELS.includes(channel) ? "Username wajib diisi" : "Nama mitra/reseller wajib diisi";
     return { success: false, error: message };
@@ -112,7 +104,6 @@ function validateAndNormalize(body: any): ValidationResult {
       purchased,
       ads: ads || null, // null jika string kosong
       price_range,
-      nama_toko,
     },
   };
 }
