@@ -428,6 +428,17 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // siapa yang boleh membuat pengambilan.
   "/api/accessory-units": [...ITEM_OUTFLOW_ROLES],
   "/api/units/search-sn-kebutuhan": [...ITEM_OUTFLOW_ROLES],
+  // Search SN (laptop + aksesoris) untuk modal Penyiapan Barang (CreateModal
+  // di /dashboard/preparation & AddAccessoryModal di /dashboard/preparation/[id]).
+  // Dulu TIDAK terdaftar → middleware jatuh ke dynamic-matrix & memblok role
+  // non-ADMIN (mis. PENYEDIA_BARANG) walau modalnya muncul untuk mereka →
+  // fetch 403 → hasil search kosong ("SN tidak nampil"). Gabungan role yang
+  // boleh BUAT penyiapan (CreateModal) + role yang boleh SELESAIKAN/ADD unit
+  // (AddAccessoryModal). Pola fix sama persis dgn /api/accessory-units di atas.
+  "/api/units/search-sn": Array.from(new Set<UserRole>([
+    ...PREPARATION_CREATE_ROLES,
+    ...PREPARATION_DONE_ROLES,
+  ])),
   // Peminjaman Barang — SEMUA role boleh buka & ajukan pinjam. `ALL_ROLES` tidak
   // bisa di-spread di sini (didefinisikan setelah ROUTE_PERMISSIONS), jadi ditulis
   // literal. Approve/reject tetap digate di handler pakai ITEM_LOAN_APPROVE_ROLES.

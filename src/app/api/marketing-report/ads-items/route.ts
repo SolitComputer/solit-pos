@@ -46,8 +46,12 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     let query = supabaseAdmin
       .from(TABLE)
-      .select("invoice_number, created_at, customer_name, sales_name, laptop_name, laptop_id, company_name, source_platform, status")
-      .ilike("source_platform", "%ADS%")
+      .select("invoice_number, created_at, customer_name, sales_name, laptop_name, laptop_id, company_name, source_platform, status, from_ads")
+      // ✅ Dianggap "dari Ads" kalau from_ads = true (penanda baru dari form
+      //    payment, berlaku sejak fitur ini di-deploy) ATAU source_platform
+      //    mengandung "ADS" (perilaku lama — mis. "Ads Facebook" — dibiarkan
+      //    apa adanya supaya transaksi lama yang sudah tampil di sini TIDAK hilang).
+      .or("from_ads.eq.true,source_platform.ilike.%ADS%")
       .neq("status", "CANCELLED");
     if (startUtc) query = query.gte("created_at", startUtc);
     if (endUtc) query = query.lt("created_at", endUtc);
@@ -132,13 +136,27 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       return Array.from(new Set(parts)).join("; ");
     }
 
+    // Sumber yang tampil di tabel — disamakan dengan badge "Dari Ads" di
+    // Riwayat Transaksi: kalau from_ads = true tampil "Ads <platform>"
+    // (mis. "Ads WhatsApp"); prefix "Ads " yang mungkin sudah ada dibuang
+    // dulu supaya tidak dobel. Kalau from_ads bukan true → source_platform
+    // apa adanya (perilaku lama, transaksi lama tidak berubah).
+    function formatSumber(trx: any): string | null {
+      const raw = (trx.source_platform ?? "").trim();
+      if (trx.from_ads === true) {
+        const platform = raw.replace(/^ads\s+/i, "").trim();
+        return platform ? `Ads ${platform}` : "Dari Ads";
+      }
+      return raw || null;
+    }
+
     const data: AdsItemRow[] = transactions.map((trx: any) => ({
       invoice_number: trx.invoice_number,
       created_at: trx.created_at,
       customer_name: trx.customer_name ?? "—",
       sales_name: trx.sales_name ?? null,
       barang: describeBarang(trx),
-      sumber: trx.source_platform ?? null,
+      sumber: formatSumber(trx),
       nama_toko: trx.company_name ?? null,
     }));
 

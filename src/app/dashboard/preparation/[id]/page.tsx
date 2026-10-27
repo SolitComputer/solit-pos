@@ -507,7 +507,6 @@ function AddAccessoryModal({ orderId, onClose, onAdded }: {
     const [snSearch, setSnSearch] = useState("");
     const [snResults, setSnResults] = useState<any[]>([]);
     const [searching, setSearching] = useState(false);
-    const [manualSN, setManualSN] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -527,12 +526,6 @@ function AddAccessoryModal({ orderId, onClose, onAdded }: {
             ? { serial_number: u.serial_number, item_type: "accessory", laptop_name: u.laptop_name ?? u.accessory_name ?? undefined, accessory_id: u.accessory_id ?? u.laptop_id ?? undefined, accessory_unit_id: u.id ?? undefined }
             : { serial_number: u.serial_number, item_type: "laptop", laptop_name: u.laptop_name ?? undefined, laptop_id: u.laptop_id ?? undefined, unit_id: u.id ?? undefined }]);
         setSnSearch(""); setSnResults([]);
-    };
-    const addManual = () => {
-        const sn = manualSN.trim();
-        if (!sn) return;
-        setItems(prev => [...prev, { serial_number: sn, item_type: itemKind }]);
-        setManualSN("");
     };
     const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
 
@@ -592,13 +585,11 @@ function AddAccessoryModal({ orderId, onClose, onAdded }: {
                         </div>
                     )}
 
-                    <div className="flex gap-2">
-                        <input value={manualSN} onChange={e => setManualSN(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addManual(); } }}
-                            placeholder="Atau ketik SN manual..." className={`${inputCls} font-mono flex-1`} />
-                        <button type="button" onClick={addManual}
-                            className="px-4 h-10 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition whitespace-nowrap">+ Tambah</button>
-                    </div>
+                    {/* Input manual SN DIHAPUS — item HARUS dipilih dari hasil
+                        search stok (addFromSearch) supaya accessory_id/laptop_id +
+                        unit id ikut tersimpan. SN ketik-bebas bikin preparation_items
+                        tanpa id → bermasalah saat ditarik di payment. Konsisten dgn
+                        CreateModal di /dashboard/preparation/page.tsx. */}
 
                     {items.length > 0 && (
                         <div className="space-y-1.5">

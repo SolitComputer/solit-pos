@@ -348,6 +348,27 @@ function getSourcePlatformBadge(platform: string): { text: string; color: string
   return { text: platform || "-", color: "bg-gray-50 text-gray-700 ring-1 ring-gray-200" };
 }
 
+// ── Badge "Dari Ads" — gabungan from_ads + source_platform ──────────────
+// from_ads === true  → "Ads <Platform>" (mis. "Ads WhatsApp", "Ads Shopee").
+//                      Prefix "Ads " yang mungkin sudah ada di source_platform
+//                      (mis. "Ads Facebook") dibuang dulu supaya tidak dobel.
+// from_ads === false → "Tidak".
+// from_ads null/undef (transaksi lama sebelum fitur ini) → null → tampil "—".
+function getAdsBadge(item: any): { text: string; color: string } | null {
+  if (item.from_ads === true) {
+    const raw = (item.source_platform ?? "").trim();
+    const platform = raw.replace(/^ads\s+/i, "").trim();
+    return {
+      text: platform ? `Ads ${platform}` : "Dari Ads",
+      color: "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200",
+    };
+  }
+  if (item.from_ads === false) {
+    return { text: "Tidak", color: "bg-gray-100 text-gray-500" };
+  }
+  return null;
+}
+
 function getCompanyBadge(company: string): { label: string; color: string } {
   const cn = (company ?? "").toLowerCase();
   if (cn.includes("sotech")) return { label: "Sotech", color: "bg-orange-50 text-orange-700 ring-1 ring-orange-200" };
@@ -1941,13 +1962,14 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
           </div>
         </td>
         <td className="px-4 py-3.5 text-center">
-          {item.from_ads === true ? (
-            <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200">Dari Ads</span>
-          ) : item.from_ads === false ? (
-            <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap bg-gray-100 text-gray-500">Tidak</span>
-          ) : (
-            <span className="text-[10px] text-gray-300">—</span>
-          )}
+          {(() => {
+            const ads = getAdsBadge(item);
+            return ads ? (
+              <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${ads.color}`}>{ads.text}</span>
+            ) : (
+              <span className="text-[10px] text-gray-300">—</span>
+            );
+          })()}
         </td>
         <td className="px-4 py-3.5 text-center">
           {(() => {
