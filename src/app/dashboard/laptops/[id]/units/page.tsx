@@ -1217,10 +1217,18 @@ export default function UnitsPage() {
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 active:opacity-60 transition">Batal pilih</button>
-                                {/* Bulk bar laptop sengaja HANYA Audit — Edit & Hapus massal
-                                    dihilangkan (tombol Edit/Hapus per-baris di kolom Aksi tetap ada).
-                                    Centang di halaman ini khusus untuk audit massal.
-                                    Yang sudah teraudit di-skip (tidak dibatalkan). */}
+                                {/* Edit massal unit tercentang — form sama persis dgn Edit Unit
+                                    tunggal (BulkEditUnitsModal). Hanya unit aktif (bukan SOLD)
+                                    yang ikut; Harga Modal cuma bisa diubah role full-access. */}
+                                {canManageUnits && (
+                                    <button onClick={() => setShowBulkEditModal(true)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a2e] text-white rounded-lg text-xs font-semibold hover:bg-[#16213e] transition">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Edit {selectedIds.size} Unit
+                                    </button>
+                                )}
                                 {canAuditUnits && (
                                     <button onClick={handleBulkAudit} disabled={bulkAuditing}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
