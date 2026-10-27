@@ -32,9 +32,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
      // Anti self-approve — berlaku untuk semua role approval KECUALI Admin.
     // Admin boleh ACC pengajuannya sendiri; Kepala Sales (dan role approval
     // lain di masa depan) tetap wajib minta orang lain.
-    if (me.id === req.user_id && !me.isAdmin)
+    if (me.id === req.user_id)
       return NextResponse.json(
-        { success: false, message: "Kamu tidak boleh meng-ACC pengajuanmu sendiri. Minta Admin/Kepala Sales lain." },
+        { success: false, message: "Kamu tidak boleh meng-ACC pengajuanmu sendiri. Minta Kepala Sales lain." },
         { status: 403 }
       );
     if (req.status !== "PENDING")

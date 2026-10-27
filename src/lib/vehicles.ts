@@ -18,7 +18,7 @@ export type Requester = {
   name: string;
   roles: string[];
   isAdmin: boolean;
-  canApprove: boolean; // boleh ACC/Tolak pengajuan peminjaman (ADMIN + Kepala Sales)
+  canApprove: boolean; // boleh ACC/Tolak pengajuan peminjaman (khusus Kepala Sales)
 };
 
 // Ambil identitas pemanggil. Prefer header x-user-* yang di-set middleware,
