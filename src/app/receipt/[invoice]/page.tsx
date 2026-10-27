@@ -249,6 +249,7 @@ export default async function Page(props: Props) {
                     <li>Garansi hanya berlaku untuk kerusakan yang BUKAN akibat human error.</li>
                     <li>Kerusakan LCD (pecah, kena air, terbakar, bergaris, berkedip, gelap/redup, blank putih, dead pixel, berbayang/shadow, warna pudar/tidak akurat, bercak hitam/putih) TIDAK termasuk garansi.</li>
                     <li>Wajib membawa nota ini saat klaim garansi.</li>
+                    <li>Refund dikenakan potongan 20% sejak deal barang.</li>
                   </ol>
                   <p className="font-bold mt-1.5">!! Barang yang sudah dibeli tidak bisa dikembalikan.</p>
                 </div>
