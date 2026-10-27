@@ -35,6 +35,7 @@ export const GET = withAuth(async (req) => {
   const url = new URL(req.url);
   const period = url.searchParams.get("period") ?? "";
   const accountCode = url.searchParams.get("account_code") ?? "";
+  const branchFilter = url.searchParams.get("branch") === "JOGJA" ? "JOGJA" : null;
 
   if (!isValidPeriod(period))
     return NextResponse.json({ success: false, message: "Periode tidak valid" }, { status: 400 });
@@ -61,22 +62,29 @@ export const GET = withAuth(async (req) => {
 
     if (openingErr) throw openingErr;
 
-    const openingSigned = openingRow
-      ? openingRow.side === "DEBIT"
-        ? Number(openingRow.nominal)
-        : -Number(openingRow.nominal)
-      : 0;
+    // Saldo Awal Manual itu account-level (tanpa cabang). Pada tampilan per-cabang
+    // tidak dipakai — biar saldo berjalan versi cabang murni dari mutasi cabang itu
+    // (dan tetap balance, karena tiap jurnal entry sudah seimbang).
+    const openingSigned = branchFilter
+      ? 0
+      : openingRow
+        ? openingRow.side === "DEBIT"
+          ? Number(openingRow.nominal)
+          : -Number(openingRow.nominal)
+        : 0;
 
     const priorLines: any[] = [];
     {
       const PAGE_SIZE = 1000;
       let from = 0;
       while (true) {
-        const { data: page, error: priorLineErr } = await supabase
+        let priorQ = supabase
           .from("journal_lines")
           .select("side, nominal, journal_entries!inner(period)")
           .eq("account_code", accountCode)
-          .lt("journal_entries.period", period)
+          .lt("journal_entries.period", period);
+        if (branchFilter) priorQ = priorQ.eq("journal_entries.branch", branchFilter);
+        const { data: page, error: priorLineErr } = await priorQ
           .order("id", { ascending: true })
           .range(from, from + PAGE_SIZE - 1);
 
@@ -99,10 +107,12 @@ export const GET = withAuth(async (req) => {
       const PAGE_SIZE = 1000;
       let from = 0;
       while (true) {
-        const { data: page, error: entryErr } = await supabase
+        let entryQ = supabase
           .from("journal_entries")
           .select("id, tanggal, keterangan, ref, source_type, source_id, created_at")
-          .eq("period", period)
+          .eq("period", period);
+        if (branchFilter) entryQ = entryQ.eq("branch", branchFilter);
+        const { data: page, error: entryErr } = await entryQ
           .order("tanggal", { ascending: true })
           .order("id", { ascending: true })
           .range(from, from + PAGE_SIZE - 1);
@@ -133,10 +143,12 @@ export const GET = withAuth(async (req) => {
       const PAGE_SIZE = 1000;
       let from = 0;
       while (true) {
-        const { data: page, error: lineErr } = await supabase
+        let lineQ = supabase
           .from("journal_lines")
           .select("id, entry_id, account_code, side, nominal, keterangan, journal_entries!inner(period)")
-          .eq("journal_entries.period", period)
+          .eq("journal_entries.period", period);
+        if (branchFilter) lineQ = lineQ.eq("journal_entries.branch", branchFilter);
+        const { data: page, error: lineErr } = await lineQ
           .order("id", { ascending: true })
           .range(from, from + PAGE_SIZE - 1);
 
@@ -243,9 +255,11 @@ export const GET = withAuth(async (req) => {
       data: {
         account: { code: accountCode, name: accRow.name },
         saldo_awal: saldoAwal,
-        opening_balance: openingRow
-          ? { side: openingRow.side, nominal: Number(openingRow.nominal) }
-          : null,
+        opening_balance: branchFilter
+          ? null // tampilan per-cabang tidak menampilkan saldo awal account-level
+          : openingRow
+            ? { side: openingRow.side, nominal: Number(openingRow.nominal) }
+            : null,
         lines,
         totals: { debit: totalDebit, kredit: totalKredit, saldo_akhir: running },
       },

@@ -19,7 +19,7 @@ interface NeracaData {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const rp = (n: number) => `Rp${Math.round(Number(n || 0)).toLocaleString("id-ID")}`;
 
-export default function Neraca({ period }: { period: string }) {
+export default function Neraca({ period, branch = "ALL" }: { period: string; branch?: "ALL" | "JOGJA" }) {
     const [data, setData] = useState<NeracaData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -28,8 +28,9 @@ export default function Neraca({ period }: { period: string }) {
         setLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/akutansi/neraca?period=${period}`, { cache: "no-store" });
-             const json = await res.json();
+            const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
+            const res = await fetch(`/api/akutansi/neraca?period=${period}${branchQS}`, { cache: "no-store" });
+            const json = await res.json();
             if (!json.success) {
                 setError(json.message ?? "Gagal memuat neraca");
                 setData(null);
@@ -42,7 +43,7 @@ export default function Neraca({ period }: { period: string }) {
         } finally {
             setLoading(false);
         }
-    }, [period]);
+     }, [period, branch]);
 
     useEffect(() => {
         load();

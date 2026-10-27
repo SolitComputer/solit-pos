@@ -16,6 +16,7 @@ export interface Account {
 export const AKUN = {
   KAS_SALDO: "110",
   KAS_CASH: "120",
+  KAS_CASH_JOGJA: "121", // ⬅️ BARU — kas cash fisik Cabang Jogja (bank/saldo tetap 110 shared)
   HPP: "130",
   PIUTANG: "140",
   KASBON: "141",   // ⬅️ BARU
@@ -54,6 +55,7 @@ export const ACCOUNTS: Account[] = [
   // ── Aset ──
   { code: AKUN.KAS_SALDO, name: "Kas Saldo", type: "ASET", normal: "DEBIT" },
   { code: AKUN.KAS_CASH, name: "Kas Cash", type: "ASET", normal: "DEBIT" },
+  { code: AKUN.KAS_CASH_JOGJA, name: "Kas Cash Jogja", type: "ASET", normal: "DEBIT" }, // ⬅️ BARU
   { code: AKUN.HPP, name: "HPP (Modal)", type: "ASET", normal: "DEBIT" },
   { code: AKUN.PIUTANG, name: "Piutang", type: "ASET", normal: "DEBIT" },
   { code: AKUN.KASBON, name: "Kasbon", type: "ASET", normal: "DEBIT" },
@@ -179,9 +181,12 @@ export function kasAccountFromPaymentMethod(method?: string | null): string {
   return AKUN.KAS_SALDO;
 }
 
-/** Cashflow payment_method hanya "CASH" | "SALDO" */
-export function kasAccountFromCashflow(pm?: string | null): string {
-  return pm === "CASH" ? AKUN.KAS_CASH : AKUN.KAS_SALDO;
+/** Cashflow payment_method hanya "CASH" | "SALDO".
+ *  CASH + branch "JOGJA" → kas cash Jogja (121); CASH lain → 120.
+ *  SALDO/non-cash SELALU 110 (bank/saldo dipakai bareng semua cabang). */
+export function kasAccountFromCashflow(pm?: string | null, branch?: string | null): string {
+  if (pm !== "CASH") return AKUN.KAS_SALDO;
+  return branch === "JOGJA" ? AKUN.KAS_CASH_JOGJA : AKUN.KAS_CASH;
 }
 
 // ─── Mapping Kategori Cashflow → Akun ────────────────────────────────────────

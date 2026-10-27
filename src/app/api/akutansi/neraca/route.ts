@@ -25,10 +25,11 @@ export const GET = withAuth(async (req) => {
   if (!isValidPeriod(period))
     return NextResponse.json({ success: false, message: "Periode tidak valid" }, { status: 400 });
 
+  const branchFilter = new URL(req.url).searchParams.get("branch") === "JOGJA" ? "JOGJA" : null;
   const supabase = getAdmin();
 
   try {
-    const data = await computeNeraca(supabase, period);
+    const data = await computeNeraca(supabase, period, branchFilter);
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
     console.error("[neraca GET]", error);

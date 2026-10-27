@@ -84,7 +84,7 @@ function getNormalSide(code: string): NormalSide {
     return null;
 }
 
-export default function BukuBesar({ period }: { period: string }) {
+export default function BukuBesar({ period, branch = "ALL" }: { period: string; branch?: "ALL" | "JOGJA" }) {
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [accountCode, setAccountCode] = useState<string>(ACCOUNTS[0]?.code ?? "");
     const [tableSearch, setTableSearch] = useState("");
@@ -113,7 +113,8 @@ export default function BukuBesar({ period }: { period: string }) {
         if (!silent) setLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/akutansi/buku-besar?period=${period}&account_code=${accountCode}`);
+                       const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
+            const res = await fetch(`/api/akutansi/buku-besar?period=${period}&account_code=${accountCode}${branchQS}`);
             const json = await res.json();
             if (!json.success) {
                 if (!silent) {
@@ -145,7 +146,7 @@ export default function BukuBesar({ period }: { period: string }) {
         } finally {
             if (!silent) setLoading(false);
         }
-    }, [period, accountCode]);
+    }, [period, accountCode, branch]);
 
     // Toggle status "sudah dicek" per baris jurnal.
     // Optimistic update dulu (UI langsung berubah), lalu simpan ke server;

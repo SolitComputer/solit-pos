@@ -294,7 +294,7 @@ function getCompanyBadge(company?: string | null): { label: string; color: strin
     return { label: company.trim(), color: "bg-gray-50 text-gray-600 border-gray-200" };
 }
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function JurnalUmum({ period }: { period: string }) {
+export default function JurnalUmum({ period, branch = "ALL" }: { period: string; branch?: "ALL" | "JOGJA" }) {
     const [entries, setEntries] = useState<JournalEntry[]>([]);
     const [pending, setPending] = useState<PendingDraft[]>([]);
     const [pendingSummary, setPendingSummary] = useState<{
@@ -374,8 +374,11 @@ export default function JurnalUmum({ period }: { period: string }) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 25000);
         try {
+            const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
             const [jRes, pRes] = await Promise.all([
-                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}`, { signal: controller.signal }),
+                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}${branchQS}`, { signal: controller.signal }),
+                // Pending sengaja TIDAK difilter cabang — biar semua draft yang perlu
+                // dikonfirmasi tetap kelihatan apa pun cabang yang sedang dipilih.
                 fetch(`/api/akutansi/jurnal/pending?period=${period}`, { signal: controller.signal }),
             ]);
             const j = await jRes.json();
@@ -396,7 +399,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             clearTimeout(timeoutId);
             if (showLoader) setLoading(false);
         }
-    }, [period, sortOrder]);
+    }, [period, sortOrder, branch]);
 
     useEffect(() => { load(); }, [load]);
     useEffect(() => {

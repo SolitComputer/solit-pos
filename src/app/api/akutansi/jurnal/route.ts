@@ -51,16 +51,20 @@ export const GET = withAuth(async (req) => {
   const period = url.searchParams.get("period") ?? "";
   // default "desc" = terbaru dulu. Kirim ?sort=asc untuk terlama ke terbaru.
   const sort = url.searchParams.get("sort") === "asc" ? "asc" : "desc";
+  // Filter cabang: "JOGJA" → eksklusif Jogja; selain itu → gabungan semua cabang.
+  const branchFilter = url.searchParams.get("branch") === "JOGJA" ? "JOGJA" : null;
 
   if (!isValidPeriod(period))
     return NextResponse.json({ success: false, message: "Periode tidak valid" }, { status: 400 });
 
   const supabase = getAdmin();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("journal_entries")
     .select(ENTRY_SELECT)
-    .eq("period", period)
+    .eq("period", period);
+  if (branchFilter) query = query.eq("branch", branchFilter);
+  const { data, error } = await query
     .order("tanggal", { ascending: sort === "asc" })
     .order("created_at", { ascending: sort === "asc" }) // urutan dalam tanggal yang sama tetap konsisten (dipakai drag-and-drop reorder)
     .order("created_at", { ascending: true, foreignTable: "journal_warning_logs" }); // histori warning selalu lama → baru

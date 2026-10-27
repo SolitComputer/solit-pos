@@ -43,7 +43,11 @@ export interface NeracaResult {
   totals: { debit: number; kredit: number; balanced: boolean; selisih: number };
 }
 
-export async function computeNeraca(supabase: SupabaseClient, period: string): Promise<NeracaResult> {
+export async function computeNeraca(
+  supabase: SupabaseClient,
+  period: string,
+  branchFilter: "JOGJA" | null = null
+): Promise<NeracaResult> {
   // Ambil entry + lines s/d & termasuk periode ini, di-page karena bisa
   // lebih dari 1000 baris (cap default Supabase/PostgREST).
   const entriesWithLines: any[] = [];
@@ -51,10 +55,12 @@ export async function computeNeraca(supabase: SupabaseClient, period: string): P
     const PAGE_SIZE = 1000;
     let from = 0;
     while (true) {
-      const { data: page, error: entryErr } = await supabase
+      let neracaQ = supabase
         .from("journal_entries")
         .select("id, period, lines:journal_lines(account_code, side, nominal)")
-        .lte("period", period)
+        .lte("period", period);
+      if (branchFilter) neracaQ = neracaQ.eq("branch", branchFilter);
+      const { data: page, error: entryErr } = await neracaQ
         .order("id", { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
 
@@ -86,9 +92,14 @@ export async function computeNeraca(supabase: SupabaseClient, period: string): P
     .select("account_code, side, nominal");
   if (openingErr) throw openingErr;
 
-  for (const o of (openings ?? []) as any[]) {
-    const signed = o.side === "DEBIT" ? Number(o.nominal) : -Number(o.nominal);
-    balanceMap.set(o.account_code, (balanceMap.get(o.account_code) ?? 0) + signed);
+  // Saldo Awal Manual (account-level, tanpa cabang) hanya dipakai pada tampilan
+  // gabungan. Pada filter cabang di-skip supaya Neraca cabang tetap balance
+  // (murni dari entry jurnal cabang itu, yang masing-masing sudah seimbang).
+  if (!branchFilter) {
+    for (const o of (openings ?? []) as any[]) {
+      const signed = o.side === "DEBIT" ? Number(o.nominal) : -Number(o.nominal);
+      balanceMap.set(o.account_code, (balanceMap.get(o.account_code) ?? 0) + signed);
+    }
   }
 
   const { data: dbAccounts, error: dbErr } = await supabase
@@ -214,7 +225,11 @@ export interface LabaRugiResult {
   selisih_verifikasi: number | null;
 }
 
-export async function computeLabaRugi(supabase: SupabaseClient, period: string): Promise<LabaRugiResult> {
+export async function computeLabaRugi(
+  supabase: SupabaseClient,
+  period: string,
+  branchFilter: "JOGJA" | null = null
+): Promise<LabaRugiResult> {
   const { data: accountsData, error: accErr } = await supabase
     .from("chart_of_accounts")
     .select("code, name, type")
@@ -232,10 +247,12 @@ export async function computeLabaRugi(supabase: SupabaseClient, period: string):
     const PAGE_SIZE = 1000;
     let from = 0;
     while (true) {
-      const { data: page, error: lineErr } = await supabase
+      let lrQ = supabase
         .from("journal_lines")
         .select("account_code, side, nominal, journal_entries!inner(period)")
-        .lte("journal_entries.period", period)
+        .lte("journal_entries.period", period);
+      if (branchFilter) lrQ = lrQ.eq("journal_entries.branch", branchFilter);
+      const { data: page, error: lineErr } = await lrQ
         .order("id", { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
 
@@ -263,11 +280,16 @@ export async function computeLabaRugi(supabase: SupabaseClient, period: string):
     .select("account_code, side, nominal");
   if (openErr) throw openErr;
 
+  // Laba Ditahan bersumber dari Saldo Awal Manual akun "Laba <periode>" — itu
+  // konsep gabungan (account-level, tanpa cabang). Pada filter cabang di-skip,
+  // jadi Laba Rugi cabang murni = pendapatan − biaya cabang itu, tanpa Laba Ditahan.
   const openingByAccount = new Map<string, number>();
-  for (const o of (openings ?? []) as any[]) {
-    const signed = o.side === "DEBIT" ? Number(o.nominal) : -Number(o.nominal);
-    openingByAccount.set(o.account_code, (openingByAccount.get(o.account_code) ?? 0) + signed);
-    mutasiKumulatif.set(o.account_code, (mutasiKumulatif.get(o.account_code) ?? 0) + signed);
+  if (!branchFilter) {
+    for (const o of (openings ?? []) as any[]) {
+      const signed = o.side === "DEBIT" ? Number(o.nominal) : -Number(o.nominal);
+      openingByAccount.set(o.account_code, (openingByAccount.get(o.account_code) ?? 0) + signed);
+      mutasiKumulatif.set(o.account_code, (mutasiKumulatif.get(o.account_code) ?? 0) + signed);
+    }
   }
 
   const groups: Record<LabaRugiGroup, LabaRugiRow[]> = {
