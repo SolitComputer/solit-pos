@@ -1219,8 +1219,12 @@ export default function UnitsPage() {
                                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 active:opacity-60 transition">Batal pilih</button>
                                 {/* Edit massal unit tercentang — form sama persis dgn Edit Unit
                                     tunggal (BulkEditUnitsModal). Hanya unit aktif (bukan SOLD)
-                                    yang ikut; Harga Modal cuma bisa diubah role full-access. */}
-                                {canManageUnits && (
+                                    yang ikut; Harga Modal cuma bisa diubah role full-access.
+                                    Gate = canFullAccessBarang, DISAMAKAN dgn endpoint PUT
+                                    /api/units/[id] (BARANG_FULL_ACCESS_ROLES) & edit unit tunggal
+                                    (UnitDetailModal canEdit). Pakai canManageUnits malah bikin
+                                    role EDIT_UNITS non-full-access kena 403 di tiap unit. */}
+                                {canFullAccessBarang && (
                                     <button onClick={() => setShowBulkEditModal(true)}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a2e] text-white rounded-lg text-xs font-semibold hover:bg-[#16213e] transition">
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
