@@ -203,7 +203,54 @@ export async function PATCH(
   });
 }
 
-// ⚠️ Endpoint DELETE (hard delete) sudah dihapus sesuai permintaan.
-// Konten tidak pernah benar-benar dihapus — gunakan PATCH { is_cancelled: true }
-// (lihat tombol "Batalkan Konten" / "Cancel Konten" di CCReportModal) untuk
-// membatalkan konten. Data tetap tersimpan, hanya statusnya berubah jadi "Batal".
+// DELETE — hard delete laporan konten (di-request SOLIT03, override keputusan soft-cancel lama).
+// Role dicek di server, bukan cuma di UI, agar tidak bisa di-bypass lewat fetch manual.
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  // 1) Auth + cek role — pola sama persis dgn guard is_cancelled di PATCH
+  const currentUser = await getCurrentUser();
+  if (!currentUser || !hasAnyRole(currentUser.roles ?? [currentUser.role], CC_REPORT_MANAGE_ROLES)) {
+    return NextResponse.json(
+      { success: false, error: "Kamu tidak punya akses untuk menghapus laporan ini" },
+      { status: 403 }
+    );
+  }
+
+  // 2) Pastikan laporannya ada → balas 404 yang jelas, bukan 200 kosong
+  const { data: existing, error: existingErr } = await supabaseAdmin
+    .from("cc_reports")
+    .select("id")
+    .eq("id", id)
+    .single();
+
+  if (existingErr || !existing) {
+    return NextResponse.json({ success: false, error: "Laporan tidak ditemukan" }, { status: 404 });
+  }
+
+  // 3) Hapus anak dulu (cc_postings) biar tidak kena foreign key violation (23503).
+  //    Lewati langkah ini HANYA kalau FK cc_postings sudah ON DELETE CASCADE.
+  const { error: childErr } = await supabaseAdmin
+    .from("cc_postings")
+    .delete()
+    .eq("report_id", id); // ← SESUAIKAN nama kolom FK kalau bukan report_id
+
+  if (childErr) {
+    return NextResponse.json({ success: false, error: childErr.message }, { status: 500 });
+  }
+
+  // 4) Hapus laporan induknya
+  const { error } = await supabaseAdmin
+    .from("cc_reports")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
