@@ -238,7 +238,7 @@ export async function getTransactionSyncDraftsByInvoices(
     const { data, error } = await supabase
       .from("transactions")
       .select(
-        "invoice_number, status, deal_price, amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, item_kind, customer_name, laptop_name, serial_number"
+        "invoice_number, status, deal_price, amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, item_kind, customer_name, laptop_name, serial_number, branch"
       )
       .in("invoice_number", batch);
     if (error) {
@@ -315,13 +315,16 @@ export async function getTransactionSyncDraftsByInvoices(
     const isSplitPayment = !!m2 && a1 > 0 && a2 > 0;
 
     if (isSplitPayment) {
-      const account2 = kasAccountFromPaymentMethod(m2);
-      const account1 = account2 === AKUN.KAS_CASH ? AKUN.KAS_SALDO : AKUN.KAS_CASH;
+      // Tiap metode dihitung akun kas-nya sendiri + cabang: cash Jogja → 121,
+      // cash Utama → 120, transfer/QRIS → 110 (shared). Jadi split cash+transfer
+      // Jogja = 121 (bagian cash) + 110 (bagian transfer).
+      const account1 = kasAccountFromPaymentMethod(t.payment_method, t.branch);
+      const account2 = kasAccountFromPaymentMethod(m2, t.branch);
       const a2Final = deal - a1;
       lines.push({ account_code: account1, side: "DEBIT", nominal: a1 });
       if (a2Final > 0) lines.push({ account_code: account2, side: "DEBIT", nominal: a2Final });
     } else {
-      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
+      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method, t.branch), side: "DEBIT", nominal: deal });
     }
 
     if (effectiveItemKind === "accessory") {
@@ -688,7 +691,7 @@ export async function getServiceSyncDraftsByIds(
   for (const batch of chunkArray(eligibleIds, 150)) {
     const { data, error } = await supabase
       .from("service_orders")
-      .select("id, payment_amount, payment_method, nama, type_laptop")
+      .select("id, payment_amount, payment_method, nama, type_laptop, branch")
       .in("id", batch);
     if (error) {
       console.error("[akuntansi] fetch service_orders (sync):", error.message);
@@ -711,7 +714,7 @@ export async function getServiceSyncDraftsByIds(
       }));
 
     const lines: DraftLine[] = [
-      { account_code: kasAccountFromPaymentMethod(s.payment_method), side: "DEBIT", nominal: bayar },
+      { account_code: kasAccountFromPaymentMethod(s.payment_method, s.branch), side: "DEBIT", nominal: bayar },
       { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: bayar },
       ...sparepartLines,
     ];
@@ -893,8 +896,9 @@ async function buildTransactionDrafts(
     const isSplitPayment = !!m2 && a1 > 0 && a2 > 0;
 
     if (isSplitPayment) {
-      const account2 = kasAccountFromPaymentMethod(m2);
-      const account1 = account2 === AKUN.KAS_CASH ? AKUN.KAS_SALDO : AKUN.KAS_CASH;
+      // cash Jogja → 121, cash Utama → 120, transfer/QRIS → 110 (shared).
+      const account1 = kasAccountFromPaymentMethod(t.payment_method, t.branch);
+      const account2 = kasAccountFromPaymentMethod(m2, t.branch);
 
       const a2Final = deal - a1;
       lines.push({ account_code: account1, side: "DEBIT", nominal: a1 });
@@ -902,7 +906,7 @@ async function buildTransactionDrafts(
         lines.push({ account_code: account2, side: "DEBIT", nominal: a2Final });
       }
     } else {
-      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
+      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method, t.branch), side: "DEBIT", nominal: deal });
     }
 
     // (fix) Kredit akun pendapatan sesuai jenis barang — sebelumnya SELALU
@@ -1266,7 +1270,7 @@ async function buildTransactionPaymentDrafts(
     const paymentMethod = p.payment_method || trx?.payment_method || "CASH";
 
     const lines = mergeLines([
-      { account_code: kasAccountFromPaymentMethod(paymentMethod), side: "DEBIT", nominal: amount },
+      { account_code: kasAccountFromPaymentMethod(paymentMethod, trx?.branch), side: "DEBIT", nominal: amount },
       { account_code: AKUN.PIUTANG, side: "KREDIT", nominal: amount },
     ]);
 
@@ -1464,7 +1468,7 @@ async function buildServiceDrafts(
     const tanggal = jakartaDate(refDate);
 
     const lines: DraftLine[] = [
-      { account_code: kasAccountFromPaymentMethod(s.payment_method), side: "DEBIT", nominal: delta },
+      { account_code: kasAccountFromPaymentMethod(s.payment_method, s.branch), side: "DEBIT", nominal: delta },
       { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: delta },
     ];
 

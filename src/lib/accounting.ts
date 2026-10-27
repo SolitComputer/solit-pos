@@ -174,10 +174,14 @@ export function jakartaDate(iso: string): string {
 }
 
 // ─── Mapping Kas ──────────────────────────────────────────────────────────────
-/** Metode bayar transaksi/service → akun kas.  Tunai/Cash → 120, sisanya (TF/QRIS) → 110 */
-export function kasAccountFromPaymentMethod(method?: string | null): string {
+/** Metode bayar transaksi/service → akun kas.
+ *  Tunai/Cash + branch "JOGJA" → 121 (Kas Cash Jogja); Tunai/Cash lain → 120;
+ *  sisanya (TF/QRIS/dll) → 110 (Kas Saldo, dipakai bareng semua cabang). */
+export function kasAccountFromPaymentMethod(method?: string | null, branch?: string | null): string {
   const m = (method ?? "").toUpperCase();
-  if (m.includes("TUNAI") || m.includes("CASH")) return AKUN.KAS_CASH;
+  if (m.includes("TUNAI") || m.includes("CASH")) {
+    return branch === "JOGJA" ? AKUN.KAS_CASH_JOGJA : AKUN.KAS_CASH;
+  }
   return AKUN.KAS_SALDO;
 }
 
