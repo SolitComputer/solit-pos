@@ -25,7 +25,6 @@ import {
   ShoppingBag,
   UserCircle2,
   Wallet,
-  Calendar,
   Building2,
   ChevronDown,
 } from "lucide-react";
@@ -359,13 +358,6 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
           {/* Kontrol filter kanan — filter tanggal + status audit dikelompokkan.
               Keduanya komposabel (lihat filteredRows). */}
           <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-            <DateRangeFilter
-              from={dateFrom}
-              to={dateTo}
-              onChange={({ from, to }) => { setDateFrom(from); setDateTo(to); }}
-              onReset={() => { setDateFrom(""); setDateTo(""); }}
-            />
-
             {/* Filter status audit — jalan di rows yang sudah dimuat, tidak nambah request API. */}
             <div className="inline-flex items-center gap-1 rounded-full bg-gray-100 p-1 overflow-x-auto">
             <button
@@ -395,6 +387,14 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
             </div>
           </div>
         </div>
+
+        {/* Filter tanggal — preset cepat + rentang manual + pilih bulan.
+            Nilai from/to dikirim ke server lewat fetchRows (?from=&to=). */}
+        <DateFilterBar
+          from={dateFrom}
+          to={dateTo}
+          onChange={({ from, to }) => { setDateFrom(from); setDateTo(to); }}
+        />
 
         {error && (
           <div className="flex items-center gap-2 rounded-xl bg-red-50 text-red-600 px-4 py-3 text-sm">
@@ -805,109 +805,151 @@ function PriceRangeBadge({ value }: { value: string | null | undefined }) {
   );
 }
 
-// Label ringkas untuk tombol filter: "23 Okt", "01 Okt – 23 Okt", "≥ 01 Okt", dst.
-function formatRangeLabel(from: string, to: string): string {
-  const fmt = (ymd: string) =>
-    new Date(ymd + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
-  if (from && to) return from === to ? fmt(from) : `${fmt(from)} – ${fmt(to)}`;
-  if (from) return `≥ ${fmt(from)}`;
-  if (to) return `≤ ${fmt(to)}`;
-  return "Filter Tanggal";
+// ── Helper filter tanggal ────────────────────────────────────────────────
+// Ubah Date → "YYYY-MM-DD" versi waktu LOKAL (Jakarta di sisi user).
+// Sengaja TIDAK pakai toISOString() karena itu konversi ke UTC dan bisa
+// menggeser tanggal mundur 1 hari. getFullYear/Month/Date mengikuti lokal.
+function toYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
-function DateRangeFilter({
+// Rentang {from, to} tiap preset, berbasis tanggal HARI INI (lokal).
+// Format hasilnya sama persis dengan yang dikirim ke API (?from=&to=).
+function presetRange(preset: string): { from: string; to: string } {
+  const today = new Date();
+  const ymdToday = toYmd(today);
+
+  if (preset === "hari-ini") return { from: ymdToday, to: ymdToday };
+
+  if (preset === "7-hari") {
+    const d = new Date(today);
+    d.setDate(d.getDate() - 6); // 7 hari inklusif (hari ini + 6 ke belakang)
+    return { from: toYmd(d), to: ymdToday };
+  }
+
+  if (preset === "bulan-ini") {
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { from: toYmd(first), to: ymdToday }; // tgl 1 s/d hari ini
+  }
+
+  if (preset === "bulan-lalu") {
+    const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const last = new Date(today.getFullYear(), today.getMonth(), 0); // tgl 0 = hari terakhir bulan lalu
+    return { from: toYmd(first), to: toYmd(last) };
+  }
+
+  return { from: "", to: "" }; // "semua" → kosongkan filter
+}
+
+// Deteksi preset aktif dari from/to sekarang, supaya pill-nya ter-highlight
+// walau komponen remount / tanggal direstore dari URL. Tanggal manual yang
+// tidak cocok preset mana pun → null. Dua-duanya kosong → "semua".
+function detectPreset(from: string, to: string): string | null {
+  if (!from && !to) return "semua";
+  for (const p of ["hari-ini", "7-hari", "bulan-ini", "bulan-lalu"]) {
+    const r = presetRange(p);
+    if (r.from === from && r.to === to) return p;
+  }
+  return null;
+}
+
+const DATE_PRESETS = [
+  { key: "hari-ini", label: "Hari Ini" },
+  { key: "7-hari", label: "7 Hari" },
+  { key: "bulan-ini", label: "Bulan Ini" },
+  { key: "bulan-lalu", label: "Bulan Lalu" },
+  { key: "semua", label: "Semua" },
+] as const;
+
+function DateFilterBar({
   from,
   to,
   onChange,
-  onReset,
 }: {
   from: string;
   to: string;
   onChange: (next: { from: string; to: string }) => void;
-  onReset: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const active = Boolean(from || to);
+  const active = detectPreset(from, to);
 
-  // Tutup popover kalau klik di luar area filter.
-  useEffect(() => {
-    if (!open) return;
-    function onDocClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [open]);
+  // Pilih bulan penuh → from = tgl 1, to = tgl terakhir bulan itu.
+  function handleMonth(value: string) {
+    if (!value) { onChange({ from: "", to: "" }); return; } // dikosongkan
+    const [y, m] = value.split("-").map(Number);
+    const first = new Date(y, m - 1, 1);
+    const last = new Date(y, m, 0); // tgl 0 bulan berikutnya = hari terakhir bulan ini
+    onChange({ from: toYmd(first), to: toYmd(last) });
+  }
+
+  // Nilai <input type="month"> terisi selama from & to berada di bulan yang sama.
+  // Dibuat longgar (tidak harus 1 bulan penuh) supaya saat preset "Bulan Ini"
+  // aktif (mis. 01–27 Okt), kolom Pilih Bulan tetap menampilkan bulan tsb.
+  const monthValue = (() => {
+    if (!from || !to) return "";
+    const f = new Date(from + "T00:00:00");
+    const t = new Date(to + "T00:00:00");
+    return f.getFullYear() === t.getFullYear() && f.getMonth() === t.getMonth()
+      ? `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}`
+      : "";
+  })();
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${
-          active
-            ? "bg-violet-50 text-violet-700 border-violet-200"
-            : "bg-white text-gray-500 border-gray-200 hover:text-gray-700 hover:border-gray-300"
-        }`}
-      >
-        <Calendar className="w-3.5 h-3.5" />
-        {formatRangeLabel(from, to)}
-        {active && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); onReset(); }}
-            className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-violet-200/60"
-            title="Hapus filter tanggal"
-          >
-            <X className="w-3 h-3" />
-          </span>
-        )}
-      </button>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 space-y-3">
+      {/* Preset cepat */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {DATE_PRESETS.map((p) => {
+          const isActive = active === p.key;
+          return (
+            <button
+              key={p.key}
+              onClick={() => onChange(presetRange(p.key))}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${
+                isActive
+                  ? "bg-gray-900 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+              }`}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {open && (
-        <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-gray-100 shadow-xl p-4 z-30">
-          <p className="text-[11px] font-bold text-violet-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Calendar className="w-3 h-3" /> Filter berdasarkan tanggal
-          </p>
-          <div className="space-y-2.5">
-            <div>
-              <label className="text-[11px] font-medium text-gray-500 mb-1 block">Dari tanggal</label>
-              <input
-                type="date"
-                value={from}
-                max={to || undefined}
-                onChange={(e) => onChange({ from: e.target.value, to })}
-                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-gray-500 mb-1 block">Sampai tanggal</label>
-              <input
-                type="date"
-                value={to}
-                min={from || undefined}
-                onChange={(e) => onChange({ from, to: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
-              />
-            </div>
-          </div>
-          <div className="flex gap-2 mt-3.5">
-            <button
-              onClick={() => { onReset(); setOpen(false); }}
-              className="flex-1 py-2 rounded-lg text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30"
-            >
-              Reset
-            </button>
-            <button
-              onClick={() => setOpen(false)}
-              className="flex-1 py-2 rounded-lg text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
-            >
-              Selesai
-            </button>
-          </div>
+      {/* Rentang manual + pilih bulan */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 block">Dari</label>
+          <input
+            type="date"
+            value={from}
+            max={to || undefined}
+            onChange={(e) => onChange({ from: e.target.value, to })}
+            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 transition-colors"
+          />
         </div>
-      )}
+        <div>
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 block">Sampai</label>
+          <input
+            type="date"
+            value={to}
+            min={from || undefined}
+            onChange={(e) => onChange({ from, to: e.target.value })}
+            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 transition-colors"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 block">Pilih Bulan</label>
+          <input
+            type="month"
+            value={monthValue}
+            onChange={(e) => handleMonth(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 transition-colors"
+          />
+        </div>
+      </div>
     </div>
   );
 }
