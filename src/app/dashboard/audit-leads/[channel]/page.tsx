@@ -423,9 +423,6 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                     <span className="inline-flex items-center gap-1.5"><Wallet className="w-3 h-3" /> Range Harga</span>
                   </th>
                   <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
-                    <span className="inline-flex items-center gap-1.5"><Building2 className="w-3 h-3" /> Nama Toko</span>
-                  </th>
-                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><MessageSquare className="w-3 h-3" /> Keterangan</span>
                   </th>
                   <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
@@ -452,7 +449,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                 {loading && rows.length === 0 ? (
                   [1, 2, 3].map((i) => (
                     <tr key={i} className="border-b border-gray-50 last:border-0">
-                      <td colSpan={12} className="px-4 py-3.5">
+                      <td colSpan={11} className="px-4 py-3.5">
                         <div className="flex items-center gap-3 animate-pulse">
                           <div className="h-3 w-5 bg-gray-100 rounded-full" />
                           <div className="h-3 flex-1 max-w-[160px] bg-gray-100 rounded-full" />
@@ -464,7 +461,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                   ))
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-12">
+                    <td colSpan={11} className="px-4 py-12">
                       <div className="flex flex-col items-center text-center">
                         <div className="w-11 h-11 rounded-full bg-violet-50 flex items-center justify-center mb-3">
                           <Inbox className="w-5 h-5 text-violet-300" />
@@ -504,7 +501,6 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                       <td className="px-4 py-3.5 align-top whitespace-nowrap">
                         <PriceRangeBadge value={row.price_range} />
                       </td>
-                      <td className="px-4 py-3.5 align-top text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.nama_toko || undefined}>{row.nama_toko || "—"}</td>
                       <td className="px-4 py-3.5 align-top text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words leading-snug hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
                       <td className="px-4 py-3.5 align-top text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
                       <td className="px-4 py-3.5 text-center align-middle">
