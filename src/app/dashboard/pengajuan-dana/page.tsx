@@ -10,7 +10,7 @@ import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, X, CheckCheck, RotateCcw, Banknote,
   ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon, Pencil,
-  Search, ChevronLeft, ChevronRight, Bell, BellRing, Ban, MapPin, Lock, Shield,
+  Search, ChevronLeft, ChevronRight, Bell, BellRing, Ban, MapPin, Shield,
 } from "lucide-react";
 
 interface FundRequest {
@@ -216,8 +216,8 @@ function PaymentMethodBadge({ method }: { method: "CASH" | "SALDO" }) {
  *  ditampilkan ke user sbg Depok/Jogja. Mau jadi "Utama"? ganti di sini SAJA.
  * ════════════════════════════════════════════════════════════════════════════ */
 const BRANCH_LABEL: Record<"UTAMA" | "JOGJA", string> = {
-  UTAMA: "Utama",
-  JOGJA: "Jogja",
+  UTAMA: "Cash Utama",
+  JOGJA: "Cash Jogja",
 };
 
 function LocationBadge({ branch }: { branch: "UTAMA" | "JOGJA" }) {
@@ -331,7 +331,7 @@ function FormModal({
     // ⬅️ BARU: paymentMethod sekarang bisa null (belum dipilih) — tolak submit
     // kalau user belum klik Cash atau Saldo.
     if (!paymentMethod) { toast.error("Pilih metode pembayaran (Cash/Saldo) dulu"); return; }
-    if (!branch) { toast.error("Pilih lokasi (Utama/Jogja) dulu"); return; }
+    if (!branch) { toast.error("Pilih Lokasi Cash (Utama/Jogja) dulu"); return; }
     await onSubmit(purpose.trim(), num, paymentMethod, branch);
   };
 
@@ -442,27 +442,20 @@ function FormModal({
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2">
-              Lokasi <span className="text-red-500">*</span>
+              Lokasi Cash <span className="text-red-500">*</span>
             </label>
-            <div className="inline-flex w-full rounded-2xl border border-slate-200 bg-slate-50 p-1 gap-1">
-              {(["UTAMA", "JOGJA"] as const).map((b) => (
-                <button
-                  key={b}
-                  type="button"
-                  onClick={() => setBranch(b)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition ${FOCUS_RING} ${branch === b
-                    ? "bg-white text-slate-900 shadow-sm border border-slate-200"
-                    : "text-slate-400 hover:text-slate-600"
-                    }`}
-                >
-                  <MapPin className="w-4 h-4" />
-                  {BRANCH_LABEL[b]}
-                </button>
-              ))}
+            <div className="relative">
+              <MapPin className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
+              <select
+                value={branch ?? ""}
+                onChange={(e) => setBranch((e.target.value || null) as "UTAMA" | "JOGJA" | null)}
+                className={`w-full pl-11 pr-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 focus:bg-white transition-all ${FOCUS_RING}`}
+              >
+                <option value="" disabled>— Pilih Lokasi Cash —</option>
+                <option value="UTAMA">{BRANCH_LABEL.UTAMA}</option>
+                <option value="JOGJA">{BRANCH_LABEL.JOGJA}</option>
+              </select>
             </div>
-            {!branch && (
-              <p className="text-[10px] text-slate-400 mt-1.5">Lokasi dikunci sampai realisasi — tidak bisa diubah nanti.</p>
-            )}
           </div>
         </div>
 
@@ -814,8 +807,8 @@ function RealisasiModal({
   const [keterangan, setKeterangan] = useState(fundRequest.purpose);
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(fundRequest.payment_method);
-  // Lokasi DIKUNCI dari pengajuan — tidak bisa dipilih ulang di realisasi.
-  const branch: "UTAMA" | "JOGJA" = fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA";
+  // Lokasi Cash — default ikut pengajuan, TAPI user boleh ganti lewat dropdown.
+  const [branch, setBranch] = useState<"UTAMA" | "JOGJA">(fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
@@ -897,17 +890,20 @@ function RealisasiModal({
           <button onClick={onClose} className={`w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition ${FOCUS_RING}`}><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
-           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">Lokasi</label>
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-              <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
-                <MapPin className="w-4 h-4 text-slate-400" />
-                {BRANCH_LABEL[branch]}
-              </span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                <Lock className="w-3 h-3" /> Terkunci dari pengajuan
-              </span>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2">Lokasi Cash <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
+              <select
+                value={branch}
+                onChange={(e) => setBranch(e.target.value as "UTAMA" | "JOGJA")}
+                className={`${inputCls} pl-9`}
+              >
+                <option value="UTAMA">{BRANCH_LABEL.UTAMA}</option>
+                <option value="JOGJA">{BRANCH_LABEL.JOGJA}</option>
+              </select>
             </div>
+            <p className="text-[10px] text-slate-400 mt-1">Default ikut pengajuan, bisa diganti.</p>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2">Metode Pembayaran <span className="text-red-500">*</span></label>
