@@ -1582,7 +1582,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
 
             {/* ── Desktop/tablet: Tabel Jurnal Umum (drag-and-drop reorder) ── */}
             <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-auto max-h-[70vh]">
                     <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
                         <Droppable droppableId="journal-entries">
                             {(provided) => (
@@ -1593,7 +1593,8 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                     {...provided.droppableProps}
                                 >
                                     <thead>
-                                        <tr className="border-b border-slate-200/80 bg-slate-50/90">
+                                    <thead className="sticky top-0 z-20 bg-slate-50">
+                                        <tr className="border-b border-slate-200/80 bg-slate-50">
                                             <th className="px-3 py-3 w-[44px] text-center">
                                                 <input
                                                     type="checkbox"
@@ -3336,7 +3337,6 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                 <tbody
                     ref={(el) => { provided.innerRef(el); registerRef(el); }}
                     {...provided.draggableProps}
-                    {...provided.dragHandleProps}
                     className={`group ${snapshot.isDragging
                         ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400"
                         : isDraggingGroup && isSelected
@@ -3363,7 +3363,11 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                     className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
                                     title="Pilih entry ini"
                                 />
-                                <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Tahan & geser untuk ubah urutan">
+                                <div
+                                    {...provided.dragHandleProps}
+                                    className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Tahan & geser untuk ubah urutan"
+                                >
                                     <GripVertical className="w-3.5 h-3.5" />
                                 </div>
                             </div>
