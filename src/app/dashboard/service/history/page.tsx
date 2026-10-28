@@ -7,6 +7,8 @@ import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import { STATUS_LABEL } from "@/types/service";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import ServiceSparepartDialog from "@/components/service/ServiceSparepartDialog"; //  NEW
+import { useAuthUser } from "@/hooks/useAuthUser"; //  NEW — cek admin utk tampilkan nominal
 
 function formatDate(iso?: string): string {
   if (!iso) return "—";
@@ -267,10 +269,12 @@ function HistoryDetailModal({
   order,
   onClose,
   onEdit,
+  isAdmin,
 }: {
   order: ServiceOrder | null;
   onClose: () => void;
   onEdit: () => void;
+  isAdmin: boolean;
 }) {
   useEffect(() => {
     if (!order) return;
@@ -544,6 +548,8 @@ function HistoryDetailModal({
             )}
           </div>
 
+
+
           {/* ── TIM ── */}
           <div className="mx-4 mt-3">
             <div className="rounded-2xl border border-gray-100 bg-white p-4">
@@ -587,13 +593,15 @@ function HistoryDetailModal({
         {/* ── FOOTER ──────────────────────────────────────────────────────── */}
         <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="flex gap-2.5">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="h-11 flex-1 rounded-xl border border-[#1a1a2e]/15 bg-white text-[13px] font-black text-[#1a1a2e] outline-none transition hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/20 active:scale-[0.99]"
-            >
-              Edit Payment
-            </button>
+            {isAdmin && ( //  NEW — Edit Payment hanya admin
+              <button
+                type="button"
+                onClick={onEdit}
+                className="h-11 flex-1 rounded-xl border border-[#1a1a2e]/15 bg-white text-[13px] font-black text-[#1a1a2e] outline-none transition hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/20 active:scale-[0.99]"
+              >
+                Edit Payment
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -613,16 +621,62 @@ function EditPaymentModal({
   order,
   onClose,
   onSaved,
+  isAdmin, //  NEW — kontrol akses tab Sparepart
 }: {
   order: ServiceOrder;
   onClose: () => void;
   onSaved: () => void;
+  isAdmin: boolean; //  NEW
 }) {
+  const [tab, setTab] = useState<"payment" | "sparepart">("payment"); //  NEW — tab aktif
+  const [sparepartOpen, setSparepartOpen] = useState(false); //  NEW — buka ServiceSparepartDialog
   const [amount, setAmount] = useState(String(order.payment_amount ?? 0));
   const [method, setMethod] = useState(order.payment_method || "CASH");
   const [note, setNote] = useState(order.payment_note || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  //  NEW — simpan sparepart dari tab (reuse action "sparepart" di backend)
+  const handleSparepartConfirm = async (payload: {
+    mode: "stock" | "manual";
+    reason: string;
+    price?: number;
+    accessory_id?: string;
+    unit_id?: string;
+    serial_number?: string;
+    accessory_name?: string;
+  }) => {
+    const label = payload.mode === "stock"
+      ? `${payload.accessory_name ?? "Aksesoris"} (SN ${payload.serial_number ?? "-"})`
+      : payload.reason;
+    const sparepart_entry = `${label}§${Math.round(Number(payload.price ?? 0))}`;
+
+    const res = await fetch(`/api/service/${order.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sparepart",
+        alasan: payload.reason,
+        sparepart_entry,
+        sparepart_mode: payload.mode,
+        sparepart_modal: payload.mode === "manual" ? payload.price : undefined,
+        accessories_used:
+          payload.mode === "stock" && payload.accessory_id
+            ? [{ accessory_id: payload.accessory_id, unit_id: payload.unit_id, qty: 1 }]
+            : undefined,
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Gagal mencatat sparepart");
+    setSparepartOpen(false);
+    onSaved(); //  refetch daftar — data sparepart ikut ke-refresh
+  };
+
+  //  NEW — daftar sparepart terkini (string "label§harga" per baris)
+  const spareLines = (order.sparepart_items ?? "")
+    .split("\n")
+    .map(s => s.trim())
+    .filter(Boolean);
 
   const wasZero = !order.payment_amount || order.payment_amount === 0;
   const willBecomeNonZero = Number(amount) > 0;
@@ -664,7 +718,7 @@ function EditPaymentModal({
       <div className="relative w-full max-w-sm rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
-            <p className="text-[14px] font-black text-[#1a1a2e]">Edit Payment</p>
+            <p className="text-[14px] font-black text-[#1a1a2e]">Edit Servis</p>
             <p className="mt-0.5 text-[11px] font-medium text-gray-400">{order.nama}</p>
           </div>
           <button
@@ -676,6 +730,36 @@ function EditPaymentModal({
           </button>
         </div>
 
+        {/*  NEW — Tab bar: Payment / Sparepart */}
+        <div className="flex gap-1 border-b border-gray-100 px-5 pt-3">
+          {([
+            { key: "payment", label: "Payment" },
+            { key: "sparepart", label: "Sparepart" },
+          ] as const).map(t => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={`relative h-9 rounded-t-lg px-4 text-[12px] font-black tracking-tight transition ${
+                tab === t.key
+                  ? "text-[#1a1a2e]"
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              {t.label}
+              {t.key === "sparepart" && spareLines.length > 0 && (
+                <span className="ml-1.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black text-indigo-600 align-middle">
+                  {spareLines.length}
+                </span>
+              )}
+              {tab === t.key && (
+                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1a1a2e]" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {tab === "payment" && ( //  NEW
         <div className="space-y-4 px-5 py-4">
           {error && (
             <div className="rounded-xl bg-red-50 px-3.5 py-2.5 text-[12px] font-medium text-red-600">
@@ -742,25 +826,107 @@ function EditPaymentModal({
             </div>
           )}
         </div>
+        )}
 
-        <div className="flex gap-2.5 border-t border-gray-100 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-11 flex-1 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 transition hover:bg-gray-200"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="h-11 flex-1 rounded-xl bg-[#1a1a2e] text-[13px] font-black text-white transition hover:bg-[#2a2a4e] disabled:opacity-50"
-          >
-            {saving ? "Menyimpan..." : "Simpan"}
-          </button>
-        </div>
+        {/*  NEW — PANEL TAB SPAREPART */}
+        {tab === "sparepart" && (
+          <div className="space-y-3 px-5 py-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wide text-gray-400">
+                Sparepart Terpakai
+              </span>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setSparepartOpen(true)}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg bg-indigo-600 px-3 text-[11px] font-black text-white outline-none transition hover:bg-indigo-700 active:scale-95"
+                >
+                  + Tambah Sparepart
+                </button>
+              )}
+            </div>
+
+            {spareLines.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                {spareLines.map((ln, i) => {
+                  const [label, hargaRaw] = ln.split("§");
+                  const harga = Number(hargaRaw ?? 0);
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/40 px-3 py-2.5"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-indigo-700">
+                        {label}
+                      </span>
+                      {isAdmin && harga > 0 && (
+                        <span className="shrink-0 text-[11px] font-black tabular-nums text-gray-500">
+                          {fmtRupiah(harga)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-4 py-8 text-center">
+                <p className="text-[12px] font-medium text-gray-400">Belum ada sparepart dicatat.</p>
+                {isAdmin && (
+                  <p className="mt-1 text-[11px] text-gray-300">Klik "+ Tambah Sparepart" untuk menambahkan.</p>
+                )}
+              </div>
+            )}
+
+            {!isAdmin && (
+              <p className="rounded-xl bg-gray-50 px-3.5 py-2.5 text-[11px] font-medium text-gray-400">
+                Hanya admin yang dapat menambah sparepart.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Footer — tombol beda per tab */}
+        {tab === "payment" ? (
+          <div className="flex gap-2.5 border-t border-gray-100 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-11 flex-1 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 transition hover:bg-gray-200"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="h-11 flex-1 rounded-xl bg-[#1a1a2e] text-[13px] font-black text-white transition hover:bg-[#2a2a4e] disabled:opacity-50"
+            >
+              {saving ? "Menyimpan..." : "Simpan"}
+            </button>
+          </div>
+        ) : (
+          <div className="border-t border-gray-100 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-11 w-full rounded-xl bg-[#1a1a2e] text-[13px] font-black text-white transition hover:bg-[#2a2a4e]"
+            >
+              Tutup
+            </button>
+          </div>
+        )}
       </div>
+
+      {/*  NEW — Dialog Sparepart (UI stok/manual persis screenshot), z lebih tinggi dari modal ini */}
+      <ServiceSparepartDialog
+        open={sparepartOpen}
+        orderId={order.id}
+        orderName={order.nama}
+        orderType={order.type_laptop}
+        defaultPrice={Number(order.biaya_sparepart ?? 0)}
+        onCancel={() => setSparepartOpen(false)}
+        onConfirm={handleSparepartConfirm}
+      />
     </div>
   );
 }
@@ -793,6 +959,9 @@ function TeamRow({ label, name, color }: { label: string; name?: string; color: 
 function HistoryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuthUser(); //  NEW
+  const userRoles = user?.roles ?? (user?.role ? [user.role] : []); //  NEW
+  const isAdmin = userRoles.some(r => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r)); //  NEW
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -833,6 +1002,7 @@ function HistoryPageContent() {
   }, [periodParams]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
 
   // ── BARU: terapkan preset periode ──
   const applyPreset = (key: string) => {
@@ -1418,12 +1588,15 @@ function HistoryPageContent() {
           if (searchParams.get("id")) router.replace("/dashboard/service/history");
         }}
         onEdit={() => { if (selectedOrder) setEditOrder(selectedOrder); }}
+        isAdmin={isAdmin}
       />
+
       {editOrder && (
         <EditPaymentModal
           order={editOrder}
           onClose={() => setEditOrder(null)}
           onSaved={() => { fetchOrders(); setSelectedOrder(null); }}
+          isAdmin={isAdmin} //  NEW
         />
       )}
     </DashboardLayout>
