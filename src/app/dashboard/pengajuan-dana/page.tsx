@@ -330,9 +330,8 @@ function FormModal({
     if (!num || num <= 0) { toast.error("Nominal harus lebih dari 0"); return; }
     // ⬅️ BARU: paymentMethod sekarang bisa null (belum dipilih) — tolak submit
     // kalau user belum klik Cash atau Saldo.
-    if (!paymentMethod) { toast.error("Pilih metode pembayaran (Cash/Saldo) dulu"); return; }
-    if (!branch) { toast.error("Pilih Lokasi Cash (Utama/Jogja) dulu"); return; }
-    await onSubmit(purpose.trim(), num, paymentMethod, branch);
+    if (!paymentMethod) { toast.error("Pilih Metode Pembayaran dulu"); return; }
+    await onSubmit(purpose.trim(), num, paymentMethod, branch ?? "UTAMA");
   };
 
   if (!open) return null;
@@ -419,43 +418,22 @@ function FormModal({
             <label className="block text-xs font-bold text-slate-700 mb-2">
               Metode Pembayaran <span className="text-red-500">*</span>
             </label>
-            <div className="inline-flex w-full rounded-2xl border border-slate-200 bg-slate-50 p-1 gap-1">
-              {(["CASH", "SALDO"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setPaymentMethod(m)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition ${FOCUS_RING} ${paymentMethod === m
-                    ? "bg-white text-slate-900 shadow-sm border border-slate-200"
-                    : "text-slate-400 hover:text-slate-600"
-                    }`}
-                >
-                  {m === "CASH" ? <Banknote className="w-4 h-4" /> : <Landmark className="w-4 h-4" />}
-                  {m === "CASH" ? "Cash" : "Saldo"}
-                </button>
-              ))}
-            </div>
-            {/* ⬅️ BARU: hint kalau belum ada yang dipilih */}
-            {!paymentMethod && (
-              <p className="text-[10px] text-slate-400 mt-1.5">Klik salah satu untuk memilih metode pembayaran.</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">
-              Lokasi Cash <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
-              <select
-                value={branch ?? ""}
-                onChange={(e) => setBranch((e.target.value || null) as "UTAMA" | "JOGJA" | null)}
-                className={`w-full pl-11 pr-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 focus:bg-white transition-all ${FOCUS_RING}`}
-              >
-                <option value="" disabled>— Pilih Lokasi Cash —</option>
-                <option value="UTAMA">{BRANCH_LABEL.UTAMA}</option>
-                <option value="JOGJA">{BRANCH_LABEL.JOGJA}</option>
-              </select>
-            </div>
+            <select
+              value={paymentMethod === "SALDO" ? "SALDO" : paymentMethod === "CASH" ? (branch === "JOGJA" ? "CASH_JOGJA" : "CASH_UTAMA") : ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "SALDO") { setPaymentMethod("SALDO"); setBranch("UTAMA"); }
+                else if (v === "CASH_JOGJA") { setPaymentMethod("CASH"); setBranch("JOGJA"); }
+                else if (v === "CASH_UTAMA") { setPaymentMethod("CASH"); setBranch("UTAMA"); }
+                else { setPaymentMethod(null); setBranch(null); }
+              }}
+              className={`w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 focus:bg-white transition-all ${FOCUS_RING}`}
+            >
+              <option value="" disabled>— Pilih Metode Pembayaran —</option>
+              <option value="CASH_UTAMA">{BRANCH_LABEL.UTAMA}</option>
+              <option value="CASH_JOGJA">{BRANCH_LABEL.JOGJA}</option>
+              <option value="SALDO">Saldo</option>
+            </select>
           </div>
         </div>
 
@@ -891,29 +869,22 @@ function RealisasiModal({
         </div>
         <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">Lokasi Cash <span className="text-red-500">*</span></label>
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
-              <select
-                value={branch}
-                onChange={(e) => setBranch(e.target.value as "UTAMA" | "JOGJA")}
-                className={`${inputCls} pl-9`}
-              >
-                <option value="UTAMA">{BRANCH_LABEL.UTAMA}</option>
-                <option value="JOGJA">{BRANCH_LABEL.JOGJA}</option>
-              </select>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1">Default ikut pengajuan, bisa diganti.</p>
-          </div>
-          <div>
             <label className="block text-xs font-bold text-slate-700 mb-2">Metode Pembayaran <span className="text-red-500">*</span></label>
-            <div className="inline-flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
-              {(["CASH", "SALDO"] as const).map((m) => (
-                <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold transition ${FOCUS_RING} ${paymentMethod === m ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-600"}`}>
-                  {m === "CASH" ? <Banknote size={16} /> : <Landmark className="w-4 h-4" />} {m === "CASH" ? "Cash" : "Saldo"}
-                </button>
-              ))}
-            </div>
+            <select
+              value={paymentMethod === "SALDO" ? "SALDO" : branch === "JOGJA" ? "CASH_JOGJA" : "CASH_UTAMA"}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "SALDO") { setPaymentMethod("SALDO"); setBranch("UTAMA"); }
+                else if (v === "CASH_JOGJA") { setPaymentMethod("CASH"); setBranch("JOGJA"); }
+                else { setPaymentMethod("CASH"); setBranch("UTAMA"); }
+              }}
+              className={inputCls}
+            >
+              <option value="CASH_UTAMA">{BRANCH_LABEL.UTAMA}</option>
+              <option value="CASH_JOGJA">{BRANCH_LABEL.JOGJA}</option>
+              <option value="SALDO">Saldo</option>
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1">Default ikut pengajuan, bisa diganti.</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2.5">
             <div className="flex items-center justify-between">
@@ -1042,10 +1013,12 @@ function DetailModal({
               <p className="text-sm text-slate-700">{formatDateTime(fundRequest.created_at)}</p>
             </div>
           </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Lokasi</p>
-            <LocationBadge branch={fundRequest.branch} />
-          </div>
+          {fundRequest.payment_method === "CASH" && (
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Lokasi</p>
+              <LocationBadge branch={fundRequest.branch} />
+            </div>
+          )}
           <div className="border-t border-slate-100 pt-3 space-y-2.5">
             {fundRequest.is_rejected && (
               <div className="flex items-center justify-between gap-3">
@@ -2066,7 +2039,7 @@ export default function PengajuanDanaPage() {
                         </td>
 
                         <td className="px-4 py-4 text-center">
-                          <LocationBadge branch={row.branch} />
+                          {row.payment_method === "CASH" ? <LocationBadge branch={row.branch} /> : <span className="text-slate-300 text-xs">—</span>}
                         </td>
 
                         <td className="px-4 py-4 text-center">
@@ -2276,7 +2249,7 @@ export default function PengajuanDanaPage() {
                     <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
                       <span className="font-extrabold text-slate-900 tabular-nums text-sm">{formatRupiah(row.amount)}</span>
                       <div className="flex items-center gap-1.5">
-                        <LocationBadge branch={row.branch} />
+                        {row.payment_method === "CASH" && <LocationBadge branch={row.branch} />}
                         {userRoles.includes("ADMIN") ? (
                           <button type="button" onClick={() => setEditMetodeTarget(row)} title="Klik untuk ubah metode pembayaran">
                             <PaymentMethodBadge method={row.payment_method} />
