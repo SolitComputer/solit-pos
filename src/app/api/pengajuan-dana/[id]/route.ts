@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { FUND_EXECUTOR_IDS, FUND_APPROVER_IDS } from "@/lib/fundConfig";
+import { FUND_APPROVER_IDS, canExecuteFund } from "@/lib/fundConfig";
 
 function db() {
   return createClient(
@@ -182,7 +182,8 @@ export async function PATCH(
 
   // ── Execute ─────────────────────────────────────────────────────────────────
   if (action === "execute") {
-    if (!FUND_EXECUTOR_IDS.includes(userId) && !roles.includes("ADMIN")) {
+    // Validasi backend: cek centang izin eksekusi (anti-bypass endpoint langsung)
+    if (!(await canExecuteFund(supabase, userId))) {
       return NextResponse.json(
         { success: false, message: "Anda tidak memiliki wewenang untuk mengeksekusi" },
         { status: 403 }

@@ -8,7 +8,7 @@ import {
 } from "@/lib/permissions";
 
 // Import variabel dari file baru
-import { FUND_EXECUTOR_IDS, FUND_APPROVER_IDS } from "@/lib/fundConfig";
+import { FUND_APPROVER_IDS, getActiveFundExecutorIds } from "@/lib/fundConfig";
 
 // Cuma 3 role ini yang boleh lihat pengajuan dana SEMUA orang. Role lain yang
 // tetap punya akses ke halaman ini (lolos gate FUND_REQUEST_VIEW_ROLES di
@@ -57,12 +57,15 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
+    // executorIds = akun yang dicentang di panel Akses Eksekusi (is_active=true)
+    const executorIds = await getActiveFundExecutorIds(supabase);
+
     return NextResponse.json({
         success: true,
         data,
         meta: {
             approverIds: FUND_APPROVER_IDS,
-            executorIds: FUND_EXECUTOR_IDS,
+            executorIds,
         },
     });
 }
@@ -85,19 +88,26 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    let body: { purpose?: string; amount?: number; payment_method?: string };
+    let body: { purpose?: string; amount?: number; payment_method?: string; branch?: string };
     try {
         body = await request.json();
     } catch {
         return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
     }
 
-    const { purpose, amount, payment_method } = body;
+    const { purpose, amount, payment_method, branch } = body;
     if (!purpose || typeof purpose !== "string" || !purpose.trim()) {
         return NextResponse.json({ success: false, message: "Kebutuhan wajib diisi" }, { status: 400 });
     }
     if (!amount || typeof amount !== "number" || amount <= 0) {
         return NextResponse.json({ success: false, message: "Nominal harus lebih dari 0" }, { status: 400 });
+    }
+
+    // Lokasi WAJIB dipilih saat pengajuan (Depok = UTAMA, Jogja = JOGJA).
+    // Ditolak kalau bukan salah satu dari dua nilai ini — sengaja TIDAK di-default,
+    // supaya lokasi memang keputusan sadar si pengaju (validasi backend / Fitur 4).
+    if (branch !== "UTAMA" && branch !== "JOGJA") {
+        return NextResponse.json({ success: false, message: "Lokasi wajib dipilih (Utama atau Jogja)" }, { status: 400 });
     }
 
     // Default ke CASH kalau payment_method tidak dikirim atau nilainya tidak valid
@@ -112,6 +122,7 @@ export async function POST(request: NextRequest) {
             purpose: purpose.trim(),
             amount: Math.round(amount),
             payment_method: validPaymentMethod,
+            branch, // lokasi: UTAMA (Depok) / JOGJA — dikunci sampai realisasi
         })
         .select()
         .single();

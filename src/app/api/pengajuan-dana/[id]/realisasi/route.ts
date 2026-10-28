@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { FUND_EXECUTOR_IDS } from "@/lib/fundConfig";
+import { canExecuteFund } from "@/lib/fundConfig";
 import { isValidCategory, isKasbonCicilanCategory } from "@/lib/cashflow";
 
 // ⬅️ BARU: role yang boleh membatalkan realisasi — Admin + Purchasing (biasanya
@@ -31,7 +31,7 @@ export async function POST(
     if (!userId) {
         return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
-    if (!FUND_EXECUTOR_IDS.includes(userId) && !roles.includes("ADMIN")) {
+    if (!(await canExecuteFund(db(), userId))) {
         return NextResponse.json(
             { success: false, message: "Anda tidak memiliki wewenang untuk mengisi realisasi" },
             { status: 403 }
@@ -56,9 +56,8 @@ export async function POST(
     }
 
     const { keterangan, tanggal, payment_method, photo_url } = body;
-    // Cabang realisasi — fail-safe ke UTAMA kalau nilai tak valid
-    const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
-
+    // Lokasi realisasi TIDAK lagi diambil dari body — dikunci dari pengajuannya.
+    // (const branch dideklarasi di bawah, setelah fundRequest diambil)
     // ⬅️ BARU: dukung multi-kategori (items[]) — tombol "+" di modal Realisasi
     // bisa nambah berapa pun baris Kategori+Nominal. Tetap backward-compatible:
     // kalau client lama masih kirim body lama (category/nominal tunggal tanpa
@@ -118,13 +117,17 @@ export async function POST(
     // Cek dulu: harus sudah dieksekusi & belum pernah direalisasi sebelumnya
     const { data: fundRequest, error: fetchErr } = await supabase
         .from("fund_requests")
-        .select("id, purpose, is_executed, realisasi_cashflow_id, executed_by_id, executed_by_name")
+        .select("id, purpose, is_executed, realisasi_cashflow_id, executed_by_id, executed_by_name, branch")
         .eq("id", id)
         .single();
 
     if (fetchErr || !fundRequest) {
         return NextResponse.json({ success: false, message: "Pengajuan tidak ditemukan" }, { status: 404 });
     }
+
+    // Lokasi realisasi DIKUNCI dari pengajuannya — bukan dari input client — supaya
+    // konsisten pengajuan → realisasi & tidak bisa dibelokkan ke cabang lain.
+    const branch = fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA";
     if (!fundRequest.is_executed) {
         return NextResponse.json(
             { success: false, message: "Pengajuan harus dieksekusi dulu sebelum diisi realisasinya" },
@@ -248,7 +251,7 @@ export async function PATCH(
     if (!userId) {
         return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
-    if (!FUND_EXECUTOR_IDS.includes(userId) && !roles.includes("ADMIN")) {
+    if (!(await canExecuteFund(db(), userId))) {
         return NextResponse.json(
             { success: false, message: "Anda tidak memiliki wewenang untuk mengisi realisasi" },
             { status: 403 }
@@ -278,14 +281,12 @@ export async function PATCH(
     if (isKasbonCicilanCategory(body.category) && !target) {
         return NextResponse.json({ success: false, message: "Pilih karyawan dulu untuk baris Kasbon/Cicilan" }, { status: 400 });
     }
-    // Cabang — fail-safe ke UTAMA
-    const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
 
     const supabase = db();
 
     const { data: fundRequest, error: fetchErr } = await supabase
         .from("fund_requests")
-        .select("id, purpose, realisasi_cashflow_id, executed_by_id, executed_by_name")
+        .select("id, purpose, realisasi_cashflow_id, executed_by_id, executed_by_name, branch")
         .eq("id", id)
         .single();
 
@@ -301,6 +302,9 @@ export async function PATCH(
             { status: 403 }
         );
     }
+
+    // Lokasi dikunci dari pengajuan (konsisten dgn realisasi awal) — bukan dari body.
+    const branch = fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA";
 
     // Guard unique index uniq_cashflow_source (source_type, source_id, category):
     // 1 kategori cuma boleh sekali per pengajuan.

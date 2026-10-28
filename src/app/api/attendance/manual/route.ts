@@ -146,12 +146,15 @@ export async function POST(request: Request) {
         // setiap kali admin edit/koreksi absen MASUK lewat modal manual.
         const dateStart = `${attendance_date}T04:00:00+07:00`;
         const dateEnd = `${addDaysToDateStr(attendance_date, 1)}T03:59:59+07:00`;
-
+        // ✅ FIX: ikut hapus record IN lama ber-direction NULL (data sebelum
+        // kolom direction ada). Sebelumnya `.eq("direction","IN")` melewatkan
+        // record NULL → absen wajah lama koeksistensi dgn manual di DB.
+        // `.or(...)` mencakup direction = 'IN' DAN direction IS NULL.
         const { data: deleted, error: deleteError } = await supabase
           .from("face_verifications")
           .delete()
           .eq("user_id", user_id)
-          .eq("direction", "IN")
+          .or("direction.eq.IN,direction.is.null")
           .gte("created_at", dateStart)
           .lte("created_at", dateEnd)
           .select();

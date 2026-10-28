@@ -10,7 +10,7 @@ import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, X, CheckCheck, RotateCcw, Banknote,
   ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon, Pencil,
-  Search, ChevronLeft, ChevronRight, Bell, BellRing, Ban,
+  Search, ChevronLeft, ChevronRight, Bell, BellRing, Ban, MapPin, Lock, Shield,
 } from "lucide-react";
 
 interface FundRequest {
@@ -20,6 +20,7 @@ interface FundRequest {
   purpose: string;
   amount: number;
   payment_method: "CASH" | "SALDO";
+  branch: "UTAMA" | "JOGJA";
   is_approved: boolean;
   approved_by_id: string | null;
   approved_by_name: string | null;
@@ -211,6 +212,27 @@ function PaymentMethodBadge({ method }: { method: "CASH" | "SALDO" }) {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  LOKASI (BRANCH) — label + badge. Disimpan di DB sbg UTAMA/JOGJA,
+ *  ditampilkan ke user sbg Depok/Jogja. Mau jadi "Utama"? ganti di sini SAJA.
+ * ════════════════════════════════════════════════════════════════════════════ */
+const BRANCH_LABEL: Record<"UTAMA" | "JOGJA", string> = {
+  UTAMA: "Utama",
+  JOGJA: "Jogja",
+};
+
+function LocationBadge({ branch }: { branch: "UTAMA" | "JOGJA" }) {
+  const isJogja = branch === "JOGJA";
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border ${isJogja
+      ? "bg-orange-50 text-orange-600 border-orange-200/80"
+      : "bg-sky-50 text-sky-600 border-sky-200/80"}`}>
+      <MapPin className="w-3 h-3" />
+      {BRANCH_LABEL[branch]}
+    </span>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  SUMMARY CARD (matches dashboard card style)
  * ════════════════════════════════════════════════════════════════════════════ */
 function SummaryCard({
@@ -266,7 +288,7 @@ function FormModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onSubmit: (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO") => Promise<void>;
+  onSubmit: (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO", branch: "UTAMA" | "JOGJA") => Promise<void>;
   submitting: boolean;
 }) {
   const [purpose, setPurpose] = useState("");
@@ -274,6 +296,8 @@ function FormModal({
   // ⬅️ BARU: default null (belum ada yang dipilih) — sebelumnya langsung "CASH".
   // User WAJIB klik salah satu (Cash/Saldo) dulu sebelum bisa submit.
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO" | null>(null);
+  // Lokasi WAJIB dipilih — null dulu biar user harus klik Depok/Jogja
+  const [branch, setBranch] = useState<"UTAMA" | "JOGJA" | null>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -282,6 +306,7 @@ function FormModal({
       setPurpose("");
       setAmount("");
       setPaymentMethod(null);
+      setBranch(null);
       setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [open]);
@@ -306,7 +331,8 @@ function FormModal({
     // ⬅️ BARU: paymentMethod sekarang bisa null (belum dipilih) — tolak submit
     // kalau user belum klik Cash atau Saldo.
     if (!paymentMethod) { toast.error("Pilih metode pembayaran (Cash/Saldo) dulu"); return; }
-    await onSubmit(purpose.trim(), num, paymentMethod);
+    if (!branch) { toast.error("Pilih lokasi (Utama/Jogja) dulu"); return; }
+    await onSubmit(purpose.trim(), num, paymentMethod, branch);
   };
 
   if (!open) return null;
@@ -412,6 +438,30 @@ function FormModal({
             {/* ⬅️ BARU: hint kalau belum ada yang dipilih */}
             {!paymentMethod && (
               <p className="text-[10px] text-slate-400 mt-1.5">Klik salah satu untuk memilih metode pembayaran.</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2">
+              Lokasi <span className="text-red-500">*</span>
+            </label>
+            <div className="inline-flex w-full rounded-2xl border border-slate-200 bg-slate-50 p-1 gap-1">
+              {(["UTAMA", "JOGJA"] as const).map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setBranch(b)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition ${FOCUS_RING} ${branch === b
+                    ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                    : "text-slate-400 hover:text-slate-600"
+                    }`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  {BRANCH_LABEL[b]}
+                </button>
+              ))}
+            </div>
+            {!branch && (
+              <p className="text-[10px] text-slate-400 mt-1.5">Lokasi dikunci sampai realisasi — tidak bisa diubah nanti.</p>
             )}
           </div>
         </div>
@@ -764,7 +814,8 @@ function RealisasiModal({
   const [keterangan, setKeterangan] = useState(fundRequest.purpose);
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(fundRequest.payment_method);
-  const [branch, setBranch] = useState<"UTAMA" | "JOGJA">("UTAMA"); // ← cabang realisasi
+  // Lokasi DIKUNCI dari pengajuan — tidak bisa dipilih ulang di realisasi.
+  const branch: "UTAMA" | "JOGJA" = fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA";
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
@@ -846,17 +897,16 @@ function RealisasiModal({
           <button onClick={onClose} className={`w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition ${FOCUS_RING}`}><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">Cabang <span className="text-red-500">*</span></label>
-            <div className="inline-flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
-              {([
-                { value: "UTAMA", label: "🏢 Cabang Utama" },
-                { value: "JOGJA", label: "📍 Cabang Jogja" },
-              ] as const).map((b) => (
-                <button key={b.value} type="button" onClick={() => setBranch(b.value)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold transition ${FOCUS_RING} ${branch === b.value ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-600"}`}>
-                  {b.label}
-                </button>
-              ))}
+           <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2">Lokasi</label>
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <MapPin className="w-4 h-4 text-slate-400" />
+                {BRANCH_LABEL[branch]}
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                <Lock className="w-3 h-3" /> Terkunci dari pengajuan
+              </span>
             </div>
           </div>
           <div>
@@ -991,10 +1041,14 @@ function DetailModal({
                 )}
               </div>
             </div>
-            <div>
+             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Diajukan</p>
               <p className="text-sm text-slate-700">{formatDateTime(fundRequest.created_at)}</p>
             </div>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Lokasi</p>
+            <LocationBadge branch={fundRequest.branch} />
           </div>
           <div className="border-t border-slate-100 pt-3 space-y-2.5">
             {fundRequest.is_rejected && (
@@ -1317,6 +1371,137 @@ function NotificationBell({
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  EXECUTE ACCESS MODAL — atur akun Admin/Purchasing mana yang boleh Eksekusi.
+ *  Nyontek "Akses Audit" di Cashflow (checkbox per akun).
+ * ════════════════════════════════════════════════════════════════════════════ */
+type ExecuteAccessRow = {
+  user_id: string;
+  name: string;
+  role: string;
+  roles: string[];
+  is_active: boolean;
+};
+
+function ExecuteAccessModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<ExecuteAccessRow[]>([]);
+  const [changed, setChanged] = useState<Record<string, boolean>>({});
+  const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [savedOk, setSavedOk] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const res = await fetch("/api/pengajuan-dana/execute-access", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success) setRows(json.data ?? []);
+      else setError(json.message || "Gagal memuat daftar akun");
+    } catch { setError("Terjadi kesalahan koneksi"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const effectiveState = (row: ExecuteAccessRow) => changed[row.user_id] ?? row.is_active;
+  const toggle = (userId: string, current: boolean) => {
+    setSavedOk(false);
+    setChanged((prev) => ({ ...prev, [userId]: !current }));
+  };
+  const filteredRows = rows.filter((r) => r.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const hasChanges = Object.keys(changed).length > 0;
+
+  const submit = async () => {
+    if (!hasChanges) return;
+    setSaving(true); setError(""); setSavedOk(false);
+    try {
+      const items = Object.entries(changed).map(([user_id, is_active]) => ({ user_id, is_active }));
+      const res = await fetch("/api/pengajuan-dana/execute-access", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+      const json = await res.json();
+      if (!json.success) { setError(json.message || "Gagal menyimpan"); return; }
+      setChanged({});
+      setSavedOk(true);
+      await load();
+      onSaved(); // refresh data utama → tombol Eksekusi ikut update
+    } catch { setError("Terjadi kesalahan koneksi"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        <div className="h-1 bg-gradient-to-r from-indigo-400 to-purple-500" />
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Shield size={17} /></div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">Akses Eksekusi Pengajuan Dana</p>
+              <p className="text-[11px] text-slate-400">Pilih akun yang boleh menekan tombol Eksekusi</p>
+            </div>
+          </div>
+          <button onClick={onClose} className={`w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition ${FOCUS_RING}`}><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 text-[11px] text-amber-700">
+            Izin eksekusi <b>tidak otomatis</b> dari role. Hanya akun yang dicentang di sini yang bisa menekan tombol Eksekusi — berlaku untuk Admin maupun Purchasing.
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari nama akun…"
+              className="w-full h-11 border border-slate-200 rounded-xl pl-9 pr-3.5 text-sm bg-white outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 transition"
+            />
+          </div>
+          <div className="border border-slate-100 rounded-xl max-h-80 overflow-y-auto divide-y divide-slate-50">
+            {loading ? (
+              <div className="p-6 text-center text-sm text-slate-400">Memuat…</div>
+            ) : filteredRows.length === 0 ? (
+              <div className="p-6 text-center text-sm text-slate-400">Tidak ada akun ditemukan</div>
+            ) : (
+              filteredRows.map((row) => {
+                const checked = effectiveState(row);
+                const overridden = changed[row.user_id] !== undefined && changed[row.user_id] !== row.is_active;
+                return (
+                  <label key={row.user_id} className="flex items-center justify-between gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{row.name}</p>
+                      <p className="text-[10px] text-slate-400">{row.role.replace(/_/g, " ")}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {overridden && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-100">Diubah</span>
+                      )}
+                      <input type="checkbox" checked={checked} onChange={() => toggle(row.user_id, checked)} className="w-4 h-4 accent-indigo-600" />
+                    </div>
+                  </label>
+                );
+              })
+            )}
+          </div>
+          {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
+          {savedOk && !hasChanges && <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs text-emerald-700">Perubahan tersimpan.</div>}
+        </div>
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 bg-slate-50/60">
+          <button onClick={onClose} className={`flex-1 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition ${FOCUS_RING}`}>Tutup</button>
+          <button onClick={submit} disabled={saving || !hasChanges} className={`flex-1 h-10 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-60 ${FOCUS_RING}`}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  MAIN PAGE
  * ════════════════════════════════════════════════════════════════════════════ */
 export default function PengajuanDanaPage() {
@@ -1334,6 +1519,7 @@ export default function PengajuanDanaPage() {
   const [rejectTarget, setRejectTarget] = useState<FundRequest | null>(null);
   // ⬅️ BARU: target modal pembatalan setelah eksekusi
   const [cancelTarget, setCancelTarget] = useState<FundRequest | null>(null);
+  const [showExecuteAccessModal, setShowExecuteAccessModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -1367,6 +1553,7 @@ export default function PengajuanDanaPage() {
           requester_name: r.requester_name?.trim() || "Tanpa Nama",
           amount: typeof r.amount === "number" && Number.isFinite(r.amount) ? r.amount : 0,
           payment_method: r.payment_method === "SALDO" ? "SALDO" : "CASH",
+          branch: r.branch === "JOGJA" ? "JOGJA" : "UTAMA",
           created_at: r.created_at ?? new Date(0).toISOString(),
         }));
         setData(safeRows);
@@ -1389,17 +1576,21 @@ export default function PengajuanDanaPage() {
 
   const canCreate = userRoles.some((r) => CREATE_ROLES.includes(r));
   const canApprove = userId ? meta.approverIds.includes(userId) : false;
-  const canExecute = userId ? (meta.executorIds.includes(userId) || userRoles.includes("ADMIN")) : false;
+  // Eksekusi dikontrol per-akun lewat panel Akses Eksekusi (checkbox), BUKAN auto
+  // per role. meta.executorIds = daftar akun yang dicentang (is_active).
+  const canExecute = userId ? meta.executorIds.includes(userId) : false;
+  // Yang boleh BUKA & atur panel Akses Eksekusi (ganti di sini kalau mau cuma ADMIN).
+  const canManageExecuteAccess = userRoles.some((r) => ["ADMIN", "PURCHASING"].includes(r));
   // ⬅️ BARU: lonceng untuk approver + ADMIN (tombol Setujui/Tolak tetap ikut canApprove)
   const showBell = canApprove || userRoles.includes("ADMIN");
 
-  const handleSubmit = async (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO") => {
+  const handleSubmit = async (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO", branch: "UTAMA" | "JOGJA") => {
     setSubmitting(true);
     try {
       const res = await fetch("/api/pengajuan-dana", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purpose, amount, payment_method: paymentMethod }),
+        body: JSON.stringify({ purpose, amount, payment_method: paymentMethod, branch }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message);
@@ -1482,6 +1673,7 @@ export default function PengajuanDanaPage() {
         String(r.amount ?? ""),
         formatRupiah(r.amount),
         r.payment_method,
+        BRANCH_LABEL[r.branch],
         statusText,
         formatDate(r.created_at),
       ].filter(Boolean).join(" ").toLowerCase();
@@ -1562,6 +1754,16 @@ export default function PengajuanDanaPage() {
                 onOpenDetail={setDetailTarget}
                 onViewAll={handleViewAllPending}
               />
+            )}
+            {canManageExecuteAccess && (
+              <button
+                onClick={() => setShowExecuteAccessModal(true)}
+                title="Atur akun yang boleh Eksekusi"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-600 font-bold text-sm transition-all ${FOCUS_RING}`}
+              >
+                <Shield className="w-4 h-4" />
+                <span className="hidden sm:inline">Akses Eksekusi</span>
+              </button>
             )}
             {canCreate && (
               <button
@@ -1803,7 +2005,7 @@ export default function PengajuanDanaPage() {
           ) : (
             <>
             <div className="hidden md:block overflow-x-auto -mx-1 rounded-2xl border border-slate-100">
-              <table className="w-full text-sm min-w-[1040px]">
+              <table className="w-full text-sm min-w-[1140px]">
                 <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-slate-100">
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider w-10">No</th>
@@ -1811,6 +2013,7 @@ export default function PengajuanDanaPage() {
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kebutuhan</th>
                     <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nominal</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Metode</th>
+                    <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Lokasi</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l border-slate-100">Persetujui</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Eksekusi</th>
@@ -1864,6 +2067,10 @@ export default function PengajuanDanaPage() {
                           ) : (
                             <PaymentMethodBadge method={row.payment_method} />
                           )}
+                        </td>
+
+                        <td className="px-4 py-4 text-center">
+                          <LocationBadge branch={row.branch} />
                         </td>
 
                         <td className="px-4 py-4 text-center">
@@ -2072,13 +2279,16 @@ export default function PengajuanDanaPage() {
 
                     <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
                       <span className="font-extrabold text-slate-900 tabular-nums text-sm">{formatRupiah(row.amount)}</span>
-                      {userRoles.includes("ADMIN") ? (
-                        <button type="button" onClick={() => setEditMetodeTarget(row)} title="Klik untuk ubah metode pembayaran">
+                      <div className="flex items-center gap-1.5">
+                        <LocationBadge branch={row.branch} />
+                        {userRoles.includes("ADMIN") ? (
+                          <button type="button" onClick={() => setEditMetodeTarget(row)} title="Klik untuk ubah metode pembayaran">
+                            <PaymentMethodBadge method={row.payment_method} />
+                          </button>
+                        ) : (
                           <PaymentMethodBadge method={row.payment_method} />
-                        </button>
-                      ) : (
-                        <PaymentMethodBadge method={row.payment_method} />
-                      )}
+                        )}
+                      </div>
                     </div>
 
                     {row.is_approved ? (
@@ -2211,6 +2421,13 @@ export default function PengajuanDanaPage() {
         <RejectModal
           fundRequest={rejectTarget}
           onClose={() => setRejectTarget(null)}
+          onSaved={fetchData}
+        />
+      )}
+
+      {showExecuteAccessModal && (
+        <ExecuteAccessModal
+          onClose={() => setShowExecuteAccessModal(false)}
           onSaved={fetchData}
         />
       )}

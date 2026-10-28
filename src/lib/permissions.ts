@@ -165,8 +165,14 @@ const KEPALA_DIVISI_ROLES: UserRole[] = [
 ];
 export const FUND_REQUEST_VIEW_ROLES: UserRole[] = [
   ...FULL_ACCESS, "ACCOUNTING", "PURCHASING", ...KEPALA_DIVISI_ROLES,
+  "KEPALA_ADMIN_BARANG", // hanya lihat pengajuan miliknya sendiri (bukan FULL_VIEW → auto difilter requester_id di API)
 ];
-export const FUND_REQUEST_CREATE_ROLES: UserRole[] = [...FULL_ACCESS, "PURCHASING", ...KEPALA_DIVISI_ROLES];
+export const FUND_REQUEST_CREATE_ROLES: UserRole[] = [...FULL_ACCESS, "PURCHASING", ...KEPALA_DIVISI_ROLES, "KEPALA_ADMIN_BARANG"];
+
+// Akses Eksekusi Pengajuan Dana — kontrol per-AKUN (checkbox), bukan per-role.
+// CANDIDATE = akun yang MUNCUL di panel; MANAGE = yang boleh ATUR panel.
+export const FUND_EXECUTE_CANDIDATE_ROLES: UserRole[] = ["ADMIN", "PURCHASING"];
+export const FUND_EXECUTE_ACCESS_MANAGE_ROLES: UserRole[] = ["ADMIN", "PURCHASING"];
 
 // ─── Data Aset Tetap (Fixed Assets) ───────────────────────────────────────────
 // // Input manual murni (nama aset + nominal), tidak terhubung ke modul akutansi/inventaris lain.
@@ -714,6 +720,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/akutansi": [...AKUNTANSI_ROLES],
   "/dashboard/pengajuan-dana": [...FUND_REQUEST_VIEW_ROLES],
   "/api/pengajuan-dana": [...FUND_REQUEST_VIEW_ROLES],
+  "/api/pengajuan-dana/execute-access": [...FUND_REQUEST_VIEW_ROLES],
   "/dashboard/fixed-assets": [...FIXED_ASSET_ROLES],
   "/api/fixed-assets": [...FIXED_ASSET_ROLES],
   "/dashboard/fixed-assets/aset-matot": [...DEAD_ASSET_ROLES],
@@ -893,6 +900,7 @@ export const PERMISSIONS = {
   MANAGE_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   AUDIT_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   MANAGE_CASHFLOW_AUDIT_ACCESS: [...CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES] as UserRole[],
+  MANAGE_FUND_EXECUTE_ACCESS: [...FUND_EXECUTE_ACCESS_MANAGE_ROLES] as UserRole[],
 
   // ── Content Creator ─────────────────────────────────────────────────────────
   VIEW_CC_REPORT: [...CC_REPORT_ROLES] as UserRole[],

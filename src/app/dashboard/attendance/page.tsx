@@ -4703,13 +4703,19 @@ export default function AttendanceDashboardPage() {
 
     // Merged auto + manual
     const mergedAttendances = useMemo((): Attendance[] => {
-        const auto = attendances.map(a => ({ ...a, source: "AUTO" as const }));
         const todayWIB = getWIBToday();
+        // ✅ FIX: semua pasangan user_id + tanggal yang PUNYA catatan manual
+        const manualKeys = new Set(
+            manualRecords.map(mr => `${mr.user_id}_${mr.attendance_date}`)
+        );
+        // ✅ FIX: absen wajah (auto) dibuang kalau tanggalnya sudah ada catatan
+        // manual → status manual jadi SATU-SATUNYA sumber, biar kalender & detail
+        // nggak baca sumber beda (inilah akar beda status Hadir di kalender vs detail)
+        const auto = attendances
+            .filter(a => !manualKeys.has(`${a.user_id ?? ""}_${toWIBDateKey(a.check_in_time || a.created_at)}`))
+            .map(a => ({ ...a, source: "AUTO" as const }));
+        // ✅ FIX: SEMUA catatan manual ikut dirender (bukan cuma yang tanpa auto)
         const manualExtra: Attendance[] = manualRecords
-            .filter(mr => {
-                const inAuto = auto.some(a => (a.user_id ?? "") === mr.user_id && toWIBDateKey(a.check_in_time || a.created_at) === mr.attendance_date);
-                return !inAuto;
-            })
             .map(mr => {
                 const isPresentOrLate = mr.status === "PRESENT" || mr.status === "LATE";
                 const hasCheckout = !!checkoutTimes[`${mr.user_id}_${mr.attendance_date}`];
@@ -6405,7 +6411,10 @@ export default function AttendanceDashboardPage() {
                                                 {selectedAttendances.map((a, idx) => {
                                                     const userId = a.user_id ?? "";
                                                     const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
-                                                    const manualRec = manualMap[`${userId}_${dateKey}`];
+                                                    // ✅ FIX: fallback by id untuk baris sumber manual, biar badge status
+                                                    // tetap pakai status manual walau lookup by tanggal meleset
+                                                    const manualRec = manualMap[`${userId}_${dateKey}`]
+                                                        ?? (a.source === "MANUAL" ? manualRecords.find(mr => mr.id === a.id) : undefined);
                                                     const isHolidayWork = isDayOffForUser(a.user_name, dateKey);
                                                     const rowStatusKey: string | undefined = manualRec?.status ?? a.displayStatus;
                                                     const ACCENT_COLOR_MAP: Record<string, string> = {
