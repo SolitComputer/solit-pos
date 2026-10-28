@@ -266,11 +266,20 @@ export async function PATCH(
 
     case "sparepart": {
       //  CHANGED — dicatat dari Data Services (CS + teknisi + full access), bukan aksi khusus teknisi
-      if (!hasAnyRole(getEffectiveRoles(user), [...SERVICE_TEKNISI_ROLES, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE"]))
+      //  CHANGED — tambahkan admin agar +Tambah Sparepart dari Riwayat (admin-only) dijamin lolos.
+      //  Teknisi/CS tetap diizinkan karena action ini dipakai bersama di Data Services.
+      if (!hasAnyRole(getEffectiveRoles(user), [...SERVICE_TEKNISI_ROLES, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE", "ADMIN", "PROGRAMMER", "ASISTEN_CEO"]))
         return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
       //  CHANGED — tidak wajib SEDANG_DIKERJAKAN & TIDAK mengubah status perbaikan teknisi.
-      //  Boleh dicatat selama order masih aktif, atau sudah selesai tapi belum diambil.
-      if (!isOrderAktif && oldStatus !== "DONE")
+      //  Boleh dicatat selama order masih aktif, sudah selesai tapi belum diambil,
+      //  ATAU sudah masuk Riwayat (SUDAH_DIAMBIL/TIDAK_JADI) — biar sparepart yg lupa
+      //  dicatat masih bisa ditambahkan belakangan dari halaman Riwayat.
+      const isOrderRiwayat = oldStatus === "SUDAH_DIAMBIL" || oldStatus === "TIDAK_JADI"; //  NEW
+      //  NEW — khusus order yang SUDAH di Riwayat: pencatatan sparepart HANYA admin.
+      //  Teknisi/CS tetap boleh untuk order aktif/DONE di Data Services — tidak kena blok ini.
+      if (isOrderRiwayat && !hasAnyRole(getEffectiveRoles(user), ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]))
+        return NextResponse.json({ success: false, message: "Order sudah di Riwayat — hanya admin yang boleh menambah sparepart" }, { status: 403 });
+      if (!isOrderAktif && oldStatus !== "DONE" && !isOrderRiwayat)
         return NextResponse.json({ success: false, message: "Order sudah tidak aktif, sparepart tidak bisa dicatat" }, { status: 400 });
       newStatus = oldStatus; //  CHANGED — status tidak berubah, cuma catat part/biaya
       logCatatan = alasan ? `Sparepart dicatat: ${alasan}` : "Sparepart dicatat";
@@ -599,6 +608,9 @@ export async function PATCH(
 
     // ✅ Update payment saja (tanpa ubah status)
     case "update_payment":
+      //  NEW — edit payment (dari Riwayat) HANYA admin
+      if (!hasAnyRole(getEffectiveRoles(user), ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]))
+        return NextResponse.json({ success: false, message: "Hanya admin yang boleh mengedit payment" }, { status: 403 });
       if (payment_amount === undefined || !Number.isFinite(Number(payment_amount)) || Number(payment_amount) < 0)
         return NextResponse.json({ success: false, message: "Jumlah biaya wajib diisi dan tidak boleh negatif" }, { status: 400 });
       const { data: paid, error: payErr } = await supabase
