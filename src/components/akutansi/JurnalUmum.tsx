@@ -1592,7 +1592,6 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                     ref={provided.innerRef}
                                     {...provided.droppableProps}
                                 >
-                                    <thead>
                                     <thead className="sticky top-0 z-20 bg-slate-50">
                                         <tr className="border-b border-slate-200/80 bg-slate-50">
                                             <th className="px-3 py-3 w-[44px] text-center">
