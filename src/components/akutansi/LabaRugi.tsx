@@ -28,11 +28,18 @@ interface LabaRugiData {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const rp = (n: number) => {
+// Angka polos (tanpa "Rp") untuk badan laporan — 0 jadi "—", minus pakai tanda "-"
+const num = (n: number) => {
     const v = Math.round(Number(n || 0));
     if (v === 0) return "—";
+    return `${v < 0 ? "-" : ""}${Math.abs(v).toLocaleString("id-ID")}`;
+};
+// Pakai "Rp" khusus baris Laba Bersih / Total Laba (biar menonjol seperti di laporan)
+const rp = (n: number) => {
+    const v = Math.round(Number(n || 0));
     return `${v < 0 ? "-" : ""}Rp${Math.abs(v).toLocaleString("id-ID")}`;
 };
+const labaColor = (n: number) => (n >= 0 ? "text-emerald-700" : "text-red-600");
 
 export default function LabaRugi({ period, branch = "ALL" }: { period: string; branch?: "ALL" | "JOGJA" }) {
     const [data, setData] = useState<LabaRugiData | null>(null);
@@ -43,7 +50,7 @@ export default function LabaRugi({ period, branch = "ALL" }: { period: string; b
         setLoading(true);
         setError("");
         try {
-                       const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
+            const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
             const res = await fetch(`/api/akutansi/laba-rugi?period=${period}${branchQS}`);
             const json = await res.json();
             if (!json.success) {
@@ -85,24 +92,16 @@ export default function LabaRugi({ period, branch = "ALL" }: { period: string; b
         data.operasional.rows.length === 0 &&
         data.luar_operasional.rows.length === 0;
 
+    // Laba Kotor = Total Pendapatan − HPP (Modal Keluar). Laba Bersih = laba_operasional
+    // (dihitung server: Pendapatan − HPP − Beban Operasional − Beban Lain).
+    const labaKotor = data ? data.pendapatan.total - data.modal_keluar.total : 0;
+    const labaBersih = data ? data.laba_operasional : 0;
+    // Tampilkan ekor "Laba Ditahan + Total Laba" hanya kalau memang ada nilainya,
+    // supaya tampilan default persis laporan di gambar tapi datanya tetap tidak hilang.
+    const adaLabaDitahan = !!data && Math.round(data.laba_ditahan.total) !== 0;
+
     return (
         <div className="space-y-4">
-            {/* ── Toolbar ── */}
-            <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between gap-3">
-                <p className="text-xs text-gray-500">
-                    Laporan Laba Rugi {periodLabel(period)} — Pendapatan dikurangi Modal Keluar, Operasional, dan
-                    Biaya di Luar Operasional, lalu ditambah Laba Ditahan.
-                </p>
-                <button
-                    onClick={() => load()}
-                    disabled={loading}
-                    title="Muat ulang data terbaru"
-                    className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800 active:scale-90 transition-all duration-150 disabled:opacity-40 shrink-0"
-                >
-                    <span className={loading ? "inline-block animate-spin" : "inline-block"}>⟳</span>
-                </button>
-            </div>
-
             {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700">{error}</div>
             )}
@@ -116,236 +115,143 @@ export default function LabaRugi({ period, branch = "ALL" }: { period: string; b
                 />
             )}
 
-            {/* ── Mobile: kartu per blok, lebih gampang dibaca daripada tabel sempit ── */}
-            <div className="md:hidden space-y-3">
+            {/* ══════════════════ LAPORAN LABA RUGI ══════════════════ */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden max-w-3xl mx-auto">
+                {/* Kepala laporan (gaya dokumen) */}
+                <div className="px-6 py-6 text-center border-b border-gray-100">
+                    <h3 className="text-lg font-black text-gray-900">
+                        Solit 03{branch === "JOGJA" ? " · Cabang Jogja" : ""}
+                    </h3>
+                    <p className="text-[13px] text-gray-500 mt-0.5">Laporan Laba Rugi</p>
+                    <p className="text-[11px] text-gray-400">Periode {periodLabel(period)}</p>
+                </div>
+
                 {loading ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2 animate-pulse">
-                            <div className="h-3 bg-gray-100 rounded w-1/2" />
-                            <div className="h-3 bg-gray-100 rounded w-1/3" />
-                        </div>
-                    ))
+                    <div className="p-6 space-y-3">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} className="h-4 bg-gray-100 rounded animate-pulse" style={{ width: `${90 - i * 8}%` }} />
+                        ))}
+                    </div>
                 ) : !data || kosong ? (
-                    <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
+                    <div className="py-16 text-center">
                         <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
                         <p className="text-sm text-gray-500 font-medium">Belum ada pendapatan / beban di periode ini</p>
                         <p className="text-xs text-gray-400 mt-1 px-6">Konfirmasi jurnal di tab Jurnal Umum dulu, ya.</p>
                     </div>
                 ) : (
-                    <>
-                        <SectionMobile title="Total Pendapatan" section={data.pendapatan} tone="emerald" />
-                        <SectionMobile title="Total Modal Keluar" section={data.modal_keluar} tone="red" />
-                        <SectionMobile title="Total Operasional" section={data.operasional} tone="red" />
-                        <SectionMobile title="Total di Luar Operasional" section={data.luar_operasional} tone="red" />
+                    <div className="px-4 sm:px-6 py-5 space-y-5">
+                        {/* PENDAPATAN */}
+                        <StmtSection
+                            sectionLabel="Pendapatan"
+                            rows={data.pendapatan.rows}
+                            totalLabel="Total Pendapatan"
+                            total={data.pendapatan.total}
+                        />
 
-                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-3.5 flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-600 uppercase">Laba Periode Berjalan</span>
-                            <span className={`text-sm font-black font-mono ${data.laba_operasional >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                                {rp(data.laba_operasional)}
-                            </span>
+                        {/* HARGA POKOK / MODAL KELUAR */}
+                        <StmtSection
+                            sectionLabel="Harga Pokok / Modal Keluar"
+                            rows={data.modal_keluar.rows}
+                            totalLabel="Total HPP"
+                            total={data.modal_keluar.total}
+                        />
+
+                        {/* LABA KOTOR (highlight) */}
+                        <div className="flex items-center justify-between px-3.5 py-2.5 rounded-lg bg-blue-50 border border-blue-100">
+                            <span className="text-[13px] font-black text-gray-800">Laba Kotor</span>
+                            <span className="text-[14px] font-black font-mono text-blue-700">{num(labaKotor)}</span>
                         </div>
 
-                        <SectionMobile title="Total Laba Ditahan" section={data.laba_ditahan} tone="emerald" showRows={false} />
+                        {/* BEBAN OPERASIONAL */}
+                        <StmtSection
+                            sectionLabel="Beban Operasional"
+                            rows={data.operasional.rows}
+                            totalLabel="Total Beban Operasional"
+                            total={data.operasional.total}
+                        />
 
-                        <div className="bg-gray-100 rounded-xl border-2 border-[#D9A94A]/50 p-4 flex items-center justify-between">
-                            <span className="text-xs font-black text-gray-700 uppercase tracking-wider">Total Laba</span>
-                            <span className={`text-base font-black font-mono ${data.total_laba >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                                {rp(data.total_laba)}
+                        {/* BEBAN DI LUAR OPERASIONAL */}
+                        <StmtSection
+                            sectionLabel="Beban di Luar Operasional"
+                            rows={data.luar_operasional.rows}
+                            totalLabel="Total Beban Lain"
+                            total={data.luar_operasional.total}
+                        />
+
+                        {/* LABA BERSIH (hijau kalau laba, merah kalau rugi) */}
+                        <div
+                            className={`flex items-center justify-between px-4 py-3.5 rounded-xl border ${labaBersih >= 0 ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
+                                }`}
+                        >
+                            <span className={`text-[13px] font-black uppercase tracking-wider ${labaColor(labaBersih)}`}>
+                                Laba Bersih
                             </span>
+                            <span className={`text-lg font-black font-mono ${labaColor(labaBersih)}`}>{rp(labaBersih)}</span>
                         </div>
-                    </>
+
+                        {/* Ekor Laba Ditahan + Total Laba (hanya kalau ada) */}
+                        {adaLabaDitahan && (
+                            <div className="space-y-2 pt-1">
+                                <div className="flex items-center justify-between px-3.5 py-1.5">
+                                    <span className="text-[12px] text-gray-600">+ Laba Ditahan</span>
+                                    <span className="text-[12px] font-mono font-bold text-gray-700">{num(data.laba_ditahan.total)}</span>
+                                </div>
+                                <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-gray-100 border-2 border-gray-300">
+                                    <span className="text-[13px] font-black uppercase tracking-wider text-gray-700">Total Laba (Akhir)</span>
+                                    <span className={`text-base font-black font-mono ${labaColor(data.total_laba)}`}>{rp(data.total_laba)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
 
-            {/* ── Desktop/tablet: Tabel Laba Rugi ── */}
-            <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full border-collapse" style={{ minWidth: "640px" }}>
-                        <thead>
-                            <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
-                                <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-                                    Keterangan
-                                </th>
-                                <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[180px]">
-                                    Nominal
-                                </th>
-                                <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[190px]">
-                                    Jumlah
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                Array.from({ length: 8 }).map((_, i) => (
-                                    <tr key={i} className="border-b border-gray-50">
-                                        {Array.from({ length: 3 }).map((__, j) => (
-                                            <td key={j} className="px-4 py-4">
-                                                <div className="h-3 bg-gray-100 rounded animate-pulse" />
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))
-                            ) : !data || kosong ? (
-                                <tr>
-                                    <td colSpan={3} className="py-16 text-center">
-                                        <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
-                                        <p className="text-sm text-gray-500 font-medium">Belum ada pendapatan / beban di periode ini</p>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            Konfirmasi jurnal di tab Jurnal Umum dulu, ya.
-                                        </p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                <>
-                                    <Section title="Total Pendapatan" section={data.pendapatan} tone="emerald" />
-                                    <Spacer />
-                                    <Section title="Total Modal Keluar" section={data.modal_keluar} tone="red" />
-                                    <Spacer />
-                                    <Section title="Total Operasional" section={data.operasional} tone="red" />
-                                    <Spacer />
-                                    <Section title="Total di Luar Operasional" section={data.luar_operasional} tone="red" />
-                                    <Spacer />
-
-                                    {/* Laba periode berjalan (sebelum laba ditahan) */}
-                                    <tr className="bg-gray-50/70 border-y border-gray-200">
-                                        <td colSpan={2} className="px-4 py-3 text-right text-xs font-bold text-gray-600 uppercase">
-                                            Laba Periode Berjalan
-                                        </td>
-                                        <td className={`px-4 py-3 text-right text-sm font-black font-mono ${data.laba_operasional >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                                            {rp(data.laba_operasional)}
-                                        </td>
-                                    </tr>
-                                    <Spacer />
-
-                                   <Section
-                                        title="Total Laba Ditahan"
-                                        section={data.laba_ditahan}
-                                        tone="emerald"
-                                        showRows={false}
-                                    />
-                                </>
-                            )}
-                        </tbody>
-
-                        {data && !kosong && (
-                            <tfoot>
-                                <tr className="border-t-2 border-[#D9A94A]/50 bg-gray-100">
-                                    <td colSpan={2} className="px-4 py-3.5 text-right text-xs font-black text-gray-700 uppercase tracking-wider">
-                                        Total Laba
-                                    </td>
-                                    <td className={`px-4 py-3.5 text-right text-base font-black font-mono ${data.total_laba >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                                        {rp(data.total_laba)}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        )}
-                    </table>
-                </div>
-            </div>
+            {/* Catatan kaki */}
+            <p className="text-center text-[11px] text-gray-400 max-w-3xl mx-auto px-4">
+                Baris Laba Bersih = Total Pendapatan − HPP − Beban. Hijau artinya laba, merah artinya rugi.
+            </p>
         </div>
     );
 }
 
-// ─── Blok section: baris akun + baris subtotal ───────────────────────────────
- function Section({
-     title,
-     section,
-     tone,
-     emptyLabel,
-     showRows = true,
- }: {
-     title: string;
-     section: LabaRugiSection;
-     tone: "emerald" | "red";
-     emptyLabel?: string;
-     showRows?: boolean;
-}) {
-    const totalColor = tone === "emerald" ? "text-emerald-700" : "text-red-600";
-
-    return (
-        <>
-           {showRows && (
-                section.rows.length === 0 ? (
-                    <tr className="border-b border-gray-50">
-                        <td className="px-4 py-2.5 text-[12px] text-gray-400 italic">{emptyLabel ?? "—"}</td>
-                        <td className="px-4 py-2.5 text-right text-[12px] font-mono text-gray-300">—</td>
-                        <td className="px-4 py-2.5" />
-                    </tr>
-                ) : (
-                    section.rows.map((r) => (
-                        <tr key={r.code} className="hover:bg-blue-50/30 transition border-b border-gray-50">
-                            <td className="px-4 py-2.5 text-[12px] text-gray-800">
-                                <span className="text-[11px] font-mono font-bold text-gray-400 mr-2">{r.code}</span>
-                                {r.name}
-                            </td>
-                            <td className="px-4 py-2.5 text-right text-[12px] font-bold font-mono text-gray-800">
-                                {rp(r.nominal)}
-                            </td>
-                            <td className="px-4 py-2.5" />
-                        </tr>
-                    ))
-                )
-            )}
-            <tr className="bg-gray-50/60 border-b border-gray-100">
-                <td className="px-4 py-2.5 text-[12px] font-bold text-gray-700 pl-8">{title}</td>
-                <td className="px-4 py-2.5" />
-                <td className={`px-4 py-2.5 text-right text-[13px] font-black font-mono ${totalColor}`}>
-                    {rp(section.total)}
-                </td>
-            </tr>
-        </>
-    );
-}
-
-// ─── Versi kartu dari Section, dipakai di layout mobile ──────────────────────
-function SectionMobile({
-    title,
-    section,
-    tone,
+// ─── Satu blok section laporan: baris akun + baris subtotal ──────────────────
+function StmtSection({
+    sectionLabel,
+    rows,
+    totalLabel,
+    total,
     emptyLabel,
-    showRows = true,
 }: {
-    title: string;
-    section: LabaRugiSection;
-    tone: "emerald" | "red";
+    sectionLabel: string;
+    rows: LabaRugiRow[];
+    totalLabel: string;
+    total: number;
     emptyLabel?: string;
-    showRows?: boolean;
 }) {
-    const totalColor = tone === "emerald" ? "text-emerald-700" : "text-red-600";
-
     return (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {showRows && (
-                section.rows.length === 0 ? (
-                    <p className="px-3.5 py-2.5 text-[12px] text-gray-400 italic">{emptyLabel ?? "—"}</p>
-                ) : (
-                    <div className="divide-y divide-gray-50">
-                        {section.rows.map((r) => (
-                            <div key={r.code} className="px-3.5 py-2.5 flex items-center justify-between gap-2">
-                                <span className="text-[12px] text-gray-800 min-w-0 truncate">
-                                    <span className="text-[11px] font-mono font-bold text-gray-400 mr-2">{r.code}</span>
-                                    {r.name}
-                                </span>
-                                <span className="text-[12px] font-bold font-mono text-gray-800 shrink-0">{rp(r.nominal)}</span>
-                            </div>
-                        ))}
+        <div>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">{sectionLabel}</p>
+            {rows.length === 0 ? (
+                <div className="flex items-center justify-between py-1.5 pl-3.5">
+                    <span className="text-[12px] text-gray-400 italic">{emptyLabel ?? "—"}</span>
+                    <span className="text-[12px] font-mono text-gray-300">—</span>
+                </div>
+            ) : (
+                rows.map((r) => (
+                    <div key={r.code} className="flex items-center justify-between py-1.5 pl-3.5 gap-3">
+                        <span className="text-[13px] text-gray-800 min-w-0 truncate">
+                            <span className="text-[11px] font-mono font-bold text-gray-400 mr-2">{r.code}</span>
+                            {r.name}
+                        </span>
+                        <span className="text-[13px] font-mono text-gray-800 shrink-0">{num(r.nominal)}</span>
                     </div>
-                )
+                ))
             )}
-            <div className="px-3.5 py-2.5 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-[12px] font-bold text-gray-700">{title}</span>
-                <span className={`text-[13px] font-black font-mono ${totalColor}`}>{rp(section.total)}</span>
+            <div className="flex items-center justify-between py-2 mt-0.5 border-t border-gray-100">
+                <span className="text-[13px] font-bold text-gray-800">{totalLabel}</span>
+                <span className="text-[13px] font-black font-mono text-gray-900">{num(total)}</span>
             </div>
         </div>
-    );
-}
-
-// Baris kosong pemisah antar blok — biar mirip format laporan Excel
-function Spacer() {
-    return (
-        <tr>
-            <td colSpan={3} className="py-1.5" />
-        </tr>
     );
 }
 
@@ -364,14 +270,14 @@ function VerifikasiBox({
 
     return (
         <div
-            className={`rounded-xl border p-3.5 flex items-start gap-2.5 ${cocok ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
+            className={`rounded-xl border p-3.5 flex items-start gap-2.5 max-w-3xl mx-auto ${cocok ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
                 }`}
         >
             <span className={`shrink-0 mt-0.5 ${cocok ? "text-emerald-600" : "text-amber-600"}`}>
                 {cocok ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
             </span>
             <span className={`text-xs font-semibold leading-relaxed ${cocok ? "text-emerald-700" : "text-amber-800"}`}>
-               {cocok ? (
+                {cocok ? (
                     <>Saldo Awal Manual akun <b className="font-mono">{accountLabel}</b> sudah sinkron dengan Laba Ditahan di laporan ini.</>
                 ) : belumDijurnal ? (
                     <>
