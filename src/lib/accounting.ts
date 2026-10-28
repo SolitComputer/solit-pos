@@ -173,6 +173,13 @@ export function jakartaDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 }
 
+/** Kode jurnal harian: "GJ-YYYYMMDD-NNN" (reset per tanggal transaksi).
+ *  `tanggal` = "YYYY-MM-DD", `seq` = urutan ke-berapa pada tanggal itu (mulai 1). */
+export function formatJournalNo(tanggal: string, seq: number): string {
+  const ymd = tanggal.replace(/-/g, "");
+  return `GJ-${ymd}-${String(seq).padStart(3, "0")}`;
+}
+
 // ─── Mapping Kas ──────────────────────────────────────────────────────────────
 /** Metode bayar transaksi/service → akun kas.
  *  Tunai/Cash + branch "JOGJA" → 121 (Kas Cash Jogja); Tunai/Cash lain → 120;

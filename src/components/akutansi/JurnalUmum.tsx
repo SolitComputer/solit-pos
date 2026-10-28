@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers, Undo2, Sparkles, RefreshCw, Bookmark, BookmarkCheck } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, ChevronsUpDown, Plus, Calendar, Layers, MoreVertical, Undo2, Sparkles, RefreshCw, Bookmark, BookmarkCheck } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -46,6 +46,7 @@ interface JournalEntry {
     tanggal: string;
     keterangan: string;
     ref: string | null;
+    journal_no?: string | null; // ⬅️ BARU — kode jurnal GJ-YYYYMMDD-NNN (entry baru)
     source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN";
     source_id: string | null;
     branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU — tag cabang dari journal_entries
@@ -334,6 +335,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     const [targetMoveDate, setTargetMoveDate] = useState("");
     const [bulkBusy, setBulkBusy] = useState(false);
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+    const [expandAll, setExpandAll] = useState(false); // buka/tutup SEMUA detail akun sekaligus
     const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
     const [showOnlyOutOfSync, setShowOnlyOutOfSync] = useState(false);
     const [showSortSourceModal, setShowSortSourceModal] = useState(false);
@@ -993,6 +995,31 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         });
     }, [pending, deferredPendingSearch, showOnlyWarnings]);
 
+    // Draft (data pending) yang tampil sebagai baris di tabel desktop — ikut
+    // search & filter akun yang sama dengan baris Approved.
+    const filteredDrafts = useMemo(() => {
+        if (showOnlyWarnings || showOnlyOutOfSync) return [];
+        let result = pending;
+        if (accountCodeFilter.size > 0) {
+            result = result.filter((d) => d.lines.some((l) => accountCodeFilter.has(l.account_code)));
+        }
+        const q = deferredSearch.trim().toLowerCase();
+        const qNom = deferredSearchNominal.trim().replace(/[^0-9]/g, "");
+        if (!q && !qNom) return result;
+        return result.filter((d) => {
+            const badgeLabel = SOURCE_BADGE[d.source_type]?.label ?? "";
+            const isPengajuan = d.meta?.source_type === "PENGAJUAN_DANA";
+            const matchText = !q || (
+                d.keterangan.toLowerCase().includes(q) ||
+                badgeLabel.toLowerCase().includes(q) ||
+                (isPengajuan && "pengajuan dana".includes(q)) ||
+                d.lines.some((l) => l.account_code.includes(q) || accountName(l.account_code).toLowerCase().includes(q))
+            );
+            const matchNom = !qNom || d.lines.some((l) => String(Math.round(Number(l.nominal))).includes(qNom));
+            return matchText && matchNom;
+        });
+    }, [pending, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, showOnlyOutOfSync]);
+
     const openAccountFilterDropdown = () => {
         const btn = accountFilterButtonRef.current;
         if (btn) {
@@ -1085,13 +1112,16 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     return (
         <div className="space-y-4">
             {toast && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg toast-in flex items-center gap-3">
+                <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[80] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg toast-in flex items-center gap-2.5 ${/gagal|bermasalah|error|terlalu lama|tidak balance/i.test(toast) ? "bg-red-600" : "bg-emerald-600"}`}>
+                    {/gagal|bermasalah|error|terlalu lama|tidak balance/i.test(toast)
+                        ? <AlertTriangle className="w-4 h-4 shrink-0" />
+                        : <Check className="w-4 h-4 shrink-0" />}
                     <span>{toast}</span>
                     {undoState && (
                         <button
                             onClick={handleUndoReorder}
                             disabled={reorderingBusy}
-                            className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-900 font-bold hover:bg-amber-300 active:scale-95 transition text-[11px] flex items-center gap-1 shadow-xs shrink-0"
+                            className="px-2.5 py-1 rounded-lg bg-white/90 text-slate-900 font-bold hover:bg-white active:scale-95 transition text-[11px] flex items-center gap-1 shadow-xs shrink-0"
                         >
                             <Undo2 className="w-3 h-3" />
                             Undo
@@ -1102,7 +1132,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
 
             {/* ── Pending panel ── */}
             {pending.length > 0 && (
-                <div className="bg-amber-50/60 rounded-2xl border border-amber-200/80 overflow-hidden transition-all">
+                <div className="md:hidden bg-amber-50/60 rounded-2xl border border-amber-200/80 overflow-hidden transition-all">
                     <button
                         onClick={() => setShowPending((v) => !v)}
                         className="w-full px-4 sm:px-5 py-3 flex items-center justify-between hover:bg-amber-100/40 active:scale-[0.995] transition-all duration-150"
@@ -1257,20 +1287,6 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                     <div className="flex gap-2">
                         <div className="flex items-center gap-1 border border-slate-200/80 bg-slate-100/80 rounded-xl p-1 shrink-0">
                             <button
-                                onClick={() => setSortOrder("desc")}
-                                title="Terbaru ke terlama"
-                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${sortOrder === "desc" ? "bg-slate-900 text-white shadow-2xs font-bold" : "text-slate-500 hover:text-slate-800 hover:bg-white/50"}`}
-                            >
-                                <ArrowUpDown className="w-3 h-3" /> Terbaru
-                            </button>
-                            <button
-                                onClick={() => setSortOrder("asc")}
-                                title="Terlama ke terbaru"
-                                className={`h-8 px-3 rounded-lg text-xs font-semibold active:scale-95 transition-all duration-150 ${sortOrder === "asc" ? "bg-slate-900 text-white shadow-2xs font-bold" : "text-slate-500 hover:text-slate-800 hover:bg-white/50"}`}
-                            >
-                                Terlama
-                            </button>
-                            <button
                                 onClick={() => setShowOnlyWarnings((v) => !v)}
                                 title={showOnlyWarnings ? "Tampilkan semua data" : "Filter hanya data dengan penanda (Modal Rp0 / diedit)"}
                                 className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyWarnings ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300" : warningCount > 0 ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100" : "text-slate-500 hover:text-slate-800 hover:bg-white/50"}`}
@@ -1296,35 +1312,94 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                     </span>
                                 )}
                             </button>
-                            <button
-                                onClick={() => setShowSortSourceModal(true)}
-                                disabled={reorderingBusy || entries.length === 0}
-                                title="Rapikan urutan tiap tanggal: Manual → Service → Transaksi → Cashflow"
-                                className="h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 text-slate-700 hover:text-slate-900 bg-white border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs disabled:opacity-50"
-                            >
-                                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                                <span>{reorderingBusy ? "Merapikan..." : "Rapikan Sumber"}</span>
-                            </button>
-                            {undoState && (
+                            <div ref={accountFilterRef} className="inline-block">
                                 <button
-                                    onClick={handleUndoReorder}
-                                    disabled={reorderingBusy}
-                                    title="Kembalikan urutan sebelum dirapikan"
-                                    className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 text-amber-900 bg-amber-100 border border-amber-300 hover:bg-amber-200 shadow-2xs animate-in fade-in zoom-in-95 duration-200"
+                                    ref={accountFilterButtonRef}
+                                    type="button"
+                                    onClick={openAccountFilterDropdown}
+                                    title="Filter per akun"
+                                    className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${accountCodeFilter.size > 0 ? "bg-blue-600 text-white shadow-2xs" : "text-slate-700 bg-white border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs"}`}
                                 >
-                                    <Undo2 className="w-3.5 h-3.5 text-amber-700" />
-                                    <span>Undo Urutan</span>
+                                    <Layers className="w-3.5 h-3.5" />
+                                    <span>Filter Akun</span>
+                                    {accountCodeFilter.size > 0 && (
+                                        <span className="text-[10px] px-1.5 rounded-full font-bold bg-white/20">{accountCodeFilter.size}</span>
+                                    )}
                                 </button>
-                            )}
+                                {showAccountFilter && filterDropdownPos && (
+                                    <div className="fixed z-[90] w-72 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden text-left normal-case" style={{ top: filterDropdownPos.top, left: filterDropdownPos.left }}>
+                                        <div className="p-2 border-b border-gray-100">
+                                            <div className="relative">
+                                                <Search className="w-3.5 h-3.5 text-gray-300 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                                <input autoFocus value={accountFilterSearch} onChange={(e) => setAccountFilterSearch(e.target.value)} placeholder="Cari akun..." className="w-full h-8 border border-gray-200 rounded-lg pl-8 pr-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
+                                            </div>
+                                        </div>
+                                        <div className="max-h-64 overflow-y-auto py-1">
+                                            {accountsForDropdown.length === 0 ? (
+                                                <p className="px-3 py-4 text-xs text-gray-400 text-center">Akun tidak ditemukan</p>
+                                            ) : (
+                                                ACCOUNT_TYPE_ORDER.map((type) => {
+                                                    const group = accountsForDropdown.filter((a) => a.type === type);
+                                                    if (group.length === 0) return null;
+                                                    return (
+                                                        <div key={type}>
+                                                            <p className="px-3 pt-2 pb-1 text-[9px] font-bold text-gray-400 uppercase tracking-wider">{ACCOUNT_TYPE_LABEL[type as keyof typeof ACCOUNT_TYPE_LABEL] ?? type}</p>
+                                                            {group.map((a) => {
+                                                                const checked = accountCodeFilter.has(a.code);
+                                                                return (
+                                                                    <label key={a.code} className={`flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50 ${checked ? "bg-blue-50/60" : ""}`}>
+                                                                        <input type="checkbox" checked={checked} onChange={() => toggleAccountCodeFilter(a.code)} className="w-3.5 h-3.5 rounded border-gray-300 accent-[#1a1545] shrink-0" />
+                                                                        <span className="font-mono font-bold text-gray-400 shrink-0">{a.code}</span>
+                                                                        <span className="text-gray-700 truncate">{a.name}</span>
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                        <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50">
+                                            <button onClick={() => setAccountCodeFilter(new Set())} disabled={accountCodeFilter.size === 0} className="text-[11px] font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Hapus semua</button>
+                                            <button onClick={() => setShowAccountFilter(false)} className="text-[11px] font-bold text-blue-600 hover:underline">Selesai</button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <button
                             onClick={() => setShowManual(true)}
                             className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
                         >
-                            + Jurnal Manual
+                            + Buat Baru
                         </button>
                     </div>
                 </div>
+
+                {selected.size > 0 && (
+                    <div className="hidden md:flex flex-wrap items-center gap-2 bg-amber-500 text-white rounded-xl px-4 py-2.5">
+                        <span className="text-xs font-bold shrink-0">{selected.size} draft dipilih</span>
+                        <button
+                            onClick={() => confirmItems(pending.filter((d) => selected.has(key(d))))}
+                            disabled={busy}
+                            className="h-8 px-3 rounded-lg bg-white text-amber-700 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
+                        >
+                            <Check className="w-3.5 h-3.5" /> {busy ? "Memposting..." : "Posting Terpilih"}
+                        </button>
+                        <button
+                            onClick={() => setSelected(new Set(filteredDrafts.map((d) => key(d))))}
+                            className="h-8 px-3 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold active:scale-95 transition-all duration-150"
+                        >
+                            Pilih Semua Draft ({filteredDrafts.length})
+                        </button>
+                        <button
+                            onClick={() => setSelected(new Set())}
+                            className="h-8 px-3 rounded-lg text-xs font-semibold text-white/80 hover:text-white ml-auto"
+                        >
+                            Batal Pilih
+                        </button>
+                    </div>
+                )}
 
                 {selectedEntryIds.size > 0 && (
                     <div className="flex flex-wrap items-center gap-2 bg-slate-900 text-white rounded-xl px-4 py-2.5">
@@ -1513,115 +1588,69 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                             {(provided) => (
                                 <table
                                     className="w-full border-collapse relative"
-                                    style={{ minWidth: "760px" }}
+                                    style={{ minWidth: "900px" }}
                                     ref={provided.innerRef}
                                     {...provided.droppableProps}
                                 >
                                     <thead>
                                         <tr className="border-b border-slate-200/80 bg-slate-50/90">
-                                            <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[95px] sm:w-[110px]">Tanggal</th>
-                                            <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
-                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[70px] sm:w-[80px]">
-                                                <div ref={accountFilterRef} className="inline-block">
+                                            <th className="px-3 py-3 w-[44px] text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={filtered.length > 0 && filtered.every((e) => selectedEntryIds.has(e.id))}
+                                                    onChange={(e) => setSelectedEntryIds(e.target.checked ? new Set(filtered.map((x) => x.id)) : new Set())}
+                                                    className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] cursor-pointer align-middle"
+                                                    title="Pilih semua entry"
+                                                />
+                                            </th>
+                                            <th className="px-2 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[95px]">
+                                                <button
+                                                    onClick={() => setSortOrder((o) => (o === "desc" ? "asc" : "desc"))}
+                                                    title={sortOrder === "desc" ? "Terbaru dulu — klik untuk terlama" : "Terlama dulu — klik untuk terbaru"}
+                                                    className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-slate-800 transition-colors"
+                                                >
+                                                    Tanggal
+                                                    <ArrowUpDown className={`w-3 h-3 ${sortOrder === "asc" ? "text-blue-600" : "text-slate-400"}`} />
+                                                </button>
+                                            </th>
+                                            <th className="px-2 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[120px]">Sumber</th>
+                                            <th className="px-2 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
+                                            <th className="px-2 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[150px]">Nominal</th>
+                                            <th className="px-2 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[130px]">Status</th>
+                                            <th className="px-2 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[90px]">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <span>Aksi</span>
                                                     <button
-                                                        ref={accountFilterButtonRef}
-                                                        type="button"
-                                                        onClick={openAccountFilterDropdown}
-                                                        className={`inline-flex items-center gap-0.5 hover:text-gray-900 transition-colors ${accountCodeFilter.size > 0 ? "text-blue-600" : ""}`}
+                                                        onClick={() => setExpandAll((v) => !v)}
+                                                        title={expandAll ? "Tutup semua detail akun" : "Buka semua detail akun"}
+                                                        className={`p-1 rounded-lg active:scale-90 transition-all duration-150 ${expandAll ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"}`}
                                                     >
-                                                        Ref
-                                                        <ChevronDown className="w-3 h-3" />
-                                                        {accountCodeFilter.size > 0 && (
-                                                            <span className="ml-0.5 inline-flex items-center justify-center min-w-[14px] h-[14px] px-0.5 rounded-full bg-blue-600 text-white text-[9px] font-bold normal-case">
-                                                                {accountCodeFilter.size}
-                                                            </span>
-                                                        )}
+                                                        <ChevronsUpDown className="w-3.5 h-3.5" />
                                                     </button>
-
-                                                    {showAccountFilter && filterDropdownPos && (
-                                                        <div
-                                                            className="fixed z-[90] w-72 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden text-left normal-case"
-                                                            style={{ top: filterDropdownPos.top, left: filterDropdownPos.left }}
-                                                        >
-                                                            <div className="p-2 border-b border-gray-100">
-                                                                <div className="relative">
-                                                                    <Search className="w-3.5 h-3.5 text-gray-300 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                                                                    <input
-                                                                        autoFocus
-                                                                        value={accountFilterSearch}
-                                                                        onChange={(e) => setAccountFilterSearch(e.target.value)}
-                                                                        placeholder="Cari akun..."
-                                                                        className="w-full h-8 border border-gray-200 rounded-lg pl-8 pr-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="max-h-64 overflow-y-auto py-1">
-                                                                {accountsForDropdown.length === 0 ? (
-                                                                    <p className="px-3 py-4 text-xs text-gray-400 text-center">Akun tidak ditemukan</p>
-                                                                ) : (
-                                                                    ACCOUNT_TYPE_ORDER.map((type) => {
-                                                                        const group = accountsForDropdown.filter((a) => a.type === type);
-                                                                        if (group.length === 0) return null;
-                                                                        return (
-                                                                            <div key={type}>
-                                                                                <p className="px-3 pt-2 pb-1 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                                                                                    {ACCOUNT_TYPE_LABEL[type as keyof typeof ACCOUNT_TYPE_LABEL] ?? type}
-                                                                                </p>
-                                                                                {group.map((a) => {
-                                                                                    const checked = accountCodeFilter.has(a.code);
-                                                                                    return (
-                                                                                        <label
-                                                                                            key={a.code}
-                                                                                            className={`flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50 ${checked ? "bg-blue-50/60" : ""}`}
-                                                                                        >
-                                                                                            <input
-                                                                                                type="checkbox"
-                                                                                                checked={checked}
-                                                                                                onChange={() => toggleAccountCodeFilter(a.code)}
-                                                                                                className="w-3.5 h-3.5 rounded border-gray-300 accent-[#1a1545] shrink-0"
-                                                                                            />
-                                                                                            <span className="font-mono font-bold text-gray-400 shrink-0">{a.code}</span>
-                                                                                            <span className="text-gray-700 truncate">{a.name}</span>
-                                                                                        </label>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        );
-                                                                    })
-                                                                )}
-                                                            </div>
-
-                                                            <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50">
-                                                                <button
-                                                                    onClick={() => setAccountCodeFilter(new Set())}
-                                                                    disabled={accountCodeFilter.size === 0}
-                                                                    className="text-[11px] font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                                                                >
-                                                                    Hapus semua
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setShowAccountFilter(false)}
-                                                                    className="text-[11px] font-bold text-blue-600 hover:underline"
-                                                                >
-                                                                    Selesai
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </th>
-                                            <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[120px] sm:w-[150px]">Debit</th>
-                                            <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[120px] sm:w-[150px]">Kredit</th>
-                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[90px] sm:w-[110px]">Aksi</th>
                                         </tr>
                                     </thead>
+
+                                    {/* ── Baris DRAFT (belum diposting), tampil di atas, di luar drag-reorder ── */}
+                                    {!loading && filteredDrafts.map((d) => (
+                                        <JournalDraftRow
+                                            key={key(d)}
+                                            draft={d}
+                                            selected={selected.has(key(d))}
+                                            busy={busy}
+                                            forceOpen={expandAll}
+                                            accountCodeFilter={accountCodeFilter}
+                                            onToggleSelect={() => setSelected((prev) => { const n = new Set(prev); n.has(key(d)) ? n.delete(key(d)) : n.add(key(d)); return n; })}
+                                            onPost={() => confirmItems([d])}
+                                        />
+                                    ))}
 
                                     {loading ? (
                                         <tbody>
                                             {Array.from({ length: 4 }).map((_, i) => (
                                                 <tr key={i} className="border-b border-gray-50">
-                                                    {Array.from({ length: 6 }).map((__, j) => (
+                                                    {Array.from({ length: 7 }).map((__, j) => (
                                                         <td key={j} className="px-4 py-4">
                                                             <div className="h-3 bg-gray-100 rounded animate-pulse" />
                                                         </td>
@@ -1629,10 +1658,10 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                                 </tr>
                                             ))}
                                         </tbody>
-                                    ) : filtered.length === 0 ? (
+                                    ) : filtered.length === 0 && filteredDrafts.length === 0 ? (
                                         <tbody>
                                             <tr>
-                                                <td colSpan={6} className="py-16 text-center">
+                                                <td colSpan={7} className="py-16 text-center">
                                                     <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
                                                     <p className="text-sm text-gray-500 font-medium">Belum ada jurnal di periode ini</p>
                                                     <p className="text-xs text-gray-400 mt-1">
@@ -1650,6 +1679,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                                 isSelected={selectedEntryIds.has(entry.id)}
                                                 isDraggingGroup={isDraggingGroup}
                                                 accountCodeFilter={accountCodeFilter}
+                                                forceOpen={expandAll}
                                                 isBookmarked={bookmarkedId === entry.id}
                                                 isFlashing={flashId === entry.id}
                                                 onToggleBookmark={toggleBookmark}
@@ -1722,7 +1752,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
 
             <style jsx global>{`
                 @keyframes toastIn {
-                    from { opacity: 0; transform: translate(-50%, 8px); }
+                                      from { opacity: 0; transform: translate(-50%, -8px); }
                     to { opacity: 1; transform: translate(-50%, 0); }
                 }
                 .toast-in { animation: toastIn 0.25s ease-out backwards; }
@@ -3122,6 +3152,7 @@ interface JournalEntryRowProps {
     isSelected: boolean;
     isDraggingGroup: boolean;
     accountCodeFilter: Set<string>;
+    forceOpen?: boolean;
     isBookmarked: boolean;
     isFlashing: boolean;
     onToggleBookmark: (entryId: string) => void;
@@ -3189,12 +3220,89 @@ function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<stri
         checkedByName, entryJam,
     };
 }
+// ─── Menu aksi (⋮) untuk baris jurnal ────────────────────────────────────────
+function RowActionsMenu({
+    entry, isBookmarked, isEntryChecked,
+    onToggleBookmark, onEdit, onLog, onToggleChecked, onDelete,
+}: {
+    entry: JournalEntry;
+    isBookmarked: boolean;
+    isEntryChecked: boolean;
+    onToggleBookmark: (id: string) => void;
+    onEdit: (e: JournalEntry) => void;
+    onLog: (e: JournalEntry) => void;
+    onToggleChecked: (e: JournalEntry, checked: boolean) => void;
+    onDelete: (e: JournalEntry) => void;
+}) {
+    const wrapRef = useRef<HTMLDivElement>(null);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const [open, setOpen] = useState(false);
+    const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const onDown = (e: MouseEvent) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener("mousedown", onDown);
+        return () => document.removeEventListener("mousedown", onDown);
+    }, [open]);
+
+    const toggle = () => {
+        const r = btnRef.current?.getBoundingClientRect();
+        if (r) {
+            const MENU_H = 230;
+            const below = window.innerHeight - r.bottom;
+            const top = below < MENU_H ? Math.max(8, r.top - MENU_H - 6) : r.bottom + 6;
+            setPos({ top, left: Math.max(8, r.right - 196) });
+        }
+        setOpen((v) => !v);
+    };
+    const run = (fn: () => void) => () => { setOpen(false); fn(); };
+
+    return (
+        <div ref={wrapRef} className="inline-block">
+            <button
+                ref={btnRef}
+                onClick={toggle}
+                title="Aksi lain"
+                className={`p-1.5 rounded-lg active:scale-90 transition-all duration-150 ${open ? "bg-slate-200 text-slate-700" : "text-gray-400 hover:text-slate-700 hover:bg-slate-100"}`}
+            >
+                <MoreVertical className="w-4 h-4" />
+            </button>
+            {open && pos && (
+                <div className="fixed z-[90] w-48 bg-white border border-gray-200 rounded-xl shadow-xl py-1 text-left" style={{ top: pos.top, left: pos.left }}>
+                    <button onClick={run(() => onToggleChecked(entry, !isEntryChecked))} className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50">
+                        <Check className={`w-4 h-4 ${isEntryChecked ? "text-emerald-600" : "text-gray-400"}`} />
+                        {isEntryChecked ? "Batalkan tanda dicek" : "Tandai sudah dicek"}
+                    </button>
+                    <button onClick={run(() => onToggleBookmark(entry.id))} className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50">
+                        {isBookmarked ? <BookmarkCheck className="w-4 h-4 text-amber-600" /> : <Bookmark className="w-4 h-4 text-gray-400" />}
+                        {isBookmarked ? "Hapus penanda baca" : "Tandai penanda baca"}
+                    </button>
+                    <button onClick={run(() => onEdit(entry))} className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50">
+                        <Pencil className="w-4 h-4 text-gray-400" /> Edit jurnal
+                    </button>
+                    <button onClick={run(() => onLog(entry))} className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50">
+                        <Clock className="w-4 h-4 text-gray-400" /> Riwayat perubahan
+                    </button>
+                    <div className="h-px bg-gray-100 my-1" />
+                    <button onClick={run(() => onDelete(entry))} className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50">
+                        <Undo2 className="w-4 h-4" /> Batalkan posting
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 const JournalEntryRow = React.memo(function JournalEntryRow({
     entry,
     index,
     isSelected,
     isDraggingGroup,
     accountCodeFilter,
+    forceOpen,
     isBookmarked,
     isFlashing,
     onToggleBookmark,
@@ -3213,6 +3321,14 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
         badge, companyBadge, branchBadge, specParts, modalMissing, cashflowNama, isPengajuanDana,
         linesToRender, isEntryChecked, latestCheckedAt, checkedByName, entryJam,
     } = useJournalEntryDerived(entry, accountCodeFilter);
+
+    const [expanded, setExpanded] = useState(false);
+    const open = expanded || accountCodeFilter.size > 0 || !!forceOpen;
+
+    const totalDebit = sumSide(entry.lines, "DEBIT");
+    const totalKredit = sumSide(entry.lines, "KREDIT");
+    const seimbang = totalDebit === totalKredit;
+    const hasTerkait = isPengajuanDana || !!cashflowNama || !!companyBadge || entry.is_edited || modalMissing;
 
     return (
         <Draggable draggableId={entry.id} index={index}>
@@ -3233,162 +3349,348 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                         }`}
                     style={provided.draggableProps.style}
                 >
-                    {linesToRender.map((line, i) => {
-                        const first = i === 0;
-                        const isKredit = line.side === "KREDIT";
-                        return (
-                            <tr
-                                key={line.id}
-                                onClick={(e) => {
-                                    const target = e.target as HTMLElement;
-                                    if (target.closest("button, input, a, select, textarea")) return;
-                                    onToggleSelect(entry.id);
-                                }}
-                                className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 cursor-pointer transition ${isSelected ? "bg-blue-50/50" : ""}`}
-                            >
-                                <td className={`px-4 py-2 align-top relative ${isBookmarked ? "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-amber-500" : ""}`}>
-                                    {first && (
-                                        <div className="space-y-1">
-                                            <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => onToggleSelect(entry.id)}
-                                                    className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
-                                                    title="Pilih entry ini"
-                                                />
-                                                <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600" title="Tahan & geser dari sini (bukan dari checkbox)">
-                                                    <GripVertical className="w-3 h-3" />
-                                                </div>
-                                                {fmtTgl(entry.tanggal)}
+                    {/* ── Baris ringkas ── */}
+                    <tr
+                        className={`border-t-2 border-gray-200 hover:bg-blue-50/30 transition ${isSelected ? "bg-blue-50/50" : ""}`}
+                    >
+                        {/* checkbox + grip */}
+                        <td className={`px-3 py-3 align-top relative ${isBookmarked ? "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-amber-500" : ""}`}>
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => onToggleSelect(entry.id)}
+                                    className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
+                                    title="Pilih entry ini"
+                                />
+                                <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Tahan & geser untuk ubah urutan">
+                                    <GripVertical className="w-3.5 h-3.5" />
+                                </div>
+                            </div>
+                        </td>
+
+                        {/* Tanggal */}
+                        <td className="px-2 py-3 align-top">
+                            <div className="text-[12px] font-bold text-gray-800 whitespace-nowrap">{fmtTgl(entry.tanggal)}</div>
+                            {entryJam && <div className="text-[10px] text-gray-400 font-mono">{entryJam}</div>}
+                        </td>
+
+                        {/* Sumber */}
+                        <td className="px-2 py-3 align-top">
+                            <div className="flex flex-col items-start gap-1">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${badge.color}`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{badge.label}
+                                </span>
+                                {branchBadge && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${branchBadge.color}`}>{branchBadge.label}</span>}
+                            </div>
+                        </td>
+
+                        {/* Keterangan + kode GJ inline */}
+                        <td className="px-2 py-3 align-top">
+                            <div className="text-sm text-gray-900 leading-snug">
+                                {(entry.journal_no || entry.ref) && (
+                                    <span className="text-[11px] font-mono text-gray-400 mr-2">{entry.journal_no ?? entry.ref}</span>
+                                )}
+                                <span className="font-bold">{entry.keterangan}</span>
+                            </div>
+                            {specParts.length > 0 && <div className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</div>}
+                        </td>
+
+                        {/* Nominal */}
+                        <td className="px-2 py-3 text-right align-top">
+                            <span className="text-[13px] font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">{rp(entry.total)}</span>
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-2 py-3 align-top">
+                            <div className="flex flex-col items-start gap-1">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Approved
+                                </span>
+                                {entry.has_warning && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-red-600" />Penanda</span>}
+                                {entry.sync_available && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 inline-flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5 text-blue-600" />Nominal Berubah</span>}
+                                {isEntryChecked && <span className="text-[9px] font-semibold text-emerald-600 inline-flex items-center gap-1"><Check className="w-2.5 h-2.5" />dicek</span>}
+                            </div>
+                        </td>
+
+                        {/* Aksi: ⋮ + expand */}
+                        <td className="px-2 py-3 align-top">
+                            <div className="flex items-center justify-end gap-0.5">
+                                <RowActionsMenu
+                                    entry={entry}
+                                    isBookmarked={isBookmarked}
+                                    isEntryChecked={isEntryChecked}
+                                    onToggleBookmark={onToggleBookmark}
+                                    onEdit={onEdit}
+                                    onLog={onLog}
+                                    onToggleChecked={onToggleChecked}
+                                    onDelete={onDelete}
+                                />
+                                <button
+                                    onClick={() => setExpanded((v) => !v)}
+                                    aria-expanded={open}
+                                    title={open ? "Tutup detail" : "Lihat detail akun"}
+                                    className="p-1.5 rounded-lg text-gray-400 hover:text-slate-700 hover:bg-slate-100 active:scale-90 transition-all duration-150"
+                                >
+                                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${open ? "rotate-180 text-slate-700" : ""}`} />
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+
+                    {/* ── Panel detail ── */}
+                    {open && (
+                        <tr className={isSelected ? "bg-blue-50/40" : "bg-slate-50/50"}>
+                            <td colSpan={7} className="px-4 pb-4 pt-0">
+                                <div className="flex items-center justify-between gap-3 flex-wrap mb-2.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        {hasTerkait && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Terkait</span>}
+                                        {isPengajuanDana && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-teal-50 text-teal-700 border-teal-200">Pengajuan Dana</span>}
+                                        {cashflowNama && (
+                                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200 inline-flex items-center gap-1">
+                                                <span className="w-3.5 h-3.5 rounded-full bg-[#1a1545] text-white text-[7px] font-black flex items-center justify-center">{cashflowNama.charAt(0)}</span>{cashflowNama}
                                             </span>
-                                            {entryJam && (
-                                                <div className="pl-7 text-[9px] text-gray-400 font-mono" title="Jam data ini masuk ke jurnal">
-                                                    Masuk {entryJam}
-                                                </div>
-                                            )}
-                                            {isEntryChecked && (
-                                                <div className="pl-7 text-[9px] text-emerald-600 font-semibold flex items-center gap-1" title={`Dicek oleh ${checkedByName ?? "—"} pada ${fmtWaktu(latestCheckedAt ?? undefined)}`}>
-                                                    <Check className="w-2.5 h-2.5" />
-                                                    {checkedByName ?? "—"} · {fmtJam(latestCheckedAt)}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </td>
-
-                                <td className="px-4 py-2 align-top">
-                                    {first && (
-                                        <>
-                                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>{badge.label}</span>
-                                                {branchBadge && (
-                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${branchBadge.color}`}>{branchBadge.label}</span>
-                                                )}
-                                                {companyBadge && (
-                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>{companyBadge.label}</span>
-                                                )}
-                                                {isPengajuanDana && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-teal-50 text-teal-700 border-teal-200">Pengajuan Dana</span>
-                                                )}
-                                                {cashflowNama && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200">{cashflowNama}</span>
-                                                )}
-                                                {entry.is_edited && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">diedit · {entry.updated_by_user?.name ?? "—"}</span>
-                                                )}
-                                                {entry.has_warning && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1 shrink-0">
-                                                        <AlertTriangle className="w-2.5 h-2.5 text-red-600" /> Penanda
-                                                    </span>
-                                                )}
-                                                {entry.sync_available && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 inline-flex items-center gap-1 shrink-0" title="Nominal berbeda dari data sumber terbaru">
-                                                        <RefreshCw className="w-2.5 h-2.5 text-blue-600" /> Nominal Berubah
-                                                    </span>
-                                                )}
-                                                {modalMissing && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1 shrink-0" title="Harga modal belum diinput di transaksi ini">
-                                                        <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Modal Rp0
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-sm font-bold text-gray-900 mt-1 mb-0.5 leading-snug">{entry.keterangan}</div>
-                                        </>
-                                    )}
-                                    {first && specParts.length > 0 && (
-                                        <div className="text-[10px] text-gray-400 mb-1.5">{specParts.join(" · ")}</div>
-                                    )}
-                                    <div className={`text-[11px] ${isKredit ? "pl-10 text-emerald-800" : "pl-1 text-blue-800"} font-medium`}>
-                                        {line.account_name}
+                                        )}
+                                        {companyBadge && <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${companyBadge.color}`}>{companyBadge.label}</span>}
+                                        {entry.is_edited && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">diedit · {entry.updated_by_user?.name ?? "—"}</span>}
+                                        {modalMissing && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-amber-600" />Modal Rp0</span>}
                                     </div>
-                                    {line.keterangan && (
-                                        <div className={`text-[10px] italic text-gray-400 mt-0.5 ${isKredit ? "pl-10" : "pl-1"}`}>{line.keterangan}</div>
+                                    <span className="text-[11px] text-gray-400 font-mono">Input {fmtTgl(entry.tanggal)}{entryJam ? ` · ${entryJam}` : ""}</span>
+                                </div>
+
+                                <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+                                    <table className="w-full border-collapse">
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-100">
+                                                <th className="px-3 py-1.5 text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider w-[70px]">Kode</th>
+                                                <th className="px-3 py-1.5 text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider">Nama Akun</th>
+                                                <th className="px-3 py-1.5 text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider">Keterangan</th>
+                                                <th className="px-3 py-1.5 text-right text-[9px] font-bold text-gray-400 uppercase tracking-wider w-[120px]">Debit</th>
+                                                <th className="px-3 py-1.5 text-right text-[9px] font-bold text-gray-400 uppercase tracking-wider w-[120px]">Kredit</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {linesToRender.map((line) => {
+                                                const isKredit = line.side === "KREDIT";
+                                                return (
+                                                    <tr key={line.id} className="border-b border-gray-50 last:border-0">
+                                                        <td className="px-3 py-1.5 align-top">
+                                                            <span className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${accountCodeFilter.has(line.account_code) ? "bg-blue-50 text-blue-700" : "text-gray-400"}`}>{line.account_code}</span>
+                                                        </td>
+                                                        <td className="px-3 py-1.5 align-top">
+                                                            <span className={`text-[11px] font-medium ${isKredit ? "pl-6 text-emerald-800" : "text-blue-800"}`}>{line.account_name}</span>
+                                                        </td>
+                                                        <td className="px-3 py-1.5 align-top text-[10px] text-gray-500">{line.keterangan || "—"}</td>
+                                                        <td className="px-3 py-1.5 text-right align-top text-[11px] font-mono font-bold text-gray-900 tabular-nums">{!isKredit ? rp(line.nominal) : ""}</td>
+                                                        <td className="px-3 py-1.5 text-right align-top text-[11px] font-mono font-bold text-gray-900 tabular-nums">{isKredit ? rp(line.nominal) : ""}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="bg-gray-50 border-t border-gray-200">
+                                                <td className="px-3 py-1.5" />
+                                                <td className="px-3 py-1.5 text-[11px] font-bold text-gray-600">Total</td>
+                                                <td className="px-3 py-1.5" />
+                                                <td className="px-3 py-1.5 text-right text-[11px] font-mono font-black text-gray-900 tabular-nums">{rp(totalDebit)}</td>
+                                                <td className="px-3 py-1.5 text-right text-[11px] font-mono font-black text-gray-900 tabular-nums">{rp(totalKredit)}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                                    <button onClick={() => onEdit(entry)} className="h-8 px-3 rounded-lg border border-gray-200 bg-white text-gray-600 text-[12px] font-semibold hover:bg-gray-50 active:scale-95 transition inline-flex items-center gap-1.5"><Pencil className="w-3.5 h-3.5" />Edit</button>
+                                    <button onClick={() => onDelete(entry)} className="h-8 px-3 rounded-lg border border-gray-200 bg-white text-gray-600 text-[12px] font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-200 active:scale-95 transition inline-flex items-center gap-1.5"><Undo2 className="w-3.5 h-3.5" />Batalkan posting</button>
+                                    <SyncHistoryToggle entry={entry} onUpdated={() => onUpdated(false)} onSynced={onSynced} setToast={setToast} />
+                                    <WarningToggle entry={entry} onUpdated={() => onUpdated(false)} onToggleWarningState={onToggleWarningState} setToast={setToast} />
+                                    {seimbang ? (
+                                        <span className="text-[11px] font-bold text-emerald-600 inline-flex items-center gap-1 ml-auto"><Check className="w-3.5 h-3.5" />Debit = Kredit, seimbang</span>
+                                    ) : (
+                                        <span className="text-[11px] font-bold text-red-600 inline-flex items-center gap-1 ml-auto"><AlertTriangle className="w-3.5 h-3.5" />Tidak seimbang</span>
                                     )}
-                                </td>
-
-                                <td className="px-4 py-2 text-center align-bottom">
-                                    <span className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${accountCodeFilter.has(line.account_code) ? "bg-blue-50 text-blue-700" : "text-gray-400"}`}>
-                                        {line.account_code}
-                                    </span>
-                                    {first && entry.ref && (
-                                        <div className="text-[9px] text-gray-300 font-mono mt-0.5 break-all max-w-[80px] mx-auto leading-tight" title={entry.ref}>{entry.ref}</div>
-                                    )}
-                                </td>
-
-                                <td className="px-4 py-2 text-right align-bottom">
-                                    {!isKredit && <span className="text-[12px] font-bold text-gray-900 font-mono">{rp(line.nominal)}</span>}
-                                </td>
-
-                                <td className="px-4 py-2 text-right align-bottom">
-                                    {isKredit && <span className="text-[12px] font-bold text-gray-900 font-mono">{rp(line.nominal)}</span>}
-                                </td>
-
-                                <td className="px-4 py-2 align-top">
-                                    {first && (
-                                        <div className="flex items-center justify-center gap-1">
-                                            <button
-                                                onClick={() => onToggleBookmark(entry.id)}
-                                                title={isBookmarked ? "Hapus penanda baca" : "Tandai sebagai baris terakhir dibaca"}
-                                                className={`p-1.5 rounded-lg active:scale-90 transition-all duration-150 ${isBookmarked ? "text-amber-600 bg-amber-50 hover:bg-amber-100" : "text-gray-400 hover:text-amber-600 hover:bg-amber-50"}`}
-                                            >
-                                                {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                                            </button>
-                                            <button onClick={() => onEdit(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150" title="Edit jurnal">
-                                                <Pencil className="w-4 h-4" />
-                                            </button>
-                                            <SyncHistoryToggle entry={entry} onUpdated={() => onUpdated(false)} onSynced={onSynced} setToast={setToast} />
-                                            <button onClick={() => onLog(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150" title="Riwayat perubahan">
-                                                <Clock className="w-4 h-4" />
-                                            </button>
-                                            <WarningToggle entry={entry} onUpdated={() => onUpdated(false)} onToggleWarningState={onToggleWarningState} setToast={setToast} />
-                                            <button onClick={() => onDelete(entry)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150" title="Hapus">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => onToggleChecked(entry, !isEntryChecked)}
-                                                title={isEntryChecked ? `Sudah dicek pada ${fmtWaktu(latestCheckedAt ?? undefined)} (Klik untuk batalkan)` : "Tandai sudah dicek"}
-                                                className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked ? "bg-green-600 border-green-600 text-white shadow-2xs" : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"}`}
-                                            >
-                                                <Check className="w-3.5 h-3.5 mx-auto" />
-                                            </button>
-                                        </div>
-                                    )}
-                                </td>
-                            </tr>
-                        );
-                    })}
+                                </div>
+                                {isEntryChecked && (
+                                    <p className="text-[10px] text-emerald-600 font-semibold mt-1.5 inline-flex items-center gap-1"><Check className="w-2.5 h-2.5" />Dicek {checkedByName ?? "—"} · {fmtWaktu(latestCheckedAt ?? undefined)}</p>
+                                )}
+                            </td>
+                        </tr>
+                    )}
                 </tbody>
             )}
         </Draggable>
     );
 });
 
+// ─── Menu aksi (⋮) untuk baris DRAFT ─────────────────────────────────────────
+function DraftActionsMenu({ busy, onPost }: { busy: boolean; onPost: () => void }) {
+    const wrapRef = useRef<HTMLDivElement>(null);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const [open, setOpen] = useState(false);
+    const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+    useEffect(() => {
+        if (!open) return;
+        const onDown = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); };
+        document.addEventListener("mousedown", onDown);
+        return () => document.removeEventListener("mousedown", onDown);
+    }, [open]);
+    const toggle = () => {
+        const r = btnRef.current?.getBoundingClientRect();
+        if (r) { const below = window.innerHeight - r.bottom; const top = below < 120 ? Math.max(8, r.top - 120) : r.bottom + 6; setPos({ top, left: Math.max(8, r.right - 180) }); }
+        setOpen((v) => !v);
+    };
+    return (
+        <div ref={wrapRef} className="inline-block">
+            <button ref={btnRef} onClick={toggle} title="Aksi" className={`p-1.5 rounded-lg active:scale-90 transition-all duration-150 ${open ? "bg-slate-200 text-slate-700" : "text-gray-400 hover:text-slate-700 hover:bg-slate-100"}`}>
+                <MoreVertical className="w-4 h-4" />
+            </button>
+            {open && pos && (
+                <div className="fixed z-[90] w-44 bg-white border border-gray-200 rounded-xl shadow-xl py-1 text-left" style={{ top: pos.top, left: pos.left }}>
+                    <button onClick={() => { setOpen(false); onPost(); }} disabled={busy} className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-40">
+                        <Check className="w-4 h-4" /> Posting jurnal
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Baris DRAFT (data pending) untuk tabel desktop ──────────────────────────
+function JournalDraftRow({
+    draft, selected, busy, forceOpen, accountCodeFilter, onToggleSelect, onPost,
+}: {
+    draft: PendingDraft;
+    selected: boolean;
+    busy: boolean;
+    forceOpen: boolean;
+    accountCodeFilter: Set<string>;
+    onToggleSelect: () => void;
+    onPost: () => void;
+}) {
+    const [expanded, setExpanded] = useState(false);
+    const open = expanded || accountCodeFilter.size > 0 || forceOpen;
+    const badge = SOURCE_BADGE[draft.source_type];
+    const branchBadge = getBranchBadge(draft.branch);
+    const companyBadge = draft.source_type === "TRANSACTION" ? getCompanyBadge(draft.meta?.company_name) : null;
+    const specParts = [draft.meta?.cpu, draft.meta?.ram, draft.meta?.storage].filter(Boolean) as string[];
+    const isPengajuan = draft.meta?.source_type === "PENGAJUAN_DANA";
+    const modalMissing = draft.source_type === "TRANSACTION" && draft.meta?.modal_missing === true;
+    const lines = accountCodeFilter.size > 0 ? draft.lines.filter((l) => accountCodeFilter.has(l.account_code)) : draft.lines;
+    const totalDebit = sumSide(draft.lines, "DEBIT");
+    const totalKredit = sumSide(draft.lines, "KREDIT");
+
+    return (
+        <tbody className="bg-amber-50/20">
+            <tr
+                className={`border-t-2 border-amber-200/60 hover:bg-amber-50/40 transition ${selected ? "bg-amber-50/70" : ""}`}
+            >
+                <td className="px-3 py-3 align-top">
+                    <input type="checkbox" checked={selected} onChange={onToggleSelect} className="w-5 h-5 rounded border-gray-300 accent-amber-600 shrink-0 cursor-pointer" title="Pilih draft ini untuk diposting" />
+                </td>
+                <td className="px-2 py-3 align-top">
+                    <div className="text-[12px] font-bold text-gray-800 whitespace-nowrap">{fmtTgl(draft.tanggal)}</div>
+                </td>
+                <td className="px-2 py-3 align-top">
+                    <div className="flex flex-col items-start gap-1">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${badge.color}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{badge.label}
+                        </span>
+                        {branchBadge && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${branchBadge.color}`}>{branchBadge.label}</span>}
+                    </div>
+                </td>
+                <td className="px-2 py-3 align-top">
+                    <div className="text-sm font-bold text-gray-900 leading-snug">{draft.keterangan}</div>
+                    {specParts.length > 0 && <div className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</div>}
+                </td>
+                <td className="px-2 py-3 text-right align-top">
+                    <span className="text-[13px] font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">{rp(draft.total)}</span>
+                </td>
+                <td className="px-2 py-3 align-top">
+                    <div className="flex flex-col items-start gap-1">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />Draft
+                        </span>
+                        {modalMissing && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-amber-600" />Modal Rp0</span>}
+                    </div>
+                </td>
+                <td className="px-2 py-3 align-top">
+                    <div className="flex items-center justify-end gap-0.5">
+                        <DraftActionsMenu busy={busy} onPost={onPost} />
+                        <button onClick={() => setExpanded((v) => !v)} aria-expanded={open} title={open ? "Tutup detail" : "Lihat detail akun"} className="p-1.5 rounded-lg text-gray-400 hover:text-slate-700 hover:bg-slate-100 active:scale-90 transition-all duration-150">
+                            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${open ? "rotate-180 text-slate-700" : ""}`} />
+                        </button>
+                    </div>
+                </td>
+            </tr>
+
+            {open && (
+                <tr className="bg-amber-50/30">
+                    <td colSpan={7} className="px-4 pb-4 pt-0">
+                        {(isPengajuan || companyBadge || modalMissing) && (
+                            <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Terkait</span>
+                                {isPengajuan && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-teal-50 text-teal-700 border-teal-200">Pengajuan Dana</span>}
+                                {companyBadge && <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${companyBadge.color}`}>{companyBadge.label}</span>}
+                                {modalMissing && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-amber-600" />Modal Rp0</span>}
+                            </div>
+                        )}
+                        <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+                            <table className="w-full border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-100">
+                                        <th className="px-3 py-1.5 text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider w-[70px]">Kode</th>
+                                        <th className="px-3 py-1.5 text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider">Nama Akun</th>
+                                        <th className="px-3 py-1.5 text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider">Keterangan</th>
+                                        <th className="px-3 py-1.5 text-right text-[9px] font-bold text-gray-400 uppercase tracking-wider w-[120px]">Debit</th>
+                                        <th className="px-3 py-1.5 text-right text-[9px] font-bold text-gray-400 uppercase tracking-wider w-[120px]">Kredit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {lines.map((line, i) => {
+                                        const isKredit = line.side === "KREDIT";
+                                        return (
+                                            <tr key={`${line.account_code}-${line.side}-${i}`} className="border-b border-gray-50 last:border-0">
+                                                <td className="px-3 py-1.5 align-top"><span className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${accountCodeFilter.has(line.account_code) ? "bg-blue-50 text-blue-700" : "text-gray-400"}`}>{line.account_code}</span></td>
+                                                <td className="px-3 py-1.5 align-top"><span className={`text-[11px] font-medium ${isKredit ? "pl-6 text-emerald-800" : "text-blue-800"}`}>{accountName(line.account_code)}</span></td>
+                                                <td className="px-3 py-1.5 align-top text-[10px] text-gray-500">{line.keterangan || "—"}</td>
+                                                <td className="px-3 py-1.5 text-right align-top text-[11px] font-mono font-bold text-gray-900 tabular-nums">{!isKredit ? rp(line.nominal) : ""}</td>
+                                                <td className="px-3 py-1.5 text-right align-top text-[11px] font-mono font-bold text-gray-900 tabular-nums">{isKredit ? rp(line.nominal) : ""}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="bg-gray-50 border-t border-gray-200">
+                                        <td className="px-3 py-1.5" />
+                                        <td className="px-3 py-1.5 text-[11px] font-bold text-gray-600">Total</td>
+                                        <td className="px-3 py-1.5" />
+                                        <td className="px-3 py-1.5 text-right text-[11px] font-mono font-black text-gray-900 tabular-nums">{rp(totalDebit)}</td>
+                                        <td className="px-3 py-1.5 text-right text-[11px] font-mono font-black text-gray-900 tabular-nums">{rp(totalKredit)}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2.5">
+                            <button onClick={onPost} disabled={busy} className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-bold inline-flex items-center gap-1.5 active:scale-95 transition disabled:opacity-40"><Check className="w-3.5 h-3.5" />{busy ? "Memposting..." : "Posting ke jurnal"}</button>
+                            {totalDebit === totalKredit ? (
+                                <span className="text-[11px] font-bold text-emerald-600 inline-flex items-center gap-1 ml-auto"><Check className="w-3.5 h-3.5" />Debit = Kredit, seimbang</span>
+                            ) : (
+                                <span className="text-[11px] font-bold text-red-600 inline-flex items-center gap-1 ml-auto"><AlertTriangle className="w-3.5 h-3.5" />Tidak seimbang</span>
+                            )}
+                        </div>
+                    </td>
+                </tr>
+            )}
+        </tbody>
+    );
+}
+
 // ─── Kartu entry jurnal untuk layout mobile ──────────────────────────────────
 const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
     entry,
     isSelected,
     accountCodeFilter,
+    forceOpen,
     isBookmarked,
     isFlashing,
     onToggleBookmark,
@@ -3410,11 +3712,6 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
     return (
         <div
             ref={registerRef}
-            onClick={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest("button, input, a, select, textarea")) return;
-                onToggleSelect(entry.id);
-            }}
             className={`rounded-xl border p-3.5 transition-colors ${isFlashing
                 ? "border-amber-400 bg-amber-50/60 ring-2 ring-amber-400"
                 : isBookmarked
@@ -3475,6 +3772,9 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
                     <p className="text-sm font-bold text-gray-900 leading-snug break-words">{entry.keterangan}</p>
                     {specParts.length > 0 && (
                         <p className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</p>
+                    )}
+                    {entry.journal_no && (
+                        <p className="text-[9px] text-slate-500 font-mono font-bold mt-0.5 break-all">{entry.journal_no}</p>
                     )}
                     {entry.ref && (
                         <p className="text-[9px] text-gray-300 font-mono mt-0.5 break-all">Ref: {entry.ref}</p>

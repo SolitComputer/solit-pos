@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { isValidPeriod, periodFromDate, isBalanced } from "@/lib/accounting";
+import { isValidPeriod, periodFromDate, isBalanced, formatJournalNo } from "@/lib/accounting";
 import {
   buildDraftsForPeriod,
   draftKey,
   draftToLineRows,
   getPostedKeys,
+  getMaxJournalSeqByDate,
 } from "@/lib/accountingSource";
 
 function getAdmin(): SupabaseClient {
@@ -82,11 +83,26 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     });
   }
 
+  // ── Kode jurnal GJ-YYYYMMDD-NNN (reset per tanggal transaksi), hanya entry baru ──
+  const maxSeqByDate = await getMaxJournalSeqByDate(supabase, selected.map((d) => d.tanggal));
+  const seqCounter = new Map<string, number>(maxSeqByDate);
+  const journalNoByKey = new Map<string, string>();
+  for (const d of [...selected].sort((a, b) =>
+    a.tanggal !== b.tanggal
+      ? a.tanggal.localeCompare(b.tanggal)
+      : (a.sort_ts ?? "").localeCompare(b.sort_ts ?? "")
+  )) {
+    const next = (seqCounter.get(d.tanggal) ?? 0) + 1;
+    seqCounter.set(d.tanggal, next);
+    journalNoByKey.set(draftKey(d), formatJournalNo(d.tanggal, next));
+  }
+
   const entryRows = selected.map((d) => ({
     period: periodFromDate(d.tanggal),
     tanggal: d.tanggal,
     keterangan: d.keterangan,
     ref: d.ref,
+    journal_no: journalNoByKey.get(draftKey(d)) ?? null,
     source_type: d.source_type,
     source_id: d.source_id,
     source_category: d.source_category,
@@ -129,6 +145,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       tanggal: d.tanggal,
       keterangan: d.keterangan,
       ref: d.ref,
+      journal_no: journalNoByKey.get(draftKey(d)) ?? null,
       source_type: d.source_type,
       source_id: d.source_id,
       source_category: d.source_category,

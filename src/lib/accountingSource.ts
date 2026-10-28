@@ -59,6 +59,38 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 /**
+ * Nomor urut GJ tertinggi yang SUDAH ada per tanggal (format "GJ-YYYYMMDD-NNN").
+ * Return Map<tanggal, maxSeq>; nomor berikutnya = maxSeq + 1. Tanggal yang belum
+ * punya kode sama sekali tidak ada di Map (→ mulai dari 1).
+ */
+export async function getMaxJournalSeqByDate(
+  supabase: SupabaseClient,
+  dates: string[]
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  const unique = [...new Set(dates)];
+  if (unique.length === 0) return map;
+  for (const batch of chunkArray(unique, 150)) {
+    const { data, error } = await supabase
+      .from("journal_entries")
+      .select("tanggal, journal_no")
+      .in("tanggal", batch)
+      .not("journal_no", "is", null);
+    if (error) {
+      console.error("[akuntansi] getMaxJournalSeqByDate:", error.message);
+      continue;
+    }
+    for (const r of (data ?? []) as any[]) {
+      const seq = parseInt(String(r.journal_no).split("-").pop() ?? "", 10);
+      if (!Number.isFinite(seq)) continue;
+      const cur = map.get(r.tanggal as string) ?? 0;
+      if (seq > cur) map.set(r.tanggal as string, seq);
+    }
+  }
+  return map;
+}
+
+/**
  * Deal (harga jual) + modal (harga beli) aksesoris per invoice, dari
  * transaction_items. Dipakai untuk memisah pendapatan laptop vs aksesoris
  * (410 vs 420) DAN membukukan HPP aksesoris (D450 Biaya Printilan / K170

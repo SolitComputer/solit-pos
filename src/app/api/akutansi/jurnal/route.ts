@@ -12,6 +12,7 @@ import {
   linesEqual,
   periodFromDate,
   totalOf,
+  formatJournalNo,
 } from "@/lib/accounting";
 import {
   draftToLineRows,
@@ -20,6 +21,7 @@ import {
   getCashflowSyncDraftsByIds,
   getCashflowMetaByIds,
   getServiceSyncDraftsByIds,
+  getMaxJournalSeqByDate,
 } from "@/lib/accountingSource";
 
 function getAdmin(): SupabaseClient {
@@ -318,6 +320,10 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       { status: 400 }
     );
 
+  // Kode jurnal GJ-YYYYMMDD-NNN untuk entry manual baru (urut per tanggal).
+  const maxSeqByDate = await getMaxJournalSeqByDate(supabase, [tanggal]);
+  const journalNo = formatJournalNo(tanggal, (maxSeqByDate.get(tanggal) ?? 0) + 1);
+
   const { data: entry, error: entryErr } = await supabase
     .from("journal_entries")
     .insert({
@@ -325,6 +331,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       tanggal,
       keterangan: keterangan.trim(),
       ref: ref?.trim() || null,
+      journal_no: journalNo,
       source_type: "MANUAL",
       source_id: null,
       source_category: source_category ?? null,
