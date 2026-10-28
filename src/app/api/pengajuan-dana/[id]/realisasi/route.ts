@@ -56,8 +56,9 @@ export async function POST(
     }
 
     const { keterangan, tanggal, payment_method, photo_url } = body;
-    // Lokasi realisasi TIDAK lagi diambil dari body — dikunci dari pengajuannya.
-    // (const branch dideklarasi di bawah, setelah fundRequest diambil)
+    // Lokasi Cash realisasi diambil dari dropdown (body); fail-safe ke UTAMA kalau
+    // nilainya tak valid. Kompatibel dengan data lama (UTAMA/JOGJA).
+    const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
     // ⬅️ BARU: dukung multi-kategori (items[]) — tombol "+" di modal Realisasi
     // bisa nambah berapa pun baris Kategori+Nominal. Tetap backward-compatible:
     // kalau client lama masih kirim body lama (category/nominal tunggal tanpa
@@ -125,9 +126,6 @@ export async function POST(
         return NextResponse.json({ success: false, message: "Pengajuan tidak ditemukan" }, { status: 404 });
     }
 
-    // Lokasi realisasi DIKUNCI dari pengajuannya — bukan dari input client — supaya
-    // konsisten pengajuan → realisasi & tidak bisa dibelokkan ke cabang lain.
-    const branch = fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA";
     if (!fundRequest.is_executed) {
         return NextResponse.json(
             { success: false, message: "Pengajuan harus dieksekusi dulu sebelum diisi realisasinya" },
@@ -303,16 +301,18 @@ export async function PATCH(
         );
     }
 
-    // Lokasi dikunci dari pengajuan (konsisten dgn realisasi awal) — bukan dari body.
-    const branch = fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA";
-
     // Guard unique index uniq_cashflow_source (source_type, source_id, category):
     // 1 kategori cuma boleh sekali per pengajuan.
     const { data: siblings } = await supabase
         .from("cashflow_entries")
-        .select("category, nominal")
+        .select("category, nominal, branch")
         .eq("source_type", "PENGAJUAN_DANA")
         .eq("source_id", id);
+
+    // Lokasi Cash kategori tambahan IKUT lokasi realisasi yang sudah ada (sibling),
+    // supaya tidak masuk ke lokasi yang salah. Fallback: lokasi pengajuan, lalu UTAMA.
+    const siblingBranch = (siblings ?? []).find((e: any) => e.branch === "JOGJA" || e.branch === "UTAMA")?.branch as "JOGJA" | "UTAMA" | undefined;
+    const branch = siblingBranch ?? (fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA");
 
     if ((siblings ?? []).some((e) => e.category === body.category)) {
         return NextResponse.json(
