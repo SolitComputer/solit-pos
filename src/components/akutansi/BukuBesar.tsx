@@ -1,7 +1,7 @@
 "use client";
 // src/components/akutansi/BukuBesar.tsx
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ACCOUNTS, ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
 import { Lock, Pencil, BookOpen, Check, X, AlertTriangle, DollarSign, Search } from "lucide-react";
 
@@ -11,6 +11,11 @@ interface LedgerLine {
     tanggal: string;
     keterangan: string;
     ref: string;
+    // (baru) No. Jurnal (kode GJ) — dikembalikan /api/akutansi/buku-besar kalau
+    // barisnya berasal dari journal_entries yang punya journal_no. Opsional &
+    // null-safe: kalau route belum mengembalikannya, kolom "No. Jurnal" cukup
+    // nampilin "—" tanpa error.
+    journal_no?: string | null;
     side: "DEBIT" | "KREDIT";
     debit: number;
     kredit: number;
@@ -41,8 +46,25 @@ interface LedgerData {
     totals: { debit: number; kredit: number; saldo_akhir: number };
 }
 
+// (baru) Satu baris Neraca Saldo — dipakai cuma buat angka saldo di sidebar akun.
+// Bentuknya mengikuti /api/akutansi/neraca (lihat Neraca.tsx).
+interface NeracaRow {
+    code: string;
+    name: string;
+    debit: number;
+    kredit: number;
+    is_abnormal: boolean;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const rp = (n: number) => `Rp${Math.round(Number(n || 0)).toLocaleString("id-ID")}`;
+// (baru) Format ringkas buat sidebar — biar muat di kolom sempit: 85.600.000 → "85.6jt".
+// 0 ditampilkan "—" supaya akun tanpa saldo nggak ramai.
+const rpShort = (n: number) => {
+    const v = Math.abs(Math.round(Number(n || 0)));
+    if (v === 0) return "—";
+    return `${(v / 1_000_000).toFixed(1)}jt`;
+};
 const fmtTgl = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
 // (baru) — format tanggal + jam (WIB) khusus buat tooltip "Cek", beda dari fmtTgl yang cuma tanggal
@@ -96,6 +118,10 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [showOpeningModal, setShowOpeningModal] = useState(false);
+    // (baru) Saldo seluruh akun (Neraca Saldo) buat angka di sidebar. Dipisah dari
+    // `data` yang hanya 1 akun. Gagal fetch-nya diabaikan — sidebar tetap jalan
+    // tanpa angka (nggak nge-block buku besar utama).
+    const [neraca, setNeraca] = useState<NeracaRow[]>([]);
     // (fix) baris id yang lagi proses centang (PATCH belum selesai) — dipakai load()
     // supaya auto-refresh nggak nimpa optimistic update yang belum ke-confirm server.
     const pendingChecksRef = useRef<Set<string>>(new Set());
@@ -113,7 +139,7 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
         if (!silent) setLoading(true);
         setError("");
         try {
-                       const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
+            const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
             const res = await fetch(`/api/akutansi/buku-besar?period=${period}&account_code=${accountCode}${branchQS}`);
             const json = await res.json();
             if (!json.success) {
@@ -147,6 +173,19 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
             if (!silent) setLoading(false);
         }
     }, [period, accountCode, branch]);
+
+    // (baru) Muat Neraca Saldo (semua akun) buat angka di sidebar. Read-only,
+    // nggak ngubah logic buku besar; error-nya sengaja ditelan.
+    const loadNeraca = useCallback(async () => {
+        try {
+            const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
+            const res = await fetch(`/api/akutansi/neraca?period=${period}${branchQS}`, { cache: "no-store" });
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data?.rows)) setNeraca(json.data.rows);
+        } catch {
+            /* sidebar saldo bersifat opsional — abaikan kalau gagal */
+        }
+    }, [period, branch]);
 
     // Toggle status "sudah dicek" per baris jurnal.
     // Optimistic update dulu (UI langsung berubah), lalu simpan ke server;
@@ -217,11 +256,18 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
         load();
     }, [load]);
 
+    useEffect(() => {
+        loadNeraca();
+    }, [loadNeraca]);
+
     // Auto-refresh saat user kembali ke tab ini (misal habis edit di Jurnal Umum
     // lalu balik lagi ke Buku Besar) — supaya data selalu sinkron tanpa perlu reload manual.
     useEffect(() => {
         const onVisible = () => {
-            if (document.visibilityState === "visible") load({ silent: true });
+            if (document.visibilityState === "visible") {
+                load({ silent: true });
+                loadNeraca();
+            }
         };
         document.addEventListener("visibilitychange", onVisible);
         window.addEventListener("focus", onVisible);
@@ -229,7 +275,14 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
             document.removeEventListener("visibilitychange", onVisible);
             window.removeEventListener("focus", onVisible);
         };
-    }, [load]);
+    }, [load, loadNeraca]);
+
+    // (baru) Peta kode akun → saldo (dari Neraca Saldo) buat ditampilkan di sidebar.
+    const neracaByCode = useMemo(() => {
+        const m = new Map<string, { net: number; abnormal: boolean }>();
+        for (const r of neraca) m.set(r.code, { net: r.debit - r.kredit, abnormal: r.is_abnormal });
+        return m;
+    }, [neraca]);
 
     // Filter baris buku besar berdasarkan keterangan, nominal debit, atau nominal kredit.
     const filteredLines = useMemo(() => {
@@ -248,6 +301,7 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
             // 2) Filter pencarian teks (kalau kosong, lolos semua)
             if (!q) return true;
             if (l.keterangan.toLowerCase().includes(q)) return true;
+            if (l.journal_no && l.journal_no.toLowerCase().includes(q)) return true;
             if (l.debit > 0 && (String(l.debit).includes(q) || rp(l.debit).toLowerCase().includes(q))) return true;
             if (l.kredit > 0 && (String(l.kredit).includes(q) || rp(l.kredit).toLowerCase().includes(q))) return true;
             return false;
@@ -285,9 +339,10 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
     );
 
     return (
-        <div className="space-y-4">
-            {/* ── Account picker ── */}
-            <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
+            {/* ══════════════════ SIDEBAR AKUN ══════════════════ */}
+            {/* Mobile/tablet (< lg): dropdown ringkas — sidebar penuh terlalu makan tempat */}
+            <div className="lg:hidden w-full bg-white rounded-xl border border-gray-200 p-3 flex gap-2">
                 <select
                     value={accountCode}
                     onChange={(e) => setAccountCode(e.target.value)}
@@ -308,7 +363,7 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
                     })}
                 </select>
                 <button
-                    onClick={() => load()}
+                    onClick={() => { load(); loadNeraca(); }}
                     disabled={loading}
                     title="Muat ulang data terbaru"
                     className="h-10 w-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800 active:scale-90 transition-all duration-150 disabled:opacity-40 shrink-0"
@@ -317,466 +372,501 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
                 </button>
             </div>
 
-            {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700">{error}</div>
-            )}
+            {/* Desktop (≥ lg): daftar akun berkelompok + saldo tiap akun */}
+            <aside className="hidden lg:flex lg:flex-col w-72 shrink-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Daftar Akun</span>
+                    <button
+                        onClick={() => { load(); loadNeraca(); }}
+                        disabled={loading}
+                        title="Muat ulang data terbaru"
+                        className="h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 hover:text-gray-700 active:scale-90 transition-all duration-150 disabled:opacity-40"
+                    >
+                        <span className={loading ? "inline-block animate-spin text-xs" : "inline-block text-xs"}>⟳</span>
+                    </button>
+                </div>
+                <div className="overflow-y-auto max-h-[calc(100vh-220px)] py-1">
+                    {ACCOUNT_TYPE_ORDER.map((type) => {
+                        const accs = allAccounts.filter((a) => a.type === type);
+                        if (accs.length === 0) return null;
+                        return (
+                            <div key={type} className="mb-1">
+                                <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                    {ACCOUNT_TYPE_LABEL[type]}
+                                </p>
+                                {accs.map((a) => {
+                                    const active = a.code === accountCode;
+                                    const info = neracaByCode.get(a.code);
+                                    const net = info?.net ?? 0;
+                                    return (
+                                        <button
+                                            key={a.code}
+                                            onClick={() => setAccountCode(a.code)}
+                                            className={`w-full flex items-center gap-2 px-4 py-2 text-left border-l-[3px] transition-colors duration-150 ${active
+                                                ? "border-blue-600 bg-blue-50"
+                                                : "border-transparent hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            <span className={`text-[11px] font-mono font-bold shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`}>
+                                                {a.code}
+                                            </span>
+                                            <span className={`text-[12px] flex-1 truncate ${active ? "font-semibold text-gray-900" : "text-gray-700"}`}>
+                                                {a.name}
+                                            </span>
+                                            <span className={`text-[11px] font-mono shrink-0 ${info?.abnormal ? "text-red-500" : "text-gray-400"}`}>
+                                                {rpShort(net)}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })}
+                </div>
+            </aside>
 
-            {/* ── Summary ── */}
-            {data && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="bg-white rounded-xl border border-gray-200 border-t-2 border-t-[#0f0c29]/70 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">Akun</p>
-                        <p className="text-base font-black font-mono truncate text-gray-900">
-                            {data.account.code} · {data.account.name}
-                        </p>
+            {/* ══════════════════ KONTEN KANAN ══════════════════ */}
+            <div className="flex-1 min-w-0 w-full space-y-4">
+                {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700">{error}</div>
+                )}
+
+                {/* ── Saldo Awal Manual (one-time input) ── */}
+                {data && (
+                    <div
+                        className={`rounded-xl border p-3.5 flex items-center justify-between gap-3 flex-wrap ${data.opening_balance ? "bg-gray-50 border-gray-200" : "bg-amber-50 border-amber-200"
+                            }`}
+                    >
+                        {data.opening_balance ? (
+                            <>
+                                <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-gray-400"><Lock className="w-4 h-4" /></span>
+                                    <span className="text-gray-600">
+                                        Saldo awal manual akun ini:{" "}
+                                        <b className="text-gray-900 font-mono">
+                                            {rp(data.opening_balance.nominal)}
+                                        </b>{" "}
+                                        di sisi{" "}
+                                        <b className={data.opening_balance.side === "DEBIT" ? "text-blue-700" : "text-emerald-700"}>
+                                            {data.opening_balance.side === "DEBIT" ? "Debit" : "Kredit"}
+                                        </b>
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setShowOpeningModal(true)}
+                                    className="h-8 px-3 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-[11px] font-bold hover:opacity-90 active:scale-[0.96] transition-all duration-150 whitespace-nowrap shrink-0 inline-flex items-center"
+                                >
+                                    <Pencil className="w-3.5 h-3.5 inline mr-1" /> Koreksi
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <span className="text-xs text-amber-800">
+                                    Akun ini belum punya saldo awal manual (saldo dihitung murni dari mutasi jurnal).
+                                </span>
+                                <button
+                                    onClick={() => setShowOpeningModal(true)}
+                                    className="h-8 px-3 rounded-lg bg-amber-600 text-white text-[11px] font-bold hover:bg-amber-700 active:scale-[0.96] transition-all duration-150 whitespace-nowrap"
+                                >
+                                    + Set Saldo Awal
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* ══════════════════ KARTU BUKU BESAR ══════════════════ */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    {/* Header kartu: kode · nama + badge saldo normal */}
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                        <h3 className="text-base font-black text-gray-900 flex items-center gap-2 min-w-0">
+                            <span className="font-mono text-blue-600">{data ? data.account.code : "—"}</span>
+                            <span className="truncate">{data ? data.account.name : "Pilih akun"}</span>
+                        </h3>
                         {normalSide && (
-                            <span
-                                className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${normalSide === "DEBIT"
-                                    ? "bg-blue-50 text-blue-600 border-blue-200"
-                                    : "bg-emerald-50 text-emerald-600 border-emerald-200"
-                                    }`}
-                            >
-                                Normal: {normalSide === "DEBIT" ? "Debit" : "Kredit"}
+                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200 whitespace-nowrap">
+                                Saldo normal: {normalSide === "DEBIT" ? "Debit" : "Kredit"}
                             </span>
                         )}
                     </div>
-                    <div className="bg-white rounded-xl border border-gray-200 border-t-2 border-t-[#D9A94A]/60 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">Saldo Awal (Total)</p>
-                        <div className="flex items-center gap-2">
-                            <p className="text-base font-black font-mono truncate text-gray-900">
-                                {rp(Math.abs(data.saldo_awal))}
-                            </p>
-                            <SaldoBadge amount={data.saldo_awal} normalSide={normalSide} />
-                        </div>
-                    </div>
-                    <Stat label="Mutasi Debit" value={rp(data.totals.debit)} tone="blue" />
-                    <Stat label="Mutasi Kredit" value={rp(data.totals.kredit)} tone="emerald" />
-                </div>
-            )}
 
-            {/* ── Saldo Awal Manual (one-time input) ── */}
-            {data && (
-                <div
-                    className={`rounded-xl border p-3.5 flex items-center justify-between gap-3 flex-wrap ${data.opening_balance ? "bg-gray-50 border-gray-200" : "bg-amber-50 border-amber-200"
-                        }`}
-                >
-                    {data.opening_balance ? (
-                        <>
-                            <div className="flex items-center gap-2 text-xs">
-                                <span className="text-gray-400"><Lock className="w-4 h-4" /></span>
-                                <span className="text-gray-600">
-                                    Saldo awal manual akun ini:{" "}
-                                    <b className="text-gray-900 font-mono">
-                                        {rp(data.opening_balance.nominal)}
-                                    </b>{" "}
-                                    di sisi{" "}
-                                    <b className={data.opening_balance.side === "DEBIT" ? "text-blue-700" : "text-emerald-700"}>
-                                        {data.opening_balance.side === "DEBIT" ? "Debit" : "Kredit"}
-                                    </b>
-                                </span>
-                            </div>
-                            <button
-                                onClick={() => setShowOpeningModal(true)}
-                                className="h-8 px-3 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-[11px] font-bold hover:opacity-90 active:scale-[0.96] transition-all duration-150 whitespace-nowrap shrink-0 inline-flex items-center"
-                            >
-                                <Pencil className="w-3.5 h-3.5 inline mr-1" /> Koreksi
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <span className="text-xs text-amber-800">
-                                Akun ini belum punya saldo awal manual (saldo dihitung murni dari mutasi jurnal).
-                            </span>
-                            <button
-                                onClick={() => setShowOpeningModal(true)}
-                                className="h-8 px-3 rounded-lg bg-amber-600 text-white text-[11px] font-bold hover:bg-amber-700 active:scale-[0.96] transition-all duration-150 whitespace-nowrap"
-                            >
-                                + Set Saldo Awal
-                            </button>
-                        </>
+                    {/* Strip 4 angka ringkas */}
+                    {data && (
+                        <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100 border-b border-gray-100">
+                            <SummaryCell label="Saldo Awal" value={rp(Math.abs(data.saldo_awal))} tone="dark" badge={<SaldoBadge amount={data.saldo_awal} normalSide={normalSide} />} />
+                            <SummaryCell label="Mutasi Debit" value={rp(data.totals.debit)} tone="blue" />
+                            <SummaryCell label="Mutasi Kredit" value={rp(data.totals.kredit)} tone="emerald" />
+                            <SummaryCell label="Saldo Akhir" value={rp(Math.abs(data.totals.saldo_akhir))} tone="dark" badge={<SaldoBadge amount={data.totals.saldo_akhir} normalSide={normalSide} />} />
+                        </div>
                     )}
-                </div>
-            )}
 
-            {/* ── Filter status cek & nama pencentang ── */}
-            {data && data.lines.length > 0 && (
-                <div className="flex justify-end gap-2 flex-wrap">
-                    {/* Filter per nama pencentang — hanya muncul kalau ada yang sudah dicek */}
-                    {checkerNames.length > 0 && (
-                        <select
-                            value={checkerFilter}
-                            onChange={(e) => setCheckerFilter(e.target.value)}
-                            title="Filter berdasarkan siapa yang mencentang"
-                            className="h-9 border border-gray-200 rounded-lg px-3 pr-8 text-xs font-bold bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition cursor-pointer"
-                        >
-                            <option value="all">Semua Pencentang</option>
-                            {checkerNames.map((name) => (
-                                <option key={name} value={name}>
-                                    {name} ({data.lines.filter((l) => l.checked_by_name === name).length})
-                                </option>
-                            ))}
-                        </select>
+                    {/* Toolbar: cari + filter */}
+                    {data && (
+                        <div className="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row gap-2 sm:items-center">
+                            <div className="relative flex-1">
+                                <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                <input
+                                    value={tableSearch}
+                                    onChange={(e) => setTableSearch(e.target.value)}
+                                    placeholder="Cari keterangan, no. jurnal, atau nominal..."
+                                    className="w-full h-9 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                                />
+                            </div>
+                            {data.lines.length > 0 && (
+                                <div className="flex gap-2 flex-wrap shrink-0">
+                                    {checkerNames.length > 0 && (
+                                        <select
+                                            value={checkerFilter}
+                                            onChange={(e) => setCheckerFilter(e.target.value)}
+                                            title="Filter berdasarkan siapa yang mencentang"
+                                            className="h-9 border border-gray-200 rounded-lg px-3 pr-8 text-xs font-bold bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition cursor-pointer"
+                                        >
+                                            <option value="all">Semua Pencentang</option>
+                                            {checkerNames.map((name) => (
+                                                <option key={name} value={name}>
+                                                    {name} ({data.lines.filter((l) => l.checked_by_name === name).length})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    <select
+                                        value={checkFilter}
+                                        onChange={(e) => setCheckFilter(e.target.value as "all" | "checked" | "unchecked")}
+                                        className="h-9 border border-gray-200 rounded-lg px-3 pr-8 text-xs font-bold bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition cursor-pointer"
+                                    >
+                                        <option value="all">Semua ({data.lines.length})</option>
+                                        <option value="checked">Sudah Dicek ({data.lines.filter((l) => l.checked).length})</option>
+                                        <option value="unchecked">Belum Dicek ({data.lines.filter((l) => !l.checked && !l.is_synthetic).length})</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
                     )}
-                    <select
-                        value={checkFilter}
-                        onChange={(e) => setCheckFilter(e.target.value as "all" | "checked" | "unchecked")}
-                        className="h-9 border border-gray-200 rounded-lg px-3 pr-8 text-xs font-bold bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition cursor-pointer"
-                    >
-                        <option value="all">Semua ({data.lines.length})</option>
-                        <option value="checked">
-                            Sudah Dicek ({data.lines.filter((l) => l.checked).length})
-                        </option>
-                        <option value="unchecked">
-                            Belum Dicek ({data.lines.filter((l) => !l.checked && !l.is_synthetic).length})
-                        </option>
-                    </select>
-                </div>
-            )}
-            {/* ── Cari baris buku besar ── */}
-            {data && (
-                <div className="sticky top-0 z-20 bg-white py-2 relative">
-                    <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                        value={tableSearch}
-                        onChange={(e) => setTableSearch(e.target.value)}
-                        placeholder="Cari keterangan, nominal debit, atau kredit..."
-                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                    />
-                </div>
-            )}
 
-            {/* ── Mobile: kartu per mutasi, lebih gampang dibaca & tap "Cek" daripada tabel sempit ── */}
-            <div className="md:hidden space-y-2">
-                {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2 animate-pulse">
-                            <div className="h-3 bg-gray-100 rounded w-1/2" />
-                            <div className="h-3 bg-gray-100 rounded w-1/3" />
-                        </div>
-                    ))
-                ) : !data ? (
-                    <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-sm text-gray-400">
-                        Pilih akun untuk melihat buku besar
-                    </div>
-                ) : (
-                    <>
-                        {/* Saldo Awal */}
-                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-3.5 flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-bold text-gray-500 italic">Saldo Awal</span>
-                            <SaldoBadge amount={data.saldo_awal} normalSide={normalSide} />
-                        </div>
-
-                        {data.lines.length === 0 ? (
-                            <div className="bg-white rounded-xl border border-gray-200 py-14 text-center">
-                                <div className="flex justify-center mb-3 opacity-40"><BookOpen className="w-10 h-10" /></div>
-                                <p className="text-sm text-gray-500 font-medium">Belum ada mutasi di periode ini</p>
-                                <p className="text-xs text-gray-400 mt-1 px-6">Konfirmasi data di Jurnal Umum agar muncul di sini.</p>
-                            </div>
-                        ) : filteredLines.length === 0 ? (
-                            <div className="bg-white rounded-xl border border-gray-200 py-14 text-center">
-                                <div className="flex justify-center mb-3 opacity-40"><Search className="w-10 h-10" /></div>
-                                <p className="text-sm text-gray-500 font-medium">Tidak ada baris yang cocok</p>
-                                <p className="text-xs text-gray-400 mt-1 px-6">Coba kata kunci lain untuk keterangan, debit, atau kredit.</p>
-                            </div>
+                    {/* ── Mobile: kartu per mutasi ── */}
+                    <div className="md:hidden p-3 space-y-2">
+                        {loading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <div key={i} className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2 animate-pulse">
+                                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                                    <div className="h-3 bg-gray-100 rounded w-1/3" />
+                                </div>
+                            ))
+                        ) : !data ? (
+                            <div className="py-16 text-center text-sm text-gray-400">Pilih akun untuk melihat buku besar</div>
                         ) : (
-                            filteredLines.map((l) => {
-                                const companyBadge = getCompanyBadge(l.trx_meta?.company_name);
-                                const specParts = [l.trx_meta?.cpu, l.trx_meta?.ram, l.trx_meta?.storage].filter(Boolean) as string[];
-                                return (
-                                    <div key={l.id} className="bg-white rounded-xl border border-gray-200 p-3.5">
-                                        <div className="flex items-start justify-between gap-2 mb-1.5">
-                                            <span className="text-[11px] font-semibold text-gray-500">{fmtTgl(l.tanggal)}</span>
-                                            {l.is_synthetic ? (
-                                                <span
-                                                    title="Baris otomatis (modal belum diinput) — tidak bisa dicek manual"
-                                                    className="w-7 h-7 rounded-md border border-dashed border-gray-200 flex items-center justify-center text-gray-300 shrink-0"
-                                                >
-                                                    —
-                                                </span>
-                                            ) : (
-                                                <button
-                                                    onClick={() => toggleChecked(l.id, !l.checked)}
-                                                    title={
-                                                        l.checked
-                                                            ? `Sudah dicek${l.checked_at ? " · " + fmtTglJam(l.checked_at) : ""} · ${l.checked_by_name ? "oleh " + l.checked_by_name : "pencentang tidak tercatat"}`
-                                                            : "Tandai sudah dicek"
-                                                    }
-                                                    className={`w-7 h-7 rounded-md border flex items-center justify-center active:scale-90 transition-all duration-150 shrink-0 ${l.checked
-                                                        ? "bg-green-600 border-green-600 text-white"
-                                                        : "bg-white border-gray-300 text-gray-300"
-                                                        }`}
-                                                >
-                                                    <Check className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                        </div>
+                            <>
+                                <div className="bg-gray-50 rounded-xl border border-gray-200 p-3.5 flex items-center justify-between gap-2">
+                                    <span className="text-[11px] font-bold text-gray-500 italic">Saldo Awal</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[13px] font-mono font-bold text-gray-900">{rp(Math.abs(data.saldo_awal))}</span>
+                                        <SaldoBadge amount={data.saldo_awal} normalSide={normalSide} />
+                                    </div>
+                                </div>
 
-                                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                            {companyBadge && (
-                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
-                                                    {companyBadge.label}
-                                                </span>
-                                            )}
-                                            {l.is_synthetic && (
-                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
-                                                    <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
-                                                </span>
-                                            )}
-                                            {l.ref && <span className="text-[10px] font-mono font-bold text-gray-400">Ref: {l.ref}</span>}
-                                        </div>
-                                        <p className="text-[13px] text-gray-800">{l.keterangan}</p>
-                                        {specParts.length > 0 && (
-                                            <p className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</p>
-                                        )}
-                                        {l.checked && (
-                                            <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
-                                                <Check className="w-2.5 h-2.5" />
-                                                Dicek {l.checked_by_name ?? "—"}
-                                                {l.checked_at && <span className="text-gray-400 font-normal">· {fmtTglJam(l.checked_at)}</span>}
-                                            </p>
-                                        )}
+                                {data.lines.length === 0 ? (
+                                    <div className="bg-white rounded-xl border border-gray-200 py-14 text-center">
+                                        <div className="flex justify-center mb-3 opacity-40"><BookOpen className="w-10 h-10" /></div>
+                                        <p className="text-sm text-gray-500 font-medium">Belum ada mutasi di periode ini</p>
+                                        <p className="text-xs text-gray-400 mt-1 px-6">Konfirmasi data di Jurnal Umum agar muncul di sini.</p>
+                                    </div>
+                                ) : filteredLines.length === 0 ? (
+                                    <div className="bg-white rounded-xl border border-gray-200 py-14 text-center">
+                                        <div className="flex justify-center mb-3 opacity-40"><Search className="w-10 h-10" /></div>
+                                        <p className="text-sm text-gray-500 font-medium">Tidak ada baris yang cocok</p>
+                                        <p className="text-xs text-gray-400 mt-1 px-6">Coba kata kunci lain untuk keterangan, no. jurnal, debit, atau kredit.</p>
+                                    </div>
+                                ) : (
+                                    filteredLines.map((l) => {
+                                        const companyBadge = getCompanyBadge(l.trx_meta?.company_name);
+                                        const specParts = [l.trx_meta?.cpu, l.trx_meta?.ram, l.trx_meta?.storage].filter(Boolean) as string[];
+                                        const saldoNet = l.saldo_debit > 0 ? l.saldo_debit : -l.saldo_kredit;
+                                        return (
+                                            <div key={l.id} className="bg-white rounded-xl border border-gray-200 p-3.5">
+                                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-[11px] font-semibold text-gray-500">{fmtTgl(l.tanggal)}</span>
+                                                        {l.journal_no && (
+                                                            <span className="text-[10px] font-mono font-bold text-blue-600">{l.journal_no}</span>
+                                                        )}
+                                                    </div>
+                                                    {l.is_synthetic ? (
+                                                        <span
+                                                            title="Baris otomatis (modal belum diinput) — tidak bisa dicek manual"
+                                                            className="w-7 h-7 rounded-md border border-dashed border-gray-200 flex items-center justify-center text-gray-300 shrink-0"
+                                                        >
+                                                            —
+                                                        </span>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => toggleChecked(l.id, !l.checked)}
+                                                            title={
+                                                                l.checked
+                                                                    ? `Sudah dicek${l.checked_at ? " · " + fmtTglJam(l.checked_at) : ""} · ${l.checked_by_name ? "oleh " + l.checked_by_name : "pencentang tidak tercatat"}`
+                                                                    : "Tandai sudah dicek"
+                                                            }
+                                                            className={`w-7 h-7 rounded-md border flex items-center justify-center active:scale-90 transition-all duration-150 shrink-0 ${l.checked
+                                                                ? "bg-green-600 border-green-600 text-white"
+                                                                : "bg-white border-gray-300 text-gray-300"
+                                                                }`}
+                                                        >
+                                                            <Check className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
 
-                                        <div className="mt-2.5 pt-2.5 border-t border-gray-100 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] font-mono">
-                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold">Debit</span>
-                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold text-right">Kredit</span>
-                                            <span className={l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}>
-                                                {l.debit > 0 || (l.is_synthetic && l.side === "DEBIT") ? rp(l.debit) : "—"}
-                                            </span>
-                                            <span className={`text-right ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
-                                                {l.kredit > 0 || (l.is_synthetic && l.side === "KREDIT") ? rp(l.kredit) : "—"}
-                                            </span>
-                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold">Saldo D</span>
-                                            <span className="text-gray-400 text-[10px] uppercase font-sans font-bold text-right">Saldo K</span>
-                                            <span className="text-blue-700">{l.saldo_debit > 0 ? rp(l.saldo_debit) : "—"}</span>
-                                            <span className="text-emerald-700 text-right">{l.saldo_kredit > 0 ? rp(l.saldo_kredit) : "—"}</span>
+                                                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                                    {companyBadge && (
+                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
+                                                            {companyBadge.label}
+                                                        </span>
+                                                    )}
+                                                    {l.is_synthetic && (
+                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
+                                                            <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
+                                                        </span>
+                                                    )}
+                                                    {l.ref && <span className="text-[10px] font-mono font-bold text-gray-400">Ref: {l.ref}</span>}
+                                                </div>
+                                                <p className="text-[13px] text-gray-800">{l.keterangan}</p>
+                                                {specParts.length > 0 && (
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</p>
+                                                )}
+                                                {l.checked && (
+                                                    <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                                                        <Check className="w-2.5 h-2.5" />
+                                                        Dicek {l.checked_by_name ?? "—"}
+                                                        {l.checked_at && <span className="text-gray-400 font-normal">· {fmtTglJam(l.checked_at)}</span>}
+                                                    </p>
+                                                )}
+
+                                                <div className="mt-2.5 pt-2.5 border-t border-gray-100 grid grid-cols-3 gap-x-3 gap-y-1 text-[12px] font-mono">
+                                                    <span className="text-gray-400 text-[10px] uppercase font-sans font-bold">Debit</span>
+                                                    <span className="text-gray-400 text-[10px] uppercase font-sans font-bold">Kredit</span>
+                                                    <span className="text-gray-400 text-[10px] uppercase font-sans font-bold text-right">Saldo</span>
+                                                    <span className={l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}>
+                                                        {l.debit > 0 || (l.is_synthetic && l.side === "DEBIT") ? rp(l.debit) : "—"}
+                                                    </span>
+                                                    <span className={l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}>
+                                                        {l.kredit > 0 || (l.is_synthetic && l.side === "KREDIT") ? rp(l.kredit) : "—"}
+                                                    </span>
+                                                    <span className="text-right font-bold inline-flex items-center justify-end gap-1">
+                                                        <span className="text-gray-900">{rp(Math.abs(saldoNet))}</span>
+                                                        <SaldoBadge amount={saldoNet} normalSide={normalSide} />
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+
+                                {data.lines.length > 0 && (
+                                    <div className="rounded-xl border-2 border-gray-300 bg-gray-50 p-3.5">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-bold text-gray-600 uppercase">Total &amp; Saldo Akhir</span>
+                                            <SaldoBadge amount={data.totals.saldo_akhir} size="md" normalSide={normalSide} />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-x-3 text-sm font-black font-mono">
+                                            <span className="text-gray-900">{rp(data.totals.debit)}</span>
+                                            <span className="text-gray-900">{rp(data.totals.kredit)}</span>
+                                            <span className="text-gray-900 text-right">{rp(Math.abs(data.totals.saldo_akhir))}</span>
                                         </div>
                                     </div>
-                                );
-                            })
+                                )}
+                            </>
                         )}
+                    </div>
 
-                        {data.lines.length > 0 && (
-                            <div className="rounded-xl border-2 border-gray-300 bg-gray-50 p-3.5">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-bold text-gray-600 uppercase">Total &amp; Saldo Akhir</span>
-                                    <SaldoBadge amount={data.totals.saldo_akhir} size="md" normalSide={normalSide} />
-                                </div>
-                                <div className="grid grid-cols-2 gap-x-3 text-sm font-black font-mono">
-                                    <span className="text-gray-900">{rp(data.totals.debit)}</span>
-                                    <span className="text-gray-900 text-right">{rp(data.totals.kredit)}</span>
-                                </div>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-
-            {/* ── Desktop/tablet: Tabel Buku Besar ── */}
-            <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full border-collapse" style={{ minWidth: "1040px" }}>
-                        <thead>
-                            <tr className="border-b border-gray-100 bg-gray-50">
-                                <th rowSpan={2} className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[100px] align-bottom">
-                                    Tanggal
-                                </th>
-                                <th rowSpan={2} className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider align-bottom">
-                                    Keterangan
-                                </th>
-                                <th rowSpan={2} className="px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[100px] align-bottom">
-                                    Ref
-                                </th>
-                                <th rowSpan={2} className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[140px] align-bottom">
-                                    Debit
-                                </th>
-                                <th rowSpan={2} className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[140px] align-bottom">
-                                    Kredit
-                                </th>
-                                <th colSpan={2} className="px-4 py-2 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider border-l-2 border-gray-200">
-                                    Saldo
-                                </th>
-                                <th rowSpan={2} className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[64px] align-bottom border-l-2 border-gray-200">
-                                    <div>Cek</div>
-                                    {data && data.lines.length > 0 && (
-                                        <div className="mt-1 text-[10px] font-bold text-gray-400 normal-case tracking-normal font-mono whitespace-nowrap">
-                                            {checkedCount}/{data.lines.length}
-                                        </div>
-                                    )}
-                                </th>
-                            </tr>
-                            <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
-                                <th className="px-4 py-2 text-right text-[10px] font-bold text-blue-600 uppercase tracking-wider w-[140px] border-l-2 border-gray-200">
-                                    Debit
-                                </th>
-                                <th className="px-4 py-2 text-right text-[10px] font-bold text-emerald-600 uppercase tracking-wider w-[140px]">
-                                    Kredit
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                Array.from({ length: 5 }).map((_, i) => (
-                                    <tr key={i} className="border-b border-gray-50">
-                                        {Array.from({ length: 8 }).map((__, j) => (
-                                            <td key={j} className="px-4 py-4">
-                                                <div className="h-3 bg-gray-100 rounded animate-pulse" />
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))
-                            ) : !data ? (
-                                <tr>
-                                    <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
-                                        Pilih akun untuk melihat buku besar
-                                    </td>
+                    {/* ── Desktop/tablet: Tabel Buku Besar ── */}
+                    <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full border-collapse" style={{ minWidth: "960px" }}>
+                            <thead>
+                                <tr className="border-b border-gray-100 bg-gray-50">
+                                    <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[92px]">Tanggal</th>
+                                    <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[120px]">No. Jurnal</th>
+                                    <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
+                                    <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[130px]">Debit</th>
+                                    <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[130px]">Kredit</th>
+                                    <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[150px]">Saldo</th>
+                                    <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[64px] border-l-2 border-gray-200">
+                                        <div>Cek</div>
+                                        {data && data.lines.length > 0 && (
+                                            <div className="mt-1 text-[10px] font-bold text-gray-400 normal-case tracking-normal font-mono whitespace-nowrap">
+                                                {checkedCount}/{data.lines.length}
+                                            </div>
+                                        )}
+                                    </th>
                                 </tr>
-                            ) : (
-                                <>
-                                    {/* Baris Saldo Awal */}
-                                    <tr className="bg-gray-50/70">
-                                        <td colSpan={3} className="px-4 py-2.5">
-                                            <span className="text-[11px] font-bold text-gray-500 italic mr-2">Saldo Awal</span>
-                                            <SaldoBadge amount={data.saldo_awal} normalSide={normalSide} />
+                            </thead>
+                            <tbody>
+                                {loading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <tr key={i} className="border-b border-gray-50">
+                                            {Array.from({ length: 7 }).map((__, j) => (
+                                                <td key={j} className="px-4 py-4">
+                                                    <div className="h-3 bg-gray-100 rounded animate-pulse" />
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))
+                                ) : !data ? (
+                                    <tr>
+                                        <td colSpan={7} className="py-16 text-center text-sm text-gray-400">
+                                            Pilih akun untuk melihat buku besar
                                         </td>
-                                        <td className="px-4 py-2.5 text-right text-[11px] font-mono text-gray-400">—</td>
-                                        <td className="px-4 py-2.5 text-right text-[11px] font-mono text-gray-400">—</td>
-                                        <td className="px-4 py-2.5 text-right text-[12px] font-mono font-bold text-blue-700 border-l-2 border-gray-200">
-                                            {data.saldo_awal >= 0 ? rp(data.saldo_awal) : ""}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right text-[12px] font-mono font-bold text-emerald-700">
-                                            {data.saldo_awal < 0 ? rp(Math.abs(data.saldo_awal)) : ""}
-                                        </td>
-                                        <td className="px-3 py-2.5 text-center text-gray-300 border-l-2 border-gray-200">—</td>
                                     </tr>
+                                ) : (
+                                    <>
+                                        {/* Baris Saldo Awal periode */}
+                                        <tr className="bg-gray-50/70">
+                                            <td colSpan={5} className="px-4 py-2.5">
+                                                <span className="text-[11px] font-bold text-gray-500 italic">Saldo awal periode</span>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right">
+                                                <span className="inline-flex items-center gap-1.5 text-[12px] font-mono font-bold text-gray-700">
+                                                    {rp(Math.abs(data.saldo_awal))}
+                                                    <SaldoBadge amount={data.saldo_awal} normalSide={normalSide} />
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center text-gray-300 border-l-2 border-gray-100">—</td>
+                                        </tr>
 
-                                    {data.lines.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={8} className="py-14 text-center">
-                                                <div className="flex justify-center mb-3 opacity-40"><BookOpen className="w-10 h-10" /></div>
-                                                <p className="text-sm text-gray-500 font-medium">Belum ada mutasi di periode ini</p>
-                                                <p className="text-xs text-gray-400 mt-1">
-                                                    Konfirmasi data di Jurnal Umum agar muncul di sini.
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    ) : filteredLines.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={8} className="py-14 text-center">
-                                                <div className="flex justify-center mb-3 opacity-40"><Search className="w-10 h-10" /></div>
-                                                <p className="text-sm text-gray-500 font-medium">Tidak ada baris yang cocok dengan pencarian</p>
-                                                <p className="text-xs text-gray-400 mt-1">
-                                                    Coba kata kunci lain untuk keterangan, debit, atau kredit.
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        filteredLines.map((l) => {
-                                            const companyBadge = getCompanyBadge(l.trx_meta?.company_name);
-                                            const specParts = [l.trx_meta?.cpu, l.trx_meta?.ram, l.trx_meta?.storage].filter(Boolean) as string[];
-                                            return (
-                                                <tr key={l.id} className="hover:bg-blue-50/30 transition border-b border-gray-50">
-                                                    <td className="px-4 py-2.5 text-[11px] font-semibold text-gray-700 whitespace-nowrap">
-                                                        {fmtTgl(l.tanggal)}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-[11px] text-gray-800">
-                                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                                            {companyBadge && (
-                                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
-                                                                    {companyBadge.label}
-                                                                </span>
+                                        {data.lines.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="py-14 text-center">
+                                                    <div className="flex justify-center mb-3 opacity-40"><BookOpen className="w-10 h-10" /></div>
+                                                    <p className="text-sm text-gray-500 font-medium">Belum ada mutasi di periode ini</p>
+                                                    <p className="text-xs text-gray-400 mt-1">
+                                                        Konfirmasi data di Jurnal Umum agar muncul di sini.
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        ) : filteredLines.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="py-14 text-center">
+                                                    <div className="flex justify-center mb-3 opacity-40"><Search className="w-10 h-10" /></div>
+                                                    <p className="text-sm text-gray-500 font-medium">Tidak ada baris yang cocok dengan pencarian</p>
+                                                    <p className="text-xs text-gray-400 mt-1">
+                                                        Coba kata kunci lain untuk keterangan, no. jurnal, debit, atau kredit.
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredLines.map((l) => {
+                                                const companyBadge = getCompanyBadge(l.trx_meta?.company_name);
+                                                const specParts = [l.trx_meta?.cpu, l.trx_meta?.ram, l.trx_meta?.storage].filter(Boolean) as string[];
+                                                const saldoNet = l.saldo_debit > 0 ? l.saldo_debit : -l.saldo_kredit;
+                                                return (
+                                                    <tr key={l.id} className="hover:bg-blue-50/30 transition border-b border-gray-50">
+                                                        <td className="px-4 py-2.5 text-[11px] font-semibold text-gray-700 whitespace-nowrap align-top">
+                                                            {fmtTgl(l.tanggal)}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 align-top">
+                                                            {l.journal_no ? (
+                                                                <span className="text-[11px] font-mono font-bold text-blue-600">{l.journal_no}</span>
+                                                            ) : (
+                                                                <span className="text-[11px] font-mono text-gray-300">—</span>
                                                             )}
-                                                            {l.is_synthetic && (
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
-                                                                    <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
-                                                                </span>
-                                                            )}
-                                                            <span>{l.keterangan}</span>
-                                                        </div>
-                                                        {specParts.length > 0 && (
-                                                            <div className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</div>
-                                                        )}
-                                                        {l.checked && (
-                                                            <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
-                                                                <Check className="w-2.5 h-2.5" />
-                                                                Dicek {l.checked_by_name ?? "—"}
-                                                                {l.checked_at && (
-                                                                    <span className="text-gray-400 font-normal">· {fmtTglJam(l.checked_at)}</span>
+                                                        </td>
+                                                        <td className="px-4 py-2.5 text-[11px] text-gray-800 align-top">
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                {companyBadge && (
+                                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
+                                                                        {companyBadge.label}
+                                                                    </span>
                                                                 )}
+                                                                {l.is_synthetic && (
+                                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
+                                                                        <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
+                                                                    </span>
+                                                                )}
+                                                                <span>{l.keterangan}</span>
                                                             </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-center text-[10px] font-mono font-bold text-gray-400">
-                                                        {l.ref || "—"}
-                                                    </td>
-                                                    <td className={`px-4 py-2.5 text-right text-[12px] font-mono ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
-                                                        {l.debit > 0 || (l.is_synthetic && l.side === "DEBIT") ? rp(l.debit) : ""}
-                                                    </td>
-                                                    <td className={`px-4 py-2.5 text-right text-[12px] font-mono ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
-                                                        {l.kredit > 0 || (l.is_synthetic && l.side === "KREDIT") ? rp(l.kredit) : ""}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-right text-[12px] font-mono text-blue-700 border-l-2 border-gray-100">
-                                                        {l.saldo_debit > 0 ? rp(l.saldo_debit) : ""}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-right text-[12px] font-mono text-emerald-700">
-                                                        {l.saldo_kredit > 0 ? rp(l.saldo_kredit) : ""}
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-center border-l-2 border-gray-100">
-                                                        {l.is_synthetic ? (
-                                                            <span
-                                                                title="Baris otomatis (modal belum diinput) — tidak bisa dicek manual"
-                                                                className="w-6 h-6 rounded-md border border-dashed border-gray-200 flex items-center justify-center text-gray-300 mx-auto"
-                                                            >
-                                                                —
+                                                            {(specParts.length > 0 || l.ref) && (
+                                                                <div className="text-[10px] text-gray-400 mt-0.5">
+                                                                    {l.ref && <span className="font-mono mr-2">Ref: {l.ref}</span>}
+                                                                    {specParts.join(" · ")}
+                                                                </div>
+                                                            )}
+                                                            {l.checked && (
+                                                                <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                                                                    <Check className="w-2.5 h-2.5" />
+                                                                    Dicek {l.checked_by_name ?? "—"}
+                                                                    {l.checked_at && (
+                                                                        <span className="text-gray-400 font-normal">· {fmtTglJam(l.checked_at)}</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className={`px-4 py-2.5 text-right text-[12px] font-mono align-top ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
+                                                            {l.debit > 0 || (l.is_synthetic && l.side === "DEBIT") ? rp(l.debit) : ""}
+                                                        </td>
+                                                        <td className={`px-4 py-2.5 text-right text-[12px] font-mono align-top ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
+                                                            {l.kredit > 0 || (l.is_synthetic && l.side === "KREDIT") ? rp(l.kredit) : ""}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 text-right align-top">
+                                                            <span className="inline-flex items-center justify-end gap-1.5 text-[12px] font-mono font-bold text-gray-900">
+                                                                {rp(Math.abs(saldoNet))}
+                                                                <SaldoBadge amount={saldoNet} normalSide={normalSide} />
                                                             </span>
-                                                        ) : (
-                                                            <button
-                                                                onClick={() => toggleChecked(l.id, !l.checked)}
-                                                                title={
-                                                                    l.checked
-                                                                        ? `Sudah dicek${l.checked_at ? " · " + fmtTglJam(l.checked_at) : ""} · ${l.checked_by_name ? "oleh " + l.checked_by_name : "pencentang tidak tercatat (data sebelum fitur ini aktif)"}`
-                                                                        : "Tandai sudah dicek"
-                                                                }
-                                                                className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${l.checked
-                                                                    ? "bg-green-600 border-green-600 text-white"
-                                                                    : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
-                                                                    }`}
-                                                            >
-                                                                <Check className="w-3.5 h-3.5 mx-auto" />
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </>
-                            )}
-                        </tbody>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center border-l-2 border-gray-100 align-top">
+                                                            {l.is_synthetic ? (
+                                                                <span
+                                                                    title="Baris otomatis (modal belum diinput) — tidak bisa dicek manual"
+                                                                    className="w-6 h-6 rounded-md border border-dashed border-gray-200 flex items-center justify-center text-gray-300 mx-auto"
+                                                                >
+                                                                    —
+                                                                </span>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => toggleChecked(l.id, !l.checked)}
+                                                                    title={
+                                                                        l.checked
+                                                                            ? `Sudah dicek${l.checked_at ? " · " + fmtTglJam(l.checked_at) : ""} · ${l.checked_by_name ? "oleh " + l.checked_by_name : "pencentang tidak tercatat (data sebelum fitur ini aktif)"}`
+                                                                            : "Tandai sudah dicek"
+                                                                    }
+                                                                    className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 mx-auto ${l.checked
+                                                                        ? "bg-green-600 border-green-600 text-white"
+                                                                        : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
+                                                                        }`}
+                                                                >
+                                                                    <Check className="w-3.5 h-3.5 mx-auto" />
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </>
+                                )}
+                            </tbody>
 
-                        {data && data.lines.length > 0 && (
-                            <tfoot>
-                                <tr className="border-t-2 border-gray-300 bg-gray-50">
-                                    <td colSpan={3} className="px-4 py-3 text-right">
-                                        <span className="text-xs font-bold text-gray-600 uppercase mr-2">Total &amp; Saldo Akhir</span>
-                                        <SaldoBadge amount={data.totals.saldo_akhir} size="md" normalSide={normalSide} />
-                                    </td>
-                                    <td className="px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">
-                                        {rp(data.totals.debit)}
-                                    </td>
-                                    <td className="px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">
-                                        {rp(data.totals.kredit)}
-                                    </td>
-                                    <td className="px-4 py-3 text-right text-sm font-black text-blue-700 font-mono border-l-2 border-gray-200">
-                                        {data.totals.saldo_akhir >= 0 ? rp(data.totals.saldo_akhir) : ""}
-                                    </td>
-                                    <td className="px-4 py-3 text-right text-sm font-black text-emerald-700 font-mono">
-                                        {data.totals.saldo_akhir < 0 ? rp(Math.abs(data.totals.saldo_akhir)) : ""}
-                                    </td>
-                                    <td className="px-3 py-3 text-center border-l-2 border-gray-200" />
-                                </tr>
-                            </tfoot>
-                        )}
-                    </table>
+                            {data && data.lines.length > 0 && (
+                                <tfoot>
+                                    <tr className="border-t-2 border-gray-300 bg-gray-50">
+                                        <td colSpan={3} className="px-4 py-3">
+                                            <span className="text-xs font-bold text-gray-600 uppercase">Saldo Akhir</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">
+                                            {rp(data.totals.debit)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">
+                                            {rp(data.totals.kredit)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <span className="inline-flex items-center justify-end gap-1.5 text-sm font-black text-gray-900 font-mono">
+                                                {rp(Math.abs(data.totals.saldo_akhir))}
+                                                <SaldoBadge amount={data.totals.saldo_akhir} size="md" normalSide={normalSide} />
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-3 text-center border-l-2 border-gray-200" />
+                                    </tr>
+                                </tfoot>
+                            )}
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -790,9 +880,34 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
                     onSaved={() => {
                         setShowOpeningModal(false);
                         load();
+                        loadNeraca();
                     }}
                 />
             )}
+        </div>
+    );
+}
+
+// ─── Sel ringkasan di header kartu ──────────────────────────────────────────
+function SummaryCell({
+    label,
+    value,
+    tone,
+    badge,
+}: {
+    label: string;
+    value: string;
+    tone: "dark" | "blue" | "emerald";
+    badge?: ReactNode;
+}) {
+    const valueColor = tone === "blue" ? "text-blue-700" : tone === "emerald" ? "text-emerald-700" : "text-gray-900";
+    return (
+        <div className="px-5 py-3.5">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1">{label}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+                <p className={`text-[15px] font-black font-mono ${valueColor}`}>{value}</p>
+                {badge}
+            </div>
         </div>
     );
 }
@@ -978,20 +1093,5 @@ function SaldoBadge({
             <span>{isAbnormal ? <AlertTriangle className="w-3.5 h-3.5" /> : <DollarSign className="w-3.5 h-3.5" />}</span>
             <span>{isDebit ? "D" : "K"}</span>
         </span>
-    );
-}
-
-// ─── Stat card ────────────────────────────────────────────────────────────────
-function Stat({ label, value, tone }: { label: string; value: string; tone: "gray" | "blue" | "emerald" }) {
-    const map = {
-        gray: "border-gray-200 text-gray-900",
-        blue: "border-gray-200 border-t-blue-400 text-blue-800",
-        emerald: "border-gray-200 border-t-emerald-400 text-emerald-800",
-    };
-    return (
-        <div className={`bg-white rounded-xl border border-t-2 p-4 ${map[tone]}`}>
-            <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">{label}</p>
-            <p className="text-base font-black font-mono truncate">{value}</p>
-        </div>
     );
 }
