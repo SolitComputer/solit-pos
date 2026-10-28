@@ -6,6 +6,7 @@ import "./globals.css";
 import "@/lib/patchPointerCapture";
 import NetworkStatus from "@/components/ui/NetworkStatus";
 import ServiceWorkerUpdater from "@/components/ui/ServiceWorkerUpdater";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 // 2. Inisialisasi font Plus Jakarta Sans dan buat variabelnya
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -49,7 +50,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id">
+    <html lang="id" suppressHydrationWarning>
       {/* 3. Masukkan variabel font Plus Jakarta Sans */}
       <body className={`${plusJakartaSans.variable} font-sans antialiased`}>
         {/*  Disable Next.js auto scroll-to-top saat navigasi */}
@@ -58,10 +59,17 @@ export default function RootLayout({
             __html: `history.scrollRestoration = 'manual';`,
           }}
         />
-        <NetworkStatus />
-        <ServiceWorkerUpdater />
-        {children}
-        <Toaster richColors />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <NetworkStatus />
+          <ServiceWorkerUpdater />
+          {children}
+          <Toaster richColors />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -2,12 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --app-bg: #f8fafc;
+  --app-fg: #1a1a2e;
+}
+
+html.dark {
+  --app-bg: #0f1117;
+  --app-fg: #e5e7eb;
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  background: #f8fafc;
+  background: var(--app-bg);
+  color: var(--app-fg);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * {
@@ -21,4 +33,45 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
-}
+}
+
+/* =========================================================
+   DARK MODE — override kelas warna hardcoded (halaman lama).
+   Scoped ke html.dark → mode terang 100% tidak tersentuh.
+   Perluas sendiri per halaman konten kalau ada warna lain.
+   ========================================================= */
+
+/* Shell dashboard (gradient background di DashboardLayout) */
+html.dark .bg-gradient-to-br.from-\[\#F5F6FB\] {
+  background-image: none;
+  background-color: #0f1117;
+}
+
+/* Surface putih & abu */
+html.dark .bg-white   { background-color: #171923; }
+html.dark .bg-slate-50  { background-color: #1c2030; }
+html.dark .bg-slate-100 { background-color: #262b3a; }
+html.dark .bg-gray-50   { background-color: #1c2030; }
+html.dark .bg-gray-100  { background-color: #262b3a; }
+
+/* Teks */
+html.dark .text-\[\#1a1a2e\],
+html.dark .text-slate-900,
+html.dark .text-gray-900 { color: #e5e7eb; }
+html.dark .text-slate-800 { color: #d4d9e2; }
+html.dark .text-slate-700 { color: #c3cad6; }
+html.dark .text-slate-600 { color: #aab2c0; }
+html.dark .text-slate-500 { color: #98a2b3; }
+html.dark .text-slate-400 { color: #7e8a9c; }
+
+/* Border */
+html.dark .border-slate-100,
+html.dark .border-gray-100 { border-color: #2a3040; }
+html.dark .border-slate-200,
+html.dark .border-gray-200 { border-color: #343c4e; }
+html.dark .border-slate-200\/70 { border-color: #343c4e; }
+html.dark .border-slate-100\/90 { border-color: #2a3040; }
+
+/* Hover surface */
+html.dark .hover\:bg-slate-50:hover  { background-color: #262b3a; }
+html.dark .hover\:bg-slate-100:hover { background-color: #2f3545; }

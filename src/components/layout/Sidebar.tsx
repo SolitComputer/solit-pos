@@ -22,6 +22,7 @@ import { YOGA_ADMIN_ID, REINALDY_ADMIN_ID } from "@/lib/contractSigners";
 import SolitBorder from "@/components/solit-coins/SolitBorder";
 import CoinBalanceChip from "@/components/solit-coins/CoinBalanceChip";
 import type { BorderStyle } from "@/lib/solit-coins/types";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 const CACHE_KEY = "solit_sidebar_userit";
 const RAIL_KEY = "solit_sidebar_rail";
@@ -1640,6 +1641,7 @@ function SidebarContent({
       </nav>
 
       <div className={`border-t border-slate-100 flex-shrink-0 ${rail ? "p-2 pb-5" : "p-3 pb-24 md:pb-5"}`}>
+        <ThemeToggle rail={rail} />
         <button onClick={onLogout} title={rail ? "Keluar" : undefined} className={`w-full group flex items-center rounded-xl text-sm font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all ${rail ? "justify-center py-2.5" : "gap-3 px-3 py-2"}`}>
           <span className="flex-shrink-0 group-hover:text-red-500">{Icons.logout}</span>
           {!rail && <span>Keluar</span>}
