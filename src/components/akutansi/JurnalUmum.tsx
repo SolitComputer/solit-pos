@@ -403,6 +403,23 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         }
     }, [period, sortOrder, branch]);
 
+ // Pending (baris "Draft") DIPISAH dari skeleton — endpoint /pending ngebangun
+    // ulang semua draft sebulan dari sumber (berat), jadi jangan nahan tabel utama.
+    const loadPending = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/akutansi/jurnal/pending?period=${period}`);
+            const p = await res.json();
+            const pendingSorted = (p.success ? p.data ?? [] : []).slice().sort((a: PendingDraft, b: PendingDraft) => {
+                if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
+                return (b.sort_ts ?? "").localeCompare(a.sort_ts ?? "");
+            });
+            setPending(pendingSorted);
+            setPendingSummary(p.success ? p.summary ?? null : null);
+        } catch {
+            /* pending opsional — kalau gagal, tabel utama tetap jalan */
+        }
+    }, [period]);
+
     const load = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
         const controller = new AbortController();
@@ -410,24 +427,11 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         let ok = false;
         try {
             const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
-            // FASE 1 (cepat): &sync=0 → tanpa hitung-ulang "Nominal Berubah"
-            const [jRes, pRes] = await Promise.all([
-                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}${branchQS}&sync=0`, { signal: controller.signal }),
-                // Pending sengaja TIDAK difilter cabang — biar semua draft yang perlu
-                // dikonfirmasi tetap kelihatan apa pun cabang yang sedang dipilih.
-                fetch(`/api/akutansi/jurnal/pending?period=${period}`, { signal: controller.signal }),
-            ]);
+            // FASE 1 (cepat): cuma entry yang SUDAH diposting, &sync=0.
+            // Pending & badge "Nominal Berubah" nyusul di belakang — skeleton nggak nungguin.
+            const jRes = await fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}${branchQS}&sync=0`, { signal: controller.signal });
             const j = await jRes.json();
-            const p = await pRes.json();
             setEntries(j.success ? j.data ?? [] : []);
-
-            const pendingSorted = (p.success ? p.data ?? [] : []).slice().sort((a: PendingDraft, b: PendingDraft) => {
-                if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
-                return (b.sort_ts ?? "").localeCompare(a.sort_ts ?? "");
-            });
-            setPending(pendingSorted);
-            setPendingSummary(p.success ? p.summary ?? null : null);
-
             if (showLoader) setSelected(new Set());
             ok = j.success;
         } catch (e: any) {
@@ -436,9 +440,12 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
             clearTimeout(timeoutId);
             if (showLoader) setLoading(false);
         }
-        // FASE 2: badge nyusul, nggak nahan skeleton
-        if (ok) loadSyncStatus();
-    }, [period, sortOrder, branch, loadSyncStatus]);
+        // Background (nggak nahan skeleton): baris Draft + badge Nominal Berubah
+        if (ok) {
+            loadPending();
+            loadSyncStatus();
+        }
+    }, [period, sortOrder, branch, loadPending, loadSyncStatus]);
 
     useEffect(() => { load(); }, [load]);
     useEffect(() => {
