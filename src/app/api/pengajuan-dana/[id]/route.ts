@@ -25,7 +25,7 @@ export async function PATCH(
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { action?: string; payment_method?: string; reason?: string };
+  let body: { action?: string; payment_method?: string; reason?: string; cash_location?: string; branch?: string };
   try {
     body = await request.json();
   } catch {
@@ -361,6 +361,9 @@ export async function PATCH(
     }
 
     const newMethod = body.payment_method === "SALDO" ? "SALDO" : "CASH";
+    // ⬅️ BARU: akun kas fisik & cabang
+    const newCashLocation = newMethod === "CASH" ? (body.cash_location === "JOGJA" ? "JOGJA" : "UTAMA") : null;
+    const newBranch = body.branch === "JOGJA" ? "JOGJA" : body.branch === "UTAMA" ? "UTAMA" : null;
 
     if (existing.realisasi_cashflow_id) {
       const { data: cfEntry } = await supabase
@@ -378,7 +381,7 @@ export async function PATCH(
 
       const { error: cfUpdateErr } = await supabase
         .from("cashflow_entries")
-        .update({ payment_method: newMethod })
+        .update({ payment_method: newMethod, cash_location: newCashLocation, ...(newBranch ? { branch: newBranch } : {}) })
         .eq("id", existing.realisasi_cashflow_id);
 
       if (cfUpdateErr) {
@@ -388,7 +391,7 @@ export async function PATCH(
 
     const { data, error } = await supabase
       .from("fund_requests")
-      .update({ payment_method: newMethod })
+      .update({ payment_method: newMethod, cash_location: newCashLocation, ...(newBranch ? { branch: newBranch } : {}) })
       .eq("id", id)
       .select()
       .single();

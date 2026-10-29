@@ -1028,6 +1028,8 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     const targetUserId = (body.target_user_id as string | undefined) || null;
     // Cabang entry manual — fail-safe ke UTAMA
     const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
+    // ⬅️ BARU: akun kas fisik (wallet). Dipakai saat CASH -> 120/121; SALDO -> null (110).
+    const cashLocation = body.cash_location === "JOGJA" ? "JOGJA" : "UTAMA";
     if (isKasbonCicilanCategory(category) && !targetUserId)
         return NextResponse.json({ success: false, message: "Pilih karyawan dulu untuk Kasbon/Cicilan" }, { status: 400 });
 
@@ -1122,6 +1124,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
                 photo_url: (body.photo_url as string | undefined) ?? null, // ⬅️ BARU: foto bukti Uang Masuk
                 target_user_id: isKasbonCicilanCategory(category) ? targetUserId : null, // ⬅️ BARU
                 branch, // ← cabang
+                cash_location: pm === "CASH" ? cashLocation : null, // ← akun kas fisik (120/121); SALDO -> null (110)
                 created_by: user.id,
             })
             .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)
@@ -1166,6 +1169,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
             photo_url: photoUrl,
             target_user_id: isKasbonCicilanCategory(category) ? targetUserId : null, // ⬅️ BARU
             branch, // ← cabang
+            cash_location: pm === "CASH" ? cashLocation : null, // ← akun kas fisik (120/121); SALDO -> null (110)
             created_by: user.id,
         })
         .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)

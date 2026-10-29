@@ -44,6 +44,7 @@ export async function POST(
         keterangan?: string;
         tanggal?: string;
         payment_method?: string;
+        cash_location?: string; // ⬅️ BARU: akun kas fisik
         photo_url?: string | null;
         items?: { category: string; nominal: number | string; target_user_id?: string | null }[]; // ⬅️ BARU
         target_user_id?: string | null; // ⬅️ BARU: fallback target
@@ -112,6 +113,8 @@ export async function POST(
 
     const totalNominal = items.reduce((sum, it) => sum + it.nominal, 0);
     const pm = payment_method === "SALDO" ? "SALDO" : "CASH";
+    // ⬅️ BARU: akun kas fisik — CASH -> UTAMA(120)/JOGJA(121); SALDO -> null (110)
+    const cashLocation = pm === "CASH" ? (body.cash_location === "JOGJA" ? "JOGJA" : "UTAMA") : null;
 
     const supabase = db();
 
@@ -170,6 +173,7 @@ export async function POST(
                 photo_url: photo_url ?? null,
                 target_user_id: it.target_user_id, // ⬅️ BARU
                 branch, // ← cabang realisasi (UTAMA / JOGJA)
+                cash_location: cashLocation, // ← akun kas fisik (120/121); NULL = Saldo (110)
                 created_by: userId,
                 is_audited: false,
             }))
@@ -261,6 +265,7 @@ export async function PATCH(
         tanggal?: string; payment_method?: string; photo_url?: string | null;
         target_user_id?: string | null;
         branch?: string; // ← cabang realisasi (UTAMA / JOGJA)
+        cash_location?: string; // ⬅️ BARU: akun kas fisik
     };
     try {
         body = await request.json();
@@ -305,7 +310,7 @@ export async function PATCH(
     // 1 kategori cuma boleh sekali per pengajuan.
     const { data: siblings } = await supabase
         .from("cashflow_entries")
-        .select("category, nominal, branch")
+        .select("category, nominal, branch, cash_location")
         .eq("source_type", "PENGAJUAN_DANA")
         .eq("source_id", id);
 
@@ -322,6 +327,9 @@ export async function PATCH(
     }
 
     const pm = body.payment_method === "SALDO" ? "SALDO" : "CASH";
+    // ⬅️ BARU: akun kas fisik — ikut sibling dulu, lalu body, lalu default. SALDO -> null.
+    const siblingCashLocation = (siblings ?? []).find((e: any) => e.cash_location === "JOGJA" || e.cash_location === "UTAMA")?.cash_location as "JOGJA" | "UTAMA" | undefined;
+    const cashLocation = pm === "CASH" ? (siblingCashLocation ?? (body.cash_location === "JOGJA" ? "JOGJA" : "UTAMA")) : null;
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
     const { error: cfErr } = await supabase
@@ -340,6 +348,7 @@ export async function PATCH(
             photo_url: body.photo_url ?? null,
             target_user_id: target,
             branch, // ← cabang realisasi (UTAMA / JOGJA)
+            cash_location: cashLocation, // ← akun kas fisik (120/121); NULL = Saldo (110)
             created_by: userId,
             is_audited: false,
         });

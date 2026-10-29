@@ -88,14 +88,14 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    let body: { purpose?: string; amount?: number; payment_method?: string; branch?: string };
-    try {
+    let body: { purpose?: string; amount?: number; payment_method?: string; branch?: string; cash_location?: string };
+        try {
         body = await request.json();
     } catch {
         return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
     }
 
-    const { purpose, amount, payment_method, branch } = body;
+    const { purpose, amount, payment_method, branch, cash_location } = body;
     if (!purpose || typeof purpose !== "string" || !purpose.trim()) {
         return NextResponse.json({ success: false, message: "Kebutuhan wajib diisi" }, { status: 400 });
     }
@@ -112,6 +112,8 @@ export async function POST(request: NextRequest) {
 
     // Default ke CASH kalau payment_method tidak dikirim atau nilainya tidak valid
     const validPaymentMethod = payment_method === "SALDO" ? "SALDO" : "CASH";
+    // ⬅️ BARU: akun kas fisik — CASH -> UTAMA(120)/JOGJA(121); SALDO -> null (110)
+    const validCashLocation = validPaymentMethod === "CASH" ? (cash_location === "JOGJA" ? "JOGJA" : "UTAMA") : null;
 
     const supabase = db();
     const { data, error } = await supabase
@@ -122,7 +124,8 @@ export async function POST(request: NextRequest) {
             purpose: purpose.trim(),
             amount: Math.round(amount),
             payment_method: validPaymentMethod,
-            branch, // lokasi: UTAMA (Depok) / JOGJA — dikunci sampai realisasi
+            cash_location: validCashLocation, // ← akun kas fisik (120/121); NULL = Saldo (110)
+            branch, // cabang (dimensi laba-rugi)
         })
         .select()
         .single();

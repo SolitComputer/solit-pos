@@ -233,6 +233,15 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
     };
     if (payment_method) {
         updatePayload.payment_method = payment_method;
+        // ⬅️ BARU: akun kas fisik ikut metode — SALDO -> null (akun 110), CASH -> 120/121
+        updatePayload.cash_location =
+            payment_method === "CASH"
+                ? (body.cash_location === "JOGJA" ? "JOGJA" : "UTAMA")
+                : null;
+    }
+    // ⬅️ BARU: Cabang (dimensi laba-rugi) — boleh diubah saat edit
+    if (body.branch === "UTAMA" || body.branch === "JOGJA") {
+        updatePayload.branch = body.branch;
     }
     if (photo_url !== undefined) {
         updatePayload.photo_url = photo_url;

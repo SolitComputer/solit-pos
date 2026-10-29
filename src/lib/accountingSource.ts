@@ -417,14 +417,15 @@ type CashflowRow = {
   keterangan: string | null;
   tanggal: string;
   payment_method: string | null;
-  branch: string | null; // ⬅️ BARU — cabang entry (UTAMA/JOGJA): nentuin kas cash 120 vs 121
+  branch: string | null; // cabang entry (UTAMA/JOGJA) — dimensi laba-rugi
+  cash_location: string | null; // ⬅️ BARU — akun kas fisik: UTAMA=120, JOGJA=121, null=Saldo(110)
   source_type: string;
   source_id: string | null; // ⬅️ perekat group PENGAJUAN_DANA
   created_at: string | null;
 };
 
 const CASHFLOW_ROW_SELECT =
-  "id, direction, category, nama, nominal, keterangan, tanggal, payment_method, branch, source_type, source_id, created_at";
+  "id, direction, category, nama, nominal, keterangan, tanggal, payment_method, branch, cash_location, source_type, source_id, created_at";
 
 // Jeda maksimal antar-baris (ms) supaya dianggap 1 submit form yang sama.
 const CASHFLOW_GROUP_WINDOW_MS = 10_000;
@@ -544,7 +545,8 @@ function cashflowGroupLines(group: CashflowRow[]): DraftLine[] {
     const nominal = Math.round(Number(e.nominal ?? 0));
     if (nominal <= 0) continue;
 
-       const kasAccount = kasAccountFromCashflow(e.payment_method, e.branch);
+       // ⬅️ Akun kas dari cash_location (akun kas fisik); fallback ke branch utk data lama.
+       const kasAccount = kasAccountFromCashflow(e.payment_method, e.cash_location ?? e.branch);
     if (e.direction === "OUT") {
       lines.push({ account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal });
       lines.push({ account_code: kasAccount, side: "KREDIT", nominal });
