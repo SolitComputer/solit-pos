@@ -227,7 +227,7 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     const modals = aktif.map(u => u.buy_price).filter((n): n is number => n != null && n > 0);
     const minModal = modals.length ? Math.min(...modals) : 0;
     const maxModal = modals.length ? Math.max(...modals) : 0;
-const margin = (a.sell_price || 0) - (a.buy_price || 0);
+    const margin = (a.sell_price || 0) - (a.buy_price || 0);
     return {
         id: a.id, tipe: "AKSESORIS", nama: a.name, kategori: a.category,
         brand: a.brand || null, cpu: null, ram: null, storage: null, spek: a.spec || null,
@@ -1231,7 +1231,7 @@ export default function UnifiedBarangContent() {
     // ── Export Excel: RINGKAS (1 baris per model) ──────────────────────────
     const handleExportRingkas = useCallback(() => {
         try {
-            const exportRows: Record<string, string | number>[] = []; 
+            const exportRows: Record<string, string | number>[] = [];
             let no = 1;
 
             filteredRows.forEach((row) => {
@@ -1733,7 +1733,11 @@ export default function UnifiedBarangContent() {
                     ...accForm,
                     buy_price: Number(accForm.buy_price) || 0,
                     sell_price: Number(accForm.sell_price) || 0,
-                    stock: Number(accForm.stock) || 0,
+                    // Stok aksesoris sekarang ikut pola laptop: tidak diinput manual saat
+                    // tambah barang. Saat CREATE stok dipaksa 0, lalu diisi otomatis dari
+                    // unit ber-SN lewat "Tambah Unit". Saat EDIT, nilai lama tetap dihormati
+                    // supaya aksesoris lama (stok manual, belum ber-SN) tidak berubah.
+                    stock: formModal.mode === "create" ? 0 : (Number(accForm.stock) || 0),
                 };
                 const url = formModal.mode === "edit" ? `/api/accessories/${formModal.row!.id}` : "/api/accessories";
                 const res = await fetch(url, {
@@ -2623,7 +2627,12 @@ export default function UnifiedBarangContent() {
                                         <Field label="Harga Modal"><input type="number" inputMode="numeric" className={inputCls} value={accForm.buy_price} onChange={e => setAccForm(p => ({ ...p, buy_price: e.target.value }))} /></Field>
                                         <Field label="Harga Jual" required><input type="number" inputMode="numeric" className={inputCls} value={accForm.sell_price} onChange={e => setAccForm(p => ({ ...p, sell_price: e.target.value }))} /></Field>
                                     </div>
-                                    <Field label="Stok" required><input type="number" inputMode="numeric" className={inputCls} value={accForm.stock} onChange={e => setAccForm(p => ({ ...p, stock: e.target.value }))} /></Field>
+                                    {/* Field Stok hanya untuk EDIT aksesoris lama yang stoknya masih manual
+    (belum ber-SN). Saat TAMBAH barang, field ini disembunyikan — stok
+    diisi dari unit ber-SN, sama seperti laptop. */}
+                                    {formModal.mode === "edit" && (
+                                        <Field label="Stok"><input type="number" inputMode="numeric" className={inputCls} value={accForm.stock} onChange={e => setAccForm(p => ({ ...p, stock: e.target.value }))} /></Field>
+                                    )}
                                     <Field label="Keterangan"><textarea rows={2} className={inputCls} value={accForm.notes} onChange={e => setAccForm(p => ({ ...p, notes: e.target.value }))} /></Field>
                                 </>
                             )}

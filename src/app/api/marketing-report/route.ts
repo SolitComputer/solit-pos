@@ -63,6 +63,28 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     });
     if (error) throw new Error(error.message);
 
+    // 1b) Data import historis (Excel) dari `marketing_report_import` — digabung
+    //     ke rekap seolah-olah laporan teraudit. Difilter rentang & toko yang SAMA.
+    //     Tiap baris qty di-"mekar" jadi N baris sintetis {channel, interest}.
+    //     TIDAK menyentuh sales_online_reports → poin/leaderboard/Laporan Harian
+    //     Sales tidak terpengaruh. Hapus baris importnya untuk membatalkan.
+    const { data: importRows, error: importError } = await fetchAllRows((from, to) => {
+      let q = supabaseAdmin
+        .from("marketing_report_import")
+        .select("channel, interest, qty");
+      if (startUtc) q = q.gte("occurred_at", startUtc);
+      if (endUtc) q = q.lt("occurred_at", endUtc);
+      if (storeFilter && storeFilter !== "ALL") q = q.eq("nama_toko", storeFilter);
+      return q.order("occurred_at", { ascending: false }).range(from, to);
+    });
+    if (importError) throw new Error(importError.message);
+
+    const expandedImport: AuditedReportLite[] = [];
+    for (const r of (importRows ?? []) as Array<{ channel: string; interest: string; qty: number }>) {
+      const qty = Math.max(0, Math.trunc(Number(r.qty) || 0));
+      for (let i = 0; i < qty; i++) expandedImport.push({ channel: r.channel, interest: r.interest });
+    }
+
     // 2) Jumlah laporan yang BELUM diaudit di periode yang sama — cuma info
     //    di UI ("x laporan menunggu audit"), TIDAK ikut dihitung di Qty.
     let pendingQuery = supabaseAdmin
@@ -78,8 +100,11 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     const { count: pendingAuditCount, error: pendingError } = await pendingQuery;
     if (pendingError) throw new Error(pendingError.message);
 
-    const report = aggregateMarketingReport((data ?? []) as AuditedReportLite[]);
-
+    const report = aggregateMarketingReport([
+      ...((data ?? []) as AuditedReportLite[]),
+      ...expandedImport,
+    ]);
+    
     return NextResponse.json({
       success: true,
       data: { ...report, pendingAuditCount: pendingAuditCount ?? 0 },

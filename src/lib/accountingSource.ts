@@ -104,15 +104,15 @@ export async function getMaxJournalSeqByDate(
 async function getAccessoryDealModalByInvoices(
   supabase: SupabaseClient,
   invoiceNumbers: string[]
-): Promise<Map<string, { deal: number; modal: number }>> {
-  const map = new Map<string, { deal: number; modal: number }>();
+): Promise<Map<string, { deal: number; modal: number; sns: string[] }>> {
+  const map = new Map<string, { deal: number; modal: number; sns: string[] }>();
   if (invoiceNumbers.length === 0) return map;
 
   const accRows: any[] = [];
   for (const batch of chunkArray(invoiceNumbers, 150)) {
     const { data } = await supabase
       .from("transaction_items")
-      .select("invoice_number, item_type, accessory_id, unit_id, deal_price, selling_price, quantity")
+          .select("invoice_number, item_type, accessory_id, unit_id, deal_price, selling_price, quantity, serial_number")
       .in("invoice_number", batch);
     for (const it of (data ?? []) as any[]) {
       const isAccessoryItem = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
@@ -134,9 +134,11 @@ async function getAccessoryDealModalByInvoices(
     const qty = Math.max(1, Math.round(Number(it.quantity ?? 1)));
     const deal = Math.round(Number(it.deal_price ?? 0));
     const unitModal = Math.round(Number(it.selling_price ?? 0)) || (buyPriceMap.get(it.accessory_id) ?? 0);
-    const cur = map.get(inv) ?? { deal: 0, modal: 0 };
+    const cur = map.get(inv) ?? { deal: 0, modal: 0, sns: [] as string[] };
     cur.deal += deal;
     cur.modal += unitModal * qty;
+    const sn = (it.serial_number as string)?.trim();
+    if (sn) cur.sns.push(sn);
     map.set(inv, cur);
   }
 
@@ -332,8 +334,11 @@ export async function getTransactionSyncDraftsByInvoices(
       const sn = serialNumberMap.get(id);
       if (sn) sns.push(sn);
     }
-    const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
-    const keterangan = `${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}`;
+  const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
+    // (baru) SN aksesoris ikut ditampilin di keterangan (dari transaction_items.serial_number).
+    const accSns = accMap.get(t.invoice_number as string)?.sns ?? [];
+    const accSuffix = accSns.length > 0 ? ` · Aksesoris: ${accSns.join(", ")}` : "";
+    const keterangan = `${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}${accSuffix}`;
 
     const effectiveItemKind: "laptop" | "accessory" | "mixed" =
       t.item_kind === "mixed" || t.item_kind === "accessory" || t.item_kind === "laptop"
