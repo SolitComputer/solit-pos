@@ -46,7 +46,7 @@ export function cashSourceLabel(pm: PaymentMethod | null, loc: CashLocation): st
 export function BranchPaymentFields({
   value,
   onChange,
-  jogjaCashEnabled = false,
+  jogjaCashEnabled = true,
   disabled = false,
   required = false,
   idPrefix = "bpf",
@@ -109,9 +109,7 @@ export function BranchPaymentFields({
               className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/20 transition disabled:opacity-60"
             >
               <option value="UTAMA">Cash Utama</option>
-              <option value="JOGJA" disabled={!jogjaCashEnabled}>
-                Cash Jogja{!jogjaCashEnabled ? " — kas fisik belum ada" : ""}
-              </option>
+              <option value="JOGJA" disabled={!jogjaCashEnabled}>Cash Jogja</option>
             </select>
           </div>
         )}
