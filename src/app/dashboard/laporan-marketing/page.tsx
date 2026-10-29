@@ -108,6 +108,13 @@ export default function LaporanMarketingPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight" | "kesalahan" | "ads" | "ads_items">("barang");
   const [exporting, setExporting] = useState(false);
+  // Sortir tabel Rekap: default "total" menurun (paling dicari dulu — perilaku lama).
+  const [sortBy, setSortBy] = useState<"total" | "keyword">("total");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const toggleSort = (col: "total" | "keyword") => {
+    if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortBy(col); setSortDir(col === "keyword" ? "asc" : "desc"); }
+  };
 
   // Urutan tab — bisa di-drag, disimpan di localStorage biar tetap setelah reload.
   const [tabOrder, setTabOrder] = useState<string[]>(DEFAULT_TAB_ORDER);
@@ -120,7 +127,7 @@ export default function LaporanMarketingPage() {
         // gabung: urutan tersimpan + tab baru yang belum ada di urutan lama
         setTabOrder([...valid, ...DEFAULT_TAB_ORDER.filter((k) => !valid.includes(k))]);
       }
-    } catch {}
+    } catch { }
   }, []);
   const handleTabDrop = (targetKey: string) => {
     if (!dragKey || dragKey === targetKey) { setDragKey(null); return; }
@@ -128,7 +135,7 @@ export default function LaporanMarketingPage() {
     order.splice(order.indexOf(dragKey), 1);
     order.splice(order.indexOf(targetKey), 0, dragKey);
     setTabOrder(order);
-    try { localStorage.setItem("laporanMarketingTabOrder", JSON.stringify(order)); } catch {}
+    try { localStorage.setItem("laporanMarketingTabOrder", JSON.stringify(order)); } catch { }
     setDragKey(null);
   };
 
@@ -181,9 +188,17 @@ export default function LaporanMarketingPage() {
   const filteredRows: MarketingReportRow[] = useMemo(() => {
     if (!report) return [];
     const tokens = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return report.rows;
-    return report.rows.filter((r) => tokens.every((t) => r.key.includes(t)));
-  }, [report, searchQuery]);
+    const base = tokens.length === 0 ? report.rows : report.rows.filter((r) => tokens.every((t) => r.key.includes(t)));
+    return [...base].sort((a, b) => {
+      if (sortBy === "keyword") {
+        const cmp = a.keyword.localeCompare(b.keyword, "id", { sensitivity: "base" });
+        return sortDir === "asc" ? cmp : -cmp;
+      }
+      // sortBy === "total": arah ikut pilihan user, tie-break nama A-Z biar stabil
+      const diff = sortDir === "asc" ? a.total - b.total : b.total - a.total;
+      return diff || a.keyword.localeCompare(b.keyword, "id");
+    });
+  }, [report, searchQuery, sortBy, sortDir]);
 
   // Total per kolom dihitung dari baris yang SEDANG tampil, supaya baris
   // TOTAL selalu konsisten dengan isi tabel (termasuk saat dicari).
@@ -456,8 +471,16 @@ export default function LaporanMarketingPage() {
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr>
-                        <th className="sticky left-0 z-10 bg-violet-600 text-white border border-violet-700 px-3 py-2 text-left font-bold whitespace-nowrap min-w-[180px]">
-                          Model / Kata Kunci
+                        <th className="sticky left-0 z-10 bg-violet-600 text-white border border-violet-700 p-0 text-left font-bold whitespace-nowrap min-w-[180px]">
+                          <button
+                            type="button"
+                            onClick={() => toggleSort("keyword")}
+                            title="Urutkan berdasarkan nama"
+                            className="w-full flex items-center gap-1 px-3 py-2 hover:bg-violet-700/60 transition-colors"
+                          >
+                            Model / Kata Kunci
+                            <span className="text-[10px] opacity-80">{sortBy === "keyword" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}</span>
+                          </button>
                         </th>
                         {visibleChannels.map((ch) => (
                           <th
@@ -467,8 +490,16 @@ export default function LaporanMarketingPage() {
                             {channelLabel(ch)}
                           </th>
                         ))}
-                        <th className="bg-violet-600 text-white border border-violet-700 px-3 py-2 text-center font-bold min-w-[72px]">
-                          TOTAL
+                        <th className="bg-violet-600 text-white border border-violet-700 p-0 text-center font-bold min-w-[72px]">
+                          <button
+                            type="button"
+                            onClick={() => toggleSort("total")}
+                            title="Urutkan berdasarkan jumlah (Qty)"
+                            className="w-full flex items-center justify-center gap-1 px-3 py-2 hover:bg-violet-700/60 transition-colors"
+                          >
+                            TOTAL
+                            <span className="text-[10px] opacity-80">{sortBy === "total" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}</span>
+                          </button>
                         </th>
                       </tr>
                     </thead>
@@ -531,7 +562,7 @@ export default function LaporanMarketingPage() {
           </div>
         )}
 
-           {activeTab === "range" && <MarketingPriceRangeReport />}
+        {activeTab === "range" && <MarketingPriceRangeReport />}
         {activeTab === "insight" && <MarketingInsightBoard />}
         {activeTab === "kesalahan" && <SalesErrorReport />}
         {activeTab === "ads" && <AdsReport />}
