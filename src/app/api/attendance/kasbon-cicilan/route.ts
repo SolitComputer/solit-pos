@@ -38,8 +38,16 @@ export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-    if (!hasAccess(user)) return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
 
+    const canViewAll = hasAccess(user);
+
+    // ⬅️ REVISI — role PKL TIDAK punya akses Kasbon & Cicilan sama sekali
+    // (kecuali dia juga punya role full-access KASBON_ACCESS_ROLES). Ditolak di
+    // server supaya tidak bisa diakses lewat URL langsung.
+    const userHasPKLRole = getRoles(user).some((r) => isPKLRole(r));
+    if (!canViewAll && userHasPKLRole) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+    }
     const { searchParams } = new URL(request.url);
     const year = parseInt(searchParams.get("year") ?? "", 10);
     const month = parseInt(searchParams.get("month") ?? "", 10); // 1..12
@@ -61,7 +69,12 @@ export async function GET(request: Request) {
       .order("name", { ascending: true });
     if (uErr) return NextResponse.json({ success: false, message: uErr.message }, { status: 500 });
 
-    const users = (usersRaw ?? []).filter((u: any) => !isPKLRole(u.role)); // ⬅️ buang PKL
+    // ⬅️ BARU — non-full-access hanya melihat barisnya sendiri. PKL tetap
+    // di-exclude untuk full-access; untuk user sendiri, baris dirinya tetap
+    // ditampilkan walau dia PKL (biar dia tetap bisa lihat kasbon/cicilannya).
+    const users = canViewAll
+      ? (usersRaw ?? []).filter((u: any) => !isPKLRole(u.role))
+      : (usersRaw ?? []).filter((u: any) => u.id === user.id);
 
     // Saldo awal manual — HANYA yang di-set pada/sesudah cutoff auto-sync.
     // Opening balance lama (sebelum cutoff) sengaja diabaikan supaya tabel
