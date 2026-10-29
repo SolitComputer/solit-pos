@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,8 +9,8 @@
 }
 
 html.dark {
-  --app-bg: #0f1117;
-  --app-fg: #e5e7eb;
+  --app-bg: #0e1417;
+  --app-fg: #e7eef2;
 }
 
 html,
@@ -17,8 +18,9 @@ body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  background: var(--app-bg);
+    background: var(--app-bg);
   color: var(--app-fg);
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -36,42 +38,107 @@ body {
 }
 
 /* =========================================================
-   DARK MODE — override kelas warna hardcoded (halaman lama).
+   DARK MODE — override kelas warna hardcoded.
    Scoped ke html.dark → mode terang 100% tidak tersentuh.
-   Perluas sendiri per halaman konten kalau ada warna lain.
+   Palet mengikuti prototipe akuntansi (deep teal-navy + cyan).
    ========================================================= */
 
 /* Shell dashboard (gradient background di DashboardLayout) */
 html.dark .bg-gradient-to-br.from-\[\#F5F6FB\] {
   background-image: none;
-  background-color: #0f1117;
+  background-color: #0e1417;
 }
 
-/* Surface putih & abu */
-html.dark .bg-white   { background-color: #171923; }
-html.dark .bg-slate-50  { background-color: #1c2030; }
-html.dark .bg-slate-100 { background-color: #262b3a; }
-html.dark .bg-gray-50   { background-color: #1c2030; }
-html.dark .bg-gray-100  { background-color: #262b3a; }
+/* ---- Surface ---- */
+html.dark .bg-white    { background-color: #161e23; }
+html.dark .bg-slate-50 { background-color: #1b242a; }
+html.dark .bg-gray-50  { background-color: #1b242a; }
+html.dark .bg-slate-100,
+html.dark .bg-gray-100 { background-color: #232e35; }
+html.dark .bg-slate-50\/90,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/60,
+html.dark .bg-gray-50\/70 { background-color: #1b242a; }
 
-/* Teks */
+/* ---- Teks netral ---- */
 html.dark .text-\[\#1a1a2e\],
 html.dark .text-slate-900,
-html.dark .text-gray-900 { color: #e5e7eb; }
-html.dark .text-slate-800 { color: #d4d9e2; }
-html.dark .text-slate-700 { color: #c3cad6; }
-html.dark .text-slate-600 { color: #aab2c0; }
-html.dark .text-slate-500 { color: #98a2b3; }
-html.dark .text-slate-400 { color: #7e8a9c; }
+html.dark .text-gray-900 { color: #e7eef2; }
+html.dark .text-slate-800,
+html.dark .text-gray-800 { color: #d4dbe2; }
+html.dark .text-slate-700,
+html.dark .text-gray-700 { color: #c3ccd6; }
+html.dark .text-slate-600,
+html.dark .text-gray-600 { color: #a1b1bc; }
+html.dark .text-slate-500,
+html.dark .text-gray-500 { color: #8d9bab; }
+html.dark .text-slate-400,
+html.dark .text-gray-400 { color: #728390; }
+html.dark .text-gray-300 { color: #566573; }
 
-/* Border */
+/* ---- Border netral ---- */
 html.dark .border-slate-100,
-html.dark .border-gray-100 { border-color: #2a3040; }
+html.dark .border-gray-100,
+html.dark .border-gray-50 { border-color: #1f2a31; }
 html.dark .border-slate-200,
-html.dark .border-gray-200 { border-color: #343c4e; }
-html.dark .border-slate-200\/70 { border-color: #343c4e; }
-html.dark .border-slate-100\/90 { border-color: #2a3040; }
+html.dark .border-gray-200,
+html.dark .border-slate-200\/80,
+html.dark .border-slate-200\/70 { border-color: #263139; }
+html.dark .border-slate-100\/90 { border-color: #1f2a31; }
+html.dark .border-gray-300,
+html.dark .border-slate-300 { border-color: #303c45; }
 
-/* Hover surface */
-html.dark .hover\:bg-slate-50:hover  { background-color: #262b3a; }
-html.dark .hover\:bg-slate-100:hover { background-color: #2f3545; }
+/* ---- Hover surface ---- */
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-gray-50:hover   { background-color: #1f2a31; }
+html.dark .hover\:bg-slate-100:hover { background-color: #26323a; }
+/* hover baris tabel (tint cyan tipis) */
+html.dark .hover\:bg-blue-50\/30:hover { background-color: rgba(43,182,205,0.08); }
+html.dark .bg-blue-50\/30 { background-color: rgba(43,182,205,0.08); }
+html.dark .bg-blue-50\/50 { background-color: rgba(43,182,205,0.12); }
+
+/* ---- Badge & status: background gelap lembut ---- */
+html.dark .bg-blue-50    { background-color: #17283d; }
+html.dark .bg-emerald-50 { background-color: #14301f; }
+html.dark .bg-amber-50   { background-color: #352a14; }
+html.dark .bg-red-50     { background-color: #3a1c1c; }
+html.dark .bg-purple-50  { background-color: #271d3d; }
+html.dark .bg-orange-50  { background-color: #352414; }
+html.dark .bg-indigo-50  { background-color: #1e2140; }
+html.dark .bg-teal-50    { background-color: #13302a; }
+
+/* ---- Teks berwarna (debit/kredit/status/badge) ---- */
+html.dark .text-blue-700,
+html.dark .text-blue-600    { color: #7fb2ec; }
+html.dark .text-emerald-700,
+html.dark .text-emerald-600 { color: #5fd089; }
+html.dark .text-red-700,
+html.dark .text-red-600     { color: #e07b7b; }
+html.dark .text-amber-800,
+html.dark .text-amber-700,
+html.dark .text-amber-600   { color: #e2ab5c; }
+html.dark .text-purple-700  { color: #b394e8; }
+html.dark .text-orange-700  { color: #e0a15c; }
+html.dark .text-indigo-700  { color: #9aa0e8; }
+html.dark .text-teal-700    { color: #5cc4a1; }
+
+/* ---- Border berwarna (badge) ---- */
+html.dark .border-blue-200,
+html.dark .border-blue-100    { border-color: #284862; }
+html.dark .border-emerald-200 { border-color: #1f4a30; }
+html.dark .border-amber-200,
+html.dark .border-amber-100   { border-color: #4a3a1c; }
+html.dark .border-red-200     { border-color: #4e2a2a; }
+html.dark .border-purple-200  { border-color: #3a2d55; }
+html.dark .border-orange-200  { border-color: #4a361c; }
+html.dark .border-indigo-200  { border-color: #2e3360; }
+html.dark .border-teal-200    { border-color: #1f4a40; }
+
+/* ---- Tombol utama (gradient navy) → cyan biar nonjol di dark ---- */
+html.dark .bg-gradient-to-br.from-\[\#0f0c29\] {
+  background-image: none;
+  background-color: #2bb6cd;
+  color: #06222a;
+}
+
+/* Hide scrollbar utility sudah di atas — jangan dihapus */
