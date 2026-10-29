@@ -186,6 +186,12 @@ export function formatJournalNo(tanggal: string, seq: number): string {
  *  sisanya (TF/QRIS/dll) → 110 (Kas Saldo, dipakai bareng semua cabang). */
 export function kasAccountFromPaymentMethod(method?: string | null, branch?: string | null): string {
   const m = (method ?? "").toUpperCase();
+  // (fix) Metode transfer dicek DULUAN → selalu 110 Kas Saldo (shared semua cabang).
+  // Tanpa ini, kode split "TF_CASH" (leg TF dari pembayaran TF+Tunai) kejebak
+  // substring "CASH" dan salah masuk ke 120 Kas Cash — bikin bagian TF ilang.
+  if (m.startsWith("TF") || m.includes("TRANSFER") || m.includes("QRIS") || m.includes("BANK") || m.includes("SALDO")) {
+    return AKUN.KAS_SALDO;
+  }
   if (m.includes("TUNAI") || m.includes("CASH")) {
     return branch === "JOGJA" ? AKUN.KAS_CASH_JOGJA : AKUN.KAS_CASH;
   }
