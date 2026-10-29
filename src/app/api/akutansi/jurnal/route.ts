@@ -55,6 +55,9 @@ export const GET = withAuth(async (req) => {
   const sort = url.searchParams.get("sort") === "asc" ? "asc" : "desc";
   // Filter cabang: "JOGJA" → eksklusif Jogja; selain itu → gabungan semua cabang.
   const branchFilter = url.searchParams.get("branch") === "JOGJA" ? "JOGJA" : null;
+  // (baru) ?sync=0 → FASE CEPAT: skip hitung-ulang "Nominal Berubah" (bagian terberat).
+  // Frontend pakai ini buat nampilin tabel dulu; badge sync nyusul lewat fetch ke-2 (sync default ON).
+  const withSync = url.searchParams.get("sync") !== "0";
 
   if (!isValidPeriod(period))
     return NextResponse.json({ success: false, message: "Periode tidak valid" }, { status: 400 });
@@ -134,12 +137,19 @@ export const GET = withAuth(async (req) => {
     ),
   ];
 
-    const [syncDraftMap, cashflowSyncDraftMap, cashflowMetaMap, serviceSyncDraftMap] = await Promise.all([
-    getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers),
-    getCashflowSyncDraftsByIds(supabase, primaryCashflowIds),
-    getCashflowMetaByIds(supabase, primaryCashflowIds),
-    getServiceSyncDraftsByIds(supabase, primaryServiceIds),
-  ]);
+    // Meta nama cashflow (buat badge) selalu diambil — ringan.
+    const cashflowMetaMap = await getCashflowMetaByIds(supabase, primaryCashflowIds);
+    // Hitung-ulang draft sumber (BERAT) hanya kalau diminta (?sync != 0).
+    let syncDraftMap = new Map<string, any>();
+    let cashflowSyncDraftMap = new Map<string, any>();
+    let serviceSyncDraftMap = new Map<string, any>();
+    if (withSync) {
+      [syncDraftMap, cashflowSyncDraftMap, serviceSyncDraftMap] = await Promise.all([
+        getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers),
+        getCashflowSyncDraftsByIds(supabase, primaryCashflowIds),
+        getServiceSyncDraftsByIds(supabase, primaryServiceIds),
+      ]);
+    }
 
   // ⬅️ BARU: nama karyawan (target_user) utk entry Kasbon/Cicilan dari Cashflow,
   // supaya di Jurnal tampil nama karyawan pemilik kasbon — bukan nama penginput.
@@ -241,13 +251,20 @@ export const GET = withAuth(async (req) => {
 
   if (allLineIds.length > 0) {
     const chunkSize = 200;
+    const chunks: string[][] = [];
     for (let i = 0; i < allLineIds.length; i += chunkSize) {
-      const chunk = allLineIds.slice(i, i + chunkSize);
-      const { data: checksData } = await supabase
-       .from("journal_umum_line_checks")
-        .select("line_id, checked_at, checked_by_user:users(id, name)")
-        .in("line_id", chunk);
-
+      chunks.push(allLineIds.slice(i, i + chunkSize));
+    }
+    // (fix) PARALEL — sebelumnya await di dalam loop = ~11 query nunggu satu-satu.
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        supabase
+          .from("journal_umum_line_checks")
+          .select("line_id, checked_at, checked_by_user:users(id, name)")
+          .in("line_id", chunk)
+      )
+    );
+    for (const { data: checksData } of results) {
       for (const c of (checksData ?? []) as any[]) {
         checkedMap.set(c.line_id, {
           checked_at: c.checked_at,
