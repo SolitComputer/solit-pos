@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { EXPENSE_CATEGORIES, isKasbonCicilanCategory } from "@/lib/cashflow";
 import { notifyPengajuanDanaResolved } from "@/hooks/usePengajuanDanaNotify";
+import BranchPaymentFields, { type BranchPaymentValue, cashSourceLabel } from "@/components/cashflow/BranchPaymentFields";
 import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, X, CheckCheck, RotateCcw, Banknote,
@@ -21,6 +22,7 @@ interface FundRequest {
   amount: number;
   payment_method: "CASH" | "SALDO";
   branch: "UTAMA" | "JOGJA";
+  cash_location?: "UTAMA" | "JOGJA" | null; // ← akun kas fisik (120/121); NULL = Saldo (110)
   is_approved: boolean;
   approved_by_id: string | null;
   approved_by_name: string | null;
@@ -194,7 +196,7 @@ function StatusPill({ approved, executed, rejected, cancelled }: { approved: boo
 /* ════════════════════════════════════════════════════════════════════════════
  *  PAYMENT METHOD BADGE
  * ════════════════════════════════════════════════════════════════════════════ */
-function PaymentMethodBadge({ method }: { method: "CASH" | "SALDO" }) {
+function PaymentMethodBadge({ method, cashLocation }: { method: "CASH" | "SALDO"; cashLocation?: "UTAMA" | "JOGJA" | null }) {
   if (method === "SALDO") {
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-200/80">
@@ -206,7 +208,7 @@ function PaymentMethodBadge({ method }: { method: "CASH" | "SALDO" }) {
   return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-teal-50 text-teal-600 border border-teal-200/80">
       <Banknote className="w-3 h-3" />
-      Cash
+      {cashSourceLabel(method, cashLocation ?? null)}
     </span>
   );
 }
@@ -216,8 +218,8 @@ function PaymentMethodBadge({ method }: { method: "CASH" | "SALDO" }) {
  *  ditampilkan ke user sbg Depok/Jogja. Mau jadi "Utama"? ganti di sini SAJA.
  * ════════════════════════════════════════════════════════════════════════════ */
 const BRANCH_LABEL: Record<"UTAMA" | "JOGJA", string> = {
-  UTAMA: "Cash Utama",
-  JOGJA: "Cash Jogja",
+  UTAMA: "Cabang Utama",
+  JOGJA: "Cabang Jogja",
 };
 
 function LocationBadge({ branch }: { branch: "UTAMA" | "JOGJA" }) {
@@ -288,16 +290,13 @@ function FormModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onSubmit: (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO", branch: "UTAMA" | "JOGJA") => Promise<void>;
+  onSubmit: (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO", branch: "UTAMA" | "JOGJA", cashLocation: "UTAMA" | "JOGJA" | null) => Promise<void>;
   submitting: boolean;
 }) {
   const [purpose, setPurpose] = useState("");
   const [amount, setAmount] = useState("");
-  // ⬅️ BARU: default null (belum ada yang dipilih) — sebelumnya langsung "CASH".
-  // User WAJIB klik salah satu (Cash/Saldo) dulu sebelum bisa submit.
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO" | null>(null);
-  // Lokasi WAJIB dipilih — null dulu biar user harus klik Depok/Jogja
-  const [branch, setBranch] = useState<"UTAMA" | "JOGJA" | null>(null);
+  // ⬅️ BARU: Cabang + Metode (Cash Utama/Jogja / Saldo) — semua null dulu, user WAJIB pilih.
+  const [bpf, setBpf] = useState<BranchPaymentValue>({ branch: null, paymentMethod: null, cashLocation: null });
   const backdropRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -305,8 +304,7 @@ function FormModal({
     if (open) {
       setPurpose("");
       setAmount("");
-      setPaymentMethod(null);
-      setBranch(null);
+      setBpf({ branch: null, paymentMethod: null, cashLocation: null });
       setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [open]);
@@ -328,10 +326,10 @@ function FormModal({
     if (!purpose.trim()) { toast.error("Kebutuhan wajib diisi"); return; }
     const num = parseInt(amount.replace(/\D/g, ""), 10);
     if (!num || num <= 0) { toast.error("Nominal harus lebih dari 0"); return; }
-    // ⬅️ BARU: paymentMethod sekarang bisa null (belum dipilih) — tolak submit
-    // kalau user belum klik Cash atau Saldo.
-    if (!paymentMethod) { toast.error("Pilih Metode Pembayaran dulu"); return; }
-    await onSubmit(purpose.trim(), num, paymentMethod, branch ?? "UTAMA");
+    // ⬅️ BARU: Cabang & Metode wajib dipilih dulu.
+    if (!bpf.branch) { toast.error("Pilih Cabang dulu"); return; }
+    if (!bpf.paymentMethod) { toast.error("Pilih Metode Pembayaran dulu"); return; }
+    await onSubmit(purpose.trim(), num, bpf.paymentMethod, bpf.branch, bpf.cashLocation);
   };
 
   if (!open) return null;
@@ -414,27 +412,7 @@ function FormModal({
               />
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">
-              Metode Pembayaran <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={paymentMethod === "SALDO" ? "SALDO" : paymentMethod === "CASH" ? (branch === "JOGJA" ? "CASH_JOGJA" : "CASH_UTAMA") : ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "SALDO") { setPaymentMethod("SALDO"); setBranch("UTAMA"); }
-                else if (v === "CASH_JOGJA") { setPaymentMethod("CASH"); setBranch("JOGJA"); }
-                else if (v === "CASH_UTAMA") { setPaymentMethod("CASH"); setBranch("UTAMA"); }
-                else { setPaymentMethod(null); setBranch(null); }
-              }}
-              className={`w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 focus:bg-white transition-all ${FOCUS_RING}`}
-            >
-              <option value="" disabled>— Pilih Metode Pembayaran —</option>
-              <option value="CASH_UTAMA">{BRANCH_LABEL.UTAMA}</option>
-              <option value="CASH_JOGJA">{BRANCH_LABEL.JOGJA}</option>
-              <option value="SALDO">Saldo</option>
-            </select>
-          </div>
+          <BranchPaymentFields value={bpf} onChange={setBpf} required idPrefix="ajukan" />
         </div>
 
         {/* Footer */}
@@ -547,7 +525,11 @@ function EditMetodeModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [method, setMethod] = useState<"CASH" | "SALDO">(fundRequest.payment_method);
+  const [bpf, setBpf] = useState<BranchPaymentValue>({
+    branch: fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA",
+    paymentMethod: fundRequest.payment_method,
+    cashLocation: fundRequest.payment_method === "SALDO" ? null : (fundRequest.cash_location ?? "UTAMA"),
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -562,7 +544,7 @@ function EditMetodeModal({
       const res = await fetch(`/api/pengajuan-dana/${fundRequest.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "update_payment_method", payment_method: method }),
+         body: JSON.stringify({ action: "update_payment_method", payment_method: bpf.paymentMethod, cash_location: bpf.cashLocation, branch: bpf.branch }),
       });
       const json = await res.json();
       if (!json.success) { toast.error(json.message || "Gagal mengubah metode pembayaran"); return; }
@@ -589,14 +571,7 @@ function EditMetodeModal({
           <button onClick={onClose} className={`w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition ${FOCUS_RING}`}><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-2">
-          <label className="block text-xs font-bold text-slate-700 mb-1">Metode Pembayaran <span className="text-red-500">*</span></label>
-          <div className="inline-flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
-            {(["CASH", "SALDO"] as const).map((m) => (
-              <button key={m} type="button" onClick={() => setMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold transition ${FOCUS_RING} ${method === m ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-600"}`}>
-                {m === "CASH" ? <Banknote size={16} /> : <Landmark className="w-4 h-4" />} {m === "CASH" ? "Cash" : "Saldo"}
-              </button>
-            ))}
-          </div>
+          <BranchPaymentFields value={bpf} onChange={setBpf} required idPrefix="editmetode" />
           <p className="text-[10px] text-slate-400 pt-1">Kebutuhan & nominal tidak bisa diubah dari sini.</p>
         </div>
         <div className="px-5 py-4 border-t border-slate-100 flex gap-3 bg-slate-50/60">
@@ -784,9 +759,11 @@ function RealisasiModal({
   }, []);
   const [keterangan, setKeterangan] = useState(fundRequest.purpose);
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(fundRequest.payment_method);
-  // Lokasi Cash — default ikut pengajuan, TAPI user boleh ganti lewat dropdown.
-  const [branch, setBranch] = useState<"UTAMA" | "JOGJA">(fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA");
+  const [bpf, setBpf] = useState<BranchPaymentValue>({
+    branch: fundRequest.branch === "JOGJA" ? "JOGJA" : "UTAMA",
+    paymentMethod: fundRequest.payment_method,
+    cashLocation: fundRequest.payment_method === "SALDO" ? null : (fundRequest.cash_location ?? "UTAMA"),
+  });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
@@ -835,8 +812,9 @@ function RealisasiModal({
           })),
           keterangan: keterangan.trim() || fundRequest.purpose,
           tanggal,
-          payment_method: paymentMethod,
-          branch, // ← cabang realisasi
+          payment_method: bpf.paymentMethod,
+          cash_location: bpf.cashLocation,
+          branch: bpf.branch, // ← cabang realisasi
           ...(photoUrl ? { photo_url: photoUrl } : {}),
         }),
       });
@@ -868,24 +846,7 @@ function RealisasiModal({
           <button onClick={onClose} className={`w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition ${FOCUS_RING}`}><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">Metode Pembayaran <span className="text-red-500">*</span></label>
-            <select
-              value={paymentMethod === "SALDO" ? "SALDO" : branch === "JOGJA" ? "CASH_JOGJA" : "CASH_UTAMA"}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "SALDO") { setPaymentMethod("SALDO"); setBranch("UTAMA"); }
-                else if (v === "CASH_JOGJA") { setPaymentMethod("CASH"); setBranch("JOGJA"); }
-                else { setPaymentMethod("CASH"); setBranch("UTAMA"); }
-              }}
-              className={inputCls}
-            >
-              <option value="CASH_UTAMA">{BRANCH_LABEL.UTAMA}</option>
-              <option value="CASH_JOGJA">{BRANCH_LABEL.JOGJA}</option>
-              <option value="SALDO">Saldo</option>
-            </select>
-            <p className="text-[10px] text-slate-400 mt-1">Default ikut pengajuan, bisa diganti.</p>
-          </div>
+          <BranchPaymentFields value={bpf} onChange={setBpf} required idPrefix="real" />
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-slate-700">Kategori &amp; Nominal</label>
@@ -1523,6 +1484,7 @@ export default function PengajuanDanaPage() {
           amount: typeof r.amount === "number" && Number.isFinite(r.amount) ? r.amount : 0,
           payment_method: r.payment_method === "SALDO" ? "SALDO" : "CASH",
           branch: r.branch === "JOGJA" ? "JOGJA" : "UTAMA",
+          cash_location: r.cash_location === "JOGJA" ? "JOGJA" : r.cash_location === "UTAMA" ? "UTAMA" : null,
           created_at: r.created_at ?? new Date(0).toISOString(),
         }));
         setData(safeRows);
@@ -1553,13 +1515,13 @@ export default function PengajuanDanaPage() {
   // ⬅️ BARU: lonceng untuk approver + ADMIN (tombol Setujui/Tolak tetap ikut canApprove)
   const showBell = canApprove || userRoles.includes("ADMIN");
 
-  const handleSubmit = async (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO", branch: "UTAMA" | "JOGJA") => {
+  const handleSubmit = async (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO", branch: "UTAMA" | "JOGJA", cashLocation: "UTAMA" | "JOGJA" | null) => {
     setSubmitting(true);
     try {
       const res = await fetch("/api/pengajuan-dana", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purpose, amount, payment_method: paymentMethod, branch }),
+        body: JSON.stringify({ purpose, amount, payment_method: paymentMethod, branch, cash_location: cashLocation }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message);
