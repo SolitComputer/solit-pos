@@ -4525,14 +4525,14 @@ export default function AttendanceDashboardPage() {
 
     // ⬅️ BARU — muat data Kasbon & Cicilan saat tab aktif / ganti bulan
     useEffect(() => {
-        if (activeTab === "kasbon-cicilan" && userCanAccessKasbon(currentUser) && selectedMonth) {
+        if (activeTab === "kasbon-cicilan" && userCanAccessKasbon(currentUser) && !userIsPKL(currentUser) && selectedMonth) {
             fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
         }
     }, [activeTab, selectedMonth, currentUser, fetchKasbonCicilan]);
 
     // ⬅️ BARU — muat data Dana Pensiun saat tab aktif / ganti tahun
     useEffect(() => {
-        if (activeTab === "dana-pensiun" && userCanAccessKasbon(currentUser) && selectedMonth) {
+        if (activeTab === "dana-pensiun" && userCanAccessKasbon(currentUser) && !userIsPKL(currentUser) && selectedMonth) {
             fetchPension(selectedMonth.year);
         }
     }, [activeTab, selectedMonth, currentUser, fetchPension]);
@@ -5908,7 +5908,10 @@ export default function AttendanceDashboardPage() {
     const isAdmin = userIsAdmin(currentUser);
     const canManage = isAdmin || getEffectiveSubordinates(userRoles).length > 0;
     const canSalary = userCanViewSalary(currentUser);
-    const canKasbon = userCanAccessKasbon(currentUser);
+    // ⬅️ REVISI — role PKL TIDAK boleh lihat tab Kasbon & Cicilan (& Dana Pensiun).
+    // userCanAccessKasbon sudah membatasi ke KASBON_ACCESS_ROLES; cek !userIsPKL
+    // menutup celah akun double-role (PKL + role kasbon).
+    const canKasbon = userCanAccessKasbon(currentUser) && !userIsPKL(currentUser);
 
     if (!selectedMonth) return (
         <DashboardLayout>
