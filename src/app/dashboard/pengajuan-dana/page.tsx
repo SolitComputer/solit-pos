@@ -976,7 +976,7 @@ function DetailModal({
           </div>
           {fundRequest.payment_method === "CASH" && (
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Lokasi</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Cabang</p>
               <LocationBadge branch={fundRequest.branch} />
             </div>
           )}
@@ -1944,7 +1944,7 @@ export default function PengajuanDanaPage() {
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kebutuhan</th>
                     <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nominal</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Metode</th>
-                    <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Lokasi</th>
+                    <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cabang</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l border-slate-100">Persetujui</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Eksekusi</th>
