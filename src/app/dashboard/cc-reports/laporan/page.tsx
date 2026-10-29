@@ -7,7 +7,7 @@ import {
   CC_STATUS_META, CC_BRANDS, BRAND_META, BRAND_TABS, DEFAULT_BRAND,
   computeStatus, fmtDateTime,
 } from "@/lib/ccReports";
-import { hasAnyRole, CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
+import { hasAnyRole, CC_REPORT_MANAGE_ROLES, CC_REPORT_DELETE_ROLES } from "@/lib/permissions";
 import type { UserRole } from "@/lib/auth";
 import CCReportModal from "@/components/cc/CCReportModal";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -40,6 +40,7 @@ export default function CCLaporanPage() {
   const [creating, setCreating] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [canDelete, setCanDelete] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [q, setQ] = useState("");
@@ -96,6 +97,7 @@ export default function CCLaporanPage() {
         const me = await getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })).then((r) => r.json());
         const roles: string[] = me?.user?.roles ?? (me?.user?.role ? [me.user.role] : []);
         setCanManage(hasAnyRole(roles, CC_REPORT_MANAGE_ROLES as UserRole[]));
+        setCanDelete(hasAnyRole(roles, CC_REPORT_DELETE_ROLES as UserRole[]));
       } catch {
         /* ignore */
       }
@@ -126,6 +128,7 @@ export default function CCLaporanPage() {
   };
 
   const handleDelete = async (id: string, judul: string) => {
+    if (!canDelete) return;        // role selain Admin & Kepala CC tidak boleh trigger hapus
     if (deletingId) return;
     const ok = window.confirm(`Apakah Anda yakin ingin menghapus laporan "${judul}"?`);
     if (!ok) return;
@@ -291,21 +294,21 @@ export default function CCLaporanPage() {
                     <th className="px-4 py-3 text-center">Platform</th>
                     <th className="px-4 py-3 text-center">Selesai</th>
                     <th className="px-5 py-3">Dibuat</th>
-                    {canManage && <th className="px-4 py-3 text-center">Aksi</th>}
+                    {canDelete && <th className="px-4 py-3 text-center">Aksi</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     [...Array(5)].map((_, i) => (
                       <tr key={i} className="border-b border-gray-50">
-                        <td colSpan={canManage ? 10 : 9} className="px-5 py-4">
+                        <td colSpan={canDelete ? 10 : 9} className="px-5 py-4">
                           <div className="h-4 animate-pulse rounded bg-gray-100" />
                         </td>
                       </tr>
                     ))
                   ) : withStatus.length === 0 ? (
                     <tr>
-                      <td colSpan={canManage ? 10 : 9} className="px-5 py-16 text-center text-sm text-gray-400">
+                      <td colSpan={canDelete ? 10 : 9} className="px-5 py-16 text-center text-sm text-gray-400">
                         {debouncedQ || filter !== "ALL" || brand !== "ALL"
                           ? "Tidak ada konten yang cocok dengan filter."
                           : "Belum ada konten. Tambah judul di atas untuk mulai."}
@@ -342,7 +345,7 @@ export default function CCLaporanPage() {
                           </td>
                           <td className="px-4 py-3.5 text-center"><Dot done={Boolean(r.posting_done)} /></td>
                           <td className="whitespace-nowrap px-5 py-3.5 text-gray-400">{fmtDateTime(r.created_at)}</td>
-                          {canManage && (
+                          {canDelete && (
                             <td className="px-4 py-3.5 text-center">
                               <button
                                 type="button"
