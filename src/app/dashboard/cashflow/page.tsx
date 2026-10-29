@@ -27,6 +27,7 @@ import {
 } from "@/lib/cashflow";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import TargetUserSelect from "@/components/kasbon/TargetUserSelect"; // ⬅️ BARU
+import BranchPaymentFields, { type BranchPaymentValue, cashSourceLabel } from "@/components/cashflow/BranchPaymentFields";
 import InlineDateRange from "@/components/common/InlineDateRange"; // dipindah ke komponen bersama (dipakai juga di Laporan Marketing)
 import {
     ShoppingCart,
@@ -84,6 +85,8 @@ type Entry = {
     invoice_number?: string | null;
     tanggal: string;
     payment_method: "CASH" | "SALDO" | null;
+    branch?: "UTAMA" | "JOGJA" | null;        // ← Cabang (dimensi laba-rugi)
+    cash_location?: "UTAMA" | "JOGJA" | null; // ← akun kas fisik (120/121); NULL = Saldo (110)
     photo_url: string | null;
     is_audited: boolean;
     audited_at: string | null;
@@ -1057,11 +1060,16 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                         <span className="inline-flex text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700">{categoryLabel(entry.direction, entry.category)}</span>
                     </DetailRow>
                     {(entry.source_type === "MANUAL" || entry.source_type === "PENGAJUAN_DANA") && (
+                        <>
                         <DetailRow label="Metode">
                             {entry.payment_method === "SALDO"
                                 ? <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={12} /> Saldo</span>
-                                : <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={12} /> Cash</span>}
+                                : <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={12} /> {cashSourceLabel(entry.payment_method, entry.cash_location ?? null)}</span>}
                         </DetailRow>
+                        <DetailRow label="Cabang">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-700 border border-slate-200">📍 {entry.branch === "JOGJA" ? "Cabang Jogja" : "Cabang Utama"}</span>
+                        </DetailRow>
+                        </>
                     )}
                     {entry.source_type === "PENGAJUAN_DANA" && (
                         <DetailRow label="Sumber">
@@ -1142,8 +1150,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     const [targetUserId, setTargetUserId] = useState(""); // ⬅️ BARU: karyawan pemilik Kasbon/Cicilan
     const [keterangan, setKeterangan] = useState("");
     const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
-    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
-    const [branch, setBranch] = useState<"UTAMA" | "JOGJA">("UTAMA"); // ← cabang entry manual
+    const [bpf, setBpf] = useState<BranchPaymentValue>({ branch: "UTAMA", paymentMethod: "CASH", cashLocation: "UTAMA" });
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
@@ -1178,7 +1185,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             for (const it of items) {
                 const res = await fetch("/api/cashflow", {
                     method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ direction: "OUT", category: it.category, nominal: Number(it.nominal), keterangan: keterangan.trim() || null, tanggal, payment_method: paymentMethod, photo_url: photoUrl, target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null, branch }),
+                    body: JSON.stringify({ direction: "OUT", category: it.category, nominal: Number(it.nominal), keterangan: keterangan.trim() || null, tanggal, payment_method: bpf.paymentMethod, cash_location: bpf.cashLocation, photo_url: photoUrl, target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null, branch: bpf.branch }),
                 });
                 const json = await res.json();
                 if (!json.success) return setError(json.message || "Gagal menyimpan");
@@ -1207,29 +1214,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
                               <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
-                    <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Cabang <span className="text-red-500">*</span></label>
-                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
-                            {([
-                                { value: "UTAMA", label: "🏢 Cabang Utama" },
-                                { value: "JOGJA", label: "📍 Cabang Jogja" },
-                            ] as const).map((b) => (
-                                <button key={b.value} type="button" onClick={() => setBranch(b.value)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${branch === b.value ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-                                    {b.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
-                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
-                            {(["CASH", "SALDO"] as const).map((m) => (
-                                <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-                                    <span>{m === "CASH" ? <Banknote size={16} /> : <Landmark size={16} />}</span> {m === "CASH" ? "Cash" : "Saldo"}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    <BranchPaymentFields value={bpf} onChange={setBpf} required idPrefix="exp" />
                     <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-2.5">
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-semibold text-gray-600">Kategori &amp; Nominal</label>
@@ -1291,7 +1276,12 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
     const [targetUserId, setTargetUserId] = useState(entry.target_user_id ?? ""); // ⬅️ BARU: prefill karyawan dari entry yang diedit
     const [keterangan, setKeterangan] = useState(entry.keterangan ?? "");
     const [tanggal, setTanggal] = useState(entry.tanggal);
-    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(entry.payment_method ?? "CASH");
+    const [bpf, setBpf] = useState<BranchPaymentValue>({
+        branch: entry.branch ?? "UTAMA",
+        paymentMethod: entry.payment_method ?? "CASH",
+        cashLocation: entry.cash_location ?? (entry.payment_method === "SALDO" ? null : "UTAMA"),
+    });
+    const { branch, paymentMethod, cashLocation } = bpf;
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(entry.photo_url);
     // ⬅️ BARU: baris kategori tambahan — tiap baris disimpan sebagai entry BARU (baris ke-1 = entry yang diedit)
@@ -1363,6 +1353,8 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                 keterangan: keterangan.trim() || null,
                 tanggal,
                 payment_method: paymentMethod,
+                cash_location: cashLocation,
+                branch,
                 photo_url: finalPhotoUrl,
                 // ⬅️ BARU: ikut update karyawan. Kalau kategori bukan Kasbon/Cicilan, server mengosongkannya.
                 target_user_id: isKasbonCicilanCategory(category) ? targetUserId : null,
@@ -1392,6 +1384,8 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                             keterangan: keterangan.trim() || null,
                             tanggal,
                             payment_method: paymentMethod,
+                            cash_location: cashLocation,
+                            branch,
                             photo_url: finalPhotoUrl,
                             target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null,
                         }),
@@ -1406,6 +1400,8 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                             keterangan: keterangan.trim() || null,
                             tanggal,
                             payment_method: paymentMethod,
+                            cash_location: cashLocation,
+                            branch,
                             photo_url: finalPhotoUrl,
                             target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null,
                         }),
@@ -1499,16 +1495,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                             <span>Entry ini sudah <b>diaudit</b>. Untuk mengubah data, batalkan status audit terlebih dahulu pada tombol audit tabel/detail.</span>
                         </div>
                     )}
-                    <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
-                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
-                            {(["CASH", "SALDO"] as const).map((m) => (
-                                <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-                                    <span>{m === "CASH" ? <Banknote size={16} /> : <Landmark size={16} />}</span> {m === "CASH" ? "Cash" : "Saldo"}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    <BranchPaymentFields value={bpf} onChange={setBpf} required idPrefix="edit" disabled={entry.is_audited} />
 
                     {/* Kotak "Kategori & Nominal" — sama dengan modal Tambah. Baris 1 = entry yang diedit,
                         baris 2+ (tombol Tambah Kategori) = entry baru. */}
@@ -1612,8 +1599,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     const [keterangan, setKeterangan] = useState("");
     // ⬅️ FIX: pakai tanggal WIB (dulu toISOString() = UTC, salah hari kalau input sebelum jam 07.00 WIB)
     const [tanggal, setTanggal] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }));
-    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
-    const [branch, setBranch] = useState<"UTAMA" | "JOGJA">("UTAMA"); // ← cabang entry manual
+    const [bpf, setBpf] = useState<BranchPaymentValue>({ branch: "UTAMA", paymentMethod: "CASH", cashLocation: "UTAMA" });
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
@@ -1663,10 +1649,11 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                         nominal: Number(it.nominal),
                         keterangan: keterangan.trim() || null,
                         tanggal,
-                        payment_method: paymentMethod,
+                        payment_method: bpf.paymentMethod,
+                        cash_location: bpf.cashLocation,
                         photo_url: photoUrl,
                         target_user_id: isKasbonCicilanCategory(it.category) ? targetUserId : null, // ⬅️ BARU
-                        branch, // ← cabang
+                        branch: bpf.branch, // ← cabang
                     }),
                 });
                 const json = await res.json();
@@ -1705,29 +1692,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                     <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
-                    <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Cabang <span className="text-red-500">*</span></label>
-                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
-                            {([
-                                { value: "UTAMA", label: "🏢 Cabang Utama" },
-                                { value: "JOGJA", label: "📍 Cabang Jogja" },
-                            ] as const).map((b) => (
-                                <button key={b.value} type="button" onClick={() => setBranch(b.value)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${branch === b.value ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-                                    {b.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
-                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
-                            {(["CASH", "SALDO"] as const).map((m) => (
-                                <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-                                    <span>{m === "CASH" ? <Banknote size={16} /> : <Landmark size={16} />}</span> {m === "CASH" ? "Cash" : "Saldo"}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    <BranchPaymentFields value={bpf} onChange={setBpf} required idPrefix="inc" />
                     <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-2.5">
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-semibold text-gray-600">Kategori &amp; Nominal</label>
@@ -2717,7 +2682,7 @@ export default function CashflowPage() {
                                                         {e.payment_method ? (
                                                             e.payment_method === "SALDO"
                                                                 ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={11} /> Saldo</span>
-                                                                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={11} /> Cash</span>
+                                                                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={11} /> {cashSourceLabel(e.payment_method, e.cash_location ?? null)}</span>
                                                         ) : e.direction === "IN" &&
                                                             (e.source_type === "TRANSACTION" || e.source_type === "TRANSACTION_PAYMENT" || e.source_type === "TRANSACTION_DP") &&
                                                             e.tx_payment_method ? (
