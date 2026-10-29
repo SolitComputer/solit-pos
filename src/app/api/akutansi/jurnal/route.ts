@@ -63,6 +63,7 @@ export const GET = withAuth(async (req) => {
     return NextResponse.json({ success: false, message: "Periode tidak valid" }, { status: 400 });
 
   const supabase = getAdmin();
+  const t0 = Date.now();
 
   let query = supabase
     .from("journal_entries")
@@ -73,6 +74,7 @@ export const GET = withAuth(async (req) => {
     .order("tanggal", { ascending: sort === "asc" })
     .order("created_at", { ascending: sort === "asc" }) // urutan dalam tanggal yang sama tetap konsisten (dipakai drag-and-drop reorder)
     .order("created_at", { ascending: true, foreignTable: "journal_warning_logs" }); // histori warning selalu lama → baru
+  console.log(`[jurnal timing] query utama: ${Date.now() - t0}ms (sync=${withSync})`);
   if (error) {
     console.error("[akuntansi GET jurnal]", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
@@ -94,7 +96,8 @@ export const GET = withAuth(async (req) => {
     ),
   ];
 
-    const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
+  // (perf) trxMeta (toko/spek) dipindah ke blok withSync — fase cepat skip.
+  let trxMetaMap = new Map<string, any>();
 
   const isKasShapedEntry = (e: any) =>
     (e.lines ?? []).some(
@@ -137,42 +140,51 @@ export const GET = withAuth(async (req) => {
     ),
   ];
 
-    // Meta nama cashflow (buat badge) selalu diambil — ringan.
-    const cashflowMetaMap = await getCashflowMetaByIds(supabase, primaryCashflowIds);
-    // Hitung-ulang draft sumber (BERAT) hanya kalau diminta (?sync != 0).
-    let syncDraftMap = new Map<string, any>();
-    let cashflowSyncDraftMap = new Map<string, any>();
-    let serviceSyncDraftMap = new Map<string, any>();
-    if (withSync) {
-      [syncDraftMap, cashflowSyncDraftMap, serviceSyncDraftMap] = await Promise.all([
-        getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers),
-        getCashflowSyncDraftsByIds(supabase, primaryCashflowIds),
-        getServiceSyncDraftsByIds(supabase, primaryServiceIds),
-      ]);
-    }
-
-  // ⬅️ BARU: nama karyawan (target_user) utk entry Kasbon/Cicilan dari Cashflow,
-  // supaya di Jurnal tampil nama karyawan pemilik kasbon — bukan nama penginput.
+  // (perf) SEMUA meta (toko/spek/nama) + hitung-ulang sync dibungkus di sini —
+  // cuma jalan di fase lengkap (?sync=1). Fase cepat (?sync=0) lewat semua ini.
+  let cashflowMetaMap = new Map<string, any>();
+  let syncDraftMap = new Map<string, any>();
+  let cashflowSyncDraftMap = new Map<string, any>();
+  let serviceSyncDraftMap = new Map<string, any>();
   const cashflowTargetNameMap = new Map<string, string>();
-  if (primaryCashflowIds.length > 0) {
-    const { data: cfRows } = await supabase
-      .from("cashflow_entries")
-      .select("id, target_user_id")
-      .in("id", primaryCashflowIds)
-      .not("target_user_id", "is", null);
-    const targetIds = [...new Set((cfRows ?? []).map((r: any) => r.target_user_id as string).filter(Boolean))];
-    if (targetIds.length > 0) {
-      const { data: targetUsers } = await supabase.from("users").select("id, name").in("id", targetIds);
-      const nameById = new Map<string, string>((targetUsers ?? []).map((u: any) => [u.id as string, u.name as string]));
-      for (const r of (cfRows ?? []) as any[]) {
-        const nm = r.target_user_id ? nameById.get(r.target_user_id as string) : null;
-        if (nm) cashflowTargetNameMap.set(r.id as string, nm);
+
+  if (withSync) {
+    const tMeta = Date.now();
+    const metaResults = await Promise.all([
+      getTransactionMetaByInvoices(supabase, trxInvoiceNumbers),
+      getCashflowMetaByIds(supabase, primaryCashflowIds),
+      getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers),
+      getCashflowSyncDraftsByIds(supabase, primaryCashflowIds),
+      getServiceSyncDraftsByIds(supabase, primaryServiceIds),
+    ]);
+    trxMetaMap = metaResults[0];
+    cashflowMetaMap = metaResults[1];
+    syncDraftMap = metaResults[2];
+    cashflowSyncDraftMap = metaResults[3];
+    serviceSyncDraftMap = metaResults[4];
+
+    // nama karyawan (target_user) utk entry Kasbon/Cicilan dari Cashflow.
+    if (primaryCashflowIds.length > 0) {
+      const { data: cfRows } = await supabase
+        .from("cashflow_entries")
+        .select("id, target_user_id")
+        .in("id", primaryCashflowIds)
+        .not("target_user_id", "is", null);
+      const targetIds = [...new Set((cfRows ?? []).map((r: any) => r.target_user_id as string).filter(Boolean))];
+      if (targetIds.length > 0) {
+        const { data: targetUsers } = await supabase.from("users").select("id, name").in("id", targetIds);
+        const nameById = new Map<string, string>((targetUsers ?? []).map((u: any) => [u.id as string, u.name as string]));
+        for (const r of (cfRows ?? []) as any[]) {
+          const nm = r.target_user_id ? nameById.get(r.target_user_id as string) : null;
+          if (nm) cashflowTargetNameMap.set(r.id as string, nm);
+        }
       }
     }
+    console.log(`[jurnal timing] meta+sync: ${Date.now() - tMeta}ms`);
   }
 
-   const entriesWithMeta = entries.map((e: any) => {
-            if (e.source_type === "CASHFLOW" && e.source_id) {
+  const entriesWithMeta = entries.map((e: any) => {
+    if (e.source_type === "CASHFLOW" && e.source_id) {
       const syncDraft = cashflowSyncDraftMap.get(e.source_id as string);
       const syncAvailable =
         !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
@@ -191,7 +203,7 @@ export const GET = withAuth(async (req) => {
       };
     }
 
-           if (e.source_type === "SERVICE" && e.source_id) {
+    if (e.source_type === "SERVICE" && e.source_id) {
       const baseId = (e.source_id as string).split("__")[0];
       const syncDraft = serviceSyncDraftMap.get(baseId);
       const syncAvailable =
@@ -218,7 +230,7 @@ export const GET = withAuth(async (req) => {
     );
     const modalAddressed = hasModalLine || e.is_edited === true;
 
-          const syncDraft = syncDraftMap.get(e.source_id as string);
+    const syncDraft = syncDraftMap.get(e.source_id as string);
     const syncAvailable =
       !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
     // ⬅️ BARU
@@ -249,6 +261,7 @@ export const GET = withAuth(async (req) => {
   const allLineIds = entriesWithMeta.flatMap((e: any) => (e.lines ?? []).map((l: any) => l.id));
   const checkedMap = new Map<string, { checked_at: string; checked_by_user: { id: string; name: string } | null }>();
 
+  const tChecks = Date.now();
   if (allLineIds.length > 0) {
     const chunkSize = 200;
     const chunks: string[][] = [];
@@ -273,6 +286,8 @@ export const GET = withAuth(async (req) => {
       }
     }
   }
+
+  console.log(`[jurnal timing] ceklis: ${Date.now() - tChecks}ms · TOTAL: ${Date.now() - t0}ms · entries=${entries.length}`);
 
   const entriesWithChecks = entriesWithMeta.map((e: any) => ({
     ...e,
