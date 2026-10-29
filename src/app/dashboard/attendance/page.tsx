@@ -3532,12 +3532,14 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                 <th className={`sticky top-0 z-20 text-right bg-blue-100 text-blue-700 ${th}`}>Cicilan Dibayar</th>
                                 <th className={`sticky top-0 z-20 text-right bg-red-100 text-red-700 ${th}`}>Sisa Kasbon</th>
                                 <th className={`sticky top-0 z-20 text-right bg-red-100 text-red-700 ${th}`}>Sisa Cicilan</th>
+                                <th className={`sticky top-0 z-20 text-right bg-indigo-100 text-indigo-700 ${th}`}>Total Pinjaman</th>
+                                <th className={`sticky top-0 z-20 text-right bg-indigo-100 text-indigo-700 ${th}`}>Total Sisa</th>
                                 {isAdmin && <th className={`sticky top-0 z-20 text-center bg-sky-200 text-gray-800 ${th}`}>Saldo Awal</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {filteredData.length === 0 ? (
-                                <tr><td colSpan={isAdmin ? 16 : 15} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
+                                <tr><td colSpan={isAdmin ? 18 : 17} className="border border-gray-300 py-12 text-center text-sm text-gray-400">{search.trim() ? `Tidak ada karyawan cocok dengan "${search.trim()}"` : "Belum ada data"}</td></tr>
                             ) : filteredData.map((r, i) => (
                                 <tr key={r.user_id} className="hover:bg-sky-50/40 group">
                                     <td className={`sticky left-0 z-10 text-center text-[11px] text-gray-400 font-black bg-white group-hover:bg-sky-50 ${td}`}>{i + 1}</td>
@@ -3568,6 +3570,8 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                     <td className={`${td} text-right bg-blue-50/40`}>{cell(r.cicilan_dibayar, "text-blue-600")}</td>
                                     <td className={`${td} text-right bg-red-50/40`}>{cell(r.sisa_kasbon, "text-red-600")}</td>
                                     <td className={`${td} text-right bg-red-50/40`}>{cell(r.sisa_cicilan, "text-red-600")}</td>
+                                    <td className={`${td} text-right bg-indigo-50/40`}>{cell((r.total_kasbon || 0) + (r.total_cicilan || 0), "text-indigo-700")}</td>
+                                    <td className={`${td} text-right bg-indigo-50/40`}>{cell((r.sisa_kasbon || 0) + (r.sisa_cicilan || 0), "text-indigo-700")}</td>
                                     {isAdmin && (
                                         <td className={`${td} text-center bg-white`}>
                                             <button
@@ -3591,6 +3595,8 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                     <td colSpan={2} className={`${tf} bg-gray-100`}></td>
                                     <td className={`${tf} text-right bg-gray-100`}><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaKasbon)}</span></td>
                                     <td className={`${tf} text-right bg-gray-100`}><span className="font-mono font-black text-red-600 text-xs">{formatRupiah(totals.sisaCicilan)}</span></td>
+                                    <td className={`${tf} text-right bg-indigo-50`}><span className="font-mono font-black text-indigo-700 text-xs">{formatRupiah(totals.totalKasbon + totals.totalCicilan)}</span></td>
+                                    <td className={`${tf} text-right bg-indigo-50`}><span className="font-mono font-black text-indigo-700 text-xs">{formatRupiah(totals.sisaKasbon + totals.sisaCicilan)}</span></td>
                                     {isAdmin && <td className={`${tf} bg-gray-100`}></td>}
                                 </tr>
                             </tfoot>
