@@ -16,6 +16,7 @@ import {
   Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
   Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
   ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
+  Search,
   Mars, Venus, Plus, UserX, UserCheck, Megaphone,
 } from "lucide-react";
 
@@ -437,6 +438,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
 // ── MultiRoleSelect ───────────────────────────────────────────────────────────
 // FIX: fetch role custom dari /api/admin/roles supaya muncul di dropdown.
+// + Search inline: filter grup role by label/key. Tidak menyentuh `values`.
 function MultiRoleSelect({
   values,
   onChange,
@@ -446,6 +448,7 @@ function MultiRoleSelect({
 }) {
   const [customRoles, setCustomRoles] = useState<CustomRoleRow[]>([]);
   const [loadingCustom, setLoadingCustom] = useState(true);
+  const [roleSearch, setRoleSearch] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -507,6 +510,25 @@ function MultiRoleSelect({
     return groups;
   }, [customRoles]);
 
+  // Filter grup berdasarkan kata kunci. Role yang label/key-nya cocok saja yang
+  // tersisa; grup yang jadi kosong dibuang. String kosong → tampilkan semua.
+  const filteredGroups = useMemo(() => {
+    const q = roleSearch.trim().toLowerCase();
+    if (!q) return ALL_ROLE_GROUPS;
+    return ALL_ROLE_GROUPS
+      .map((group) => ({
+        ...group,
+        roles: group.roles.filter(
+          (role) =>
+            getLabel(role).toLowerCase().includes(q) ||
+            role.toLowerCase().includes(q)
+        ),
+      }))
+      .filter((group) => group.roles.length > 0);
+    // getLabel sengaja tidak dimasukkan deps: stabil per-render & tidak ganti hasil.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ALL_ROLE_GROUPS, roleSearch]);
+
   const toggle = (role: string) => {
     if (values.includes(role)) {
       if (values.length === 1) return;
@@ -565,8 +587,36 @@ function MultiRoleSelect({
         </div>
       )}
 
+      {/* Kolom pencarian role — styling selaras search "Cari nama atau nomor..." */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "#94a3b8" }} />
+        <input
+          type="text"
+          value={roleSearch}
+          onChange={(e) => setRoleSearch(e.target.value)}
+          placeholder="Cari role..."
+          className="w-full h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400/30 transition"
+          style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+        />
+        {roleSearch && (
+          <button
+            type="button"
+            onClick={() => setRoleSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform"
+          >
+            <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+
       <div className="max-h-48 overflow-y-auto space-y-2 pr-0.5">
-        {ALL_ROLE_GROUPS.map(group => (
+        {filteredGroups.length === 0 ? (
+          <p className="text-[11px] text-center py-4 font-semibold" style={{ color: "#94a3b8" }}>
+            Role tidak ditemukan
+          </p>
+        ) : filteredGroups.map(group => (
           <div key={group.label}>
             <p className="text-[9px] font-bold uppercase tracking-widest mb-1"
               style={{ color: "#94a3b8" }}>
