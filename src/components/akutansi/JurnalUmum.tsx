@@ -381,14 +381,38 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         }
     }, [period]);
 
+      // FASE 2: hitung badge "Nominal Berubah" di belakang layar, lalu merge ke entries
+    // yang sudah tampil (match by id). Gagalnya diabaikan — tabel tetap jalan.
+    const loadSyncStatus = useCallback(async () => {
+        try {
+            const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
+            const res = await fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}${branchQS}`); // sync default ON
+            const j = await res.json();
+            if (!j.success || !Array.isArray(j.data)) return;
+            const byId = new Map<string, any>(j.data.map((e: any) => [e.id, e]));
+            setEntries((prev) =>
+                prev.map((e) => {
+                    const full = byId.get(e.id);
+                    return full
+                        ? { ...e, trx_meta: full.trx_meta ?? e.trx_meta, sync_available: !!full.sync_available, sync_preview: full.sync_preview ?? null }
+                        : e;
+                })
+            );
+        } catch {
+            /* badge sync opsional — kalau gagal, tabel tetap jalan */
+        }
+    }, [period, sortOrder, branch]);
+
     const load = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 25000);
+        let ok = false;
         try {
             const branchQS = branch === "JOGJA" ? "&branch=JOGJA" : "";
+            // FASE 1 (cepat): &sync=0 → tanpa hitung-ulang "Nominal Berubah"
             const [jRes, pRes] = await Promise.all([
-                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}${branchQS}`, { signal: controller.signal }),
+                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}${branchQS}&sync=0`, { signal: controller.signal }),
                 // Pending sengaja TIDAK difilter cabang — biar semua draft yang perlu
                 // dikonfirmasi tetap kelihatan apa pun cabang yang sedang dipilih.
                 fetch(`/api/akutansi/jurnal/pending?period=${period}`, { signal: controller.signal }),
@@ -405,13 +429,16 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
             setPendingSummary(p.success ? p.summary ?? null : null);
 
             if (showLoader) setSelected(new Set());
+            ok = j.success;
         } catch (e: any) {
             setToast(e?.name === "AbortError" ? "Server terlalu lama merespon, coba lagi" : "Gagal memuat data jurnal");
         } finally {
             clearTimeout(timeoutId);
             if (showLoader) setLoading(false);
         }
-    }, [period, sortOrder, branch]);
+        // FASE 2: badge nyusul, nggak nahan skeleton
+        if (ok) loadSyncStatus();
+    }, [period, sortOrder, branch, loadSyncStatus]);
 
     useEffect(() => { load(); }, [load]);
     useEffect(() => {

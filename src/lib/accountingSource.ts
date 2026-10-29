@@ -306,12 +306,15 @@ export async function getTransactionSyncDraftsByInvoices(
     }
   }
 
-  const mixedInvoiceNumbers = (trxs as any[])
-    .filter((t) => t.item_kind === "mixed")
+  // (fix) Butuh deal + MODAL aksesoris buat transaksi mixed DAN aksesoris-only —
+  // sebelumnya cuma "mixed", makanya modal aksesoris di penjualan aksesoris-only
+  // nggak pernah kebukuan.
+  const accInvoiceNumbers = (trxs as any[])
+    .filter((t) => t.item_kind === "mixed" || t.item_kind === "accessory")
     .map((t) => t.invoice_number as string);
 
   // deal (harga jual) + modal (harga beli) aksesoris per invoice.
-  const accMap = await getAccessoryDealModalByInvoices(supabase, mixedInvoiceNumbers);
+  const accMap = await getAccessoryDealModalByInvoices(supabase, accInvoiceNumbers);
 
   for (const t of trxs as any[]) {
     if (t.status !== "PAID") continue; // lihat catatan di JSDoc — accrual/cancelled tidak disinkronkan
@@ -363,28 +366,21 @@ export async function getTransactionSyncDraftsByInvoices(
       lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
     } else if (effectiveItemKind === "mixed") {
       const accessoryDeal = Math.max(0, Math.min(deal, accMap.get(t.invoice_number as string)?.deal ?? 0));
-            const laptopDeal = deal - accessoryDeal;
+      const laptopDeal = deal - accessoryDeal;
       if (laptopDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: laptopDeal });
       if (accessoryDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: accessoryDeal });
     } else {
       lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
     }
 
-    if (modal > 0) {
-      if (effectiveItemKind === "accessory") {
-        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal });
-        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal });
-      } else {
-        lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
-        lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
-      }
+    // Modal LAPTOP (D440 Modal Keluar / K130 HPP) — hanya kalau ada unit laptop.
+    if (modal > 0 && effectiveItemKind !== "accessory") {
+      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
     }
-
-    // ✅ HPP aksesoris (D450 Biaya Printilan / K170 Aksesoris) untuk transaksi MIXED.
-    // Modal aksesoris yang ditambahkan lewat Edit Riwayat Transaksi — dijual
-    // maupun bonus (deal 0) — sebelumnya TIDAK pernah dibukukan, makanya jurnalnya
-    // "cuma laptop". Modal laptop tetap lewat 440/130 di atas (tidak dobel).
-    if (effectiveItemKind === "mixed") {
+    // Modal AKSESORIS (D450 Biaya Printilan / K170 Aksesoris) — aksesoris-only & mixed,
+    // termasuk aksesoris bonus (deal 0). Dari modal aksesoris di accMap (bukan `modal` laptop).
+    if (effectiveItemKind === "accessory" || effectiveItemKind === "mixed") {
       const accessoryModal = Math.round(accMap.get(t.invoice_number as string)?.modal ?? 0);
       if (accessoryModal > 0) {
         lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: accessoryModal });
@@ -545,8 +541,8 @@ function cashflowGroupLines(group: CashflowRow[]): DraftLine[] {
     const nominal = Math.round(Number(e.nominal ?? 0));
     if (nominal <= 0) continue;
 
-       // ⬅️ Akun kas dari cash_location (akun kas fisik); fallback ke branch utk data lama.
-       const kasAccount = kasAccountFromCashflow(e.payment_method, e.cash_location ?? e.branch);
+    // ⬅️ Akun kas dari cash_location (akun kas fisik); fallback ke branch utk data lama.
+    const kasAccount = kasAccountFromCashflow(e.payment_method, e.cash_location ?? e.branch);
     if (e.direction === "OUT") {
       lines.push({ account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal });
       lines.push({ account_code: kasAccount, side: "KREDIT", nominal });
@@ -783,28 +779,15 @@ async function buildTransactionDrafts(
   }
   if (!trxs || trxs.length === 0) return [];
 
-  // ── (fix) Untuk transaksi "mixed" (laptop + aksesoris dalam satu invoice),
-  // ambil deal_price khusus baris aksesoris dari transaction_items supaya
-  // pendapatan bisa dipisah proporsional antara akun 410 (laptop) & 420 (aksesoris).
-  const mixedInvoiceNumbers = (trxs as any[])
-    .filter((t) => t.item_kind === "mixed")
+  // (fix) Ambil deal (harga jual) + MODAL (harga beli) aksesoris per invoice —
+  // buat transaksi "mixed" MAUPUN "aksesoris-only". Dipakai: (a) pisah pendapatan
+  // 410 (laptop) vs 420 (aksesoris) di mixed, (b) buku modal aksesoris D450/K170.
+  // Sebelumnya cuma deal (tanpa modal) & cuma "mixed" → modal aksesoris nggak
+  // pernah kebukuan di jalur posting ini.
+  const accInvoiceNumbers = (trxs as any[])
+    .filter((t) => t.item_kind === "mixed" || t.item_kind === "accessory")
     .map((t) => t.invoice_number as string);
-
-  const accessoryDealByInvoice = new Map<string, number>();
-  if (mixedInvoiceNumbers.length > 0) {
-    for (const batch of chunkArray(mixedInvoiceNumbers, 150)) {
-      const { data: itemRows } = await supabase
-        .from("transaction_items")
-        .select("invoice_number, item_type, accessory_id, unit_id, deal_price")
-        .in("invoice_number", batch);
-      for (const it of (itemRows ?? []) as any[]) {
-        const isAccessoryItem = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
-        if (!isAccessoryItem) continue;
-        const cur = accessoryDealByInvoice.get(it.invoice_number as string) ?? 0;
-        accessoryDealByInvoice.set(it.invoice_number as string, cur + Math.round(Number(it.deal_price ?? 0)));
-      }
-    }
-  }
+  const accMap = await getAccessoryDealModalByInvoices(supabase, accInvoiceNumbers);
 
   const invoiceNumbersForAccrualCheck = (trxs as any[]).map((t) => t.invoice_number as string);
   const existingAccrualInvoices = new Set<string>();
@@ -948,7 +931,7 @@ async function buildTransactionDrafts(
     if (effectiveItemKind === "accessory") {
       lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
     } else if (effectiveItemKind === "mixed") {
-      const accessoryDeal = Math.max(0, Math.min(deal, accessoryDealByInvoice.get(t.invoice_number as string) ?? 0));
+      const accessoryDeal = Math.max(0, Math.min(deal, accMap.get(t.invoice_number as string)?.deal ?? 0));
       const laptopDeal = deal - accessoryDeal;
       if (laptopDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: laptopDeal });
       if (accessoryDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: accessoryDeal });
@@ -956,14 +939,21 @@ async function buildTransactionDrafts(
       lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
     }
 
-    if (modal > 0) {
-      if (effectiveItemKind === "accessory") {
-        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal });
-        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal });
-      } else {
-        lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
-        lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
-      }
+    // Modal aksesoris (harga beli) — aksesoris-only & mixed, termasuk bonus (deal 0).
+    const accessoryModal =
+      effectiveItemKind === "accessory" || effectiveItemKind === "mixed"
+        ? Math.round(accMap.get(t.invoice_number as string)?.modal ?? 0)
+        : 0;
+
+    // Modal LAPTOP (D440 Modal Keluar / K130 HPP) — hanya kalau ada unit laptop.
+    if (modal > 0 && effectiveItemKind !== "accessory") {
+      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+    }
+    // Modal AKSESORIS (D450 Biaya Printilan / K170 Aksesoris).
+    if (accessoryModal > 0) {
+      lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: accessoryModal });
+      lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: accessoryModal });
     }
 
     const merged = mergeLines(lines);
@@ -984,7 +974,7 @@ async function buildTransactionDrafts(
         invoice: t.invoice_number,
         deal,
         modal,
-        modal_missing: modal === 0, // modal 0 = harga beli unit belum diinput
+        modal_missing: modal === 0 && accessoryModal === 0, // modal laptop & aksesoris dua-duanya 0
         company_name: t.company_name ?? null,
         cpu: specs?.cpu ?? null,
         ram: specs?.ram ?? null,
@@ -1538,7 +1528,7 @@ async function buildServiceDrafts(
       tanggal,
       sort_ts: sortTs,
       keterangan: `Service · ${s.type_laptop ?? "—"} - ${s.nama ?? "—"}${keteranganSuffix}`,
-       ref: idStr,
+      ref: idStr,
       lines: merged,
       total: totalOf(merged),
       branch: asBranch(s.branch), // ⬅️ BARU
@@ -2137,7 +2127,7 @@ export async function buildDraftsForPeriod(
 ): Promise<JournalDraft[]> {
   const { startISO, endISO, startDate, endDateExclusive } = periodRange(period);
 
-   const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal, sparepart, itemReturn, itemReturnReversal] = await Promise.all([
+  const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal, sparepart, itemReturn, itemReturnReversal] = await Promise.all([
     buildTransactionDrafts(supabase, startISO, endISO),
     buildTransactionAccrualDrafts(supabase, startISO, endISO),
     buildTransactionPaymentDrafts(supabase, startISO, endISO),

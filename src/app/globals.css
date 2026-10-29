@@ -38,107 +38,101 @@ body {
 }
 
 /* =========================================================
-   DARK MODE — override kelas warna hardcoded.
-   Scoped ke html.dark → mode terang 100% tidak tersentuh.
-   Palet mengikuti prototipe akuntansi (deep teal-navy + cyan).
+   DARK MODE v2 — tutup celah opacity & semua skala netral.
+   Scoped ke html.dark → mode terang tidak tersentuh.
+   Palet: deep teal-navy + aksen cyan (prototipe akuntansi).
    ========================================================= */
 
-/* Shell dashboard (gradient background di DashboardLayout) */
-html.dark .bg-gradient-to-br.from-\[\#F5F6FB\] {
-  background-image: none;
-  background-color: #0e1417;
-}
+/* Page shell */
+html.dark .bg-gradient-to-br.from-\[\#F5F6FB\] { background-image:none; background-color:#0e1417; }
 
-/* ---- Surface ---- */
-html.dark .bg-white    { background-color: #161e23; }
-html.dark .bg-slate-50 { background-color: #1b242a; }
-html.dark .bg-gray-50  { background-color: #1b242a; }
-html.dark .bg-slate-100,
-html.dark .bg-gray-100 { background-color: #232e35; }
-html.dark .bg-slate-50\/90,
-html.dark .bg-slate-50\/70,
-html.dark .bg-slate-50\/60,
-html.dark .bg-gray-50\/70 { background-color: #1b242a; }
+/* ---- Surface: putih solid + SEMUA varian transparan (toolbar/sticky/backdrop) ---- */
+html.dark .bg-white      { background-color:#161e23; }
+html.dark .bg-white\/98  { background-color:rgba(22,30,35,.98); }
+html.dark .bg-white\/95  { background-color:rgba(22,30,35,.95); }
+html.dark .bg-white\/90  { background-color:rgba(22,30,35,.90); }
+html.dark .bg-white\/85  { background-color:rgba(22,30,35,.85); }
+html.dark .bg-white\/80  { background-color:rgba(22,30,35,.80); }
+html.dark .bg-white\/75  { background-color:rgba(22,30,35,.75); }
+html.dark .bg-white\/70  { background-color:rgba(22,30,35,.70); }
+html.dark .bg-white\/60  { background-color:rgba(22,30,35,.60); }
+html.dark .bg-white\/50  { background-color:rgba(22,30,35,.50); }
+html.dark .bg-\[\#ffffff\], html.dark .bg-\[\#fff\],
+html.dark .bg-\[\#FFFFFF\], html.dark .bg-\[\#FFF\] { background-color:#161e23; }
+
+/* ---- Surface netral (slate/gray/zinc/neutral) ---- */
+html.dark .bg-slate-50,  html.dark .bg-gray-50,  html.dark .bg-zinc-50,  html.dark .bg-neutral-50  { background-color:#1b242a; }
+html.dark .bg-slate-100, html.dark .bg-gray-100, html.dark .bg-zinc-100, html.dark .bg-neutral-100 { background-color:#232e35; }
+html.dark .bg-slate-200, html.dark .bg-gray-200, html.dark .bg-zinc-200, html.dark .bg-neutral-200 { background-color:#2b3742; }
+html.dark .bg-slate-50\/90, html.dark .bg-slate-50\/70, html.dark .bg-slate-50\/60,
+html.dark .bg-gray-50\/70,  html.dark .bg-gray-50\/60,  html.dark .bg-slate-100\/70 { background-color:rgba(27,36,42,.9); }
 
 /* ---- Teks netral ---- */
 html.dark .text-\[\#1a1a2e\],
-html.dark .text-slate-900,
-html.dark .text-gray-900 { color: #e7eef2; }
-html.dark .text-slate-800,
-html.dark .text-gray-800 { color: #d4dbe2; }
-html.dark .text-slate-700,
-html.dark .text-gray-700 { color: #c3ccd6; }
-html.dark .text-slate-600,
-html.dark .text-gray-600 { color: #a1b1bc; }
-html.dark .text-slate-500,
-html.dark .text-gray-500 { color: #8d9bab; }
-html.dark .text-slate-400,
-html.dark .text-gray-400 { color: #728390; }
-html.dark .text-gray-300 { color: #566573; }
+html.dark .text-slate-900, html.dark .text-gray-900, html.dark .text-zinc-900, html.dark .text-neutral-900 { color:#e7eef2; }
+html.dark .text-slate-800, html.dark .text-gray-800, html.dark .text-zinc-800, html.dark .text-neutral-800 { color:#d4dbe2; }
+html.dark .text-slate-700, html.dark .text-gray-700, html.dark .text-zinc-700, html.dark .text-neutral-700 { color:#c3ccd6; }
+html.dark .text-slate-600, html.dark .text-gray-600, html.dark .text-zinc-600, html.dark .text-neutral-600 { color:#a1b1bc; }
+html.dark .text-slate-500, html.dark .text-gray-500, html.dark .text-zinc-500, html.dark .text-neutral-500 { color:#8d9bab; }
+html.dark .text-slate-400, html.dark .text-gray-400, html.dark .text-zinc-400, html.dark .text-neutral-400 { color:#728390; }
+html.dark .text-slate-300, html.dark .text-gray-300, html.dark .text-zinc-300, html.dark .text-neutral-300 { color:#566573; }
 
 /* ---- Border netral ---- */
-html.dark .border-slate-100,
-html.dark .border-gray-100,
-html.dark .border-gray-50 { border-color: #1f2a31; }
-html.dark .border-slate-200,
-html.dark .border-gray-200,
-html.dark .border-slate-200\/80,
-html.dark .border-slate-200\/70 { border-color: #263139; }
-html.dark .border-slate-100\/90 { border-color: #1f2a31; }
-html.dark .border-gray-300,
-html.dark .border-slate-300 { border-color: #303c45; }
+html.dark .border-slate-100, html.dark .border-gray-100, html.dark .border-zinc-100, html.dark .border-neutral-100,
+html.dark .border-slate-50,  html.dark .border-gray-50 { border-color:#1f2a31; }
+html.dark .border-slate-200, html.dark .border-gray-200, html.dark .border-zinc-200, html.dark .border-neutral-200,
+html.dark .border-slate-200\/80, html.dark .border-slate-200\/70, html.dark .border-slate-200\/60,
+html.dark .border-slate-100\/90 { border-color:#263139; }
+html.dark .border-slate-300, html.dark .border-gray-300, html.dark .border-zinc-300, html.dark .border-neutral-300 { border-color:#303c45; }
+
+/* ---- Divider (divide-*) biar garis tipis nggak nyala putih ---- */
+html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color:#263139; }
+html.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]) { border-color:#1a232a; }
 
 /* ---- Hover surface ---- */
-html.dark .hover\:bg-slate-50:hover,
-html.dark .hover\:bg-gray-50:hover   { background-color: #1f2a31; }
-html.dark .hover\:bg-slate-100:hover { background-color: #26323a; }
-/* hover baris tabel (tint cyan tipis) */
-html.dark .hover\:bg-blue-50\/30:hover { background-color: rgba(43,182,205,0.08); }
-html.dark .bg-blue-50\/30 { background-color: rgba(43,182,205,0.08); }
-html.dark .bg-blue-50\/50 { background-color: rgba(43,182,205,0.12); }
+html.dark .hover\:bg-slate-50:hover,  html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-zinc-50:hover,   html.dark .hover\:bg-neutral-50:hover { background-color:#1f2a31; }
+html.dark .hover\:bg-slate-100:hover, html.dark .hover\:bg-gray-100:hover   { background-color:#26323a; }
+html.dark .hover\:bg-white:hover { background-color:#1b242a; }
+html.dark .hover\:bg-blue-50\/30:hover { background-color:rgba(43,182,205,.08); }
+html.dark .bg-blue-50\/30 { background-color:rgba(43,182,205,.08); }
+html.dark .bg-blue-50\/50 { background-color:rgba(43,182,205,.12); }
 
 /* ---- Badge & status: background gelap lembut ---- */
-html.dark .bg-blue-50    { background-color: #17283d; }
-html.dark .bg-emerald-50 { background-color: #14301f; }
-html.dark .bg-amber-50   { background-color: #352a14; }
-html.dark .bg-red-50     { background-color: #3a1c1c; }
-html.dark .bg-purple-50  { background-color: #271d3d; }
-html.dark .bg-orange-50  { background-color: #352414; }
-html.dark .bg-indigo-50  { background-color: #1e2140; }
-html.dark .bg-teal-50    { background-color: #13302a; }
+html.dark .bg-blue-50    { background-color:#17283d; }
+html.dark .bg-emerald-50 { background-color:#14301f; }
+html.dark .bg-amber-50   { background-color:#352a14; }
+html.dark .bg-red-50     { background-color:#3a1c1c; }
+html.dark .bg-purple-50  { background-color:#271d3d; }
+html.dark .bg-orange-50  { background-color:#352414; }
+html.dark .bg-indigo-50  { background-color:#1e2140; }
+html.dark .bg-teal-50    { background-color:#13302a; }
 
 /* ---- Teks berwarna (debit/kredit/status/badge) ---- */
-html.dark .text-blue-700,
-html.dark .text-blue-600    { color: #7fb2ec; }
-html.dark .text-emerald-700,
-html.dark .text-emerald-600 { color: #5fd089; }
-html.dark .text-red-700,
-html.dark .text-red-600     { color: #e07b7b; }
-html.dark .text-amber-800,
-html.dark .text-amber-700,
-html.dark .text-amber-600   { color: #e2ab5c; }
-html.dark .text-purple-700  { color: #b394e8; }
-html.dark .text-orange-700  { color: #e0a15c; }
-html.dark .text-indigo-700  { color: #9aa0e8; }
-html.dark .text-teal-700    { color: #5cc4a1; }
+html.dark .text-blue-700,    html.dark .text-blue-600    { color:#7fb2ec; }
+html.dark .text-emerald-700, html.dark .text-emerald-600 { color:#5fd089; }
+html.dark .text-red-700,     html.dark .text-red-600     { color:#e07b7b; }
+html.dark .text-amber-800,   html.dark .text-amber-700, html.dark .text-amber-600 { color:#e2ab5c; }
+html.dark .text-purple-700  { color:#b394e8; }
+html.dark .text-orange-700  { color:#e0a15c; }
+html.dark .text-indigo-700  { color:#9aa0e8; }
+html.dark .text-teal-700    { color:#5cc4a1; }
 
 /* ---- Border berwarna (badge) ---- */
-html.dark .border-blue-200,
-html.dark .border-blue-100    { border-color: #284862; }
-html.dark .border-emerald-200 { border-color: #1f4a30; }
-html.dark .border-amber-200,
-html.dark .border-amber-100   { border-color: #4a3a1c; }
-html.dark .border-red-200     { border-color: #4e2a2a; }
-html.dark .border-purple-200  { border-color: #3a2d55; }
-html.dark .border-orange-200  { border-color: #4a361c; }
-html.dark .border-indigo-200  { border-color: #2e3360; }
-html.dark .border-teal-200    { border-color: #1f4a40; }
+html.dark .border-blue-200,  html.dark .border-blue-100  { border-color:#284862; }
+html.dark .border-emerald-200 { border-color:#1f4a30; }
+html.dark .border-amber-200, html.dark .border-amber-100 { border-color:#4a3a1c; }
+html.dark .border-red-200    { border-color:#4e2a2a; }
+html.dark .border-purple-200 { border-color:#3a2d55; }
+html.dark .border-orange-200 { border-color:#4a361c; }
+html.dark .border-indigo-200 { border-color:#2e3360; }
+html.dark .border-teal-200   { border-color:#1f4a40; }
 
 /* ---- Tombol utama (gradient navy) → cyan biar nonjol di dark ---- */
 html.dark .bg-gradient-to-br.from-\[\#0f0c29\] {
-  background-image: none;
-  background-color: #2bb6cd;
-  color: #06222a;
+  background-image:none; background-color:#2bb6cd; color:#06222a;
 }
-
-/* Hide scrollbar utility sudah di atas — jangan dihapus */
