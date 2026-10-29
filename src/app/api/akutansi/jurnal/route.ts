@@ -43,6 +43,13 @@ const ENTRY_SELECT = `
   )
 `;
 
+// (perf) Versi RINGAN buat fase cepat (?sync=0): tanpa warning_logs & join user.
+// "Penanda" + nama pembuat/pengedit nyusul di fetch ke-2 (sync=1).
+const LIGHT_SELECT = `
+  *,
+  lines:journal_lines(*)
+`;
+
 async function isValidAccountAnywhere(supabase: SupabaseClient, code: string) {
   const { data } = await supabase.from("chart_of_accounts").select("code").eq("code", code).maybeSingle();
   return !!data;
@@ -65,22 +72,32 @@ export const GET = withAuth(async (req) => {
   const supabase = getAdmin();
   const t0 = Date.now();
 
-  let query = supabase
+ let query = supabase
     .from("journal_entries")
-    .select(ENTRY_SELECT)
+    .select(withSync ? ENTRY_SELECT : LIGHT_SELECT)
     .eq("period", period);
   if (branchFilter) query = query.eq("branch", branchFilter);
-  const { data, error } = await query
+  query = query
     .order("tanggal", { ascending: sort === "asc" })
-    .order("created_at", { ascending: sort === "asc" }) // urutan dalam tanggal yang sama tetap konsisten (dipakai drag-and-drop reorder)
-    .order("created_at", { ascending: true, foreignTable: "journal_warning_logs" }); // histori warning selalu lama → baru
+    .order("created_at", { ascending: sort === "asc" }); // urutan dalam tanggal sama tetap konsisten (drag-reorder)
+  if (withSync) {
+    // warning_logs cuma di-embed di fase lengkap → order-nya pun cuma di sini
+    query = query.order("created_at", { ascending: true, foreignTable: "journal_warning_logs" });
+  }
+  const { data, error } = await query;
   console.log(`[jurnal timing] query utama: ${Date.now() - t0}ms (sync=${withSync})`);
   if (error) {
     console.error("[akuntansi GET jurnal]", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
-  const entries = (data ?? []).map((e: any) => ({
+ const entries = (data ?? []).map((e: any) => ({
+    // (perf) default biar field yang cuma ada di fase lengkap (warning_logs, nama
+    // pembuat/pengedit) nggak undefined di fase cepat → UI nggak error. Fase lengkap
+    // yang punya nilainya bakal nimpa default ini (karena ...e di bawahnya).
+    warning_logs: [],
+    created_by_user: null,
+    updated_by_user: null,
     ...e,
     lines: [...(e.lines ?? [])].sort((a: any, b: any) => {
       if (a.side !== b.side) return a.side === "DEBIT" ? -1 : 1;

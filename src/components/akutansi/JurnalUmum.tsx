@@ -381,7 +381,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         }
     }, [period]);
 
-      // FASE 2: hitung badge "Nominal Berubah" di belakang layar, lalu merge ke entries
+    // FASE 2: hitung badge "Nominal Berubah" di belakang layar, lalu merge ke entries
     // yang sudah tampil (match by id). Gagalnya diabaikan — tabel tetap jalan.
     const loadSyncStatus = useCallback(async () => {
         try {
@@ -393,9 +393,11 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
             setEntries((prev) =>
                 prev.map((e) => {
                     const full = byId.get(e.id);
-                    return full
-                        ? { ...e, trx_meta: full.trx_meta ?? e.trx_meta, sync_available: !!full.sync_available, sync_preview: full.sync_preview ?? null }
-                        : e;
+                    // Fase 2 bawa SEMUA field (warning_logs/Penanda, nama pembuat/pengedit,
+                    // trx_meta, sync_available) yang sengaja dilewat di fase cepat.
+                    // Ambil semua field fase 2, TAPI pertahanin `lines` dari fase cepat
+                    // biar centang optimistic yang baru diklik nggak ketimpa.
+                    return full ? { ...e, ...full, lines: e.lines } : e;
                 })
             );
         } catch {
@@ -403,7 +405,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         }
     }, [period, sortOrder, branch]);
 
- // Pending (baris "Draft") DIPISAH dari skeleton — endpoint /pending ngebangun
+    // Pending (baris "Draft") DIPISAH dari skeleton — endpoint /pending ngebangun
     // ulang semua draft sebulan dari sumber (berat), jadi jangan nahan tabel utama.
     const loadPending = useCallback(async () => {
         try {
