@@ -1624,7 +1624,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto" style={{ maxHeight: "calc(100dvh - 200px)", overflowY: "auto" }}>
-         <table className="w-full border-collapse" style={{ minWidth: canSeeModal ? "2070px" : "1945px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: canSeeModal ? "2070px" : "1945px" }}>
           <thead>
             <tr>
               <th className={`${HEAD} text-center w-[60px]`}>No</th>
@@ -3503,6 +3503,7 @@ export default function Page() {
         { header: "Storage", key: "storage", width: 13 }, { header: "Metode Bayar", key: "metode", width: 18 },
         { header: "Harga Modal", key: "modal", width: 22 }, { header: "Harga Jual", key: "jual", width: 22 },
         { header: "Nama Customer", key: "customer", width: 24 }, { header: "No. HP", key: "hp", width: 18 },
+        { header: "Nama Sales", key: "sales", width: 22 },
         { header: "Toko", key: "toko", width: 15 }, { header: "Serial Number", key: "sn", width: 30 },
         { header: "Catatan", key: "catatan", width: 32 },
       ];
@@ -3556,7 +3557,7 @@ export default function Page() {
             const sns: string[] = Array.isArray(g.serial_numbers) ? g.serial_numbers : [];
             const modal = canSeeFinancials ? (cachedGroupMap.get(g.laptop_name ?? "") ?? Number(g.purchase_price_total ?? 0)) : 0;
             rowNo += 1;
-            tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "", g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal, Number(g.allocated_deal_price ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
+            tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "", g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal, Number(g.allocated_deal_price ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.sales_name ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
           }
         } else {
           const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
@@ -3565,7 +3566,7 @@ export default function Page() {
             ? Number(grouped[0]?.unit_count ?? 1)
             : (sns.length > 0 ? sns.length : 1);
           rowNo += 1;
-          tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", qty, item.laptop_name ?? "", item.cpu ?? "", item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal, Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
+                  tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", qty, item.laptop_name ?? "", item.cpu ?? "", item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal, Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.sales_name ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
         }
       }
 
