@@ -3501,12 +3501,14 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                             className="h-9 w-48 sm:w-56 border border-gray-200 rounded-xl pl-9 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400/20 transition-all"
                         />
                     </div>
-                    <button
-                        onClick={onExport}
-                        disabled={loading || data.length === 0}
-                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-50 whitespace-nowrap">
-                        <FileText className="w-3.5 h-3.5" /> Export Excel
-                    </button>
+                    {isAdmin && (
+                        <button
+                            onClick={onExport}
+                            disabled={loading || data.length === 0}
+                            className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-50 whitespace-nowrap">
+                            <FileText className="w-3.5 h-3.5" /> Export Excel
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -3543,15 +3545,15 @@ function KasbonCicilanTab({ data, loading, calYear, calMonth, isAdmin, onEditOpe
                                         <button
                                             onClick={() => onOpenDetail({ userId: r.user_id, userName: r.name })}
                                             className="flex items-center gap-2.5 text-left hover:opacity-80 transition-opacity group"
-                                            title="Lihat & edit detail kasbon/cicilan"
+                                            title={isAdmin ? "Lihat & edit detail kasbon/cicilan" : "Lihat detail kasbon/cicilan"}
                                         >
                                             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">{initials(r.name)}</div>
                                             <div>
                                                 <p className="font-bold text-gray-800 text-sm leading-tight flex items-center gap-1.5 group-hover:text-indigo-600">
                                                     {r.name}
-                                                    <Pencil className="w-3 h-3 text-indigo-400 group-hover:text-indigo-600" />
+                                                    {isAdmin && <Pencil className="w-3 h-3 text-indigo-400 group-hover:text-indigo-600" />}
                                                 </p>
-                                                <p className="text-[10px] text-indigo-400 group-hover:text-indigo-600 font-semibold">Klik untuk detail & edit →</p>
+                                                <p className="text-[10px] text-indigo-400 group-hover:text-indigo-600 font-semibold">{isAdmin ? "Klik untuk detail & edit →" : "Klik untuk lihat detail →"}</p>
                                             </div>
                                         </button>
                                     </td>
@@ -4525,7 +4527,7 @@ export default function AttendanceDashboardPage() {
 
     // ⬅️ BARU — muat data Kasbon & Cicilan saat tab aktif / ganti bulan
     useEffect(() => {
-        if (activeTab === "kasbon-cicilan" && userCanAccessKasbon(currentUser) && !userIsPKL(currentUser) && selectedMonth) {
+        if (activeTab === "kasbon-cicilan" && !!currentUser && !userIsPKL(currentUser) && selectedMonth) {
             fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
         }
     }, [activeTab, selectedMonth, currentUser, fetchKasbonCicilan]);
@@ -5908,10 +5910,14 @@ export default function AttendanceDashboardPage() {
     const isAdmin = userIsAdmin(currentUser);
     const canManage = isAdmin || getEffectiveSubordinates(userRoles).length > 0;
     const canSalary = userCanViewSalary(currentUser);
-    // ⬅️ REVISI — role PKL TIDAK boleh lihat tab Kasbon & Cicilan (& Dana Pensiun).
-    // userCanAccessKasbon sudah membatasi ke KASBON_ACCESS_ROLES; cek !userIsPKL
-    // menutup celah akun double-role (PKL + role kasbon).
-    const canKasbon = userCanAccessKasbon(currentUser) && !userIsPKL(currentUser);
+    // ⬅️ REVISI — Tab Kasbon & Cicilan: SEMUA karyawan non-PKL boleh BUKA & lihat
+    // data dirinya sendiri (backend yang memfilter jadi baris miliknya saja).
+    // Hanya admin yang lihat semua + boleh kelola. PKL tetap tidak bisa akses.
+    const canKasbon = !!currentUser && !userIsPKL(currentUser);
+    const canKasbonManage = isAdmin; // kelola: atur saldo awal, edit entry, export
+    // Dana Pensiun TETAP khusus grup finance (Admin/Programmer/Asisten CEO/Accounting),
+    // dipisah dari canKasbon biar tidak ikut terbuka ke semua karyawan.
+    const canDanaPensiun = userCanAccessKasbon(currentUser) && !userIsPKL(currentUser);
 
     if (!selectedMonth) return (
         <DashboardLayout>
@@ -6066,7 +6072,7 @@ export default function AttendanceDashboardPage() {
                         ];
                         if (canManage) tabs.push({ id: "summary", label: "Ringkasan" });
                         if (canKasbon) tabs.push({ id: "kasbon-cicilan", label: "Kasbon & Cicilan" });
-                        if (canKasbon) tabs.push({ id: "dana-pensiun", label: "Dana Pensiun" }); // ⬅️ BARU
+                        if (canDanaPensiun) tabs.push({ id: "dana-pensiun", label: "Dana Pensiun" }); // ⬅️ BARU
                         if (canSalary) {
                             tabs.push({ id: "salary", label: "Rekap Gaji" });
                             tabs.push({ id: "salary-pkl", label: "Gaji PKL" });
@@ -6967,7 +6973,7 @@ export default function AttendanceDashboardPage() {
                 )}
 
                 {/* ════ TAB DANA PENSIUN ════ */}
-                {activeTab === "dana-pensiun" && canKasbon && (
+                {activeTab === "dana-pensiun" && canDanaPensiun && (
                     <DanaPensiunTab
                         data={pensionData}
                         loading={pensionLoading}
@@ -8581,7 +8587,7 @@ export default function AttendanceDashboardPage() {
                 />
             )}
 
-            {editOpeningUser && canKasbon && (
+            {editOpeningUser && canKasbonManage && (
                 <SaldoAwalModal
                     userId={editOpeningUser.userId}
                     userName={editOpeningUser.userName}
@@ -8601,7 +8607,7 @@ export default function AttendanceDashboardPage() {
                     userName={kasbonDetailUser.userName}
                     calYear={calYear}
                     calMonth={calMonth}
-                    canEdit={getUserRoles(currentUser).some(r => ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING"].includes(r))}
+                    canEdit={canKasbonManage}
                     onClose={() => setKasbonDetailUser(null)}
                     onChanged={() => {
                         if (selectedMonth) fetchKasbonCicilan(selectedMonth.year, selectedMonth.month);
@@ -8609,7 +8615,7 @@ export default function AttendanceDashboardPage() {
                 />
             )}
 
-            {showPensionManual && canKasbon && (
+            {showPensionManual && canDanaPensiun && (
                 <PensionManualModal
                     users={allUsers}
                     calYear={calYear}

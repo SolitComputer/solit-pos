@@ -1156,7 +1156,7 @@ function MobileSkeletonList() {
 }
 
 function DesktopSkeletonTable({ canSeeModal }: { canSeeModal: boolean }) {
-  const headers = ["No", "Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "CPU", "SN", "Harga", ...(canSeeModal ? ["Margin"] : []), "Metode", "Sumber", "Toko", "Aksi"];
+  const headers = ["No", "Status", "Nota", "Customer", "Kontak", "Sales", "Barang", "CPU", "SN", "Harga", ...(canSeeModal ? ["Margin"] : []), "Metode", "Sumber", "Toko", "Aksi"];
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
@@ -1633,7 +1633,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
               <SortableTh label="Customer" sortKey="customer" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[145px]`} />
               <th className={`${HEAD} w-[125px]`}>Kontak</th>
               <SortableTh label="Sales" sortKey="sales" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[125px]`} />
-              <SortableTh label="Laptop" sortKey="laptop" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[195px]`} />
+              <SortableTh label="Barang" sortKey="laptop" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[195px]`} />
               <SortableTh label="CPU" sortKey="cpu" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[155px]`} />
               <SortableTh label="SN" sortKey="sn" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[120px]`} />
               <SortableTh label="Harga Jual" sortKey="price" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="right" className={`${HEAD} text-right w-[135px]`} />

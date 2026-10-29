@@ -87,6 +87,10 @@ interface ActiveUnit {
   grade: string;
   purchase_price: number;
   deal_price: number;
+  // ✅ BARU: penanda isi baris. "laptop" (default) atau "accessory" (hasil ganti ke aksesoris).
+  item_kind?: "laptop" | "accessory";
+  accessory_id?: string;
+  category?: string;
 }
 
 interface ActiveAccessory {
@@ -404,6 +408,41 @@ export default function EditTransactionPage() {
       grade: newUnit.grade,
       purchase_price: Number(newUnit.purchase_price ?? 0),
       deal_price: previousDealPrice,
+      item_kind: "laptop", // ✅ pastikan balik jadi laptop kalau baris ini tadinya aksesoris
+    };
+    const updated = activeUnits.map((u, i) => (i === idx ? replacement : u));
+    setActiveUnits(updated);
+    syncFormDataFromUnits(updated);
+    setHasChanges(true);
+  };
+
+  // ✅ BARU: ganti isi baris Unit Barang menjadi AKSESORIS (bukan laptop).
+  // `acc` dari /api/accessory-units/search-sn:
+  // { id(=unit_id), serial_number, accessory_id, accessory_name, category, selling_price(jual), buy_price(modal) }
+  const handleReplaceUnitWithAccessory = (idx: number, acc: any) => {
+    // Cegah unit aksesoris yang sama dipilih dua kali di daftar Unit Barang.
+    if (
+      activeUnits.some(
+        (u, i) => i !== idx && u.item_kind === "accessory" && u.unit_id === acc.id
+      )
+    ) {
+      alert("Aksesoris ini sudah ada di transaksi");
+      return;
+    }
+    // Inherit harga deal baris lama biar total tidak jadi 0; kalau kosong, pakai harga jual aksesoris.
+    const previousDealPrice = activeUnits[idx]?.deal_price ?? 0;
+    const replacement: ActiveUnit = {
+      unit_id: acc.id,
+      serial_number: acc.serial_number,
+      laptop_name: acc.accessory_name || acc.display_name || "Aksesori",
+      laptop_id: "",
+      selling_price: Number(acc.selling_price ?? 0), // harga jual
+      grade: "",
+      purchase_price: Number(acc.buy_price ?? 0),    // modal
+      deal_price: previousDealPrice > 0 ? previousDealPrice : Number(acc.selling_price ?? 0),
+      item_kind: "accessory",
+      accessory_id: acc.accessory_id,
+      category: acc.category,
     };
     const updated = activeUnits.map((u, i) => (i === idx ? replacement : u));
     setActiveUnits(updated);
@@ -429,11 +468,14 @@ export default function EditTransactionPage() {
   };
 
   const syncFormDataFromUnits = (units: ActiveUnit[]) => {
-    const sns = units.map((u) => u.serial_number);
-    const unitIds = units.map((u) => u.unit_id);
-    const laptopNames = [...new Set(units.map((u) => u.laptop_name))];
+    // ✅ Hanya baris laptop yang masuk ke serial_numbers / unit_ids / laptop_name.
+    // Baris aksesoris dikirim terpisah lewat payload accessories[] di handleSave.
+    const laptopUnits = units.filter((u) => u.item_kind !== "accessory");
+    const sns = laptopUnits.map((u) => u.serial_number);
+    const unitIds = laptopUnits.map((u) => u.unit_id);
+    const laptopNames = [...new Set(laptopUnits.map((u) => u.laptop_name))];
     const laptopName = laptopNames.join(" + ");
-    const laptopId = units[0]?.laptop_id ?? null;
+    const laptopId = laptopUnits[0]?.laptop_id ?? null;
     setFormData((prev) => ({
       ...prev,
       serial_numbers: sns,
@@ -535,13 +577,17 @@ export default function EditTransactionPage() {
     setShowConfirm(false);
     setIsSaving(true);
     try {
-      const sns = activeUnits.map((u) => u.serial_number);
-      const unitIds = activeUnits.map((u) => u.unit_id);
-      const laptopNames = [...new Set(activeUnits.map((u) => u.laptop_name))];
+      // ✅ Pisahkan baris laptop vs baris aksesoris (hasil ganti ke aksesoris).
+      const laptopUnits = activeUnits.filter((u) => u.item_kind !== "accessory");
+      const accessoryUnits = activeUnits.filter((u) => u.item_kind === "accessory");
+
+      const sns = laptopUnits.map((u) => u.serial_number);
+      const unitIds = laptopUnits.map((u) => u.unit_id);
+      const laptopNames = [...new Set(laptopUnits.map((u) => u.laptop_name))];
 
       // Hanya kirim purchase_price yang benar-benar diisi user (> 0)
       // Kalau 0 = tidak diubah, skip agar tidak menimpa data existing di DB
-      const purchasePricesPerUnit = activeUnits
+      const purchasePricesPerUnit = laptopUnits
         .filter((u) => u.purchase_price > 0)
         .map((u) => ({
           unit_id: u.unit_id,
@@ -549,7 +595,7 @@ export default function EditTransactionPage() {
         }));
 
       // Hanya kirim deal_price yang benar-benar diisi user (> 0)
-      const dealPricesPerUnit = activeUnits
+      const dealPricesPerUnit = laptopUnits
         .filter((u) => u.deal_price > 0)
         .map((u) => ({
           unit_id: u.unit_id,
@@ -582,17 +628,38 @@ export default function EditTransactionPage() {
           serial_number: sns[0] ?? "",
           unit_id: unitIds[0] ?? null,
           laptop_name: laptopNames.join(" + "),
-          laptop_id: activeUnits[0]?.laptop_id ?? null,
-          accessories: activeAccessories.map((a) => ({
-            accessory_id: a.accessory_id,
-            name: a.name,
-            quantity: a.serial_number ? 1 : (Number(a.quantity) || 1), // SN → selalu 1
-            selling_price: Number(a.selling_price ?? 0),
-            deal_price: a.is_bonus ? 0 : Number(a.deal_price ?? 0),
-            is_bonus: Boolean(a.is_bonus),
-            serial_number: a.serial_number ?? null, // ✅ unit ditandai SOLD + SN tersimpan
-            unit_id: a.unit_id ?? null,
-          })),
+          laptop_id: laptopUnits[0]?.laptop_id ?? null,
+          accessories: (() => {
+            // Baris aksesoris dari section "Aksesori Tambahan" (existing).
+            const fromAccessorySection = activeAccessories.map((a) => ({
+              accessory_id: a.accessory_id,
+              name: a.name,
+              quantity: a.serial_number ? 1 : (Number(a.quantity) || 1), // SN → selalu 1
+              selling_price: Number(a.selling_price ?? 0),
+              deal_price: a.is_bonus ? 0 : Number(a.deal_price ?? 0),
+              is_bonus: Boolean(a.is_bonus),
+              serial_number: a.serial_number ?? null, // ✅ unit ditandai SOLD + SN tersimpan
+              unit_id: a.unit_id ?? null,
+            }));
+            // ✅ BARU: baris Unit Barang yang sudah di-convert jadi aksesoris.
+            // Dedup pakai unit_id biar tidak dobel dengan section di atas.
+            const usedUnitIds = new Set(
+              activeAccessories.map((a) => a.unit_id).filter(Boolean)
+            );
+            const fromUnitRows = accessoryUnits
+              .filter((u) => !u.unit_id || !usedUnitIds.has(u.unit_id))
+              .map((u) => ({
+                accessory_id: u.accessory_id,
+                name: u.laptop_name,
+                quantity: 1,                                   // 1 SN = 1 unit fisik
+                selling_price: Number(u.purchase_price ?? 0),  // modal
+                deal_price: Number(u.deal_price ?? 0),         // harga jual/deal
+                is_bonus: false,
+                serial_number: u.serial_number ?? null,        // ✅ unit ditandai SOLD + SN tersimpan
+                unit_id: u.unit_id ?? null,
+              }));
+            return [...fromAccessorySection, ...fromUnitRows];
+          })(),
           // Hanya include key-nya kalau ada data yang valid
           ...(purchasePricesPerUnit.length > 0 && {
             purchase_prices_per_unit: purchasePricesPerUnit,
@@ -1136,8 +1203,8 @@ export default function EditTransactionPage() {
 
           <div className="section-divider" />
 
-          {/* ─ Section: Unit Laptop ─ */}
-          <SectionHeader icon={Laptop} title="Unit Laptop" tint="violet" />
+          {/* ─ Section: Unit Barang ─ */}
+          <SectionHeader icon={Laptop} title="Unit Barang" tint="violet" />
           <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4">
 
             {/* Active units list */}
@@ -1153,6 +1220,7 @@ export default function EditTransactionPage() {
                     canRemove={activeUnits.length > 1}
                     onRemove={() => handleRemoveUnit(idx)}
                     onReplace={(newUnit) => handleReplaceUnit(idx, newUnit)}
+                    onReplaceWithAccessory={(acc) => handleReplaceUnitWithAccessory(idx, acc)}
                     onDealPriceChange={(price) =>
                       handleUpdateDealPrice(idx, price)
                     }
@@ -1983,6 +2051,7 @@ function UnitEditRow({
   canRemove,
   onRemove,
   onReplace,
+  onReplaceWithAccessory,
   onDealPriceChange,
 }: {
   unit: ActiveUnit;
@@ -1992,11 +2061,32 @@ function UnitEditRow({
   canRemove: boolean;
   onRemove: () => void;
   onReplace: (newUnit: ReadyUnit) => void;
+  onReplaceWithAccessory: (acc: any) => void;
   onDealPriceChange: (price: number) => void;
 }) {
   const [showReplace, setShowReplace] = useState(false);
   const [replaceSearch, setReplaceSearch] = useState("");
+  // ✅ BARU: pencarian AKSESORIS di panel ganti (selain cari laptop).
+  const [accReplaceSearch, setAccReplaceSearch] = useState("");
+  const [accReplaceResults, setAccReplaceResults] = useState<any[]>([]);
+  const [accReplaceLoading, setAccReplaceLoading] = useState(false);
   const fmt = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
+
+  // ✅ BARU: cari aksesoris ber-SN yang statusnya TERSEDIA untuk mengganti isi baris ini.
+  const handleAccReplaceSearch = async (q: string) => {
+    setAccReplaceSearch(q);
+    if (q.trim().length < 2) { setAccReplaceResults([]); return; }
+    setAccReplaceLoading(true);
+    try {
+      const res = await fetch(`/api/accessory-units/search-sn?q=${encodeURIComponent(q.trim())}`);
+      const json = await res.json();
+      setAccReplaceResults(json.success ? (json.data || []) : []);
+    } catch {
+      setAccReplaceResults([]);
+    } finally {
+      setAccReplaceLoading(false);
+    }
+  };
 
   const filteredForReplace = allReadyUnits.filter((u) => {
     if (!replaceSearch.trim()) return false;
@@ -2035,7 +2125,13 @@ function UnitEditRow({
             <span className="text-[10px] font-mono text-gray-400 truncate">
               {unit.serial_number}
             </span>
-            {unit.grade && gradeStyle && (
+            {/* ✅ BARU: penanda baris aksesoris (hasil ganti ke aksesoris) */}
+            {unit.item_kind === "accessory" && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-emerald-50 text-emerald-700">
+                Aksesoris
+              </span>
+            )}
+            {unit.item_kind !== "accessory" && unit.grade && gradeStyle && (
               <span
                 className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
                 style={{ background: gradeStyle.bg, color: gradeStyle.color }}
@@ -2096,7 +2192,7 @@ function UnitEditRow({
           style={{ background: "#FAFBFF" }}
         >
           <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-2 inline-flex items-center gap-1">
-            <RefreshCw className="w-2.5 h-2.5" /> Pilih unit pengganti
+            <RefreshCw className="w-2.5 h-2.5" /> Pilih unit pengganti (laptop)
           </p>
           <div className="relative">
             <input
@@ -2117,6 +2213,8 @@ function UnitEditRow({
                       onReplace(u);
                       setShowReplace(false);
                       setReplaceSearch("");
+                      setAccReplaceSearch("");
+                      setAccReplaceResults([]);
                     }}
                     className="w-full px-3 py-2 text-left hover:bg-violet-50 border-b border-gray-50 last:border-0 transition"
                   >
@@ -2139,13 +2237,69 @@ function UnitEditRow({
                 </p>
               )}
           </div>
+
+          {/* ✅ BARU: cari AKSESORIS untuk menggantikan isi baris ini */}
+          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mt-3 mb-2 inline-flex items-center gap-1">
+            <Package className="w-2.5 h-2.5" /> Atau ganti jadi aksesoris (via SN)
+          </p>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Scan / ketik SN aksesoris..."
+              className="w-full border border-gray-200 rounded-xl h-9 px-3 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition placeholder:text-gray-300"
+              value={accReplaceSearch}
+              onChange={(e) => handleAccReplaceSearch(e.target.value)}
+            />
+            {accReplaceLoading && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
+            )}
+            {accReplaceSearch.trim().length >= 2 && accReplaceResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-30 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+                {accReplaceResults.map((a) => (
+                  <button
+                    key={a.id ?? a.serial_number}
+                    type="button"
+                    onClick={() => {
+                      onReplaceWithAccessory(a);
+                      setShowReplace(false);
+                      setReplaceSearch("");
+                      setAccReplaceSearch("");
+                      setAccReplaceResults([]);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-emerald-50 border-b border-gray-50 last:border-0 transition flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-800 font-mono truncate">
+                        {a.serial_number}
+                      </p>
+                      <p className="text-[10px] text-gray-400 truncate">
+                        {a.accessory_name || a.display_name || "Aksesori"}
+                        {a.category ? ` · ${a.category}` : ""}
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold text-emerald-700 flex-shrink-0">
+                      {fmt(a.selling_price || 0)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {accReplaceSearch.trim().length >= 2 && accReplaceResults.length === 0 && !accReplaceLoading && (
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                SN aksesoris tidak ketemu / stok sudah terjual
+              </p>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={() => {
               setShowReplace(false);
               setReplaceSearch("");
+              setAccReplaceSearch("");
+              setAccReplaceResults([]);
             }}
-            className="mt-2 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition inline-flex items-center gap-1"
+            className="mt-3 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition inline-flex items-center gap-1"
           >
             <X className="w-2.5 h-2.5" /> Batal
           </button>

@@ -11,8 +11,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Sama seperti akses Rekap Gaji: hanya role ini yang boleh lihat/atur Kasbon & Cicilan
-const KASBON_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
+// ⬅️ REVISI — hanya role ADMIN (full access) yang boleh LIHAT SEMUA karyawan &
+// MENGELOLA (atur saldo awal / edit). Selain ini hanya lihat barisnya sendiri
+// (read-only). ACCOUNTING sengaja TIDAK di sini — dia pun hanya lihat dirinya.
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
 // ⬅️ BARU — Entry cashflow KASBON/CICILAN SEBELUM tanggal ini tidak ditarik
 // otomatis ke tabel (data lama + testing jadi kosong). Transaksi pada/sesudah
@@ -30,8 +32,9 @@ function isPKLRole(role?: string): boolean {
   if (!role) return false;
   return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-");
 }
-function hasAccess(user: any): boolean {
-  return getRoles(user).some((r) => KASBON_ACCESS_ROLES.includes(r));
+// ⬅️ REVISI — "akses penuh" = admin (lihat semua + kelola). Dipakai utk canViewAll & POST.
+function isAdminUser(user: any): boolean {
+  return getRoles(user).some((r) => FULL_ACCESS_ROLES.includes(r));
 }
 
 export async function GET(request: Request) {
@@ -39,7 +42,8 @@ export async function GET(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
-    const canViewAll = hasAccess(user);
+    // Hanya admin yang lihat semua; selain itu hanya baris miliknya sendiri.
+    const canViewAll = isAdminUser(user);
 
     // ⬅️ REVISI — role PKL TIDAK punya akses Kasbon & Cicilan sama sekali
     // (kecuali dia juga punya role full-access KASBON_ACCESS_ROLES). Ditolak di
@@ -218,7 +222,7 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-    if (!hasAccess(user)) return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+    if (!isAdminUser(user)) return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
 
     const body = await request.json();
     const { user_id, kasbon_opening, cicilan_opening } = body ?? {};
