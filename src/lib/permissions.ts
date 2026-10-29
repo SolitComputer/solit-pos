@@ -343,6 +343,13 @@ export const CC_REPORT_MANAGE_ROLES: UserRole[] = [
   ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING",
 ];
 
+// ── Hapus Laporan CC (tombol ikon tong sampah) ───────────────────────────────
+// Lebih ketat dari MANAGE: HANYA Admin & Kepala CC yang boleh lihat tombol hapus
+// DAN menjalankan DELETE. Dipakai di frontend (page.tsx) + backend route.
+// Kalau nanti Programmer mau tetap bisa hapus untuk maintenance, tinggal
+// tambahkan "PROGRAMMER" ke array ini — satu-satunya sumber.
+export const CC_REPORT_DELETE_ROLES: UserRole[] = ["ADMIN", "KEPALA_CC"];
+
 export const LEADS_CHAT_ROLES: UserRole[] = [
   ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING", "MARKETING", "KONTEN", "KEPALA_CC",
 ];
@@ -905,7 +912,7 @@ export const PERMISSIONS = {
   // ── Content Creator ─────────────────────────────────────────────────────────
   VIEW_CC_REPORT: [...CC_REPORT_ROLES] as UserRole[],
   MANAGE_CC_REPORT: [...CC_REPORT_ROLES] as UserRole[],
-  DELETE_CC_REPORT: [...CC_REPORT_MANAGE_ROLES] as UserRole[],
+  DELETE_CC_REPORT: [...CC_REPORT_DELETE_ROLES] as UserRole[],
 
   // ── To-Do List ──────────────────────────────────────────────────────────────
   VIEW_TODOS: [...TODO_ROLES] as UserRole[],

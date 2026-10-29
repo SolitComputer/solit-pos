@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { computeStatus, isCCBrand, type CCReport } from "@/lib/ccReports";
 import { getCurrentUser } from "@/lib/auth";
-import { hasAnyRole, CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
+import { hasAnyRole, CC_REPORT_MANAGE_ROLES, CC_REPORT_DELETE_ROLES } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -211,9 +211,10 @@ export async function DELETE(
 ) {
   const { id } = await params;
 
-  // 1) Auth + cek role — pola sama persis dgn guard is_cancelled di PATCH
+  // 1) Auth + cek role — HANYA Admin & Kepala CC yang boleh hapus (CC_REPORT_DELETE_ROLES).
+  //    Sengaja TIDAK pakai CC_REPORT_MANAGE_ROLES (itu lebih luas & dipakai guard is_cancelled).
   const currentUser = await getCurrentUser();
-  if (!currentUser || !hasAnyRole(currentUser.roles ?? [currentUser.role], CC_REPORT_MANAGE_ROLES)) {
+  if (!currentUser || !hasAnyRole(currentUser.roles ?? [currentUser.role], CC_REPORT_DELETE_ROLES)) {
     return NextResponse.json(
       { success: false, error: "Kamu tidak punya akses untuk menghapus laporan ini" },
       { status: 403 }
