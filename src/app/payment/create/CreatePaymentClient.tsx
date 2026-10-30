@@ -1131,8 +1131,6 @@ export default function CreatePaymentPage() {
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tahu Solit dari mana?</label>
                                 <select className={selectClass} {...register("source_platform")}>
                                     {[
-                                        "Ads Facebook",
-                                        "Ads Instagram",
                                         "Instagram",
                                         "TikTok",
                                         "Facebook",

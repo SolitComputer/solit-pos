@@ -31,7 +31,6 @@ const SECTIONS: Section[] = [
     { k: "durasi", label: "Durasi", type: "text" },
     { k: "jangkauan", label: "Jangkauan", type: "num" },
     { k: "impresi", label: "Impresi", type: "num" },
-    { k: "klik", label: "Klik Tautan", type: "num" },
     { k: "ctr", label: "CTR", type: "text" },
     { k: "chat", label: "Chat Dimulai", type: "num" },
     { k: "cpl", label: "CPL", type: "num", rp: true },
@@ -111,6 +110,7 @@ export default function AdsReport() {
   const [preview, setPreview] = useState<string | null>(null);
   // Bulan aktif ("YYYY-MM") — sama seperti pola di Kesalahan Sales.
   const [period, setPeriod] = useState(() => currentPeriodWib());
+  const [modalLaptop, setModalLaptop] = useState(0); // Total Modal Laptop (Task 1, Ringkasan CEO)
 
   const section = useMemo(() => SECTIONS.find((s) => s.key === sectionKey)!, [sectionKey]);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -153,6 +153,7 @@ export default function AdsReport() {
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat");
       setRows(json.data as AdsRow[]);
+      setModalLaptop(Number(json.modalLaptop) || 0);
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
   }, [sectionKey, period]);
   useEffect(() => { load(); }, [load]);
@@ -353,7 +354,7 @@ export default function AdsReport() {
               <Calendar className="w-3 h-3" />
               <span className="capitalize">{monthLabel}</span>
             </span>
-            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 max-w-md">
+            <div className={`grid gap-2.5 sm:gap-3 ${sectionKey === "ringkasan" ? "grid-cols-2 sm:grid-cols-3 max-w-2xl" : "grid-cols-2 max-w-md"}`}>
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-3 py-3 sm:px-4 sm:py-3.5">
                 <div className="flex items-center justify-between gap-1">
                   <p className="text-[10px] font-semibold tracking-wide text-gray-500 uppercase truncate">Total Spend</p>
@@ -370,6 +371,16 @@ export default function AdsReport() {
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tabular-nums">{totalAds} laporan</p>
                 <p className="text-[11px] text-gray-400 mt-1 truncate">{section.label}</p>
               </div>
+              {sectionKey === "ringkasan" && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-3 py-3 sm:px-4 sm:py-3.5">
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-[10px] font-semibold tracking-wide text-gray-500 uppercase truncate">Modal Laptop</p>
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-amber-50 text-amber-600"><Hash className="w-3 h-3" /></span>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tabular-nums">Rp {modalLaptop.toLocaleString("id-ID")}</p>
+                  <p className="text-[11px] text-gray-400 mt-1 truncate">Modal barang terjual (lunas)</p>
+                </div>
+              )}
             </div>
           </div>
           <div className="shrink-0 self-center lg:self-start flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full p-1">

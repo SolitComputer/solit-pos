@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, Loader2, Plus, RefreshCw, Search, UserPlus, X } from "lucide-react";
 import {
   currentPeriodWib,
   monthDates,
@@ -10,10 +10,11 @@ import {
   INSIGHT_CELL_HEX,
 } from "@/lib/marketing-insight";
 import { todayWibDate } from "@/lib/marketing-report";
-import { SALES_ROSTER, rosterKey } from "@/lib/sales-roster";
 
 type Counts = { total_lead: number; chat: number; salah: number; data: number };
 type Meta = { catatan: string; colors: Record<string, string>; chat: number };
+type Member = { user_id: string; nama: string };
+type AvailUser = { id: string; name: string };
 
 // Kolom data (setelah Nama). `key` = key warna per sel.
 const COLS = [
@@ -46,11 +47,19 @@ export default function SalesErrorReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Daftar sales (dari DB) + daftar sales aktif yang belum masuk (buat popup).
+  const [members, setMembers] = useState<Member[]>([]);
+  const [available, setAvailable] = useState<AvailUser[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [addSearch, setAddSearch] = useState("");
+  const [addingId, setAddingId] = useState<string | null>(null);
+
   const [selStart, setSelStart] = useState<{ r: number; c: number } | null>(null);
   const [selEnd, setSelEnd] = useState<{ r: number; c: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Sortir ala Excel — klik header: A–Z, klik lagi Z–A. null = urutan roster asli.
+  // Sortir ala Excel — klik header: A–Z, klik lagi Z–A. null = urutan daftar asli.
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const toggleSort = (key: string) => {
@@ -68,6 +77,48 @@ export default function SalesErrorReport() {
     return `${period}-${String(d).padStart(2, "0")}`;
   }, [period, day, dates.length]);
 
+  // ── Daftar sales (tidak tergantung tanggal) ──
+  const loadMembers = useCallback(async () => {
+    try {
+      setMembersLoading(true);
+      const res = await fetch("/api/sales-error-members", { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat daftar sales");
+      setMembers(json.data.members || []);
+      setAvailable(json.data.available || []);
+    } catch (e: any) { setError(e.message); } finally { setMembersLoading(false); }
+  }, []);
+  useEffect(() => { loadMembers(); }, [loadMembers]);
+
+  const addMember = async (user_id: string) => {
+    try {
+      setAddingId(user_id);
+      const res = await fetch("/api/sales-error-members", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "Gagal menambah sales");
+      await loadMembers();
+    } catch (e: any) { setError(e.message); } finally { setAddingId(null); }
+  };
+
+  const removeMember = async (user_id: string, nama: string) => {
+    if (!window.confirm(`Keluarkan ${nama} dari daftar Kesalahan Sales?`)) return;
+    try {
+      const res = await fetch(`/api/sales-error-members?user_id=${user_id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "Gagal menghapus");
+      await loadMembers();
+    } catch (e: any) { setError(e.message); }
+  };
+
+  const availableFiltered = useMemo(() => {
+    const q = addSearch.trim().toLowerCase();
+    return q ? available.filter((u) => u.name.toLowerCase().includes(q)) : available;
+  }, [available, addSearch]);
+
+  // ── Data per tanggal (counts/akun/meta) ──
   const load = useCallback(async () => {
     try {
       setLoading(true); setError("");
@@ -88,15 +139,15 @@ export default function SalesErrorReport() {
   }, []);
   useEffect(() => { setSelStart(null); setSelEnd(null); }, [activeDate]);
 
-  // Baris = roster tetap. Counts dicocokkan pakai user_id (filled_by).
+  // Baris = daftar sales dari DB. Counts dicocokkan pakai user_id (filled_by).
   const rows = useMemo(() => {
-    const base = SALES_ROSTER.map((e) => {
-      const key = rosterKey(e);
-      const c = e.id ? counts[e.id] : undefined;
+    const base = members.map((m) => {
+      const key = m.user_id;
+      const c = counts[key];
       return {
         key,
-        sales_name: e.nama,
-        hasId: !!e.id,
+        sales_name: m.nama,
+        hasId: true,
         total_lead: c?.total_lead ?? 0,
         chat: meta[key]?.chat ?? 0,
         salah: c?.salah ?? 0,
@@ -120,7 +171,7 @@ export default function SalesErrorReport() {
         : String(va).localeCompare(String(vb), "id");
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [counts, akun, meta, sortBy, sortDir]);
+  }, [members, counts, akun, meta, sortBy, sortDir]);
 
   // ── Simpan (debounce per name+kind) ──
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -247,6 +298,8 @@ export default function SalesErrorReport() {
     } catch (e: any) { setError("Gagal export Excel: " + (e?.message || e)); } finally { setExporting(false); }
   };
 
+  const showSkeleton = loading || membersLoading;
+
   return (
     <div className="space-y-4">
       {/* Toolbar: bulan + hari 1-31 */}
@@ -258,12 +311,16 @@ export default function SalesErrorReport() {
             <span className="text-sm font-bold text-gray-900 capitalize">{monthLabel}</span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={exportExcel} disabled={exporting}
+            <button onClick={() => { setShowAdd(true); setAddSearch(""); }}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-semibold bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-sm hover:opacity-95">
+              <UserPlus className="w-3.5 h-3.5" /> Tambah Sales
+            </button>
+            <button onClick={exportExcel} disabled={exporting || rows.length === 0}
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-semibold bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50">
               {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Export Excel
             </button>
-            <button onClick={load} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:bg-gray-50">
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            <button onClick={() => { load(); loadMembers(); }} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:bg-gray-50">
+              <RefreshCw className={`w-3.5 h-3.5 ${showSkeleton ? "animate-spin" : ""}`} /> Refresh
             </button>
           </div>
         </div>
@@ -301,8 +358,14 @@ export default function SalesErrorReport() {
 
       {/* Tabel */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        {loading ? (
+        {showSkeleton ? (
           <div className="p-4 space-y-2">{[1, 2, 3, 4].map((i) => <div key={i} className="h-8 rounded bg-gray-100 animate-pulse" />)}</div>
+        ) : rows.length === 0 ? (
+          <div className="py-12 flex flex-col items-center text-center px-6">
+            <div className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center mb-3"><UserPlus className="w-5 h-5 text-violet-300" /></div>
+            <p className="text-sm font-medium text-gray-700">Belum ada sales di daftar</p>
+            <p className="text-xs text-gray-400 mt-1">Klik “Tambah Sales” untuk menambahkan.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className={`w-full text-xs border-collapse ${isDragging ? "select-none" : ""}`}>
@@ -330,13 +393,21 @@ export default function SalesErrorReport() {
                   const namaColor = row.colors?.["nama"];
                   const namaSelected = inSel(rIdx, 0);
                   return (
-                    <tr key={row.key} className="hover:bg-blue-50/30">
+                    <tr key={row.key} className="group hover:bg-blue-50/30">
                       <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-400 font-semibold">{rIdx + 1}</td>
                       <td
                         onMouseDown={() => startSel(rIdx, 0)} onMouseEnter={() => extendSel(rIdx, 0)}
-                        title={row.hasId ? "" : "ID akun belum diset — counts belum terhitung"}
-                        className={`border border-gray-200 px-3 py-1.5 font-semibold whitespace-nowrap ${row.hasId ? "text-gray-800" : "text-gray-400 italic"} ${namaColor ? INSIGHT_COLOR_BG[namaColor] : ""} ${namaSelected ? "ring-2 ring-inset ring-violet-500/70" : ""}`}>
-                        {row.sales_name}
+                        className={`border border-gray-200 px-3 py-1.5 font-semibold whitespace-nowrap text-gray-800 ${namaColor ? INSIGHT_COLOR_BG[namaColor] : ""} ${namaSelected ? "ring-2 ring-inset ring-violet-500/70" : ""}`}>
+                        <div className="flex items-center justify-between gap-1">
+                          <span>{row.sales_name}</span>
+                          <button
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={() => removeMember(row.key, row.sales_name)}
+                            title="Keluarkan dari daftar"
+                            className="opacity-0 group-hover:opacity-100 shrink-0 w-5 h-5 inline-flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
                       </td>
                       {COLS.map((col, cIdx) => {
                         const c = cIdx + 1;
@@ -392,8 +463,42 @@ export default function SalesErrorReport() {
         )}
       </div>
       <p className="text-[11px] text-gray-400 px-1">
-        Nama = roster tetap (David s/d Dzaky). Akun/Device <b>global</b> (berlaku semua tanggal). <b>Chat Tidak Terbalas = isi manual</b> (per tanggal). Total Lead = laporan <b>disetujui</b>. Total Temuan: 0 = Tidak ada temuan · 1–10 = Perlu evaluasi · &gt;10 = Prioritas Audit.
+        Daftar sales bisa <b>ditambah/dihapus</b> lewat tombol Tambah Sales (×). Akun/Device <b>global</b> (berlaku semua tanggal). <b>Chat Tidak Terbalas = isi manual</b> (per tanggal). Total Lead = laporan <b>disetujui</b>. Total Temuan: 0 = Tidak ada temuan · 1–10 = Perlu evaluasi · &gt;10 = Prioritas Audit.
       </p>
+
+      {/* Popup Tambah Sales */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm" onClick={() => setShowAdd(false)}>
+          <div className="relative w-full max-w-sm rounded-3xl bg-white border border-gray-100 shadow-xl p-5 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-sm"><UserPlus className="w-4 h-4 text-white" /></span>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-gray-900">Tambah Sales</h3>
+                <p className="text-[11px] text-gray-400">Pilih sales aktif untuk ditambahkan ke tabel.</p>
+              </div>
+              <button onClick={() => setShowAdd(false)} className="ml-auto w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="relative mb-3">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input autoFocus value={addSearch} onChange={(e) => setAddSearch(e.target.value)} placeholder="Cari nama sales…"
+                className="w-full pl-8 pr-3 h-10 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white" />
+            </div>
+            <div className="overflow-y-auto -mx-1 px-1 space-y-1">
+              {membersLoading ? (
+                <p className="text-xs text-gray-400 text-center py-4">Memuat…</p>
+              ) : availableFiltered.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">{available.length === 0 ? "Semua sales aktif sudah ada di daftar." : "Tidak ada yang cocok."}</p>
+              ) : availableFiltered.map((u) => (
+                <button key={u.id} disabled={addingId === u.id} onClick={() => addMember(u.id)}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm text-left text-gray-700 bg-gray-50 border border-gray-200 hover:border-violet-300 hover:bg-violet-50 disabled:opacity-50 transition-colors">
+                  <span className="truncate">{u.name}</span>
+                  {addingId === u.id ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Plus className="w-4 h-4 opacity-50 shrink-0" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
