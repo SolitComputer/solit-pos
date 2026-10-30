@@ -22,11 +22,23 @@ export default function GlobalError({
       errorMessage.includes("unexpected token") ||
       errorMessage.includes("mencegat"); // from "ServiceWorker mencegat permintaan"
 
-    if (isChunkLoadError) {
-      console.log("Chunk load error detected, forcing reload...");
-      // Forcing a hard reload to fetch new JS chunks from the server
-      window.location.reload();
+    if (!isChunkLoadError) return;
+
+    // Anti-loop: auto-reload hanya kalau reload terakhir TIDAK baru saja terjadi.
+    // Kalau chunk error muncul lagi < 10 detik setelah reload, artinya reload
+    // barusan tidak menyelesaikan masalah (indikasi loop) — berhenti, dan biarkan
+    // tombol "Muat Ulang Halaman" muncul supaya user tidak terjebak reload terus.
+    const RELOAD_TS_KEY = "chunk-reload-ts";
+    const lastReload = Number(sessionStorage.getItem(RELOAD_TS_KEY) || 0);
+
+    if (Date.now() - lastReload < 10_000) {
+      console.warn("Chunk error berulang < 10 dtk — auto-reload dihentikan (anti-loop).");
+      return;
     }
+
+    sessionStorage.setItem(RELOAD_TS_KEY, String(Date.now()));
+    console.log("Chunk load error terdeteksi — reload sekali untuk ambil chunk baru...");
+    window.location.reload();
   }, [error]);
 
   return (
