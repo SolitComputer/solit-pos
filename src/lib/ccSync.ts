@@ -1,6 +1,6 @@
 // src/lib/ccSync.ts
 // ⚠️ SERVER ONLY — jangan di-import dari komponen "use client"
-import { getValidAccessToken } from "./ccTikTok";
+import { getValidAccessToken, getIntegration } from "./ccTikTok";
 import { getValidIgToken, IG_VERSION } from "./ccInstagram";
 import { parsePostUrl, isInstagramStory, type SyncStatus } from "./ccMetrics";
 
@@ -406,10 +406,21 @@ async function syncTikTok(videoId: string): Promise<SyncOutcome> {
 
   const v = json.data?.videos?.[0];
   if (!v) {
+    const integ = await getIntegration();
+    const acc = integ?.account_name ? `@${integ.account_name}` : "akun yang terhubung";
+
+    // 🔎 log buat diagnosa di server (pm2 logs)
+    console.warn("[cc-sync][tiktok] video_id tidak ada di akun terhubung", {
+      videoId,
+      connectedAccount: integ?.account_name ?? null,
+      connectedOpenId: integ?.open_id ?? null,
+    });
+
     return {
       ...fail(
         "ERROR",
-        "Video tidak ditemukan di akun TikTok yang terhubung (metrik hanya bisa untuk konten sendiri)"
+        `Video ini tidak ada di ${acc}. TikTok cuma izinkan tarik metrik untuk video yang diposting DARI ${acc}. ` +
+          `Kalau konten ini diposting dari akun brand lain (mis. OnPoint/Sotech/Zenit), isi View/Like/Komen manual.`
       ),
       platform: "TikTok",
       externalId: videoId,

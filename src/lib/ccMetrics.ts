@@ -77,9 +77,10 @@ export function parsePostUrl(raw: string): ParsedPost | null {
         return { platform: "Instagram", externalId: m?.[1] ?? null };
     }
 
-    // ── TikTok (externalId = numeric video id) ─────────────────────────────────
+    // ── TikTok (externalId = numeric video/photo id) ───────────────────────────
     if (host.endsWith("tiktok.com")) {
-        const m = path.match(/\/video\/(\d+)/);
+        // /video/123... (video/reels) & /photo/123... (mode foto / slideshow)
+        const m = path.match(/\/(?:video|photo)\/(\d+)/);
         if (m) return { platform: "TikTok", externalId: m[1] };
         return { platform: "TikTok", externalId: null };
     }
