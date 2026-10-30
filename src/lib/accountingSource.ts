@@ -2187,6 +2187,19 @@ export async function getPostedKeys(supabase: SupabaseClient): Promise<Set<strin
   return keys;
 }
 
+/** Ubah daftar DraftLine jadi baris journal_lines, line_order urut 0..n. */
+export function draftToLineRows(entryId: string, lines: DraftLine[]) {
+  return lines.map((l, i) => ({
+    entry_id: entryId,
+    account_code: l.account_code,
+    account_name: accountName(l.account_code),
+    side: l.side,
+    nominal: Math.round(Number(l.nominal)),
+    keterangan: l.keterangan?.trim() ? l.keterangan.trim() : null,
+    line_order: i,
+  }));
+}
+
 
 /** Seperti draftToLineRows, tapi line_order diberikan EKSPLISIT per baris.
  *  Dipakai saat sinkronisasi per-baris (diffJournalLines): baris baru harus
