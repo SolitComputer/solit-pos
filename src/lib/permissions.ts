@@ -1043,9 +1043,9 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
     "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "PKL_PENGELOLA_BARANG",
   ],
   // Kepala Admin Barang = kepala sub-tim Admin Barang. Boleh set absensi,
-  // jadwal, lembur & ACC lembur bawahannya. Tambah/kurangi role di array ini
-  // sesuai struktur tim (ini keputusan struktur, bukan teknis).
-  KEPALA_ADMIN_BARANG: ["ADMIN_BARANG", "PKL_PENGELOLA_BARANG"],
+  // jadwal, lembur & ACC lembur bawahannya. Keputusan 30 Okt 2026: bawahan
+  // HANYA ADMIN_BARANG — PKL_PENGELOLA_BARANG ranah Kepala Pengelola Barang.
+  KEPALA_ADMIN_BARANG: ["ADMIN_BARANG"],
   // CUSTOMER_SERVICE diperlakukan setara kepala divisi untuk bawahannya sendiri
   // (PKL_CUSTOMER_SERVICE): boleh atur jadwal/absensi/lembur mereka. Tidak bisa
   // mengatur role lain, dan dirinya sendiri tetap bawahan KEPALA_TEKNISI.
