@@ -48,7 +48,27 @@ async function getHandler(req: NextRequest) {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return NextResponse.json({ success: true, data: data ?? [] });
+
+    // Task 1: Total Modal Laptop (otomatis) — hanya untuk tab Ringkasan CEO.
+    // = jumlah inventory_price transaksi LUNAS (PAID) di bulan yang sama.
+    // Batas pakai WIB (created_at timestamptz), beda dgn report_date (date) di atas.
+    let modalLaptop = 0;
+    if (section === "ringkasan") {
+      const [yy, mm] = range.start.split("-").map(Number); // range.start = "YYYY-MM-01"
+      const startTs = new Date(`${range.start}T00:00:00+07:00`).toISOString();
+      const nextStr = mm === 12 ? `${yy + 1}-01-01` : `${yy}-${String(mm + 1).padStart(2, "0")}-01`;
+      const endTs = new Date(`${nextStr}T00:00:00+07:00`).toISOString();
+      const { data: trx, error: trxErr } = await supabaseAdmin
+        .from("transactions")
+        .select("inventory_price")
+        .eq("status", "PAID")
+        .gte("created_at", startTs)
+        .lt("created_at", endTs);
+      if (trxErr) throw new Error(trxErr.message);
+      modalLaptop = (trx ?? []).reduce((s: number, t: any) => s + (Number(t.inventory_price) || 0), 0);
+    }
+
+    return NextResponse.json({ success: true, data: data ?? [], modalLaptop });
   } catch (error: any) {
     console.error("Ads report GET error:", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
