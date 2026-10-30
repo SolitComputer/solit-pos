@@ -56,9 +56,9 @@ async function getHandler(req: NextRequest) {
     for (const a of akunRows ?? []) akun[(a as any).sales_name] = (a as any).akun_device ?? "";
 
     // Catatan + warna per tanggal (key = rosterKey)
-    const { data: metaRows } = await supabaseAdmin.from(META).select("sales_name, catatan, colors").eq("report_date", date);
-    const meta: Record<string, { catatan: string; colors: Record<string, string> }> = {};
-    for (const m of metaRows ?? []) meta[(m as any).sales_name] = { catatan: (m as any).catatan ?? "", colors: ((m as any).colors ?? {}) };
+       const { data: metaRows } = await supabaseAdmin.from(META).select("sales_name, catatan, colors, chat").eq("report_date", date);
+    const meta: Record<string, { catatan: string; colors: Record<string, string>; chat: number }> = {};
+    for (const m of metaRows ?? []) meta[(m as any).sales_name] = { catatan: (m as any).catatan ?? "", colors: ((m as any).colors ?? {}), chat: Number((m as any).chat ?? 0) };
 
     return NextResponse.json({ success: true, data: { counts, akun, meta } });
   } catch (error: any) {
@@ -83,11 +83,12 @@ async function patchHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         .upsert({ sales_name, akun_device: body.akun_device, updated_at: new Date().toISOString() }, { onConflict: "sales_name" });
       if (error) throw new Error(error.message);
     }
-    if (typeof body.catatan === "string" || (body.colors && typeof body.colors === "object")) {
-      if (!DATE_RE.test(date)) return NextResponse.json({ success: false, message: "date wajib untuk catatan/warna" }, { status: 400 });
+    if (typeof body.catatan === "string" || (body.colors && typeof body.colors === "object") || typeof body.chat === "number") {
+      if (!DATE_RE.test(date)) return NextResponse.json({ success: false, message: "date wajib untuk catatan/warna/chat" }, { status: 400 });
       const patch: any = { report_date: date, sales_name, updated_at: new Date().toISOString() };
       if (typeof body.catatan === "string") patch.catatan = body.catatan;
       if (body.colors && typeof body.colors === "object") patch.colors = body.colors;
+      if (typeof body.chat === "number") patch.chat = Math.max(0, Math.trunc(body.chat));
       const { error } = await supabaseAdmin.from(META).upsert(patch, { onConflict: "report_date,sales_name" });
       if (error) throw new Error(error.message);
     }

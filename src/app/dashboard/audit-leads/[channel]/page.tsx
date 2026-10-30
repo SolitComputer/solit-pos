@@ -66,7 +66,6 @@ const STORE_OPTIONS = ["Solit", "Sotech", "Onpoint", "Sultan Laptop"] as const;
 // Alasan penolakan — sengaja disamakan dengan value lama di Laporan Harian
 // Sales supaya isi kolom reject_reason tetap konsisten lintas halaman.
 const REJECT_REASONS = [
-  { value: "CHAT_TIDAK_TERBALAS", label: "Chat Tidak Terbalas" },
   { value: "SALAH_INPUT", label: "Salah Input Keterangan" },
   { value: "DATA_TIDAK_SESUAI", label: "Data Tidak Sesuai" },
 ] as const;

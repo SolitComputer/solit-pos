@@ -21,7 +21,12 @@ export const SALES_ROSTER: RosterEntry[] = [
     { id: "a4f2ba9a-ef90-4123-b8a8-627e23b6f396", nama: "Randy Al Fariz" },
     { id: "11ca0428-656d-4ae3-a818-9acf2484ec4e", nama: "Bayu" },
     { id: "8786ce16-c8d0-4272-8709-3a943707e29f", nama: "Dzaky" },
+    { id: "1b59e57c-94cf-4dd1-b5fb-7173ecb03cad", nama: "Andini Sazkia Putri" },
+    { id: "8261e798-0fbd-4ebf-9513-b1dc80d65e33", nama: "Farrel Dewa Adrio" },
+    { id: "6dad4a4c-71c9-4cab-aaa5-f1fce25b7b24", nama: "Dirga Riadmas" },
+    { id: "495729ce-8299-4b88-8548-b79db34b2aad", nama: "Romadon Abdusalam" },
 ];
+
 
 // Kunci penyimpanan (Akun/Device, catatan, warna) per orang — pakai ID kalau ada.
 export function rosterKey(e: RosterEntry): string {

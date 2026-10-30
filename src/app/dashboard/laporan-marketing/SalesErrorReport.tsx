@@ -13,13 +13,13 @@ import { todayWibDate } from "@/lib/marketing-report";
 import { SALES_ROSTER, rosterKey } from "@/lib/sales-roster";
 
 type Counts = { total_lead: number; chat: number; salah: number; data: number };
-type Meta = { catatan: string; colors: Record<string, string> };
+type Meta = { catatan: string; colors: Record<string, string>; chat: number };
 
 // Kolom data (setelah Nama). `key` = key warna per sel.
 const COLS = [
   { key: "akun_device", label: "Akun / Device", kind: "akun", min: 180 },
   { key: "total_lead", label: "Total Lead", kind: "num", min: 90 },
-  { key: "chat", label: "Chat Tidak Terbalas", kind: "num", min: 120 },
+  { key: "chat", label: "Chat Tidak Terbalas", kind: "chat_manual", min: 120 },
   { key: "salah", label: "Salah Input Keterangan", kind: "num", min: 130 },
   { key: "data", label: "Data Tidak Sesuai", kind: "num", min: 120 },
   { key: "total_temuan", label: "Total Temuan", kind: "temuan", min: 100 },
@@ -49,6 +49,15 @@ export default function SalesErrorReport() {
   const [selStart, setSelStart] = useState<{ r: number; c: number } | null>(null);
   const [selEnd, setSelEnd] = useState<{ r: number; c: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Sortir ala Excel — klik header: A–Z, klik lagi Z–A. null = urutan roster asli.
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const toggleSort = (key: string) => {
+    setSelStart(null); setSelEnd(null); // reset seleksi warna biar index tidak meleset
+    if (sortBy === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortBy(key); setSortDir("asc"); }
+  };
 
   const metaRef = useRef(meta);
   useEffect(() => { metaRef.current = meta; }, [meta]);
@@ -80,22 +89,38 @@ export default function SalesErrorReport() {
   useEffect(() => { setSelStart(null); setSelEnd(null); }, [activeDate]);
 
   // Baris = roster tetap. Counts dicocokkan pakai user_id (filled_by).
-  const rows = useMemo(() => SALES_ROSTER.map((e) => {
-    const key = rosterKey(e);
-    const c = e.id ? counts[e.id] : undefined;
-    return {
-      key,
-      sales_name: e.nama,
-      hasId: !!e.id,
-      total_lead: c?.total_lead ?? 0,
-      chat: c?.chat ?? 0,
-      salah: c?.salah ?? 0,
-      data: c?.data ?? 0,
-      akun_device: akun[key] ?? "",
-      catatan: meta[key]?.catatan ?? "",
-      colors: meta[key]?.colors ?? {},
+  const rows = useMemo(() => {
+    const base = SALES_ROSTER.map((e) => {
+      const key = rosterKey(e);
+      const c = e.id ? counts[e.id] : undefined;
+      return {
+        key,
+        sales_name: e.nama,
+        hasId: !!e.id,
+        total_lead: c?.total_lead ?? 0,
+        chat: meta[key]?.chat ?? 0,
+        salah: c?.salah ?? 0,
+        data: c?.data ?? 0,
+        akun_device: akun[key] ?? "",
+        catatan: meta[key]?.catatan ?? "",
+        colors: meta[key]?.colors ?? {},
+      };
+    });
+    if (!sortBy) return base;
+    const val = (r: typeof base[number]): string | number => {
+      if (sortBy === "nama") return r.sales_name.toLowerCase();
+      if (sortBy === "total_temuan" || sortBy === "status") return r.chat + r.salah + r.data;
+      if (sortBy === "akun_device" || sortBy === "catatan") return ((r as any)[sortBy] ?? "").toString().toLowerCase();
+      return Number((r as any)[sortBy] ?? 0); // total_lead, chat, salah, data
     };
-  }), [counts, akun, meta]);
+    return [...base].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      const cmp = typeof va === "number" && typeof vb === "number"
+        ? va - vb
+        : String(va).localeCompare(String(vb), "id");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [counts, akun, meta, sortBy, sortDir]);
 
   // ── Simpan (debounce per name+kind) ──
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -112,17 +137,18 @@ export default function SalesErrorReport() {
       }).catch(() => setError("Gagal menyimpan Akun/Device"));
     });
   };
-  const saveMetaCell = (key: string, patch: { catatan?: string; colors?: Record<string, string> }) => {
+  const saveMetaCell = (key: string, patch: { catatan?: string; colors?: Record<string, string>; chat?: number }) => {
     const merged: Meta = {
       catatan: patch.catatan ?? metaRef.current[key]?.catatan ?? "",
       colors: patch.colors ?? metaRef.current[key]?.colors ?? {},
+      chat: patch.chat ?? metaRef.current[key]?.chat ?? 0,
     };
     metaRef.current = { ...metaRef.current, [key]: merged };
     setMeta((m) => ({ ...m, [key]: merged }));
     debounce(`meta:${key}`, () => {
       fetch(`/api/sales-error-report?date=${activeDate}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sales_name: key, catatan: merged.catatan, colors: merged.colors }),
+        body: JSON.stringify({ sales_name: key, catatan: merged.catatan, colors: merged.colors, chat: merged.chat }),
       }).catch(() => setError("Gagal menyimpan catatan/warna"));
     });
   };
@@ -283,9 +309,17 @@ export default function SalesErrorReport() {
               <thead>
                 <tr className="bg-blue-700 text-white">
                   <th className="border border-blue-800 px-2 py-2 font-bold w-10">No</th>
-                  <th className="border border-blue-800 px-3 py-2 font-bold text-left min-w-[130px]">Nama</th>
+                  <th className="border border-blue-800 p-0 font-bold text-left min-w-[130px]">
+                    <button type="button" onClick={() => toggleSort("nama")} className="w-full flex items-center gap-1 px-3 py-2 hover:bg-blue-800/40 transition-colors">
+                      Nama <span className="text-[10px] opacity-80">{sortBy === "nama" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}</span>
+                    </button>
+                  </th>
                   {COLS.map((col) => (
-                    <th key={col.key} className="border border-blue-800 px-2 py-2 font-bold text-center" style={{ minWidth: col.min }}>{col.label}</th>
+                    <th key={col.key} className="border border-blue-800 p-0 font-bold text-center" style={{ minWidth: col.min }}>
+                      <button type="button" onClick={() => toggleSort(col.key)} className="w-full flex items-center justify-center gap-1 px-2 py-2 hover:bg-blue-800/40 transition-colors">
+                        {col.label} <span className="text-[10px] opacity-80">{sortBy === col.key ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}</span>
+                      </button>
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -318,6 +352,14 @@ export default function SalesErrorReport() {
                             ) : col.kind === "catatan" ? (
                               <input value={row.catatan} onChange={(e) => saveMetaCell(row.key, { catatan: e.target.value })}
                                 placeholder="Catatan…" className="w-full px-2 py-1.5 bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-violet-300 text-gray-800" />
+                            ) : col.kind === "chat_manual" ? (
+                              <input
+                                type="number" min={0} inputMode="numeric"
+                                value={row.chat || ""}
+                                onChange={(e) => saveMetaCell(row.key, { chat: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
+                                placeholder="0"
+                                className={`w-full px-2 py-1.5 bg-transparent outline-none text-center tabular-nums focus:bg-white focus:ring-1 focus:ring-violet-300 ${row.chat > 0 ? "font-semibold text-red-600" : "text-gray-400"}`}
+                              />
                             ) : col.kind === "status" ? (
                               <div className="px-2 py-1.5 text-center"><span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ring-1 ring-inset ${st.cls}`}>{st.label}</span></div>
                             ) : col.kind === "temuan" ? (
@@ -350,7 +392,7 @@ export default function SalesErrorReport() {
         )}
       </div>
       <p className="text-[11px] text-gray-400 px-1">
-        Nama = roster tetap (David s/d Dzaky). Akun/Device <b>global</b> (berlaku semua tanggal). Total Lead = laporan <b>disetujui</b>. Total Temuan: 0 = Tidak ada temuan · 1–10 = Perlu evaluasi · &gt;10 = Prioritas Audit.
+        Nama = roster tetap (David s/d Dzaky). Akun/Device <b>global</b> (berlaku semua tanggal). <b>Chat Tidak Terbalas = isi manual</b> (per tanggal). Total Lead = laporan <b>disetujui</b>. Total Temuan: 0 = Tidak ada temuan · 1–10 = Perlu evaluasi · &gt;10 = Prioritas Audit.
       </p>
     </div>
   );
