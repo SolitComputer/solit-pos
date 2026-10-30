@@ -1061,14 +1061,14 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                     </DetailRow>
                     {(entry.source_type === "MANUAL" || entry.source_type === "PENGAJUAN_DANA") && (
                         <>
-                        <DetailRow label="Metode">
-                            {entry.payment_method === "SALDO"
-                                ? <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={12} /> Saldo</span>
-                                : <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={12} /> {cashSourceLabel(entry.payment_method, entry.cash_location ?? null)}</span>}
-                        </DetailRow>
-                        <DetailRow label="Cabang">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-700 border border-slate-200">📍 {entry.branch === "JOGJA" ? "Cabang Jogja" : "Cabang Utama"}</span>
-                        </DetailRow>
+                            <DetailRow label="Metode">
+                                {entry.payment_method === "SALDO"
+                                    ? <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={12} /> Saldo</span>
+                                    : <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={12} /> {cashSourceLabel(entry.payment_method, entry.cash_location ?? null)}</span>}
+                            </DetailRow>
+                            <DetailRow label="Cabang">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-700 border border-slate-200">📍 {entry.branch === "JOGJA" ? "Cabang Jogja" : "Cabang Utama"}</span>
+                            </DetailRow>
                         </>
                     )}
                     {entry.source_type === "PENGAJUAN_DANA" && (
@@ -1213,7 +1213,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     </div>
                     <button onClick={onClose} className={`w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition ${BRAND_RING}`}><IconX /></button>
                 </div>
-                              <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
                     <BranchPaymentFields value={bpf} onChange={setBpf} required idPrefix="exp" />
                     <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-2.5">
                         <div className="flex items-center justify-between">
@@ -1512,7 +1512,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                                 <select value={category} onChange={(e) => setCategory(e.target.value)} className={`${inputCls} bg-white flex-1 min-w-0`}>
                                     {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                                 </select>
-                                <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus />
+                                <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls.replace("w-full", "")} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus />
                                 {extraItems.length > 0 && <span className="w-8 shrink-0" />}
                             </div>
                             {extraItems.map((it, idx) => (
@@ -2308,7 +2308,7 @@ export default function CashflowPage() {
                             <span className="hidden sm:inline text-sm">Segarkan</span>
                         </button>
                     </div>
-                              </div>
+                </div>
 
                 {/* Switcher Cabang — dipindah ke baris sendiri di bawah header biar jelas
                     "lagi lihat data cabang mana" & toolbar bawah nggak sesak. Fungsi sama persis. */}
@@ -2430,7 +2430,7 @@ export default function CashflowPage() {
 
                 {/* Tab + Filter + CTA */}
                 <div className={`${CARD_BASE} p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap`}>
-                                      <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                         <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
                             {(["IN", "OUT"] as const).map((t) => (
                                 <button key={t} onClick={() => { setTab(t); setStaleOnly(false); }} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm shadow-emerald-500/30" : "bg-red-600 text-white shadow-sm shadow-red-500/30" : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
