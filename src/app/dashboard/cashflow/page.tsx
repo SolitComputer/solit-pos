@@ -26,6 +26,7 @@ import { getAuthUser } from "@/hooks/useAuthUser";
 import TargetUserSelect from "@/components/kasbon/TargetUserSelect"; // ⬅️ BARU
 import BranchPaymentFields, { type BranchPaymentValue, cashSourceLabel } from "@/components/cashflow/BranchPaymentFields";
 import CategorySelect, { getCategoryOptions, formatCategoryOptionLabel } from "@/components/cashflow/CategorySelect";
+import { CASHFLOW_ACCOUNT } from "@/lib/accounting"; // ⬅️ BARU: peta kategori → kode akun, dipakai CategoryBadge (ID samar)
 import InlineDateRange from "@/components/common/InlineDateRange"; // dipindah ke komponen bersama (dipakai juga di Laporan Marketing)
 import {
     ShoppingCart,
@@ -146,6 +147,22 @@ function NameAvatar({ name, size = 22 }: { name: string; size?: number }) {
             style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
         >
             {initials(name)}
+        </span>
+    );
+}
+
+// ⬅️ BARU: badge kategori + ID akun "samar" — label tegas, angka ID dibuat pudar
+// (text-gray-300) & lebih kecil biar kelihatan tapi tidak menyita perhatian.
+// tone "gray" = badge abu-abu (tabel), "plain" = sedikit lebih besar (detail modal).
+function CategoryBadge({ direction, category, tone = "gray" }: { direction: Entry["direction"]; category: string; tone?: "gray" | "plain" }) {
+    const code = (CASHFLOW_ACCOUNT as Record<string, string>)[category];
+    const wrap = tone === "gray"
+        ? "inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600"
+        : "inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700";
+    return (
+        <span className={wrap}>
+            {categoryLabel(direction, category)}
+            {code && <span className="text-gray-300 font-mono tabular-nums text-[9px]">{code}</span>}
         </span>
     );
 }
@@ -1054,7 +1071,7 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                         <p className={`text-3xl font-black tabular-nums ${nominalColor}`}>{isOut ? "−" : "+"}{fmtRupiah(entry.nominal)}</p>
                     </div>
                     <DetailRow label="Kategori">
-                        <span className="inline-flex text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700">{categoryLabel(entry.direction, entry.category)}</span>
+                        <CategoryBadge direction={entry.direction} category={entry.category} tone="plain" />
                     </DetailRow>
                     {(entry.source_type === "MANUAL" || entry.source_type === "PENGAJUAN_DANA") && (
                         <>
@@ -1224,7 +1241,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                                 <div key={idx} className="flex items-center gap-2">
                                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 1}</span>
                                     <CategorySelect direction="OUT" value={it.category} onChange={(cat) => updateItem(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
-                                    <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus={idx === 0} />
+                                    <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls.replace("w-full", "")} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus={idx === 0} />
                                     <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none">
                                         <IconX />
                                     </button>
@@ -1513,7 +1530,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                                 <div key={idx} className="flex items-center gap-2">
                                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 2}</span>
                                     <CategorySelect direction={entry.direction} value={it.category} onChange={(cat) => updateExtra(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
-                                    <input type="number" min={0} value={it.nominal} onChange={(e) => updateExtra(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} />
+                                    <input type="number" min={0} value={it.nominal} onChange={(e) => updateExtra(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls.replace("w-full", "")} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} />
                                     <button type="button" onClick={() => removeExtra(idx)} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition">
                                         <IconX />
                                     </button>
@@ -1695,7 +1712,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                                 <div key={idx} className="flex items-center gap-2">
                                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 1}</span>
                                     <CategorySelect direction="IN" value={it.category} onChange={(cat) => updateItem(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
-                                    <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus={idx === 0} />
+                                    <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls.replace("w-full", "")} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus={idx === 0} />
                                     <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none">
                                         <IconX />
                                     </button>
@@ -2700,7 +2717,7 @@ export default function CashflowPage() {
                                                         {e.source_type === "MODAL_AWAL" ? (
                                                             <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-100"><Wallet size={11} /> Modal Awal</span>
                                                         ) : (
-                                                            <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{categoryLabel(e.direction, e.category)}</span>
+                                                            <CategoryBadge direction={e.direction} category={e.category} />
                                                         )}
                                                     </td>
                                                     <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.is_voided ? "text-gray-400 line-through decoration-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>

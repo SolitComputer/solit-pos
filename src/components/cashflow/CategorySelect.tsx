@@ -34,9 +34,11 @@ export function getCategoryOptions(direction: CashflowDirection): CategoryOption
 }
 
 export function formatCategoryOptionLabel(o: CategoryOption): string {
-  return `${o.label} (ID: ${o.accountCode})`;
+  // ID akun ditulis kalem di belakang label (pemisah titik tengah) biar
+  // tetap kebaca tapi tidak menyita perhatian. Native <option> tidak bisa
+  // diwarnai per-bagian, jadi "samar"-nya lewat gaya tulis, bukan warna.
+  return `${o.label}  ·  ${o.accountCode}`;
 }
-
 export default function CategorySelect({
   direction,
   value,
@@ -81,7 +83,7 @@ export default function CategorySelect({
       ))}
       {!valueInOptions && value && (
         <option value={value}>
-          {categoryLabel(direction, value)} (ID: {CASHFLOW_ACCOUNT[value] ?? "—"})
+          {categoryLabel(direction, value)}  ·  {CASHFLOW_ACCOUNT[value] ?? "—"}
         </option>
       )}
     </select>
