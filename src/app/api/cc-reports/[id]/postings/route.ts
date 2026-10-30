@@ -45,8 +45,15 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Platform wajib dipilih" }, { status: 400 });
   }
 
-  const out = postUrl ? await syncPosting(postUrl, { force: true }) : null;
-  const gotMetrics = out?.status === "OK" || out?.status === "PARTIAL";
+  // brand konten → gate auto-sync IG/TikTok per-brand (ambil dari DB, bukan dari client, biar tidak bisa di-spoof)
+  const { data: rep } = await supabaseAdmin
+    .from("cc_reports")
+    .select("brand")
+    .eq("id", id)
+    .maybeSingle();
+
+  const out = postUrl ? await syncPosting(postUrl, { force: true, brand: rep?.brand }) : null;
+    const gotMetrics = out?.status === "OK" || out?.status === "PARTIAL";
   const manual = (v: unknown) => Number(v) || 0;
 
   const currentUser = await getCurrentUser();

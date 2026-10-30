@@ -28,9 +28,17 @@ export async function POST(
 
   const before = { views: posting.views, likes: posting.likes, comments: posting.comments };
 
+  // 🏷️ brand konten → gate auto-sync IG/TikTok per-brand (dari DB, bukan client)
+  const { data: rep } = await supabaseAdmin
+    .from("cc_reports")
+    .select("brand")
+    .eq("id", id)
+    .maybeSingle();
+
   const out = await syncPosting(posting.post_url, {
     force: true,
     mediaId: posting.provider_media_id,
+    brand: rep?.brand,
   });
 
   const patch = buildPostingPatch(out, posting);
