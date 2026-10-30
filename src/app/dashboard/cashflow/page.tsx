@@ -7,9 +7,6 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES, humanizeRoleKey } from "@/lib/permissions";
 import type ExcelJS from "exceljs";
 import {
-    INCOME_CATEGORIES,
-    EXPENSE_CATEGORIES,
-    AUTO_INCOME_CATEGORIES,
     categoryLabel,
     type CashflowFilter,
     type AuditFilter,
@@ -28,6 +25,7 @@ import {
 import { getAuthUser } from "@/hooks/useAuthUser";
 import TargetUserSelect from "@/components/kasbon/TargetUserSelect"; // ⬅️ BARU
 import BranchPaymentFields, { type BranchPaymentValue, cashSourceLabel } from "@/components/cashflow/BranchPaymentFields";
+import CategorySelect, { getCategoryOptions, formatCategoryOptionLabel } from "@/components/cashflow/CategorySelect";
 import InlineDateRange from "@/components/common/InlineDateRange"; // dipindah ke komponen bersama (dipakai juga di Laporan Marketing)
 import {
     ShoppingCart,
@@ -817,8 +815,7 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
 function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
     filter: CashflowFilter; onChange: (f: CashflowFilter) => void; onReset: () => void; direction: "IN" | "OUT"; nameOptions: string[]; // ⬅️ BARU
 }) {
-    const categories = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-    const catEntries = Object.entries(categories) as [string, string][];
+    const catOptions = getCategoryOptions(direction); // terurut A–Z + ID Akun, konsisten dgn form input
     const count = activeFilterCount(filter);
     const selectCls = `h-10 border border-gray-200 rounded-xl px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
     const dateCls = `h-10 border border-gray-200 rounded-xl px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
@@ -840,7 +837,7 @@ function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Kategori</label>
                     <select value={filter.category} onChange={(e) => onChange({ ...filter, category: e.target.value })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Kategori</option>
-                        {catEntries.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                        {catOptions.map((o) => <option key={o.key} value={o.key}>{formatCategoryOptionLabel(o)}</option>)}
                     </select>
                 </div>
                 <div>
@@ -1140,10 +1137,9 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
 
 // ── Expense Modal ─────────────────────────────────────────────────────────────
 function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-    const categories = Object.entries(EXPENSE_CATEGORIES);
     type ExpenseItem = { category: string; nominal: string };
-    const [items, setItems] = useState<ExpenseItem[]>([{ category: categories[0]?.[0] ?? "", nominal: "" }]);
-    const addItem = () => setItems((prev) => [...prev, { category: categories[0]?.[0] ?? "", nominal: "" }]);
+    const [items, setItems] = useState<ExpenseItem[]>([{ category: "", nominal: "" }]); // ⬅️ default KOSONG (poin 5)
+    const addItem = () => setItems((prev) => [...prev, { category: "", nominal: "" }]);
     const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
     const updateItem = (idx: number, patch: Partial<ExpenseItem>) =>
         setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -1164,6 +1160,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 
     // Entry BARU tetap wajib > 0 (buat entry senilai 0 tidak ada gunanya)
     const submit = async () => {
+        if (items.some((it) => !it.category)) return setError("Pilih kategori dulu untuk setiap baris"); // ⬅️ validasi kategori (poin 5)
         if (items.some((it) => !it.nominal || Number(it.nominal) <= 0)) return setError("Nominal setiap kategori harus lebih dari 0");
         if (items.some((it) => isKasbonCicilanCategory(it.category)) && !targetUserId) return setError("Pilih karyawan dulu untuk Kasbon/Cicilan");
         setSaving(true); setError("");
@@ -1226,9 +1223,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                             {items.map((it, idx) => (
                                 <div key={idx} className="flex items-center gap-2">
                                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 1}</span>
-                                    <select value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} className={`${inputCls} bg-white flex-1 min-w-0`}>
-                                        {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                                    </select>
+                                    <CategorySelect direction="OUT" value={it.category} onChange={(cat) => updateItem(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
                                     <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus={idx === 0} />
                                     <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none">
                                         <IconX />
@@ -1270,8 +1265,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: () => void; onSaved: () => void }) {
     const isOut = entry.direction === "OUT";
     const isPengajuanDana = entry.source_type === "PENGAJUAN_DANA";
-    const categories = isOut ? Object.entries(EXPENSE_CATEGORIES) : Object.entries(INCOME_CATEGORIES).filter(([key]) => !(AUTO_INCOME_CATEGORIES as readonly string[]).includes(key));
-    const [category, setCategory] = useState(entry.category);
+    const [category, setCategory] = useState(entry.category); // ⬅️ tetap tampilkan kategori lama (poin 5)
     const [nominal, setNominal] = useState(String(entry.nominal ?? ""));
     const [targetUserId, setTargetUserId] = useState(entry.target_user_id ?? ""); // ⬅️ BARU: prefill karyawan dari entry yang diedit
     const [keterangan, setKeterangan] = useState(entry.keterangan ?? "");
@@ -1287,7 +1281,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
     // ⬅️ BARU: baris kategori tambahan — tiap baris disimpan sebagai entry BARU (baris ke-1 = entry yang diedit)
     type ExtraItem = { category: string; nominal: string };
     const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
-    const addExtra = () => setExtraItems((prev) => [...prev, { category: categories[0]?.[0] ?? "", nominal: "" }]);
+    const addExtra = () => setExtraItems((prev) => [...prev, { category: "", nominal: "" }]); // ⬅️ baris tambahan default KOSONG (poin 5)
     const removeExtra = (idx: number) => setExtraItems((prev) => prev.filter((_, i) => i !== idx));
     const updateExtra = (idx: number, patch: Partial<ExtraItem>) =>
         setExtraItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -1311,6 +1305,8 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
         const parsed = Number(nominal);
         if (nominal.trim() === "" || !Number.isFinite(parsed) || parsed < 0)
             return setError("Nominal tidak valid (tidak boleh kosong atau negatif)");
+        if (!category) return setError("Pilih kategori dulu"); // ⬅️ validasi kategori utama (poin 5)
+        if (extraItems.some((it) => !it.category)) return setError("Pilih kategori dulu untuk setiap baris tambahan"); // ⬅️
         if (extraItems.some((it) => !it.nominal || !Number.isFinite(Number(it.nominal)) || Number(it.nominal) <= 0))
             return setError("Nominal setiap kategori tambahan harus lebih dari 0");
         // ⬅️ BARU: Kasbon/Cicilan wajib menunjuk karyawan (baris utama atau salah satu baris tambahan)
@@ -1509,18 +1505,14 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">1</span>
-                                <select value={category} onChange={(e) => setCategory(e.target.value)} className={`${inputCls} bg-white flex-1 min-w-0`}>
-                                    {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                                </select>
+                                <CategorySelect direction={entry.direction} value={category} onChange={setCategory} required className={`${inputCls} bg-white flex-1 min-w-0`} />
                                 <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls.replace("w-full", "")} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus />
                                 {extraItems.length > 0 && <span className="w-8 shrink-0" />}
                             </div>
                             {extraItems.map((it, idx) => (
                                 <div key={idx} className="flex items-center gap-2">
                                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 2}</span>
-                                    <select value={it.category} onChange={(e) => updateExtra(idx, { category: e.target.value })} className={`${inputCls} bg-white flex-1 min-w-0`}>
-                                        {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                                    </select>
+                                    <CategorySelect direction={entry.direction} value={it.category} onChange={(cat) => updateExtra(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
                                     <input type="number" min={0} value={it.nominal} onChange={(e) => updateExtra(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} />
                                     <button type="button" onClick={() => removeExtra(idx)} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition">
                                         <IconX />
@@ -1586,12 +1578,9 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
 
 // ── Income Modal ──────────────────────────────────────────────────────────────
 function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-    const categories = Object.entries(INCOME_CATEGORIES).filter(
-        ([key]) => !(AUTO_INCOME_CATEGORIES as readonly string[]).includes(key)
-    );
     type IncomeItem = { category: string; nominal: string };
-    const [items, setItems] = useState<IncomeItem[]>([{ category: categories[0]?.[0] ?? "", nominal: "" }]);
-    const addItem = () => setItems((prev) => [...prev, { category: categories[0]?.[0] ?? "", nominal: "" }]);
+    const [items, setItems] = useState<IncomeItem[]>([{ category: "", nominal: "" }]); // ⬅️ default KOSONG (poin 5)
+    const addItem = () => setItems((prev) => [...prev, { category: "", nominal: "" }]);
     const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
     const updateItem = (idx: number, patch: Partial<IncomeItem>) =>
         setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -1612,6 +1601,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     }, [onClose]);
 
     const submit = async () => {
+        if (items.some((it) => !it.category)) return setError("Pilih kategori dulu untuk setiap baris"); // ⬅️ validasi kategori (poin 5)
         if (items.some((it) => !it.nominal || !Number.isFinite(Number(it.nominal)) || Number(it.nominal) <= 0))
             return setError("Nominal setiap kategori harus lebih dari 0");
         if (items.some((it) => isKasbonCicilanCategory(it.category)) && !targetUserId)
@@ -1704,9 +1694,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                             {items.map((it, idx) => (
                                 <div key={idx} className="flex items-center gap-2">
                                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 1}</span>
-                                    <select value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} className={`${inputCls} bg-white flex-1 min-w-0`}>
-                                        {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                                    </select>
+                                    <CategorySelect direction="IN" value={it.category} onChange={(cat) => updateItem(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
                                     <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus={idx === 0} />
                                     <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none">
                                         <IconX />
