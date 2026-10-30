@@ -2187,14 +2187,22 @@ export async function getPostedKeys(supabase: SupabaseClient): Promise<Set<strin
   return keys;
 }
 
-export function draftToLineRows(entryId: string, lines: DraftLine[]) {
-  return lines.map((l, i) => ({
+
+/** Seperti draftToLineRows, tapi line_order diberikan EKSPLISIT per baris.
+ *  Dipakai saat sinkronisasi per-baris (diffJournalLines): baris baru harus
+ *  menempati line_order aman (di atas baris lama yang dipertahankan), bukan
+ *  0..n dari subset insert yang bisa bentrok dengan baris yang tetap. */
+export function draftToLineRowsWithOrder(
+  entryId: string,
+  items: { line: DraftLine; line_order: number }[]
+) {
+  return items.map(({ line, line_order }) => ({
     entry_id: entryId,
-    account_code: l.account_code,
-    account_name: accountName(l.account_code),
-    side: l.side,
-    nominal: Math.round(Number(l.nominal)),
-    keterangan: l.keterangan?.trim() ? l.keterangan.trim() : null,
-    line_order: i,
+    account_code: line.account_code,
+    account_name: accountName(line.account_code),
+    side: line.side,
+    nominal: Math.round(Number(line.nominal)),
+    keterangan: line.keterangan?.trim() ? line.keterangan.trim() : null,
+    line_order,
   }));
 }

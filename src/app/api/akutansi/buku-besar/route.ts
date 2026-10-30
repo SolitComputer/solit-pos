@@ -229,10 +229,19 @@ export const GET = withAuth(async (req) => {
         entry.source_type === "TRANSACTION" && entry.source_id
           ? trxMetaMap.get(entry.source_id) ?? trxMetaMap.get(baseInvoice) ?? null
           : null; // (baru) — badge toko & spek, null kalau bukan entry TRANSACTION
+      // Pisahkan keterangan ENTRY (judul) vs keterangan per-BARIS supaya frontend
+      // bisa menampilkan dua-duanya bertingkat (judul entry di atas, keterangan
+      // baris di bawah). `keterangan` tetap diisi judul-atau-baris spt dulu demi
+      // kompatibilitas (search box & baris tanpa keterangan baris tetap jalan);
+      // `keterangan_entry` & `keterangan_baris` dipakai untuk tampilan bertingkat.
+      const ketEntry = (entry.keterangan ?? "").trim();
+      const ketBaris = (l.keterangan ?? "").trim();
       return {
         id: l.id,
         tanggal: entry.tanggal,
-        keterangan: l.keterangan || entry.keterangan,
+        keterangan: ketBaris || ketEntry,
+        keterangan_entry: ketEntry || null,
+        keterangan_baris: ketBaris || null,
         ref,
         side: l.side, // (baru) — dipakai frontend buat nentuin baris sintetis nominal 0 harus tampil di kolom Debit atau Kredit
         debit,

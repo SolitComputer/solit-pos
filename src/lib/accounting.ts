@@ -374,6 +374,86 @@ export function linesEqual(
   return true;
 }
 
+
+
+// ─── Sinkronisasi baris jurnal → Buku Besar (per-baris, bukan per-entry) ──────
+/**
+ * Cocokkan baris lama (sudah tersimpan, punya id) dengan baris hasil edit,
+ * pakai kunci (sisi + kode akun + nominal) secara MULTISET / count-aware —
+ * supaya akun kembar dalam 1 entry (mis. 170 muncul 2x dengan nominal beda)
+ * tetap dibedakan dengan benar.
+ *
+ * Yang cocok DIPERTAHANKAN apa adanya (id-nya tidak berubah) → ceklis yang
+ * nempel ke line_id (journal_line_checks & journal_umum_line_checks) ikut
+ * selamat. Baris yang nominalnya berubah / sisinya pindah / dihapus id-nya
+ * dibuang → cuma baris itu yang kehilangan ceklis.
+ *
+ * - toUpdate : baris dipertahankan TAPI keterangan per-barisnya berubah →
+ *              di-update tanpa menyentuh akun/sisi/nominal/ceklis.
+ * - toInsert : baris baru + line_order aman (di atas line_order lama, supaya
+ *              tidak bentrok kalau ada unique (entry_id, line_order)).
+ * - deleteIds: id baris lama yang sudah tidak ada di data baru.
+ */
+export function diffJournalLines<
+  T extends { account_code: string; side: string; nominal: number; keterangan?: string | null }
+>(
+  oldLines: {
+    id: string;
+    account_code: string;
+    side: string;
+    nominal: number;
+    keterangan?: string | null;
+    line_order?: number;
+  }[],
+  newLines: T[]
+): {
+  toUpdate: { id: string; keterangan: string | null }[];
+  toInsert: { line: T; line_order: number }[];
+  deleteIds: string[];
+} {
+  const keyOf = (l: { account_code: string; side: string; nominal: number }) =>
+    `${l.side}:${l.account_code}:${Math.round(Number(l.nominal || 0))}`;
+  const norm = (k?: string | null) => {
+    const t = (k ?? "").trim();
+    return t ? t : null;
+  };
+
+  // Antrian {id, keterangan} per-kunci → akun kembar dicocokkan satu per satu.
+  const oldByKey = new Map<string, { id: string; keterangan: string | null }[]>();
+  let maxOrder = -1;
+  for (const l of oldLines) {
+    if (typeof l.line_order === "number" && l.line_order > maxOrder) maxOrder = l.line_order;
+    if (!l.id) continue;
+    const item = { id: l.id, keterangan: norm(l.keterangan) };
+    const arr = oldByKey.get(keyOf(l));
+    if (arr) arr.push(item);
+    else oldByKey.set(keyOf(l), [item]);
+  }
+
+  const toUpdate: { id: string; keterangan: string | null }[] = [];
+  const toInsert: { line: T; line_order: number }[] = [];
+  const usedIds = new Set<string>();
+  let nextOrder = maxOrder + 1;
+
+  for (const nl of newLines) {
+    const bucket = oldByKey.get(keyOf(nl));
+    const match = bucket && bucket.length > 0 ? bucket.shift() : undefined;
+    if (match) {
+      usedIds.add(match.id);
+      const newKet = norm(nl.keterangan);
+      if (newKet !== match.keterangan) toUpdate.push({ id: match.id, keterangan: newKet });
+    } else {
+      toInsert.push({ line: nl, line_order: nextOrder++ });
+    }
+  }
+
+  const deleteIds = oldLines
+    .map((l) => l.id)
+    .filter((lid): lid is string => !!lid && !usedIds.has(lid));
+
+  return { toUpdate, toInsert, deleteIds };
+}
+
 // ─── Template jurnal manual ───────────────────────────────────────────────────
 export const MANUAL_TEMPLATES: {
   key: string;

@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { linesEqual } from "@/lib/accounting";
+import { diffJournalLines, linesEqual } from "@/lib/accounting";
 import {
-  draftToLineRows,
+  draftToLineRowsWithOrder,
   getTransactionSyncDraftsByInvoices,
   getCashflowSyncDraftsByIds,
   getServiceSyncDraftsByIds,
@@ -31,10 +31,7 @@ const ENTRY_SELECT = `
 // Sinkronkan ulang baris jurnal (nominal debit/kredit) sebuah entry supaya
 // sama persis dengan data SUMBER-nya yang sekarang — mencakup TRANSACTION
 // (penjualan langsung), CASHFLOW (entry manual), dan SERVICE (entry tunggal,
-// belum pernah dipecah DP/Cicilan/Pelunasan). Lihat JSDoc masing-masing
-// fungsi getXxxSyncDraftsByIds/Invoices di accountingSource.ts untuk batasan
-// detailnya — sengaja dibatasi supaya sync tidak pernah mengubah TIPE entry
-// (mis. Piutang jadi Kas) atau salah hitung ulang pembayaran bertahap.
+// belum pernah dipecah DP/Cicilan/Pelunasan).
 export const POST = withAuth(async (_req, ctx, user: any) => {
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ success: false, message: "ID tidak valid" }, { status: 400 });
@@ -43,7 +40,7 @@ export const POST = withAuth(async (_req, ctx, user: any) => {
 
   const { data: before, error: beforeErr } = await supabase
     .from("journal_entries")
-    .select("*, lines:journal_lines(id, account_code, account_name, side, nominal, line_order)")
+    .select("*, lines:journal_lines(id, account_code, account_name, side, nominal, line_order, keterangan)")
     .eq("id", id)
     .single();
 
@@ -129,31 +126,34 @@ export const POST = withAuth(async (_req, ctx, user: any) => {
     );
   }
 
-  const oldLineIds = ((before.lines ?? []) as any).map((l: any) => l.id).filter(Boolean);
-
+  // Sinkronisasi baris jurnal → Buku Besar PER-BARIS (lihat diffJournalLines).
+  // Baris yang akun+sisi+nominal-nya tetap dipertahankan (id tetap -> ceklis
+  // selamat); hanya baris yang berubah/dihapus yang kehilangan ceklis. Blok ini
+  // cuma jalan kalau linesChanged — kalau cuma keterangan entry yang berubah,
+  // baris tidak disentuh (keterangan entry di-update di langkah bawah).
   if (linesChanged) {
-    // Nominal / baris berubah:
-    // Sesuai aturan: jika selain keterangan yang berubah (nominal/akun),
-    // ceklis di Jurnal Umum dan Buku Besar HARUS HILANG (reset).
-    if (oldLineIds.length > 0) {
-      await supabase.from("journal_umum_line_checks").delete().in("line_id", oldLineIds);
-      await supabase.from("journal_line_checks").delete().in("line_id", oldLineIds);
-    }
-    await supabase.from("journal_lines").delete().eq("entry_id", id);
-    const { error: lineErr } = await supabase
-      .from("journal_lines")
-      .insert(draftToLineRows(id, draft.lines));
+    const { toUpdate, toInsert, deleteIds } = diffJournalLines((before.lines ?? []) as any, draft.lines);
 
-    if (lineErr) {
-      // Rollback: kembalikan baris lama supaya jurnal tidak tiba-tiba kosong
-      await supabase.from("journal_lines").insert(draftToLineRows(id, (before as any).lines ?? []));
-      console.error("[akuntansi POST sync lines]", lineErr);
-      return NextResponse.json({ success: false, message: lineErr.message }, { status: 500 });
+    if (toInsert.length > 0) {
+      const { error: lineErr } = await supabase
+        .from("journal_lines")
+        .insert(draftToLineRowsWithOrder(id, toInsert));
+      if (lineErr) {
+        console.error("[akuntansi POST sync lines]", lineErr);
+        return NextResponse.json({ success: false, message: lineErr.message }, { status: 500 });
+      }
+    }
+
+    for (const u of toUpdate) {
+      await supabase.from("journal_lines").update({ keterangan: u.keterangan }).eq("id", u.id);
+    }
+
+    if (deleteIds.length > 0) {
+      await supabase.from("journal_umum_line_checks").delete().in("line_id", deleteIds);
+      await supabase.from("journal_line_checks").delete().in("line_id", deleteIds);
+      await supabase.from("journal_lines").delete().in("id", deleteIds);
     }
   }
-  // Jika HANYA keterangan yang berubah (!linesChanged && keteranganChanged):
-  // journal_lines tidak dihapus & tidak dibuat ulang, sehingga ceklis di Jurnal Umum
-  // dan Buku Besar tetap utuh (tidak hilang).
 
   const { error: updErr } = await supabase
     .from("journal_entries")

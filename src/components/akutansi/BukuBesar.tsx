@@ -10,6 +10,10 @@ interface LedgerLine {
     id: string;
     tanggal: string;
     keterangan: string;
+    // (baru) keterangan entry (judul) & keterangan per-baris, dipisah supaya bisa
+    // ditampilkan bertingkat. Null-safe: kalau route belum mengirim, fallback ke `keterangan`.
+    keterangan_entry?: string | null;
+    keterangan_baris?: string | null;
     ref: string;
     // (baru) No. Jurnal (kode GJ) — dikembalikan /api/akutansi/buku-besar kalau
     // barisnya berasal dari journal_entries yang punya journal_no. Opsional &
@@ -628,7 +632,14 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
                                                     )}
                                                     {l.ref && <span className="text-[10px] font-mono font-bold text-gray-400">Ref: {l.ref}</span>}
                                                 </div>
-                                                <p className="text-[13px] text-gray-800">{l.keterangan}</p>
+                                                {l.keterangan_entry ? (
+                                                    <p className="text-[13px] font-semibold text-gray-900">{l.keterangan_entry}</p>
+                                                ) : (
+                                                    <p className="text-[13px] text-gray-800">{l.keterangan}</p>
+                                                )}
+                                                {l.keterangan_baris && l.keterangan_baris !== l.keterangan_entry && (
+                                                    <p className="text-[12px] text-gray-500 mt-0.5 pl-2 border-l-2 border-gray-200">{l.keterangan_baris}</p>
+                                                )}
                                                 {specParts.length > 0 && (
                                                     <p className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</p>
                                                 )}
@@ -780,8 +791,17 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
                                                                         <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
                                                                     </span>
                                                                 )}
-                                                                <span>{l.keterangan}</span>
+                                                                {l.keterangan_entry ? (
+                                                                    <span className="font-semibold text-gray-900">{l.keterangan_entry}</span>
+                                                                ) : (
+                                                                    <span>{l.keterangan}</span>
+                                                                )}
                                                             </div>
+                                                            {l.keterangan_baris && l.keterangan_baris !== l.keterangan_entry && (
+                                                                <div className="text-[11px] text-gray-500 mt-0.5 pl-0.5 border-l-2 border-gray-200 ml-0.5 pl-2">
+                                                                    {l.keterangan_baris}
+                                                                </div>
+                                                            )}
                                                             {(specParts.length > 0 || l.ref) && (
                                                                 <div className="text-[10px] text-gray-400 mt-0.5">
                                                                     {l.ref && <span className="font-mono mr-2">Ref: {l.ref}</span>}
