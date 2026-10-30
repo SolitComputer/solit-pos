@@ -13,6 +13,16 @@ export default function ServiceWorkerUpdater() {
     const onControllerChange = () => {
       if (reloaded) return;
       reloaded = true;
+
+      // Anti-loop lintas-reload: variabel `reloaded` reset tiap halaman dimuat,
+      // jadi perlu pengaman yang bertahan antar-reload. Kalau controllerchange
+      // memicu reload lagi < 10 detik setelah reload sebelumnya, hentikan —
+      // mencegah SW yang terus "aktif ulang" bikin halaman reload tanpa henti.
+      const SW_RELOAD_TS_KEY = "sw-controllerchange-ts";
+      const lastReload = Number(sessionStorage.getItem(SW_RELOAD_TS_KEY) || 0);
+      if (Date.now() - lastReload < 10_000) return;
+
+      sessionStorage.setItem(SW_RELOAD_TS_KEY, String(Date.now()));
       window.location.reload();
     };
 
