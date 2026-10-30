@@ -289,7 +289,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
               )}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <PersonComboField
+                <MultiPersonComboField
                   label="Videographer"
                   listId="cc-konten-users"
                   options={kontenUsers}
@@ -297,7 +297,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
                   value={take.videographer}
                   onChange={(name, userId) => setTake({ ...take, videographer: name, videographer_user_id: userId })}
                 />
-                <PersonComboField
+                <MultiPersonComboField
                   label="Talent"
                   listId="cc-konten-users"
                   options={kontenUsers}
@@ -356,7 +356,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <PersonComboField
+                <MultiPersonComboField
                   label="Nama Editor"
                   listId="cc-konten-users"
                   options={kontenUsers}
@@ -439,11 +439,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /**
- * Combobox nama: bisa dipilih dari daftar divisi Konten ATAU diketik manual.
- * Kalau nama persis cocok dengan user di daftar → userId keisi (dapat poin).
- * Kalau diketik manual/tidak cocok → userId "" (tersimpan null, tanpa poin).
+ * Combobox nama MULTI-ORANG: chip + autocomplete.
+ * - Beberapa nama disimpan sebagai 1 string digabung koma ("Andi, Budi") →
+ *   kolom DB (talent/videographer/editor_name) TIDAK berubah (tetap text).
+ * - userId yang dikirim = id konten-user PERTAMA yang cocok (buat atribusi poin/
+ *   leaderboard yang kolomnya cuma muat 1 orang). Nama non-konten tetap tampil,
+ *   cuma tidak dapat poin.
+ * - Tambah nama: ketik lalu Enter, pisah pakai koma, atau klik ke luar (blur).
+ *   Hapus: tombol × di chip, atau Backspace saat input kosong.
  */
-function PersonComboField({
+function MultiPersonComboField({
   label, value, listId, options, disabled, onChange,
 }: {
   label: string;
@@ -453,18 +458,96 @@ function PersonComboField({
   disabled?: boolean;
   onChange: (name: string, userId: string) => void;
 }) {
-  const resolve = (name: string) =>
-    options.find((u) => u.name.trim().toLowerCase() === name.trim().toLowerCase())?.id ?? "";
+  const [draft, setDraft] = useState("");
+
+  const names = value.split(",").map((s) => s.trim()).filter(Boolean);
+
+  const isKnown = (nm: string) =>
+    options.some((u) => u.name.trim().toLowerCase() === nm.trim().toLowerCase());
+
+  // id konten-user pertama yang cocok (urut nama) → dipakai untuk _user_id
+  const resolveFirstId = (list: string[]) => {
+    for (const nm of list) {
+      const hit = options.find((u) => u.name.trim().toLowerCase() === nm.trim().toLowerCase());
+      if (hit) return hit.id;
+    }
+    return "";
+  };
+
+  // commit daftar nama ke parent (dedup case-insensitive, buang kosong)
+  const commit = (list: string[]) => {
+    const seen = new Set<string>();
+    const clean = list
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .filter((s) => {
+        const k = s.toLowerCase();
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    onChange(clean.join(", "), resolveFirstId(clean));
+  };
+
+  const addName = (raw: string) => {
+    const nm = raw.trim();
+    if (!nm) return;
+    commit([...names, nm]);
+    setDraft("");
+  };
+
+  const removeAt = (idx: number) => commit(names.filter((_, i) => i !== idx));
+
   return (
     <Field label={label}>
-      <input
-        className={INPUT}
-        list={listId}
-        disabled={disabled}
-        value={value}
-        placeholder="Pilih / ketik nama… (opsional)"
-        onChange={(e) => onChange(e.target.value, resolve(e.target.value))}
-      />
+      <div
+        className={`flex flex-wrap items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-sm transition focus-within:border-gray-300 focus-within:ring-4 focus-within:ring-gray-900/5 ${disabled ? "pointer-events-none opacity-60" : ""
+          }`}
+      >
+        {names.map((nm, i) => (
+          <span
+            key={`${nm}-${i}`}
+            className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-semibold ${isKnown(nm)
+                ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
+                : "bg-gray-100 text-gray-600 ring-1 ring-gray-200"
+              }`}
+          >
+            {nm}
+            {!disabled && (
+              <button
+                type="button"
+                onClick={() => removeAt(i)}
+                className="opacity-60 transition hover:opacity-100"
+                aria-label={`Hapus ${nm}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </span>
+        ))}
+
+        <input
+          className="min-w-[7rem] flex-1 bg-transparent px-1 py-0.5 text-gray-800 outline-none"
+          list={listId}
+          disabled={disabled}
+          value={draft}
+          placeholder={names.length ? "Tambah nama…" : "Pilih / ketik nama… (opsional)"}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v.includes(",")) v.split(",").forEach(addName); // tempel "Andi, Budi"
+            else setDraft(v);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addName(draft);
+            } else if (e.key === "Backspace" && !draft && names.length) {
+              removeAt(names.length - 1);
+            }
+          }}
+          onBlur={() => addName(draft)}
+        />
+      </div>
     </Field>
   );
 }

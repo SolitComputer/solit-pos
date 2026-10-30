@@ -1,13 +1,20 @@
 // src/app/api/cc-reports/sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { buildPostingPatch, syncPosting, clearIgCache } from "@/lib/ccSync";
+import { buildPostingPatch, syncPosting, clearIgCache, brandCanAutoSync } from "@/lib/ccSync";
 import { isAutoSyncPlatform, isStale } from "@/lib/ccMetrics";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const CONCURRENCY = 4;
+
+/** Ambil brand dari hasil embed cc_reports(brand) — aman untuk bentuk object maupun array. */
+function brandOf(p: { report?: unknown }): string | null {
+  const r = p.report as { brand?: string | null } | { brand?: string | null }[] | null | undefined;
+  if (!r) return null;
+  return (Array.isArray(r) ? r[0]?.brand : r.brand) ?? null;
+}
 
 // POST /api/cc-reports/sync?stale=30  → hanya yang basi >30 menit (cron)
 // POST /api/cc-reports/sync?force=1   → semua, bypass SEMUA cache (tombol user)
@@ -22,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("cc_postings")
-    .select("id, platform, post_url, auto_sync, external_id, provider_media_id, last_synced_at")
+       .select("id, platform, post_url, auto_sync, external_id, provider_media_id, last_synced_at, report:cc_reports(brand)")
     .not("post_url", "is", null);
 
   if (error) {
@@ -33,6 +40,7 @@ export async function POST(req: NextRequest) {
     (p) =>
       p.auto_sync !== false &&
       isAutoSyncPlatform(p.platform) &&
+      brandCanAutoSync(p.platform, brandOf(p)) &&   // 🏷️ IG/TikTok brand lain → lewati, biar manual
       (force || staleMin === 0 || isStale(p.last_synced_at, staleMin))
   );
 
@@ -49,6 +57,7 @@ export async function POST(req: NextRequest) {
         const out = await syncPosting(p.post_url, {
           force,
           mediaId: p.provider_media_id,   // ✅ langsung hit single-media, skip scan list
+          brand: brandOf(p),              // 🏷️ konsisten dgn gate per-brand
         });
 
         if (out.status === "OK") ok++;

@@ -39,8 +39,15 @@ export async function PATCH(
     patch.external_id = parsed?.externalId ?? null;
     if (parsed && !("platform" in body)) patch.platform = parsed.platform;
 
-    if (url) {
-      const out = await syncPosting(url, { force: true, mediaId: null });
+       if (url) {
+      // brand konten → gate auto-sync IG/TikTok per-brand (ambil dari DB, bukan dari client)
+      const { data: rep } = await supabaseAdmin
+        .from("cc_reports")
+        .select("brand")
+        .eq("id", id)
+        .maybeSingle();
+
+      const out = await syncPosting(url, { force: true, mediaId: null, brand: rep?.brand });
       Object.assign(patch, buildPostingPatch(out, { external_id: patch.external_id }));
       synced = out.status === "OK";
       if (out.status !== "OK") syncMessage = out.error;
