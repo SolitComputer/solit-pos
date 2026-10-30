@@ -10,16 +10,17 @@ import BukuBesar from "./BukuBesar";
 import Neraca from "./Neraca";
 import LabaRugi from "./LabaRugi";
 import AkunManager from "./AkunManager";
+import BluePrint from "./BluePrint";
 import { Inbox, FileSpreadsheet, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 
-type TabKey = "jurnal" | "buku-besar" | "neraca" | "laba-rugi" | "akun";
-
+type TabKey = "jurnal" | "buku-besar" | "neraca" | "laba-rugi" | "akun" | "blueprint";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "jurnal", label: "Jurnal Umum" },
   { key: "buku-besar", label: "Buku Besar" },
   { key: "neraca", label: "Neraca" },
   { key: "laba-rugi", label: "Laba Rugi" },
   { key: "akun", label: "Kelola Akun" },
+  { key: "blueprint", label: "Blue Print" },
 ];
 
 export default function AkuntansiTabs({ period }: { period: string }) {
@@ -134,7 +135,7 @@ export default function AkuntansiTabs({ period }: { period: string }) {
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           {/* Filter cabang — dropdown (BUKAN tab), hanya Admin & Accounting, bukan di tab Kelola Akun.
               Sengaja berbentuk <select> biar jelas kebaca sebagai filter, bukan switch tab/mode. */}
-          {canSwitchBranch && tab !== "akun" && (
+                  {canSwitchBranch && tab !== "akun" && tab !== "blueprint" && (
             <label className="flex items-center gap-1.5 shrink-0">
               <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">Cabang:</span>
               <select
@@ -149,20 +150,22 @@ export default function AkuntansiTabs({ period }: { period: string }) {
             </label>
           )}
 
-          {/* Export Excel Button */}
-          <button
-            onClick={handleExport}
-            disabled={exporting}
-            title="Export seluruh akuntansi ke 1 file Excel"
-            className="h-10 px-4 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] text-white text-xs font-semibold shadow-xs hover:shadow transition-all disabled:opacity-40 whitespace-nowrap"
-          >
-            {exporting ? (
-              <span className="inline-block animate-spin">⟳</span>
-            ) : (
-              <FileSpreadsheet className="w-4 h-4" />
-            )}
-            {exporting ? "Exporting..." : "Export Excel"}
-          </button>
+          {/* Export Excel Button — tidak relevan di tab Blue Print */}
+          {tab !== "blueprint" && (
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              title="Export seluruh akuntansi ke 1 file Excel"
+              className="h-10 px-4 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] text-white text-xs font-semibold shadow-xs hover:shadow transition-all disabled:opacity-40 whitespace-nowrap"
+            >
+              {exporting ? (
+                <span className="inline-block animate-spin">⟳</span>
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              {exporting ? "Exporting..." : "Export Excel"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -204,6 +207,8 @@ export default function AkuntansiTabs({ period }: { period: string }) {
           <LabaRugi period={period} branch={branch} />
         ) : tab === "akun" ? (
           <AkunManager />
+        ) : tab === "blueprint" ? (
+          <BluePrint />
         ) : (
           <div className="py-16 text-center">
             <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10 text-slate-400" /></div>

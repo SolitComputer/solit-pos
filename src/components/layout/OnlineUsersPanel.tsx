@@ -337,7 +337,6 @@ export function OnlineUsersPanel() {
   const { openChat } = useChatContext();
 
   const supabaseRef = useRef(getSupabaseClient());
-  const channelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null);
 
   useEffect(() => {
     getCurrentUserClient().then(user => {
@@ -378,13 +377,23 @@ export function OnlineUsersPanel() {
     if (!isAllowed) return;
     fetchPresence();
 
-    if (channelRef.current) {
-      supabaseRef.current.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
+    // Nama channel STABIL per user — bukan Date.now(). Dengan nama tetap,
+    // channel lama benar-benar bisa dibuang & tidak menumpuk di client Supabase
+    // saat effect jalan ulang (StrictMode / remount). Inilah akar error
+    // "cannot add postgres_changes callbacks after subscribe()".
+    const supabase = supabaseRef.current;
+    const channelName = `user_presence_${currentUser?.id ?? "anon"}`;
 
-    const channel = supabaseRef.current
-      .channel(`user_presence_${Date.now()}`)
+    // Karena client Supabase singleton, channel dgn nama sama bisa masih
+    // "nyangkut" dari setup sebelumnya (React jalanin effect 2x / remount).
+    // Buang dulu SEMUA channel bernama sama sebelum bikin baru — ini yang
+    // mencegah error "cannot add postgres_changes callbacks after subscribe()".
+    supabase.getChannels()
+      .filter((ch) => ch.topic === `realtime:${channelName}`)
+      .forEach((ch) => supabase.removeChannel(ch));
+
+    const channel = supabase
+      .channel(channelName)
       .on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, (payload) => {
         const now = Date.now();
         if (payload.eventType === "DELETE") {
@@ -407,7 +416,6 @@ export function OnlineUsersPanel() {
       })
       .subscribe();
 
-    channelRef.current = channel;
     const ticker = setInterval(() => setPresence(prev => recalculate(prev)), 5_000);
     // Polling fallback: refetch presence tiap 15s supaya status tetap update
     // walau Supabase Realtime (self-hosted) tidak mengirim event postgres_changes.
@@ -416,12 +424,12 @@ export function OnlineUsersPanel() {
     return () => {
       clearInterval(ticker);
       clearInterval(poller);
-      if (channelRef.current) {
-        supabaseRef.current.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
+      // Buang channel LOKAL (bukan dari ref) — ini yang menjamin instance yang
+      // dibersihkan persis instance yang dibuat di effect ini, sehingga tidak
+      // ada channel "setengah subscribed" yang tertinggal saat remount.
+      supabase.removeChannel(channel);
     };
-  }, [isAllowed]);
+  }, [isAllowed, currentUser?.id]);
 
   if (roleLoading || !isAllowed || !currentUser) return null;
 
