@@ -67,7 +67,9 @@ interface PicCandidate {
   name: string;
   role: string;
   roles: string[];
-  is_active: boolean;
+  // ✅ status whitelist dipisah per kategori (cocok dgn output GET /api/seller-pics)
+  is_active_user: boolean;
+  is_active_pedagang: boolean;
 }
 
 type Tab = "USER" | "PEDAGANG";
@@ -347,8 +349,8 @@ function PicAccessDropdown({
   pics: PicCandidate[];
   loading: boolean;
   error: string | null;
-  savingId: string | null;
-  onToggle: (userId: string, next: boolean) => void;
+  savingId: string | null; // format "userId::USER" / "userId::PEDAGANG"
+  onToggle: (userId: string, sellerType: "USER" | "PEDAGANG", next: boolean) => void;
   onRetry: () => void;
   onSendReminder: (userId: string, name: string) => void;
   sendingReminderId: string | null;
@@ -388,7 +390,8 @@ function PicAccessDropdown({
     [pics]
   );
 
-  const activeCount = pics.filter((p) => p.is_active).length;
+  // Hitung orang yang aktif di MINIMAL satu kategori (USER atau PEDAGANG)
+  const activeCount = pics.filter((p) => p.is_active_user || p.is_active_pedagang).length;
 
   return (
     <div className="relative" ref={boxRef}>
@@ -422,7 +425,7 @@ function PicAccessDropdown({
           <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-violet-50/60 to-transparent">
             <p className="text-xs font-black text-gray-900">Izin Follow-up</p>
             <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">
-              Centang siapa yang boleh melakukan follow-up. Hanya Admin yang bisa mengubah.
+              Atur akses follow-up per kategori (User / Pedagang). Hanya Admin yang bisa mengubah.
             </p>
           </div>
 
@@ -456,32 +459,51 @@ function PicAccessDropdown({
                       {g.label}
                     </p>
                     {g.items.map((p) => {
-                      const saving = savingId === p.user_id;
+                      const savingUser = savingId === `${p.user_id}::USER`;
+                      const savingPedagang = savingId === `${p.user_id}::PEDAGANG`;
                       const sendingReminder = sendingReminderId === p.user_id;
+                      // tombol lonceng aktif kalau dia PIC di minimal satu kategori
+                      const isActiveAny = p.is_active_user || p.is_active_pedagang;
+
+                      // satu chip checkbox kategori — dipakai 2x (USER & PEDAGANG)
+                      const CategoryChip = ({
+                        type,
+                        active,
+                        saving,
+                      }: {
+                        type: "USER" | "PEDAGANG";
+                        active: boolean;
+                        saving: boolean;
+                      }) => (
+                        <button
+                          onClick={() => onToggle(p.user_id, type, !active)}
+                          disabled={saving}
+                          title={`${active ? "Nonaktifkan" : "Aktifkan"} akses ${type === "USER" ? "User" : "Pedagang"
+                            } untuk ${p.name}`}
+                          className={cx(
+                            "flex-1 min-w-0 h-9 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-bold transition-all active:scale-[0.98] disabled:opacity-50",
+                            FOCUS_RING,
+                            active
+                              ? type === "USER"
+                                ? "bg-blue-50 border-blue-200 text-blue-700"
+                                : "bg-amber-50 border-amber-200 text-amber-700"
+                              : "bg-white border-gray-200 text-gray-400 hover:border-gray-300"
+                          )}
+                        >
+                          <span className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0">
+                            {saving ? <Spinner dark={!active} /> : active ? <CheckIcon /> : null}
+                          </span>
+                          {type === "USER" ? "User" : "Pedagang"}
+                        </button>
+                      );
+
                       return (
-                        <div key={p.user_id} className="w-full min-h-[52px] flex items-center gap-1 pr-2">
-                          <button
-                            onClick={() => onToggle(p.user_id, !p.is_active)}
-                            disabled={saving}
-                            className={cx(
-                              "flex-1 min-w-0 px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50 text-left rounded-lg",
-                              FOCUS_RING
-                            )}
-                          >
-                            <span
-                              className={cx(
-                                "w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-all",
-                                p.is_active
-                                  ? "bg-emerald-600 border-emerald-600 text-white"
-                                  : "bg-white border-gray-300"
-                              )}
-                            >
-                              {saving ? (
-                                <Spinner dark={!p.is_active} />
-                              ) : p.is_active ? (
-                                <CheckIcon />
-                              ) : null}
-                            </span>
+                        <div
+                          key={p.user_id}
+                          className="w-full px-4 py-2.5 flex flex-col gap-2 hover:bg-gray-50 transition-colors rounded-lg"
+                        >
+                          {/* Baris atas: nama + lonceng */}
+                          <div className="flex items-center gap-2">
                             <span className="flex-1 min-w-0">
                               <span className="block text-xs font-bold text-gray-800 truncate">
                                 {p.name}
@@ -489,35 +511,45 @@ function PicAccessDropdown({
                               <span
                                 className={cx(
                                   "block text-[10px] truncate",
-                                  p.is_active ? "text-emerald-600 font-semibold" : "text-gray-400"
+                                  isActiveAny ? "text-emerald-600 font-semibold" : "text-gray-400"
                                 )}
                               >
-                                {p.is_active ? "Boleh follow-up" : "Nonaktif"}
+                                {isActiveAny ? "PIC aktif" : "Nonaktif"}
                               </span>
                             </span>
-                          </button>
 
-                          {/* ── Lonceng: kirim reminder follow-up ke PIC ini ── */}
-                          <button
-                            onClick={() => onSendReminder(p.user_id, p.name)}
-                            disabled={!p.is_active || sendingReminder}
-                            title={
-                              p.is_active
-                                ? `Ingatkan ${p.name} untuk follow-up`
-                                : "Aktifkan PIC ini dulu sebelum mengirim reminder"
-                            }
-                            className={cx(
-                              "flex-shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center transition-all",
-                              FOCUS_RING,
-                              !p.is_active
-                                ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed"
-                                : sendingReminder
-                                  ? "bg-amber-50 border-amber-200 text-amber-400"
-                                  : "bg-white border-gray-200 text-gray-400 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200 active:scale-95"
-                            )}
-                          >
-                            {sendingReminder ? <Spinner dark /> : <BellIcon />}
-                          </button>
+                            {/* ── Lonceng: kirim reminder follow-up ke PIC ini ── */}
+                            <button
+                              onClick={() => onSendReminder(p.user_id, p.name)}
+                              disabled={!isActiveAny || sendingReminder}
+                              title={
+                                isActiveAny
+                                  ? `Ingatkan ${p.name} untuk follow-up`
+                                  : "Aktifkan PIC ini dulu sebelum mengirim reminder"
+                              }
+                              className={cx(
+                                "flex-shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center transition-all",
+                                FOCUS_RING,
+                                !isActiveAny
+                                  ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed"
+                                  : sendingReminder
+                                    ? "bg-amber-50 border-amber-200 text-amber-400"
+                                    : "bg-white border-gray-200 text-gray-400 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200 active:scale-95"
+                              )}
+                            >
+                              {sendingReminder ? <Spinner dark /> : <BellIcon />}
+                            </button>
+                          </div>
+
+                          {/* Baris bawah: 2 chip kategori */}
+                          <div className="flex items-center gap-1.5">
+                            <CategoryChip type="USER" active={p.is_active_user} saving={savingUser} />
+                            <CategoryChip
+                              type="PEDAGANG"
+                              active={p.is_active_pedagang}
+                              saving={savingPedagang}
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -830,7 +862,7 @@ function ConfirmFollowupModal({
   if (!followup) return null;
 
   const firstName = (followup.customer_name || "").split(" ")[0] || "Customer";
-  const intervalDays = followup.seller_type === "PEDAGANG" ? "3" : "7";
+  const intervalDays = followup.seller_type === "PEDAGANG" ? "3" : "30";
   const canProceedStep1 = buktiFu !== null;
 
   return (
@@ -1387,7 +1419,7 @@ function FollowupCard({
           </span>
           <span className="text-[9px] text-gray-300">·</span>
           <span className="text-[9px] text-gray-400 font-medium">
-            interval {isPedagang ? "3" : "7"} hari
+            interval {isPedagang ? "3" : "30"} hari
           </span>
         </div>
       </div>
@@ -1795,27 +1827,36 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage, canManagePic]);
 
-  // ── Toggle checklist akses PIC (Admin) — optimistic ──
-  const togglePic = async (userId: string, next: boolean) => {
-    setSavingPicId(userId);
-    setPics((prev) => prev.map((p) => (p.user_id === userId ? { ...p, is_active: next } : p)));
+  // ── Toggle checklist akses PIC (Admin) — optimistic, PER KATEGORI ──
+  // sellerType menentukan checkbox mana yang di-toggle (USER / PEDAGANG).
+  const togglePic = async (
+    userId: string,
+    sellerType: "USER" | "PEDAGANG",
+    next: boolean
+  ) => {
+    const field = sellerType === "USER" ? "is_active_user" : "is_active_pedagang";
+
+    // savingPicId sekarang digabung dgn kategori supaya spinner hanya muncul di
+    // checkbox yang sedang disimpan, bukan dua-duanya.
+    setSavingPicId(`${userId}::${sellerType}`);
+    setPics((prev) => prev.map((p) => (p.user_id === userId ? { ...p, [field]: next } : p)));
     try {
       const res = await fetch("/api/seller-pics", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, is_active: next }),
+        body: JSON.stringify({ user_id: userId, seller_type: sellerType, is_active: next }),
       });
       const result = await res.json();
       if (!result.success) {
         alert(result.message ?? "Gagal mengubah akses PIC");
         setPics((prev) =>
-          prev.map((p) => (p.user_id === userId ? { ...p, is_active: !next } : p))
+          prev.map((p) => (p.user_id === userId ? { ...p, [field]: !next } : p))
         );
         return;
       }
       await loadData(true); // refresh flag can_followup di kartu
     } catch {
-      setPics((prev) => prev.map((p) => (p.user_id === userId ? { ...p, is_active: !next } : p)));
+      setPics((prev) => prev.map((p) => (p.user_id === userId ? { ...p, [field]: !next } : p)));
       alert("Terjadi kesalahan koneksi");
     } finally {
       setSavingPicId(null);
@@ -1982,7 +2023,7 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
           <p className="text-gray-400 text-sm mt-1.5 leading-relaxed">
             Halaman ini hanya untuk{" "}
             <span className="font-semibold text-gray-600">Admin, Kepala Marketing, Kepala Sales</span>{" "}
-            &amp; Crew Sales.
+            &amp; Crew Sales. Follow-up hanya bisa dilakukan Crew Sales yang diaktifkan Admin.
           </p>
         </div>
       </DashboardLayout>
@@ -2002,7 +2043,7 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
               </h1>
             </div>
             <p className="text-[11px] sm:text-xs text-gray-400 ml-[18px] font-medium">
-              User tiap 7 hari &nbsp;·&nbsp; Pedagang tiap 3 hari
+              User tiap 30 hari &nbsp;·&nbsp; Pedagang tiap 3 hari
             </p>
           </div>
 

@@ -93,15 +93,21 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    // ✅ Cek apakah PIC yang tercatat di customer ini masih aktif (whitelisted).
-    // Kalau PIC lama sudah dinonaktifkan Admin, customer ini dianggap terbuka lagi
-    // — sama seperti belum ada PIC — supaya tidak mengunci selamanya ke orang nonaktif.
+    // ✅ Tipe customer ini — menentukan kategori whitelist mana yang berlaku.
+    const existingType: SellerType = normalizeSellerType(existing.seller_type);
+
+    // ✅ Cek apakah PIC yang tercatat masih aktif DI KATEGORI customer ini.
+    // Kalau PIC lama sudah dinonaktifkan Admin untuk kategori ini, customer
+    // dianggap terbuka lagi — tidak mengunci selamanya ke orang nonaktif.
+    // (PIC yang aktif di USER tapi nonaktif di PEDAGANG tidak mengunci customer
+    // PEDAGANG, dan sebaliknya.)
     let picStillActive = false;
     if (existing.pic_user_id) {
       const { data: picActiveRow } = await supabaseAdmin
         .from("seller_followup_pics")
         .select("is_active")
         .eq("user_id", existing.pic_user_id)
+        .eq("seller_type", existingType)
         .maybeSingle();
       picStillActive = !!picActiveRow?.is_active;
     }
@@ -140,16 +146,22 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         );
       }
 
-      // GATE 2 — whitelist Admin
+      // GATE 2 — whitelist Admin, PER KATEGORI customer ini.
+      // Budi yang aktif di USER tapi tidak di PEDAGANG → ditolak saat FU
+      // customer PEDAGANG. Pakai sellerType (tipe yang diproses di request ini).
       const { data: picRow } = await supabaseAdmin
         .from("seller_followup_pics")
         .select("is_active")
         .eq("user_id", user.id)
+        .eq("seller_type", sellerType)
         .maybeSingle();
 
       if (!picRow?.is_active) {
         return NextResponse.json(
-          { success: false, message: "Akses follow-up kamu belum diaktifkan oleh Admin" },
+          {
+            success: false,
+            message: `Akses follow-up ${sellerType === "PEDAGANG" ? "Pedagang" : "User"} kamu belum diaktifkan oleh Admin`,
+          },
           { status: 403 }
         );
       }
@@ -185,21 +197,42 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         update.closed_by = user.name;
       }
     } else if (action === "update_phone") {
-      // GATE — sama seperti "followup": hanya yang berwenang FU customer ini atau Admin
+      // GATE — hanya Admin, ATAU Crew Sales yang berwenang atas customer ini.
       if (!canManage && !hasAnyRole(roles, PERMS.FOLLOWUP_SELLER)) {
         return NextResponse.json(
           { success: false, message: "Kamu tidak berwenang mengubah nomor HP customer ini" },
           { status: 403 }
         );
       }
-      if (!canManage && !isOwnedByMe && !isUnowned) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Customer ini sudah ditugaskan ke ${existing.closed_by ?? "PIC lain"}`,
-          },
-          { status: 403 }
-        );
+      // ✅ Kalau bukan Admin: wajib whitelisted DI KATEGORI customer ini,
+      // sekaligus pemilik/unowned. Mencegah sales yang aktif di kategori lain
+      // mengubah nomor HP customer yang bukan wewenangnya.
+      if (!canManage) {
+        const { data: myPicRow } = await supabaseAdmin
+          .from("seller_followup_pics")
+          .select("is_active")
+          .eq("user_id", user.id)
+          .eq("seller_type", existingType)
+          .maybeSingle();
+
+        if (!myPicRow?.is_active) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Akses ${existingType === "PEDAGANG" ? "Pedagang" : "User"} kamu belum diaktifkan Admin`,
+            },
+            { status: 403 }
+          );
+        }
+        if (!isOwnedByMe && !isUnowned) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Customer ini sudah ditugaskan ke ${existing.closed_by ?? "PIC lain"}`,
+            },
+            { status: 403 }
+          );
+        }
       }
 
       const parsed = updateSellerPhoneSchema.safeParse({
@@ -250,15 +283,21 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
           (SELLER_PIC_CANDIDATE_ROLES as string[]).includes(r)
         );
 
+        // ✅ Target harus aktif DI KATEGORI customer ini. Assign customer
+        // PEDAGANG ke sales yang hanya aktif di USER → ditolak.
         const { data: targetPic } = await supabaseAdmin
           .from("seller_followup_pics")
           .select("is_active")
           .eq("user_id", targetId)
+          .eq("seller_type", existingType)
           .maybeSingle();
 
         if (!target || !validRole || !targetPic?.is_active) {
           return NextResponse.json(
-            { success: false, message: "PIC tujuan tidak valid atau belum diaktifkan" },
+            {
+              success: false,
+              message: `PIC tujuan tidak valid atau belum diaktifkan untuk kategori ${existingType === "PEDAGANG" ? "Pedagang" : "User"}`,
+            },
             { status: 400 }
           );
         }

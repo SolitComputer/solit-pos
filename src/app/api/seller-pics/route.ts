@@ -35,7 +35,8 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
 
     const [{ data: users, error: uErr }, { data: pics, error: pErr }] = await Promise.all([
         supabaseAdmin.from("users").select("id, name, role, roles").order("name"),
-        supabaseAdmin.from("seller_followup_pics").select("user_id, is_active"),
+        // ✅ sekarang ikut ambil seller_type — whitelist dipisah per kategori
+        supabaseAdmin.from("seller_followup_pics").select("user_id, seller_type, is_active"),
     ]);
 
     if (uErr || pErr) {
@@ -45,8 +46,10 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
         );
     }
 
+    // ✅ Map per (user_id + seller_type). Key digabung "userId::TYPE" supaya
+    // satu orang bisa punya 2 status terpisah (USER & PEDAGANG).
     const activeMap = new Map<string, boolean>(
-        (pics ?? []).map((p: any) => [p.user_id as string, !!p.is_active])
+        (pics ?? []).map((p: any) => [`${p.user_id}::${p.seller_type}`, !!p.is_active])
     );
 
     const data = ((users ?? []) as CandidateRow[])
@@ -56,7 +59,9 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
             name: u.name,
             role: rolesOfRow(u)[0],
             roles: rolesOfRow(u),
-            is_active: activeMap.get(u.id) ?? false,
+            // ✅ dua status terpisah; default false kalau belum ada barisnya
+            is_active_user: activeMap.get(`${u.id}::USER`) ?? false,
+            is_active_pedagang: activeMap.get(`${u.id}::PEDAGANG`) ?? false,
         }));
 
     return NextResponse.json({
@@ -81,14 +86,33 @@ async function putHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
     }
 
-    const items: { user_id: string; is_active: boolean }[] = Array.isArray(body.items)
-        ? body.items
-        : body.user_id
-            ? [{ user_id: body.user_id, is_active: !!body.is_active }]
-            : [];
+    // ✅ Tiap item sekarang WAJIB bawa seller_type (USER / PEDAGANG) —
+    // whitelist dipisah per kategori. Mode single & bulk sama-sama didukung.
+    const rawItems: { user_id: string; seller_type: string; is_active: boolean }[] =
+        Array.isArray(body.items)
+            ? body.items
+            : body.user_id
+                ? [{ user_id: body.user_id, seller_type: body.seller_type, is_active: !!body.is_active }]
+                : [];
 
-    if (items.length === 0) {
+    if (rawItems.length === 0) {
         return NextResponse.json({ success: false, message: "Tidak ada perubahan" }, { status: 400 });
+    }
+
+    // ✅ Validasi seller_type: hanya USER / PEDAGANG yang diterima. Mencegah
+    // baris sampah masuk kalau frontend lupa/salah kirim kategori.
+    const items = rawItems.map((i) => ({
+        user_id: i.user_id,
+        seller_type: i.seller_type,
+        is_active: !!i.is_active,
+    }));
+
+    const badType = items.find((i) => i.seller_type !== "USER" && i.seller_type !== "PEDAGANG");
+    if (badType) {
+        return NextResponse.json(
+            { success: false, message: "seller_type wajib USER atau PEDAGANG" },
+            { status: 400 }
+        );
     }
 
     // Validasi: target harus benar-benar Crew Sales / Kepala Marketing
@@ -119,11 +143,14 @@ async function putHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     const { error } = await supabaseAdmin.from("seller_followup_pics").upsert(
         items.map((i) => ({
             user_id: i.user_id,
+            seller_type: i.seller_type, // ✅ wajib ikut — bagian dari PK baru
             is_active: i.is_active,
             updated_at: nowISO,
             updated_by: user.id,
         })),
-        { onConflict: "user_id" }
+        // ✅ onConflict sekarang gabungan (user_id, seller_type) sesuai PK baru.
+        // Kalau tetap "user_id" saja, upsert akan error / salah sasaran.
+        { onConflict: "user_id,seller_type" }
     );
 
     if (error) {
@@ -139,7 +166,11 @@ async function putHandler(req: NextRequest, _ctx: any, user: AuthUser) {
             entity: "seller_followup_pic",
             entityId: items.map((i) => i.user_id).join(","),
             entityLabel: items
-                .map((i) => `${valid.get(i.user_id)?.name}: ${i.is_active ? "AKTIF" : "NONAKTIF"}`)
+                .map(
+                    (i) =>
+                        `${valid.get(i.user_id)?.name} [${i.seller_type}]: ${i.is_active ? "AKTIF" : "NONAKTIF"
+                        }`
+                )
                 .join(", "),
             afterData: items,
         });

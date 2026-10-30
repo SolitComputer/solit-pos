@@ -127,8 +127,11 @@ export const SELLER_FOLLOWUP_SUPERVISOR_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES", "KEPALA_ZENITH",
 ];
 
-/** Role yang SECARA STRUKTURAL boleh follow-up — masih dicek whitelist + ownership */
-export const SELLER_FOLLOWUP_ACTOR_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MARKETING"];
+/** Role yang SECARA STRUKTURAL boleh follow-up — masih dicek whitelist + ownership.
+ *  Keputusan 2026-10-30: KEPALA_MARKETING DICABUT dari sini — dia jadi pengawas
+ *  (tetap bisa lihat semua lewat SUPERVISOR_ROLES + hapus lewat DELETE_ROLES),
+ *  tapi TIDAK bisa melakukan follow-up sendiri. Pelaku FU hanya Crew Sales. */
+export const SELLER_FOLLOWUP_ACTOR_ROLES: UserRole[] = ["CREW_SALES"];
 
 /** Archive / reactivate / assign ulang PIC */
 export const SELLER_FOLLOWUP_MANAGE_ROLES: UserRole[] = [...FULL_ACCESS];
@@ -139,8 +142,10 @@ export const SELLER_FOLLOWUP_DELETE_ROLES: UserRole[] = ["ADMIN", "KEPALA_MARKET
 /** Hanya Admin & Programmer yang boleh ubah checklist akses PIC */
 export const SELLER_PIC_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
-/** Role yang muncul sebagai kandidat di dropdown checklist PIC */
-export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MARKETING"];
+/** Role yang muncul sebagai kandidat di dropdown checklist PIC.
+ *  Keputusan 2026-10-30: KEPALA_MARKETING dicabut — sejalan dgn ACTOR_ROLES,
+ *  hanya Crew Sales yang relevan jadi PIC follow-up. */
+export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = ["CREW_SALES"];
 
 /** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
 export const ALL_UNITS_ROLES: UserRole[] = [

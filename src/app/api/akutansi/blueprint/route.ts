@@ -26,7 +26,7 @@ export const GET = withAuth(async () => {
       .order("created_at", { ascending: true }),
     supabase
       .from("accounting_blueprint_completions")
-      .select("task_key, day")
+      .select("task_key, day, completed_by_name")
       .eq("week_key", weekKey),
   ]);
 

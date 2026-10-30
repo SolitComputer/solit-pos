@@ -56,14 +56,18 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         (SELLER_PIC_CANDIDATE_ROLES as string[]).includes(r)
     );
 
-    const { data: picRow } = await supabaseAdmin
+    // ✅ Cek aktif di MINIMAL satu kategori (USER atau PEDAGANG).
+    // Reminder itu ajakan umum "ayo FU", jadi cukup aktif di salah satu kategori.
+    const { data: picRows } = await supabaseAdmin
         .from("seller_followup_pics")
         .select("is_active")
         .eq("user_id", targetUserId)
-        .maybeSingle();
+        .eq("is_active", true);
 
-    // Reminder hanya masuk akal untuk PIC yang sedang aktif
-    if (!isValidCandidate || !picRow?.is_active) {
+    const isActivePic = (picRows ?? []).length > 0;
+
+    // Reminder hanya masuk akal untuk PIC yang sedang aktif di salah satu kategori
+    if (!isValidCandidate || !isActivePic) {
         return NextResponse.json(
             { success: false, message: "User ini belum diaktifkan sebagai PIC follow-up" },
             { status: 400 }

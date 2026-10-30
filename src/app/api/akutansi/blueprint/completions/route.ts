@@ -17,7 +17,7 @@ function getAdmin(): SupabaseClient {
 // Body: { task_key: string; day: number (1-6); done: boolean }
 export const POST = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
-  const { task_key, day, done } = body as { task_key: string; day: number; done: boolean };
+  const { task_key, day, done, by } = body as { task_key: string; day: number; done: boolean; by?: string };
 
   if (!task_key?.trim())
     return NextResponse.json({ success: false, message: "task_key wajib diisi" }, { status: 400 });
@@ -32,11 +32,12 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     const { error } = await supabase
       .from("accounting_blueprint_completions")
       .upsert(
-        {
+              {
           task_key: task_key.trim(),
           day,
           week_key: weekKey,
           completed_by: user.id,
+          completed_by_name: by?.trim() || null,
           completed_at: new Date().toISOString(),
         },
         { onConflict: "task_key,day,week_key" }

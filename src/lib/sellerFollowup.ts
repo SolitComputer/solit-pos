@@ -2,7 +2,7 @@ export type SellerType = "USER" | "PEDAGANG";
 
 // Interval follow-up per kategori (dalam hari)
 export const SELLER_FOLLOWUP_DAYS: Record<SellerType, number> = {
-  USER: 7,
+  USER: 30,
   PEDAGANG: 3,
 };
 
