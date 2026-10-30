@@ -340,9 +340,10 @@ export default function SalesErrorReport() {
       const buf = await wb.xlsx.writeBuffer();
       const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = `Kesalahan Sales - ${activeDate}.xlsx`; a.click();
+         const fileLabel = viewMode === "hari" ? activeDate : `${range.from} sd ${range.to}`;
+      const a = document.createElement("a"); a.href = url; a.download = `Kesalahan Sales - ${fileLabel}.xlsx`; a.click();
       URL.revokeObjectURL(url);
-    } catch (e: any) { setError("Gagal export Excel: " + (e?.message || e)); } finally { setExporting(false); }
+      } catch (e: any) { setError("Gagal export Excel: " + (e?.message || e)); } finally { setExporting(false); }
   };
 
   const showSkeleton = loading || membersLoading;
@@ -492,7 +493,7 @@ export default function SalesErrorReport() {
                           <td key={col.key}
                             onMouseDown={readOnly ? undefined : () => startSel(rIdx, c)}
                             onMouseEnter={readOnly ? undefined : () => extendSel(rIdx, c)}
-                            className={`relative border border-gray-200 p-0 ${color ? INSIGHT_COLOR_BG[color] : ""} ${selected ? "ring-2 ring-inset ring-violet-500/70 z-[1]" : ""}`}>                            {col.kind === "akun" ? (
+                            className={`relative border border-gray-200 p-0 ${color ? INSIGHT_COLOR_BG[color] : ""} ${selected ? "ring-2 ring-inset ring-violet-500/70 z-[1]" : ""}`}>
                             {col.kind === "akun" ? (
                               readOnly ? (
                                 <div className="px-2 py-1.5 text-gray-800 truncate">{row.akun_device || "—"}</div>
