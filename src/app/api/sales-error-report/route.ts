@@ -16,10 +16,74 @@ function getRoles(user: AuthUser): string[] {
   return Array.isArray(u?.roles) && u.roles.length > 0 ? u.roles : u?.role ? [u.role] : [];
 }
 
+// Agregasi baris sales_online_reports → counts per user_id (filled_by).
+// Dipakai dua-duanya: mode per-hari (?date=) & mode rentang (?from=&to=).
+type SalesCounts = { total_lead: number; chat: number; salah: number; data: number };
+function buildCounts(rows: any[]): Record<string, SalesCounts> {
+  const counts: Record<string, SalesCounts> = {};
+  for (const r of rows) {
+    const id = r.filled_by;
+    if (!id) continue;
+    if (!counts[id]) counts[id] = { total_lead: 0, chat: 0, salah: 0, data: 0 };
+    const g = counts[id];
+    if (r.rejected) {
+      const reason = r.reject_reason;
+      if (reason === "CHAT_TIDAK_TERBALAS") g.chat++;
+      else if (reason === "SALAH_INPUT") g.salah++;
+      else if (reason === "DATA_TIDAK_SESUAI") g.data++;
+    } else if (r.audited) g.total_lead++;
+  }
+  return counts;
+}
+
 // GET /api/sales-error-report?date=YYYY-MM-DD
 async function getHandler(req: NextRequest) {
   try {
-    const date = new URL(req.url).searchParams.get("date") || "";
+    const sp = new URL(req.url).searchParams;
+
+    // ── Mode RENTANG (?from=YYYY-MM-DD&to=YYYY-MM-DD) → Per Minggu & Per Bulan.
+    // counts & chat dijumlahkan sepanjang rentang. Catatan/warna tidak ikut
+    // (view agregat read-only), jadi dikembalikan kosong.
+    const rawFrom = sp.get("from") || "";
+    const rawTo = sp.get("to") || "";
+    if (DATE_RE.test(rawFrom) && DATE_RE.test(rawTo)) {
+      const rangeR = resolveDateRangeUtc(rawFrom, rawTo);
+      if (!rangeR.success) return NextResponse.json({ success: false, message: rangeR.error }, { status: 400 });
+      const { startUtc, endUtc } = rangeR.value;
+
+      const { data, error } = await fetchAllRows((from, to) => {
+        let q = supabaseAdmin.from(TABLE)
+          .select("filled_by, audited, rejected, reject_reason")
+          .is("deleted_at", null);
+        if (startUtc) q = q.gte("created_at", startUtc);
+        if (endUtc) q = q.lt("created_at", endUtc);
+        return q.range(from, to);
+      });
+      if (error) throw new Error(error.message);
+      const counts = buildCounts(data ?? []);
+
+      // Akun/Device GLOBAL (sama seperti mode harian)
+      const { data: akunRows } = await supabaseAdmin.from(AKUN).select("sales_name, akun_device");
+      const akun: Record<string, string> = {};
+      for (const a of akunRows ?? []) akun[(a as any).sales_name] = (a as any).akun_device ?? "";
+
+      // Chat Tidak Terbalas (manual) DIJUMLAHKAN sepanjang rentang tanggal.
+      const { data: metaRows } = await supabaseAdmin.from(META)
+        .select("sales_name, chat")
+        .gte("report_date", rawFrom)
+        .lte("report_date", rawTo);
+      const meta: Record<string, { catatan: string; colors: Record<string, string>; chat: number }> = {};
+      for (const m of metaRows ?? []) {
+        const k = (m as any).sales_name;
+        if (!meta[k]) meta[k] = { catatan: "", colors: {}, chat: 0 };
+        meta[k].chat += Number((m as any).chat ?? 0);
+      }
+
+      return NextResponse.json({ success: true, data: { counts, akun, meta } });
+    }
+
+    // ── Mode HARIAN (?date=YYYY-MM-DD) — perilaku lama, tidak berubah.
+    const date = sp.get("date") || "";
     if (!DATE_RE.test(date)) return NextResponse.json({ success: false, message: "date wajib (YYYY-MM-DD)" }, { status: 400 });
     const range = resolveDateRangeUtc(date, date);
     if (!range.success) return NextResponse.json({ success: false, message: range.error }, { status: 400 });
@@ -36,19 +100,7 @@ async function getHandler(req: NextRequest) {
     if (error) throw new Error(error.message);
 
     // Counts per user_id (filled_by) — cocok persis, tanpa nebak nama.
-    const counts: Record<string, { total_lead: number; chat: number; salah: number; data: number }> = {};
-    for (const r of data ?? []) {
-      const id = (r as any).filled_by;
-      if (!id) continue;
-      if (!counts[id]) counts[id] = { total_lead: 0, chat: 0, salah: 0, data: 0 };
-      const g = counts[id];
-      if ((r as any).rejected) {
-        const reason = (r as any).reject_reason;
-        if (reason === "CHAT_TIDAK_TERBALAS") g.chat++;
-        else if (reason === "SALAH_INPUT") g.salah++;
-        else if (reason === "DATA_TIDAK_SESUAI") g.data++;
-      } else if ((r as any).audited) g.total_lead++;
-    }
+    const counts = buildCounts(data ?? []);
 
     // Akun/Device GLOBAL (key = rosterKey)
     const { data: akunRows } = await supabaseAdmin.from(AKUN).select("sales_name, akun_device");

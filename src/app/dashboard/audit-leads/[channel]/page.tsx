@@ -59,6 +59,12 @@ interface LeadRow {
 
 const PAGE_SIZE = 10;
 
+// Key sessionStorage untuk mengingat rentang tanggal yang dipilih marketing.
+// Sengaja TANPA channel → satu tanggal berlaku untuk semua channel, jadi saat
+// pindah tab channel tanggalnya tidak ke-reset. sessionStorage: bertahan selama
+// sesi browser (pindah halaman/remount aman), hilang saat tab/browser ditutup.
+const DATE_FILTER_STORAGE_KEY = "auditLeads.dateFilter";
+
 // Pilihan toko yang dipilih marketing saat mengaudit — HARUS disamakan dengan
 // STORE_OPTIONS di endpoint audit (sales-reports/audit & audit-leads/audit).
 const STORE_OPTIONS = ["Solit", "Sotech", "Onpoint", "Sultan Laptop"] as const;
@@ -133,8 +139,12 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   const [rejecting, setRejecting] = useState(false);
   const [auditFilter, setAuditFilter] = useState<"all" | "audited" | "unaudited">("all");
   // Filter rentang tanggal (format YYYY-MM-DD lokal). Kosong = tidak aktif.
+  // Nilai awal sengaja "" (sama di server & client) supaya tidak ada hydration
+  // mismatch — nilai sebenarnya (tersimpan / default hari ini) di-set di effect
+  // setelah mount lewat sessionStorage. dateReady menandai proses itu selesai.
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [dateReady, setDateReady] = useState(false);
 
   const canInput = hasAnyRole(userRoles, AUDIT_LEADS_INPUT_ROLES);
   const canAudit = hasAnyRole(userRoles, AUDIT_LEADS_AUDIT_ROLES);
@@ -167,7 +177,50 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
     });
   }, []);
 
-  useEffect(() => { fetchRows(); }, [fetchRows]);
+  // Restore rentang tanggal dari sessionStorage sekali setelah mount.
+  // - Ada data tersimpan → pakai itu (termasuk "" = Semua) → pindah tab tidak reset.
+  // - Belum pernah ada → default ke HARI INI.
+  // Dibaca di effect (client-only) supaya sessionStorage tidak disentuh saat SSR.
+  const dateFilterRestored = useRef(false);
+  useEffect(() => {
+    if (dateFilterRestored.current) return;
+    dateFilterRestored.current = true;
+
+    let next = { from: "", to: "" };
+    try {
+      const raw = sessionStorage.getItem(DATE_FILTER_STORAGE_KEY);
+      const saved = raw ? JSON.parse(raw) : null;
+      if (saved && typeof saved.from === "string" && typeof saved.to === "string") {
+        next = { from: saved.from, to: saved.to };
+      } else {
+        const today = toYmd(new Date());
+        next = { from: today, to: today };
+      }
+    } catch {
+      // storage diblokir / JSON korup → fallback aman ke hari ini
+      const today = toYmd(new Date());
+      next = { from: today, to: today };
+    }
+
+    setDateFrom(next.from);
+    setDateTo(next.to);
+    setDateReady(true);
+  }, []);
+
+  // Simpan rentang tanggal tiap kali berubah → bertahan antar tab/halaman.
+  // Dijaga agar tidak menimpa storage dengan nilai awal "" sebelum di-restore.
+  useEffect(() => {
+    if (!dateReady) return;
+    try {
+      sessionStorage.setItem(DATE_FILTER_STORAGE_KEY, JSON.stringify({ from: dateFrom, to: dateTo }));
+    } catch {
+      // storage penuh/diblokir → abaikan, filter tetap jalan di memori
+    }
+  }, [dateFrom, dateTo, dateReady]);
+
+  // Baru fetch setelah rentang tanggal final siap, supaya tidak ada fetch ganda
+  // (sekali dengan tanggal kosong, lalu sekali lagi dengan tanggal hari ini).
+  useEffect(() => { if (dateReady) fetchRows(); }, [fetchRows, dateReady]);
 
   // Reset ke halaman 1 setiap kali filter audit diganti, supaya tidak
   // nyangkut di halaman kosong kalau hasil filter lebih sedikit.
@@ -176,12 +229,15 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   // komponen remount — inilah penyebab tiba-tiba balik ke halaman 1.
   const didMountAuditFilter = useRef(false);
   useEffect(() => {
+    // Tunggu rentang tanggal selesai di-restore dulu; jangan reset halaman
+    // karena perubahan tanggal hasil restore (itu bukan aksi user).
+    if (!dateReady) return;
     if (!didMountAuditFilter.current) {
       didMountAuditFilter.current = true;
       return;
     }
     setPage(1);
-  }, [auditFilter, dateFrom, dateTo]);
+  }, [auditFilter, dateFrom, dateTo, dateReady]);
 
   // Tulis halaman aktif ke URL (?page=). Kalau komponen remount / refetch,
   // posisi pagination tetap terbaca dari URL, tidak balik ke 1.

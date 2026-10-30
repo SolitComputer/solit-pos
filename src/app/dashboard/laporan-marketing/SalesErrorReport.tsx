@@ -37,6 +37,35 @@ function statusOf(total: number): { label: string; cls: string } {
   return { label: "Prioritas Audit", cls: "bg-red-50 text-red-700 ring-red-200" };
 }
 
+type ViewMode = "hari" | "minggu" | "bulan";
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+// "2026-10-22" → "22 Okt 2026". Parse manual biar tidak geser hari karena zona waktu.
+function fmtShort(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// Rentang Senin–Minggu yang memuat tanggal terpilih, DIKUNCI dalam bulan yang
+// sama (konsisten dgn picker bulan — minggu di awal/akhir bisa parsial).
+function weekRange(dateStr: string): { from: string; to: string } {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dow = new Date(y, m - 1, d).getDay(); // 0=Min .. 6=Sab
+  const offset = (dow + 6) % 7;               // jarak mundur ke Senin (Senin=0)
+  const monBase = d - offset;                 // tanggal Senin (bisa < 1)
+  const monthLast = new Date(y, m, 0).getDate();
+  const fromD = Math.max(1, monBase);
+  const toD = Math.min(monthLast, monBase + 6);
+  return { from: `${y}-${pad2(m)}-${pad2(fromD)}`, to: `${y}-${pad2(m)}-${pad2(toD)}` };
+}
+
+// Rentang 1 bulan penuh dari "YYYY-MM".
+function monthRange(period: string): { from: string; to: string } {
+  const [y, m] = period.split("-").map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return { from: `${period}-01`, to: `${period}-${pad2(last)}` };
+}
+
 export default function SalesErrorReport() {
   const today = todayWibDate();
   const [period, setPeriod] = useState(() => currentPeriodWib());
@@ -46,6 +75,8 @@ export default function SalesErrorReport() {
   const [meta, setMeta] = useState<Record<string, Meta>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Mode tampilan: per hari (default, editable) / per minggu / per bulan (agregat, read-only).
+  const [viewMode, setViewMode] = useState<ViewMode>("hari");
 
   // Daftar sales (dari DB) + daftar sales aktif yang belum masuk (buat popup).
   const [members, setMembers] = useState<Member[]>([]);
@@ -76,6 +107,18 @@ export default function SalesErrorReport() {
     const d = Math.min(day, dates.length || 31);
     return `${period}-${String(d).padStart(2, "0")}`;
   }, [period, day, dates.length]);
+
+  // Rentang efektif sesuai mode: hari = 1 tgl; minggu = Senin–Minggu dari tgl
+  // aktif; bulan = 1 bulan penuh.
+  const range = useMemo(() => {
+    if (viewMode === "bulan") return monthRange(period);
+    if (viewMode === "minggu") return weekRange(activeDate);
+    return { from: activeDate, to: activeDate };
+  }, [viewMode, period, activeDate]);
+
+  // Mode agregat (minggu/bulan) read-only: tidak bisa edit sel, warnai, atau hapus.
+  const readOnly = viewMode !== "hari";
+  const rangeLabel = viewMode === "hari" ? fmtShort(range.from) : `${fmtShort(range.from)} – ${fmtShort(range.to)}`;
 
   // ── Daftar sales (tidak tergantung tanggal) ──
   const loadMembers = useCallback(async () => {
@@ -122,14 +165,18 @@ export default function SalesErrorReport() {
   const load = useCallback(async () => {
     try {
       setLoading(true); setError("");
-      const res = await fetch(`/api/sales-error-report?date=${activeDate}`, { cache: "no-store" });
+      // Per hari → ?date= (perilaku lama). Per minggu/bulan → ?from=&to= (agregat).
+      const qs = viewMode === "hari"
+        ? `date=${activeDate}`
+        : `from=${range.from}&to=${range.to}`;
+      const res = await fetch(`/api/sales-error-report?${qs}`, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat");
       setCounts(json.data.counts || {});
       setAkun(json.data.akun || {});
       setMeta(json.data.meta || {});
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
-  }, [activeDate]);
+  }, [viewMode, activeDate, range.from, range.to]);
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
@@ -137,7 +184,7 @@ export default function SalesErrorReport() {
     window.addEventListener("mouseup", up);
     return () => window.removeEventListener("mouseup", up);
   }, []);
-  useEffect(() => { setSelStart(null); setSelEnd(null); }, [activeDate]);
+  useEffect(() => { setSelStart(null); setSelEnd(null); }, [activeDate, viewMode]);
 
   // Baris = daftar sales dari DB. Counts dicocokkan pakai user_id (filled_by).
   const rows = useMemo(() => {
@@ -305,10 +352,27 @@ export default function SalesErrorReport() {
       {/* Toolbar: bulan + hari 1-31 */}
       <div className="rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-3.5 sm:px-5 sm:py-4 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <input type="month" value={period} onChange={(e) => e.target.value && setPeriod(e.target.value)}
               className="h-9 px-3 rounded-full bg-gray-50 border border-gray-200 text-sm font-semibold text-gray-700 outline-none focus:border-violet-300" />
             <span className="text-sm font-bold text-gray-900 capitalize">{monthLabel}</span>
+
+            {/* Mode filter: Per Hari / Per Minggu / Per Bulan */}
+            <div className="inline-flex items-center gap-0.5 rounded-full bg-gray-100 p-0.5">
+              {([["hari", "Per Hari"], ["minggu", "Per Minggu"], ["bulan", "Per Bulan"]] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`h-8 px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${viewMode === mode ? "bg-violet-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-100">
+              {rangeLabel}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => { setShowAdd(true); setAddSearch(""); }}
@@ -324,16 +388,24 @@ export default function SalesErrorReport() {
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-1 overflow-x-auto pb-1">
-          <button onClick={() => setDay((d) => Math.max(1, d - 1))} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
-          {dates.map((d) => (
-            <button key={d.id} onClick={() => setDay(d.day)} title={d.weekday}
-              className={`shrink-0 min-w-[34px] h-8 px-1.5 rounded-lg text-xs font-semibold transition-colors ${d.day === Math.min(day, dates.length) ? "bg-violet-600 text-white shadow-sm" : d.isSunday ? "text-red-500 hover:bg-gray-100" : "text-gray-600 hover:bg-gray-100"}`}>
-              {d.day}
-            </button>
-          ))}
-          <button onClick={() => setDay((d) => Math.min(dates.length, d + 1))} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
-        </div>
+        {/* Picker hari — relevan untuk Per Hari & Per Minggu (menentukan minggu
+            mana). Di Per Bulan disembunyikan karena seluruh bulan dihitung. */}
+        {viewMode !== "bulan" && (
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            <button onClick={() => setDay((d) => Math.max(1, d - 1))} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
+            {dates.map((d) => {
+              const ymd = `${period}-${pad2(d.day)}`;
+              const inWeek = viewMode === "minggu" && ymd >= range.from && ymd <= range.to;
+              return (
+                <button key={d.id} onClick={() => setDay(d.day)} title={d.weekday}
+                  className={`shrink-0 min-w-[34px] h-8 px-1.5 rounded-lg text-xs font-semibold transition-colors ${d.day === Math.min(day, dates.length) ? "bg-violet-600 text-white shadow-sm" : inWeek ? "bg-violet-100 text-violet-700" : d.isSunday ? "text-red-500 hover:bg-gray-100" : "text-gray-600 hover:bg-gray-100"}`}>
+                  {d.day}
+                </button>
+              );
+            })}
+            <button onClick={() => setDay((d) => Math.min(dates.length, d + 1))} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -396,17 +468,20 @@ export default function SalesErrorReport() {
                     <tr key={row.key} className="group hover:bg-blue-50/30">
                       <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-400 font-semibold">{rIdx + 1}</td>
                       <td
-                        onMouseDown={() => startSel(rIdx, 0)} onMouseEnter={() => extendSel(rIdx, 0)}
+                        onMouseDown={readOnly ? undefined : () => startSel(rIdx, 0)}
+                        onMouseEnter={readOnly ? undefined : () => extendSel(rIdx, 0)}
                         className={`border border-gray-200 px-3 py-1.5 font-semibold whitespace-nowrap text-gray-800 ${namaColor ? INSIGHT_COLOR_BG[namaColor] : ""} ${namaSelected ? "ring-2 ring-inset ring-violet-500/70" : ""}`}>
                         <div className="flex items-center justify-between gap-1">
                           <span>{row.sales_name}</span>
-                          <button
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={() => removeMember(row.key, row.sales_name)}
-                            title="Keluarkan dari daftar"
-                            className="opacity-0 group-hover:opacity-100 shrink-0 w-5 h-5 inline-flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition">
-                            <X className="w-3 h-3" />
-                          </button>
+                          {!readOnly && (
+                            <button
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={() => removeMember(row.key, row.sales_name)}
+                              title="Keluarkan dari daftar"
+                              className="opacity-0 group-hover:opacity-100 shrink-0 w-5 h-5 inline-flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition">
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       </td>
                       {COLS.map((col, cIdx) => {
@@ -415,22 +490,35 @@ export default function SalesErrorReport() {
                         const selected = inSel(rIdx, c);
                         return (
                           <td key={col.key}
-                            onMouseDown={() => startSel(rIdx, c)} onMouseEnter={() => extendSel(rIdx, c)}
-                            className={`relative border border-gray-200 p-0 ${color ? INSIGHT_COLOR_BG[color] : ""} ${selected ? "ring-2 ring-inset ring-violet-500/70 z-[1]" : ""}`}>
+                            onMouseDown={readOnly ? undefined : () => startSel(rIdx, c)}
+                            onMouseEnter={readOnly ? undefined : () => extendSel(rIdx, c)}
+                            className={`relative border border-gray-200 p-0 ${color ? INSIGHT_COLOR_BG[color] : ""} ${selected ? "ring-2 ring-inset ring-violet-500/70 z-[1]" : ""}`}>                            {col.kind === "akun" ? (
                             {col.kind === "akun" ? (
-                              <input value={row.akun_device} onChange={(e) => saveAkun(row.key, e.target.value)}
-                                placeholder="Laptop… (global)" className="w-full px-2 py-1.5 bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-violet-300 text-gray-800" />
+                              readOnly ? (
+                                <div className="px-2 py-1.5 text-gray-800 truncate">{row.akun_device || "—"}</div>
+                              ) : (
+                                <input value={row.akun_device} onChange={(e) => saveAkun(row.key, e.target.value)}
+                                  placeholder="Laptop… (global)" className="w-full px-2 py-1.5 bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-violet-300 text-gray-800" />
+                              )
                             ) : col.kind === "catatan" ? (
-                              <input value={row.catatan} onChange={(e) => saveMetaCell(row.key, { catatan: e.target.value })}
-                                placeholder="Catatan…" className="w-full px-2 py-1.5 bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-violet-300 text-gray-800" />
+                              readOnly ? (
+                                <div className="px-2 py-1.5 text-gray-800 truncate">{row.catatan || "—"}</div>
+                              ) : (
+                                <input value={row.catatan} onChange={(e) => saveMetaCell(row.key, { catatan: e.target.value })}
+                                  placeholder="Catatan…" className="w-full px-2 py-1.5 bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-violet-300 text-gray-800" />
+                              )
                             ) : col.kind === "chat_manual" ? (
-                              <input
-                                type="number" min={0} inputMode="numeric"
-                                value={row.chat || ""}
-                                onChange={(e) => saveMetaCell(row.key, { chat: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
-                                placeholder="0"
-                                className={`w-full px-2 py-1.5 bg-transparent outline-none text-center tabular-nums focus:bg-white focus:ring-1 focus:ring-violet-300 ${row.chat > 0 ? "font-semibold text-red-600" : "text-gray-400"}`}
-                              />
+                              readOnly ? (
+                                <div className={`px-2 py-1.5 text-center tabular-nums ${row.chat > 0 ? "font-semibold text-red-600" : "text-gray-400"}`}>{row.chat || 0}</div>
+                              ) : (
+                                <input
+                                  type="number" min={0} inputMode="numeric"
+                                  value={row.chat || ""}
+                                  onChange={(e) => saveMetaCell(row.key, { chat: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
+                                  placeholder="0"
+                                  className={`w-full px-2 py-1.5 bg-transparent outline-none text-center tabular-nums focus:bg-white focus:ring-1 focus:ring-violet-300 ${row.chat > 0 ? "font-semibold text-red-600" : "text-gray-400"}`}
+                                />
+                              )
                             ) : col.kind === "status" ? (
                               <div className="px-2 py-1.5 text-center"><span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ring-1 ring-inset ${st.cls}`}>{st.label}</span></div>
                             ) : col.kind === "temuan" ? (
