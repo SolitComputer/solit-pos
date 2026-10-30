@@ -722,7 +722,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // Laporan Marketing → tab "Laporan Ads" (tabel ads_report_rows). WAJIB terdaftar
   // di sini — kalau tidak, middleware jatuh ke dynamic-matrix & blokir MARKETING
   // (redirect HTML → fetch gagal "Unexpected token '<'"). Role = sama dengan yang
-  // boleh buka Laporan Marketing. Write tetap digate di handler pakai canManage().
+  // boleh buka Laporan Marketing. Write tetap digate di handler pakai canManage(). 
   "/api/ads-report": [...SALES_REPORT_AUDIT_ROLES],
 
   "/dashboard/todos": [...TODO_ROLES],
