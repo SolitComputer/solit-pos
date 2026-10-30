@@ -7,6 +7,7 @@ import {
     expandRolesWithParents,
     PERMISSIONS as PERMS,
     SELLER_PIC_CANDIDATE_ROLES,
+    canActorFollowupType, // ✅ cek role boleh FU kategori tertentu
 } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
 
@@ -54,15 +55,23 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
 
     const data = ((users ?? []) as CandidateRow[])
         .filter(isCandidate)
-        .map((u) => ({
-            user_id: u.id,
-            name: u.name,
-            role: rolesOfRow(u)[0],
-            roles: rolesOfRow(u),
-            // ✅ dua status terpisah; default false kalau belum ada barisnya
-            is_active_user: activeMap.get(`${u.id}::USER`) ?? false,
-            is_active_pedagang: activeMap.get(`${u.id}::PEDAGANG`) ?? false,
-        }));
+        .map((u) => {
+            const r = rolesOfRow(u);
+            return {
+                user_id: u.id,
+                name: u.name,
+                role: r[0],
+                roles: r,
+                // ✅ dua status terpisah; default false kalau belum ada barisnya
+                is_active_user: activeMap.get(`${u.id}::USER`) ?? false,
+                is_active_pedagang: activeMap.get(`${u.id}::PEDAGANG`) ?? false,
+                // ✅ kategori mana yang RELEVAN untuk role ini — UI pakai ini buat
+                // menentukan chip mana yang ditampilkan (Crew Sales → User saja,
+                // Kepala Marketing → Pedagang saja).
+                eligible_user: canActorFollowupType(r, "USER"),
+                eligible_pedagang: canActorFollowupType(r, "PEDAGANG"),
+            };
+        });
 
     return NextResponse.json({
         success: true,
@@ -135,6 +144,29 @@ async function putHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     if (invalid.length > 0) {
         return NextResponse.json(
             { success: false, message: "Hanya Crew Sales & Kepala Marketing yang bisa dijadikan PIC" },
+            { status: 400 }
+        );
+    }
+
+    // ✅ Validasi PER KATEGORI: role target harus boleh FU kategori yang di-toggle.
+    //   - Crew Sales hanya boleh dicentang di kategori USER
+    //   - Kepala Marketing hanya boleh dicentang di kategori PEDAGANG
+    // Mencegah kombinasi tak valid masuk DB (mis. Crew Sales dicentang Pedagang).
+    const mismatch = items.find((i) => {
+        const target = valid.get(i.user_id);
+        if (!target) return false; // sudah ditangkap invalid di atas
+        const targetRoles = rolesOfRow(target);
+        return !canActorFollowupType(targetRoles, i.seller_type as "USER" | "PEDAGANG");
+    });
+
+    if (mismatch) {
+        const target = valid.get(mismatch.user_id);
+        return NextResponse.json(
+            {
+                success: false,
+                message: `${target?.name ?? "User ini"} tidak berwenang follow-up kategori ${mismatch.seller_type === "PEDAGANG" ? "Pedagang" : "User"
+                    }`,
+            },
             { status: 400 }
         );
     }

@@ -8,6 +8,7 @@ import {
   expandRolesWithParents,
   PERMISSIONS as PERMS,
   SELLER_PIC_CANDIDATE_ROLES,
+  canActorFollowupType, // ✅ cek role boleh FU kategori tertentu
 } from "@/lib/permissions";
 import { nextFollowupISO, normalizeSellerType, SellerType } from "@/lib/sellerFollowup";
 import { logActivity } from "@/lib/activityLogger";
@@ -135,12 +136,15 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (typeof fields.notes === "string") update.notes = fields.notes;
 
     if (action === "followup") {
-      // GATE 1 — role
-      if (!hasAnyRole(roles, PERMS.FOLLOWUP_SELLER)) {
+      // GATE 1 — role PER KATEGORI (keputusan 2026-10-30 rev):
+      //   - USER     → hanya Crew Sales
+      //   - PEDAGANG → hanya Kepala Marketing
+      // sellerType = tipe yang diproses di request ini (dihitung di atas).
+      if (!canActorFollowupType(roles, sellerType as "USER" | "PEDAGANG")) {
         return NextResponse.json(
           {
             success: false,
-            message: "Hanya Crew Sales & Kepala Marketing yang bisa melakukan follow-up",
+            message: `Follow-up ${sellerType === "PEDAGANG" ? "Pedagang" : "User"} bukan wewenang role kamu`,
           },
           { status: 403 }
         );
@@ -197,8 +201,9 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         update.closed_by = user.name;
       }
     } else if (action === "update_phone") {
-      // GATE — hanya Admin, ATAU Crew Sales yang berwenang atas customer ini.
-      if (!canManage && !hasAnyRole(roles, PERMS.FOLLOWUP_SELLER)) {
+      // GATE — hanya Admin, ATAU actor yang berwenang atas KATEGORI customer ini
+      // (Crew Sales utk USER, Kepala Marketing utk PEDAGANG).
+      if (!canManage && !canActorFollowupType(roles, existingType)) {
         return NextResponse.json(
           { success: false, message: "Kamu tidak berwenang mengubah nomor HP customer ini" },
           { status: 403 }
@@ -279,10 +284,11 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
             ? target!.roles
             : [target?.role].filter(Boolean) as string[];
 
-        const validRole = targetRoles.some((r) =>
-          (SELLER_PIC_CANDIDATE_ROLES as string[]).includes(r)
-        );
-
+        // ✅ Role target harus cocok KATEGORI customer ini, bukan sekadar
+        // "termasuk kandidat PIC". Admin tidak bisa assign customer PEDAGANG
+        // ke Crew Sales (atau customer USER ke Kepala Marketing).
+        const validRole = canActorFollowupType(targetRoles, existingType);
+        
         // ✅ Target harus aktif DI KATEGORI customer ini. Assign customer
         // PEDAGANG ke sales yang hanya aktif di USER → ditolak.
         const { data: targetPic } = await supabaseAdmin

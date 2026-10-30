@@ -8,6 +8,7 @@ import {
   hasAnyRole,
   expandRolesWithParents,
   PERMISSIONS as PERMS,
+  canActorFollowupType, // ✅ cek role boleh FU kategori tertentu (per baris)
 } from "@/lib/permissions";
 
 async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUser) {
@@ -121,12 +122,18 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
       .map((row: any) => {
         const due = isDue(row.next_followup_at, now);
 
-        // ✅ Tipe customer baris ini menentukan whitelist & "penguncian" mana
+         // ✅ Tipe customer baris ini menentukan whitelist & "penguncian" mana
         // yang dipakai. Normalisasi defensif ke USER kalau nilainya aneh.
         const rowType: "USER" | "PEDAGANG" =
           row.seller_type === "PEDAGANG" ? "PEDAGANG" : "USER";
         const activeSetForType = activePicIdsByType[rowType];
         const iAmWhitelistedForType = whitelistedByType[rowType];
+
+        // ✅ Role-ku boleh FU kategori baris INI? (keputusan 2026-10-30 rev)
+        //   - Crew Sales     → hanya baris USER
+        //   - Kepala Marketing → hanya baris PEDAGANG
+        // Dihitung per baris, bukan global, karena actor beda per kategori.
+        const iAmActorForType = canActorFollowupType(roles, rowType);
 
         // ✅ PIC yang tercatat masih "mengunci" customer ini HANYA kalau dia
         // masih aktif DI KATEGORI customer ini. Kalau PIC-nya aktif di USER
@@ -142,16 +149,16 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
         const isOwner = row.pic_user_id === null || isTrueOwner || !picIsStillActive;
 
         let lockReason: string | null = null;
-        if (!isActorRole) {
-          lockReason = "Role kamu tidak berwenang melakukan follow-up";
+        if (!iAmActorForType) {
+          lockReason = `Follow-up ${rowType === "PEDAGANG" ? "Pedagang" : "User"} bukan wewenang role kamu`;
         } else if (!iAmWhitelistedForType) {
           lockReason = `Akses follow-up ${rowType === "PEDAGANG" ? "Pedagang" : "User"} kamu belum diaktifkan Admin`;
         } else if (!isOwner) {
           lockReason = `Customer ini sudah milik ${row.closed_by ?? "PIC lain"}`;
         }
 
-        // ✅ can_followup sekarang pakai whitelist SESUAI kategori customer ini.
-        const canFollowup = isActorRole && iAmWhitelistedForType && isOwner;
+        // ✅ can_followup: actor SESUAI kategori + whitelist sesuai kategori + owner.
+        const canFollowup = iAmActorForType && iAmWhitelistedForType && isOwner;
 
         return {
           ...row,

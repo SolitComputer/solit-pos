@@ -127,11 +127,34 @@ export const SELLER_FOLLOWUP_SUPERVISOR_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES", "KEPALA_ZENITH",
 ];
 
-/** Role yang SECARA STRUKTURAL boleh follow-up — masih dicek whitelist + ownership.
- *  Keputusan 2026-10-30: KEPALA_MARKETING DICABUT dari sini — dia jadi pengawas
- *  (tetap bisa lihat semua lewat SUPERVISOR_ROLES + hapus lewat DELETE_ROLES),
- *  tapi TIDAK bisa melakukan follow-up sendiri. Pelaku FU hanya Crew Sales. */
-export const SELLER_FOLLOWUP_ACTOR_ROLES: UserRole[] = ["CREW_SALES"];
+/** Role yang boleh follow-up, DIPISAH PER KATEGORI (keputusan 2026-10-30 rev).
+ *  - USER     → Crew Sales
+ *  - PEDAGANG → Kepala Marketing
+ *  Masih dicek whitelist (per kategori) + ownership di layer berikutnya.
+ *  Ini SATU-SATUNYA sumber "role mana boleh kategori apa" — ubah di sini saja. */
+export const SELLER_ACTOR_ROLES_BY_TYPE: Record<"USER" | "PEDAGANG", UserRole[]> = {
+  USER: ["CREW_SALES"],
+  PEDAGANG: ["KEPALA_MARKETING"],
+};
+
+/** Gabungan semua role yang boleh FU (kategori mana pun). Dipakai untuk gate
+ *  KASAR di level route/permission (PERMS.FOLLOWUP_SELLER) — "boleh sentuh fitur
+ *  FU sama sekali atau tidak". Cek HALUS per kategori pakai helper di bawah. */
+export const SELLER_FOLLOWUP_ACTOR_ROLES: UserRole[] = Array.from(
+  new Set<UserRole>([
+    ...SELLER_ACTOR_ROLES_BY_TYPE.USER,
+    ...SELLER_ACTOR_ROLES_BY_TYPE.PEDAGANG,
+  ])
+);
+
+/** Helper: apakah salah satu role user boleh FU kategori tertentu? */
+export function canActorFollowupType(
+  userRoles: string[],
+  sellerType: "USER" | "PEDAGANG"
+): boolean {
+  const allowed = SELLER_ACTOR_ROLES_BY_TYPE[sellerType] as string[];
+  return userRoles.some((r) => allowed.includes(r));
+}
 
 /** Archive / reactivate / assign ulang PIC */
 export const SELLER_FOLLOWUP_MANAGE_ROLES: UserRole[] = [...FULL_ACCESS];
@@ -143,10 +166,12 @@ export const SELLER_FOLLOWUP_DELETE_ROLES: UserRole[] = ["ADMIN", "KEPALA_MARKET
 export const SELLER_PIC_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
 /** Role yang muncul sebagai kandidat di dropdown checklist PIC.
- *  Keputusan 2026-10-30: KEPALA_MARKETING dicabut — sejalan dgn ACTOR_ROLES,
- *  hanya Crew Sales yang relevan jadi PIC follow-up. */
-export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = ["CREW_SALES"];
-
+ *  Keputusan 2026-10-30 rev: gabungan semua actor — Crew Sales (untuk USER) +
+ *  Kepala Marketing (untuk PEDAGANG). Kategori chip mana yang muncul per orang
+ *  ditentukan di UI sesuai role-nya (lihat SELLER_ACTOR_ROLES_BY_TYPE). */
+export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = Array.from(
+  new Set<UserRole>([...SELLER_FOLLOWUP_ACTOR_ROLES])
+);
 /** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
 export const ALL_UNITS_ROLES: UserRole[] = [
   ...FULL_ACCESS, "ACCOUNTING", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG",

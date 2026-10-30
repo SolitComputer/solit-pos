@@ -70,6 +70,10 @@ interface PicCandidate {
   // ✅ status whitelist dipisah per kategori (cocok dgn output GET /api/seller-pics)
   is_active_user: boolean;
   is_active_pedagang: boolean;
+  // ✅ kategori mana yang RELEVAN untuk role ini (Crew Sales → user,
+  // Kepala Marketing → pedagang). UI pakai ini untuk tampilkan chip yg sesuai.
+  eligible_user: boolean;
+  eligible_pedagang: boolean;
 }
 
 type Tab = "USER" | "PEDAGANG";
@@ -374,17 +378,21 @@ function PicAccessDropdown({
     return () => document.removeEventListener("keydown", onEsc);
   }, []);
 
+  // ✅ Dikelompokkan per KATEGORI follow-up, bukan per role:
+  //   - "Follow-up User"     → kandidat yang eligible kategori USER (Crew Sales)
+  //   - "Follow-up Pedagang" → kandidat yang eligible kategori PEDAGANG (Kepala Marketing)
+  // Satu orang bisa muncul di dua grup kalau rolenya eligible dua-duanya.
   const groups = useMemo(
     () => [
       {
-        label: "Kepala Marketing",
-        items: pics.filter((p) => p.roles.includes("KEPALA_MARKETING")),
+        label: "Follow-up User",
+        type: "USER" as const,
+        items: pics.filter((p) => p.eligible_user),
       },
       {
-        label: "Crew Sales",
-        items: pics.filter(
-          (p) => p.roles.includes("CREW_SALES") && !p.roles.includes("KEPALA_MARKETING")
-        ),
+        label: "Follow-up Pedagang",
+        type: "PEDAGANG" as const,
+        items: pics.filter((p) => p.eligible_pedagang),
       },
     ],
     [pics]
@@ -459,51 +467,43 @@ function PicAccessDropdown({
                       {g.label}
                     </p>
                     {g.items.map((p) => {
-                      const savingUser = savingId === `${p.user_id}::USER`;
-                      const savingPedagang = savingId === `${p.user_id}::PEDAGANG`;
+                      // kategori grup ini menentukan chip & status yang dipakai
+                      const type = g.type; // "USER" | "PEDAGANG"
+                      const active = type === "USER" ? p.is_active_user : p.is_active_pedagang;
+                      const saving = savingId === `${p.user_id}::${type}`;
                       const sendingReminder = sendingReminderId === p.user_id;
-                      // tombol lonceng aktif kalau dia PIC di minimal satu kategori
-                      const isActiveAny = p.is_active_user || p.is_active_pedagang;
-
-                      // satu chip checkbox kategori — dipakai 2x (USER & PEDAGANG)
-                      const CategoryChip = ({
-                        type,
-                        active,
-                        saving,
-                      }: {
-                        type: "USER" | "PEDAGANG";
-                        active: boolean;
-                        saving: boolean;
-                      }) => (
-                        <button
-                          onClick={() => onToggle(p.user_id, type, !active)}
-                          disabled={saving}
-                          title={`${active ? "Nonaktifkan" : "Aktifkan"} akses ${type === "USER" ? "User" : "Pedagang"
-                            } untuk ${p.name}`}
-                          className={cx(
-                            "flex-1 min-w-0 h-9 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-bold transition-all active:scale-[0.98] disabled:opacity-50",
-                            FOCUS_RING,
-                            active
-                              ? type === "USER"
-                                ? "bg-blue-50 border-blue-200 text-blue-700"
-                                : "bg-amber-50 border-amber-200 text-amber-700"
-                              : "bg-white border-gray-200 text-gray-400 hover:border-gray-300"
-                          )}
-                        >
-                          <span className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0">
-                            {saving ? <Spinner dark={!active} /> : active ? <CheckIcon /> : null}
-                          </span>
-                          {type === "USER" ? "User" : "Pedagang"}
-                        </button>
-                      );
 
                       return (
                         <div
-                          key={p.user_id}
-                          className="w-full px-4 py-2.5 flex flex-col gap-2 hover:bg-gray-50 transition-colors rounded-lg"
+                          key={`${p.user_id}-${type}`}
+                          className="w-full min-h-[52px] flex items-center gap-1 pr-2"
                         >
-                          {/* Baris atas: nama + lonceng */}
-                          <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => onToggle(p.user_id, type, !active)}
+                            disabled={saving}
+                            title={`${active ? "Nonaktifkan" : "Aktifkan"} akses ${type === "USER" ? "User" : "Pedagang"
+                              } untuk ${p.name}`}
+                            className={cx(
+                              "flex-1 min-w-0 px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50 text-left rounded-lg",
+                              FOCUS_RING
+                            )}
+                          >
+                            <span
+                              className={cx(
+                                "w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-all",
+                                active
+                                  ? type === "USER"
+                                    ? "bg-blue-600 border-blue-600 text-white"
+                                    : "bg-amber-600 border-amber-600 text-white"
+                                  : "bg-white border-gray-300"
+                              )}
+                            >
+                              {saving ? (
+                                <Spinner dark={!active} />
+                              ) : active ? (
+                                <CheckIcon />
+                              ) : null}
+                            </span>
                             <span className="flex-1 min-w-0">
                               <span className="block text-xs font-bold text-gray-800 truncate">
                                 {p.name}
@@ -511,45 +511,37 @@ function PicAccessDropdown({
                               <span
                                 className={cx(
                                   "block text-[10px] truncate",
-                                  isActiveAny ? "text-emerald-600 font-semibold" : "text-gray-400"
+                                  active ? "text-emerald-600 font-semibold" : "text-gray-400"
                                 )}
                               >
-                                {isActiveAny ? "PIC aktif" : "Nonaktif"}
+                                {active
+                                  ? `Boleh FU ${type === "USER" ? "User" : "Pedagang"}`
+                                  : "Nonaktif"}
                               </span>
                             </span>
+                          </button>
 
-                            {/* ── Lonceng: kirim reminder follow-up ke PIC ini ── */}
-                            <button
-                              onClick={() => onSendReminder(p.user_id, p.name)}
-                              disabled={!isActiveAny || sendingReminder}
-                              title={
-                                isActiveAny
-                                  ? `Ingatkan ${p.name} untuk follow-up`
-                                  : "Aktifkan PIC ini dulu sebelum mengirim reminder"
-                              }
-                              className={cx(
-                                "flex-shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center transition-all",
-                                FOCUS_RING,
-                                !isActiveAny
-                                  ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed"
-                                  : sendingReminder
-                                    ? "bg-amber-50 border-amber-200 text-amber-400"
-                                    : "bg-white border-gray-200 text-gray-400 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200 active:scale-95"
-                              )}
-                            >
-                              {sendingReminder ? <Spinner dark /> : <BellIcon />}
-                            </button>
-                          </div>
-
-                          {/* Baris bawah: 2 chip kategori */}
-                          <div className="flex items-center gap-1.5">
-                            <CategoryChip type="USER" active={p.is_active_user} saving={savingUser} />
-                            <CategoryChip
-                              type="PEDAGANG"
-                              active={p.is_active_pedagang}
-                              saving={savingPedagang}
-                            />
-                          </div>
+                          {/* ── Lonceng: kirim reminder follow-up ke PIC ini ── */}
+                          <button
+                            onClick={() => onSendReminder(p.user_id, p.name)}
+                            disabled={!active || sendingReminder}
+                            title={
+                              active
+                                ? `Ingatkan ${p.name} untuk follow-up`
+                                : "Aktifkan PIC ini dulu sebelum mengirim reminder"
+                            }
+                            className={cx(
+                              "flex-shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center transition-all",
+                              FOCUS_RING,
+                              !active
+                                ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed"
+                                : sendingReminder
+                                  ? "bg-amber-50 border-amber-200 text-amber-400"
+                                  : "bg-white border-gray-200 text-gray-400 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200 active:scale-95"
+                            )}
+                          >
+                            {sendingReminder ? <Spinner dark /> : <BellIcon />}
+                          </button>
                         </div>
                       );
                     })}
@@ -1389,7 +1381,7 @@ function FollowupCard({
               phone={f.customer_phone}
               canEdit={f.can_followup || canManage}
               saving={processing}
-             onSave={(newPhone) => onEditPhone?.(f.id, newPhone)}
+              onSave={(newPhone) => onEditPhone?.(f.id, newPhone)}
             />
           </div>
 
@@ -1765,7 +1757,7 @@ export default function ManagementSellerPage() {
       .catch(() => setAuthUser(null));
   }, []);
 
-const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
+  const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
 
   const canView = hasAnyRole(userRoles, PERMISSIONS.VIEW_SELLER_FOLLOWUP);
   const canManage = hasAnyRole(userRoles, PERMISSIONS.MANAGE_SELLER_FOLLOWUP);
@@ -2023,7 +2015,8 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
           <p className="text-gray-400 text-sm mt-1.5 leading-relaxed">
             Halaman ini hanya untuk{" "}
             <span className="font-semibold text-gray-600">Admin, Kepala Marketing, Kepala Sales</span>{" "}
-            &amp; Crew Sales. Follow-up hanya bisa dilakukan Crew Sales yang diaktifkan Admin.
+            &amp; Crew Sales. FU User oleh Crew Sales, FU Pedagang oleh Kepala Marketing
+            (yang diaktifkan Admin).
           </p>
         </div>
       </DashboardLayout>
