@@ -948,12 +948,12 @@ const GROUP_ORDER: string[] = [
   "Transaksi",
   "Laporan Sales",
   "Audit Marketing",
+  "Marketing",
   "Penyedia Barang",
   "Penyiapan Barang",
   "Pengantaran",
   "Servis",
   "Misi Pekerjaan",
-  "Marketing",
   "Absensi",
   "Log",
   "Ultah",
@@ -1137,11 +1137,8 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
     if (!utama.items.some((it) => it.href === ITEM_LENCANA.href)) {
       utama.items.push(ITEM_LENCANA);
     }
-    if (!utama.items.some((it) => it.href === ITEM_PELANGGARAN.href)) {
-      utama.items.push(ITEM_PELANGGARAN);
-    }
   } else {
-    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE, ITEM_LENCANA, ITEM_PELANGGARAN] }, ...ROLE_MENUS[role]];
+    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE, ITEM_LENCANA] }, ...ROLE_MENUS[role]];
   }
 });
 // Kendaraan: grup sendiri (collapsible) berisi Dashboard + Management Kendaraan.
@@ -1231,6 +1228,31 @@ function withContractInAbsensi(
     const utamaIdx = next.findIndex((g) => g.label === "Utama");
     const at = utamaIdx >= 0 ? utamaIdx + 1 : next.length;
     return [...next.slice(0, at), { label: "Absensi", items }, ...next.slice(at)];
+  }
+  return next;
+}
+
+// Pelanggaran: dulu menu di grup "Utama". Sekarang dipindah jadi submenu di
+// dalam grup "Absensi", ditaruh di posisi PALING AKHIR grup Absensi — artinya
+// tepat di bawah "Daftar Kontrak" (ITEM_CONTRACT_EXPIRING) yang disuntik
+// withContractInAbsensi. Karena itu fungsi ini WAJIB dipanggil SETELAH
+// withContractInAbsensi di pipeline `groups`. Halaman & hak akses Pelanggaran
+// TIDAK berubah — semua role tetap dapat menu ini (semua role punya grup
+// Absensi; fallback bikin grup Absensi minimal kalau belum ada, pola identik
+// dgn withContractInAbsensi).
+function withPelanggaranInAbsensi(groups: MenuGroup[]): MenuGroup[] {
+  const HREF = ITEM_PELANGGARAN.href;
+  let injected = false;
+  const next = groups.map((g) => {
+    if (g.label !== "Absensi") return g;
+    injected = true;
+    if (g.items.some((it) => it.href === HREF)) return g;
+    return { ...g, items: [...g.items, ITEM_PELANGGARAN] };
+  });
+  if (!injected) {
+    const utamaIdx = next.findIndex((g) => g.label === "Utama");
+    const at = utamaIdx >= 0 ? utamaIdx + 1 : next.length;
+    return [...next.slice(0, at), { label: "Absensi", items: [ITEM_PELANGGARAN] }, ...next.slice(at)];
   }
   return next;
 }
@@ -1855,7 +1877,7 @@ export default function Sidebar() {
       .map((g) => ({ ...g, items: g.items.filter((it) => it.href !== ITEM_PKL_REPORT.href) }))
       .filter((g) => g.items.length > 0);
 
-  const groups: MenuGroup[] = stripPklReports(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKendaraanGroup(
+  const groups: MenuGroup[] = stripPklReports(withPelanggaranInAbsensi(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKendaraanGroup( 
     dedupeGroups([
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
@@ -1871,7 +1893,7 @@ export default function Sidebar() {
     showPerjanjian: !!(contractStatus && contractStatus !== "APPROVED"),
     showSign: isContractSigner,
     showExpiring: isContractExpiringAdmin,
-  }));
+  })));
 
   const groupsSig = groups.map((g) => g.label).join("|");
 

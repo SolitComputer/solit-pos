@@ -484,7 +484,7 @@ function MultiRoleSelect({
   const ALL_ROLE_GROUPS = useMemo(() => {
     const groups = [
       { label: "Akses Penuh", roles: ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] },
-      { label: "Management", roles: ["KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG"] },
+      { label: "Management", roles: ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG"] },
       {
         label: "Operasional",
         roles: [
@@ -497,7 +497,7 @@ function MultiRoleSelect({
       { label: "Onpoint & Sotech", roles: ["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"] },
       {
         label: "Magang (PKL)", roles: [
-          "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+          "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
           "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
           "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
           "PKL_ACCOUNTING",

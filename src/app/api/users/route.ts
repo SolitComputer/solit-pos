@@ -10,6 +10,11 @@ const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 // Management User — dikunci per-akun, bukan per-role.
 const DELETE_USER_ALLOWED_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
 
+// Role yang sudah dipensiunkan — tidak boleh di-assign ke user baru maupun
+// ditambahkan ke user lama lewat edit/API. User yang SUDAH memilikinya tidak
+// diutak-atik supaya datanya tidak hilang.
+const DEPRECATED_ROLES = new Set(["KEPALA_ZENITH", "PKL_ZENITH"]);
+
 function isFullAccess(roles: string[]): boolean {
   return roles.some(r => FULL_ACCESS_ROLES.has(r));
 }
@@ -162,6 +167,16 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   if (!name || !phone_number || rolesArray.length === 0) {
     return NextResponse.json(
       { success: false, message: "Nama, nomor WA, dan minimal 1 role wajib diisi" },
+      { status: 400 }
+    );
+  }
+
+  // User BARU tidak boleh pakai role yang sudah dipensiunkan, walau request
+  // dikirim langsung ke API (bypass dropdown).
+  const blockedNewRoles = rolesArray.filter((r) => DEPRECATED_ROLES.has(r));
+  if (blockedNewRoles.length > 0) {
+    return NextResponse.json(
+      { success: false, message: `Role sudah tidak tersedia: ${blockedNewRoles.join(", ")}` },
       { status: 400 }
     );
   }
@@ -363,6 +378,33 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
         : null;
 
   if (rolesArray !== null) {
+    // Cegah PENAMBAHAN role yang sudah dipensiunkan lewat edit / API langsung.
+    // User lama yang SUDAH punya role tsb tetap boleh menyimpannya (tidak
+    // kehilangan data) — jadi yang diblokir hanya role deprecated yang BARU.
+    const incomingDeprecated = rolesArray.filter((r) => DEPRECATED_ROLES.has(r));
+    if (incomingDeprecated.length > 0) {
+      const { data: currentRow } = await supabaseAdmin
+        .from("users")
+        .select("role, roles")
+        .eq("id", id)
+        .maybeSingle();
+
+      const currentRoles: string[] =
+        Array.isArray(currentRow?.roles) && currentRow!.roles.length > 0
+          ? currentRow!.roles
+          : currentRow?.role
+            ? [currentRow.role]
+            : [];
+
+      const addingNew = incomingDeprecated.filter((r) => !currentRoles.includes(r));
+      if (addingNew.length > 0) {
+        return NextResponse.json(
+          { success: false, message: `Role sudah tidak tersedia: ${addingNew.join(", ")}` },
+          { status: 400 }
+        );
+      }
+    }
+
     updates.roles = rolesArray;
     updates.role = rolesArray[0]; // sync primary role
   }
