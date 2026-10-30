@@ -70,13 +70,20 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
     "PENGELOLA_BARANG",
     "KEPALA_PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG", "PKL",
   ],
+  // ✅ NEW — Kepala Admin Barang: ACC lembur + input manual + visibility
+  // bawahannya (Admin Barang & PKL Pengelola Barang). Disamakan dgn
+  // DIVISION_MAP di src/lib/permissions.ts biar scope absensi & lembur konsisten.
+  KEPALA_ADMIN_BARANG: [
+    "ADMIN_BARANG", "PKL_PENGELOLA_BARANG",
+    "KEPALA_ADMIN_BARANG", "PKL",
+  ],
 };
 
 const PAY_VIEW_ROLES = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
   "KEPALA_PENYEDIA_BARANG", "KEPALA_ONPOINT", "KEPALA_SOTECH",
-  "KEPALA_PENGELOLA_BARANG", "KEPALA_CC",
+  "KEPALA_PENGELOLA_BARANG", "KEPALA_CC", "KEPALA_ADMIN_BARANG",
 ];
 
 function isHolidayOvertimeLate(

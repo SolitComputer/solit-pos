@@ -677,13 +677,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/attendance/shift-config": [
     ...FULL_ACCESS, "KEPALA_TEKNISI", "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_CC",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
-    "KEPALA_PENGELOLA_BARANG",
+    "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG",
   ],
 
   "/api/attendance/schedule": [
     ...FULL_ACCESS, "KEPALA_TEKNISI", "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_CC",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
-    "KEPALA_PENGELOLA_BARANG",
+    "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG",
   ], "/api/attendance/users": [...ALL_ROLES],
   "/api/attendance/kasbon-cicilan": [...FULL_ACCESS, "ACCOUNTING"], // ⬅️ BARU: Admin, Programmer, Asisten CEO, Accounting
 
