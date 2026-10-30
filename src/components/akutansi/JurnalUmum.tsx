@@ -338,7 +338,9 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     const [expandAll, setExpandAll] = useState(false); // buka/tutup SEMUA detail akun sekaligus
     const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
     const [showOnlyOutOfSync, setShowOnlyOutOfSync] = useState(false);
-    const [showSortSourceModal, setShowSortSourceModal] = useState(false);
+        const [showSortSourceModal, setShowSortSourceModal] = useState(false);
+    const [showSyncAllModal, setShowSyncAllModal] = useState(false);
+    const [syncAllBusy, setSyncAllBusy] = useState(false);
     const [undoState, setUndoState] = useState<{ previousEntries: JournalEntry[]; batches: { date: string; orderedIds: string[] }[] } | null>(null);
     const [reorderingBusy, setReorderingBusy] = useState(false);
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
@@ -951,8 +953,41 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     const hasWarning = useCallback((e: JournalEntry) => Boolean(e.has_warning), []);
     const warningCount = useMemo(() => entries.filter(hasWarning).length, [entries, hasWarning]);
 
-    const isOutOfSync = useCallback((e: JournalEntry) => Boolean(e.sync_available), []);
+       const isOutOfSync = useCallback((e: JournalEntry) => Boolean(e.sync_available), []);
     const outOfSyncCount = useMemo(() => entries.filter(isOutOfSync).length, [entries, isOutOfSync]);
+    const outOfSyncEntries = useMemo(() => entries.filter(isOutOfSync), [entries, isOutOfSync]);
+
+    // Sinkronkan BANYAK entry sekaligus (dipakai modal "Sinkronisasi Jurnal").
+    // Pakai ulang endpoint sync per-entry yang sudah ada (/[id]/sync) — dibatasi
+    // 4 request paralel sekaligus biar tidak membanjiri Supabase saat entry banyak.
+    const handleSyncMany = useCallback(async (ids: string[]) => {
+        if (ids.length === 0 || syncAllBusy) return;
+        setSyncAllBusy(true);
+        try {
+            const CONCURRENCY = 4;
+            const results: { success?: boolean }[] = [];
+            for (let i = 0; i < ids.length; i += CONCURRENCY) {
+                const chunk = ids.slice(i, i + CONCURRENCY);
+                const chunkRes = await Promise.all(
+                    chunk.map((id) =>
+                        fetch(`/api/akutansi/jurnal/${id}/sync`, { method: "POST" })
+                            .then((r) => r.json())
+                            .catch(() => ({ success: false }))
+                    )
+                );
+                results.push(...chunkRes);
+            }
+            const gagal = results.filter((r) => !r?.success).length;
+            const ok = ids.length - gagal;
+            setToast(gagal > 0 ? `${ok} jurnal disinkronkan, ${gagal} gagal` : `${ok} jurnal disinkronkan`);
+            setShowSyncAllModal(false);
+            await load(false);
+        } catch {
+            setToast("Koneksi bermasalah saat sinkronisasi massal");
+        } finally {
+            setSyncAllBusy(false);
+        }
+    }, [syncAllBusy, load]);
 
     const filtered = useMemo(() => {
         const q = deferredSearch.trim().toLowerCase();
@@ -1320,7 +1355,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                         </div>
                     </div>
 
-                    <div className="flex gap-2">
+                                      <div className="flex flex-wrap gap-2">
                         <div className="flex items-center gap-1 border border-slate-200/80 bg-slate-100/80 rounded-xl p-1 shrink-0">
                             <button
                                 onClick={() => setShowOnlyWarnings((v) => !v)}
@@ -1403,6 +1438,15 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                 )}
                             </div>
                         </div>
+                                              {outOfSyncCount > 0 && (
+                            <button
+                                onClick={() => setShowSyncAllModal(true)}
+                                title="Lihat & sinkronkan semua entri yang nominal/keterangannya berubah di sumber"
+                                className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap inline-flex items-center justify-center gap-1.5"
+                            >
+                                <RefreshCw className="w-3.5 h-3.5" /> Sinkronkan Semua ({outOfSyncCount})
+                            </button>
+                        )}
                         <button
                             onClick={() => setShowManual(true)}
                             className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
@@ -1777,12 +1821,20 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                     busy={bulkBusy}
                 />
             )}
-            {showSortSourceModal && (
+                      {showSortSourceModal && (
                 <SortBySourceModal
                     period={period}
                     onClose={() => setShowSortSourceModal(false)}
                     onConfirm={handleSortBySource}
                     busy={reorderingBusy}
+                />
+            )}
+            {showSyncAllModal && (
+                <SyncAllModal
+                    entries={outOfSyncEntries}
+                    busy={syncAllBusy}
+                    onClose={() => setShowSyncAllModal(false)}
+                    onSyncMany={handleSyncMany}
                 />
             )}
 
@@ -2448,6 +2500,173 @@ function SyncPreviewModal({
         </div>
     );
 }
+// ─── Modal "Sinkronisasi Jurnal" — semua entri out-of-sync dalam satu tampilan ───
+// Menampilkan SEMUA entry yang sync_available=true sekaligus beserta preview
+// before→after per akun (pakai ulang computeSyncDiffRows + SyncDiffDetailTable),
+// plus checklist + tombol sinkronkan massal. Tidak mengubah data sumber — cuma
+// menyamakan baris jurnal dengan draft terbaru, persis seperti sync per-entry.
+function SyncAllModal({
+    entries,
+    busy,
+    onClose,
+    onSyncMany,
+}: {
+    entries: JournalEntry[];
+    busy: boolean;
+    onClose: () => void;
+    onSyncMany: (ids: string[]) => void;
+}) {
+    const [selected, setSelected] = useState<Set<string>>(() => new Set(entries.map((e) => e.id)));
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    const toggleSelect = (id: string) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+
+    const toggleExpand = (id: string) =>
+        setExpanded((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+
+    const allSelected = entries.length > 0 && entries.every((e) => selected.has(e.id));
+    // Hanya id yang MASIH ada di daftar (jaga-jaga daftar berubah saat modal terbuka).
+    const selectedIds = useMemo(
+        () => entries.filter((e) => selected.has(e.id)).map((e) => e.id),
+        [entries, selected]
+    );
+
+    return (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
+            <div className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl max-h-[90dvh] flex flex-col overflow-hidden">
+                <div className="h-1 bg-gradient-to-r from-blue-500 to-blue-700 shrink-0" />
+
+                <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between shrink-0">
+                    <div className="min-w-0">
+                        <h3 className="font-bold text-gray-900 text-sm inline-flex items-center gap-1.5">
+                            <RefreshCw className="w-4 h-4 text-blue-600" /> Sinkronisasi Jurnal
+                        </h3>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                            {entries.length} entri nominal/keterangannya berbeda dari data sumber terbaru
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 active:scale-90 transition-all duration-150 flex items-center justify-center shrink-0">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                <div className="px-5 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between shrink-0">
+                    <label className="inline-flex items-center gap-2 text-xs font-semibold text-gray-600 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={(e) => setSelected(e.target.checked ? new Set(entries.map((x) => x.id)) : new Set())}
+                            className="w-4 h-4 rounded border-gray-300 accent-blue-600"
+                        />
+                        Pilih semua
+                    </label>
+                    <span className="text-[11px] font-bold text-blue-600">{selectedIds.length} dipilih</span>
+                </div>
+
+                <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
+                    {entries.length === 0 ? (
+                        <div className="py-16 text-center">
+                            <div className="flex justify-center mb-3 opacity-40"><Check className="w-10 h-10" /></div>
+                            <p className="text-sm text-gray-500 font-medium">Semua jurnal sudah sinkron</p>
+                        </div>
+                    ) : (
+                        entries.map((entry) => {
+                            if (!entry.sync_preview) return null;
+                            const rows = computeSyncDiffRows(entry.lines, entry.sync_preview.lines);
+                            const changedCount = rows.filter((r) => r.status !== "same").length;
+                            const ketChanged = entry.keterangan !== entry.sync_preview.keterangan;
+                            const totalBefore = sumLinesBySide(entry.lines, "DEBIT");
+                            const totalAfter = sumLinesBySide(entry.sync_preview.lines, "DEBIT");
+                            const delta = totalAfter - totalBefore;
+                            const badge = SOURCE_BADGE[badgeKeyOf(entry)] ?? SOURCE_BADGE[entry.source_type];
+                            const isOpen = expanded.has(entry.id);
+                            const isSel = selected.has(entry.id);
+
+                            return (
+                                <div key={entry.id} className={isSel ? "bg-blue-50/30" : ""}>
+                                    <div className="flex items-center gap-3 px-5 py-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={isSel}
+                                            onChange={() => toggleSelect(entry.id)}
+                                            className="w-4 h-4 rounded border-gray-300 accent-blue-600 shrink-0"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>{badge.label}</span>
+                                                <span className="text-[10px] text-gray-400 font-mono">{fmtTgl(entry.tanggal)}</span>
+                                            </div>
+                                            <p className="text-xs font-semibold text-gray-800 truncate mt-0.5">{entry.keterangan}</p>
+                                        </div>
+                                        <div className="flex flex-col items-end shrink-0">
+                                            <span className="text-[10px] font-bold text-blue-600 whitespace-nowrap">{changedCount} baris berubah</span>
+                                            {delta !== 0 && (
+                                                <span className={`text-[11px] font-mono font-bold ${delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                                    {delta > 0 ? "+" : ""}{rp(delta)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => toggleExpand(entry.id)}
+                                            aria-expanded={isOpen}
+                                            title={isOpen ? "Tutup detail" : "Lihat detail per akun"}
+                                            className="p-1.5 rounded-lg text-gray-400 hover:text-slate-700 hover:bg-slate-100 active:scale-90 transition-all shrink-0"
+                                        >
+                                            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180 text-slate-700" : ""}`} />
+                                        </button>
+                                    </div>
+
+                                    {isOpen && (
+                                        <div className="px-5 pb-4 space-y-2">
+                                            {ketChanged && (
+                                                <div className="bg-white border border-slate-200 rounded-lg p-2 text-[10px]">
+                                                    <span className="text-gray-400 font-bold block text-[9px] uppercase tracking-wider mb-0.5">Keterangan</span>
+                                                    <p className="text-red-500 line-through leading-tight">{entry.keterangan}</p>
+                                                    <p className="text-emerald-600 font-bold leading-tight mt-0.5">→ {entry.sync_preview.keterangan}</p>
+                                                </div>
+                                            )}
+                                            <SyncDiffDetailTable rows={rows} />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50 shrink-0">
+                    <button onClick={onClose} disabled={busy} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all duration-150 disabled:opacity-50">
+                        Tutup
+                    </button>
+                    <button
+                        onClick={() => onSyncMany(selectedIds)}
+                        disabled={busy || selectedIds.length === 0}
+                        className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold active:scale-[0.97] transition-all duration-150 disabled:opacity-40"
+                    >
+                        {busy ? "Menyinkronkan..." : `Sinkronkan Terpilih (${selectedIds.length})`}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function EntryFormModal({
     period,
     entry,
