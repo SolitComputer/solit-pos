@@ -74,8 +74,8 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
   // bawahannya (Admin Barang & PKL Pengelola Barang). Disamakan dgn
   // DIVISION_MAP di src/lib/permissions.ts biar scope absensi & lembur konsisten.
   KEPALA_ADMIN_BARANG: [
-    "ADMIN_BARANG", "PKL_PENGELOLA_BARANG",
-    "KEPALA_ADMIN_BARANG", "PKL",
+    "ADMIN_BARANG",
+    "KEPALA_ADMIN_BARANG",
   ],
 };
 
