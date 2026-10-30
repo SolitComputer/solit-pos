@@ -30,6 +30,7 @@ export default function AddUnitModalAccessory({
     const [form, setForm] = useState({
         serial_number: "",
         condition: "BARU",
+        source: "",
         buy_price: "",
         selling_price: String(defaultSellingPrice || ""),
         notes: "",
@@ -58,6 +59,7 @@ export default function AddUnitModalAccessory({
                     accessory_id: accessoryId,
                     serial_number: form.serial_number.trim(),
                     condition: form.condition,
+                    source: form.source.trim() || null,
                     buy_price: Number(form.buy_price) || 0,
                     selling_price: Number(form.selling_price) || 0,
                     notes: form.notes,
@@ -103,6 +105,11 @@ export default function AddUnitModalAccessory({
                         <select name="condition" value={form.condition} onChange={handleChange} className={inputCls}>
                             {CONDITION_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                         </select>
+                    </Field>
+
+                    <Field label="Sumber">
+                        <input name="source" value={form.source} onChange={handleChange}
+                            placeholder="Contoh: Kosasih, Lelang, China" className={inputCls} />
                     </Field>
 
                     <div className="grid grid-cols-2 gap-3">

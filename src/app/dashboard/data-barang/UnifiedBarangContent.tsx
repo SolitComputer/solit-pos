@@ -48,6 +48,7 @@ interface LaptopRaw {
 interface AccessoryUnitLite {
     id: string; serial_number: string; condition: string; status: string;
     buy_price?: number; selling_price?: number; created_at?: string;
+    source?: string | null; // asal barang per unit (parity dengan laptop)
     msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
     so_at?: string | null; so_by?: string | null; // SO per-unit (progress X/Y)
     audited_at?: string | null; audited_by?: string | null; // Audit per-unit (progress X/Y)
@@ -160,6 +161,26 @@ function getAccessoryUnitAction(row: UnifiedRow): "units" | "add" | "detail" | n
     if (row.unit_count === 1) return "detail";
     return "add";
 }
+
+// Status unit yang dianggap "keluar" dari Data Barang. Barang keluar (fisik
+// tidak ada di stok) dipisah dari status pembayaran — semua ini DIBUANG dari
+// export per-SN, persis seperti tampilan Data Barang.
+const OUT_STATUSES = new Set([
+    "SOLD", "TERJUAL", "KELUAR", "RETURNED", "RESERVED", "HELD", "PACKING", "PENDING",
+]);
+
+// Peta status unit → 3 label bersih. Setelah OUT_STATUSES dibuang, sisa status
+// cuma ini; fallback tampilkan apa adanya kalau ada status tak terduga.
+const STATUS_UNIT_LABEL: Record<string, string> = {
+    SIAP_JUAL: "Siap Jual", TERSEDIA: "Siap Jual", READY: "Siap Jual",
+    BELUM_SIAP: "Belum Siap Jual",
+    MINUS_SIAP_JUAL: "Minus Siap Jual",
+};
+const statusUnitLabel = (s: string) => STATUS_UNIT_LABEL[s] ?? s;
+
+// Audit unit aksesoris aktif (TTL 3 hari) — versi per-unit untuk export.
+const isUnitAuditActiveAccessory = (auditedAt?: string | null) =>
+    !!auditedAt && Date.now() - new Date(auditedAt).getTime() < ACCESSORY_AUDIT_TTL_MS;
 
 function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const units = l.laptop_units ?? [];
@@ -1235,8 +1256,8 @@ export default function UnifiedBarangContent() {
             let no = 1;
 
             filteredRows.forEach((row) => {
-                const auditLabel = isAuditActive(row) ? "Teraudit" : "Belum";
-                const soLabel = row.tipe === "LAPTOP" ? (isSoActive(row.so_at) ? "Sudah SO" : "Belum SO") : "-";
+                const auditLabel = isAuditActive(row) ? "Sudah" : "Belum";
+                const soLabel = isSoActive(row.so_at) ? "Sudah" : "Belum";
 
                 if (row.tipe === "LAPTOP") {
                     // Total Modal = jumlah modal SEMUA unit aktif (bukan SOLD/KELUAR/MSJ)
@@ -1245,7 +1266,7 @@ export default function UnifiedBarangContent() {
                         .filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id);
                     const totalModal = aktif.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
                     exportRows.push({
-                        No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
+                        No: no++, Tipe: "LAPTOP", "Nama Barang": row.nama,
                         Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                         CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
                         "Harga Jual": row.harga_jual,
@@ -1264,7 +1285,7 @@ export default function UnifiedBarangContent() {
                         ? accAktif.reduce((s, u) => s + (u.buy_price ?? acc.buy_price ?? 0), 0)
                         : (acc.buy_price ?? 0) * (row.stok ?? 0);
                     exportRows.push({
-                        No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
+                        No: no++, Tipe: "AKSESORIS", "Nama Barang": row.nama,
                         Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                         CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
                         "Harga Jual": row.harga_jual,
@@ -1282,7 +1303,8 @@ export default function UnifiedBarangContent() {
                 { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 6 },
                 { wch: 11 }, { wch: 10 },
             ];
-            writeStyledExcel(exportRows, cols, "Ringkas Barang", "Data-Barang-Ringkas");
+            writeStyledExcel(exportRows, cols, "Ringkas Barang", "Data-Barang-Ringkas",
+                ["Harga Jual", "Total Modal", "Total Jual"]);
             toast.success(`Export ringkas berhasil — ${exportRows.length} baris`);
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal export Excel");
@@ -1296,76 +1318,72 @@ export default function UnifiedBarangContent() {
             let no = 1;
 
             filteredRows.forEach((row) => {
-                const auditLabel = isAuditActive(row) ? "Teraudit" : "Belum";
-                const soLabel = row.tipe === "LAPTOP" ? (isSoActive(row.so_at) ? "Sudah SO" : "Belum SO") : "-";
-
                 if (row.tipe === "LAPTOP") {
-                    const units = ((row.raw as LaptopRaw).laptop_units ?? []).filter(u => u.status !== "SOLD" && u.status !== "KELUAR");
+                    // Hanya unit yang masih stok — buang semua yang sudah keluar
+                    // (Terjual/Reserved/Held/Packing/Keluar). Barang keluar ≠ payment.
+                    const units = ((row.raw as LaptopRaw).laptop_units ?? [])
+                        .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
 
                     if (units.length === 0) {
                         exportRows.push({
-                            No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
+                            No: no++, Tipe: "LAPTOP", "Nama Barang": row.nama,
                             Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                             CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
                             SN: "-", "Status Unit": "-",
                             "Harga Modal": 0, "Modal Sparepart": 0, "Harga Jual": row.harga_jual,
                             Sumber: "-", "Tgl Masuk": "-", Stok: 0,
-                            "Status Audit": auditLabel, "Status SO": soLabel,
+                            "Status Audit": "Belum", "Status SO": "Belum",
                         });
                         return;
                     }
 
                     units.forEach((u) => {
                         exportRows.push({
-                            No: no++, Tipe: row.kategori || "Laptop", "Nama Barang": row.nama,
+                            No: no++, Tipe: "LAPTOP", "Nama Barang": row.nama,
                             Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                             CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
-                            SN: u.serial_number, "Status Unit": u.status,
+                            SN: u.serial_number, "Status Unit": statusUnitLabel(u.status),
                             "Harga Modal": u.purchase_price ?? 0, "Modal Sparepart": u.sparepart_cost ?? 0,
                             "Harga Jual": row.harga_jual,
                             Sumber: u.source ?? "-",
                             "Tgl Masuk": u.created_at ? new Date(u.created_at).toLocaleDateString("id-ID") : "-",
                             Stok: 1,
-                            "Status Audit": auditLabel, "Status SO": soLabel,
+                            "Status Audit": isUnitAuditActiveLaptop(u) ? "Sudah" : "Belum",
+                            "Status SO": isUnitSoActive(u.so_at) ? "Sudah" : "Belum",
                         });
                     });
                 } else {
                     const acc = row.raw as AccessoryRaw;
-                    // Sama seperti laptop: iterasi SEMUA unit aktif aksesoris supaya
-                    // tiap SN + modal per-SN keluar 1 baris sendiri. "TERJUAL"/"KELUAR"
-                    // dibuang biar konsisten dengan normalizeAccessory().
-                    const accUnits = (acc.accessory_units ?? []).filter(
-                        u => u.status !== "TERJUAL" && u.status !== "KELUAR"
-                    );
+                    const accUnits = (acc.accessory_units ?? [])
+                        .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
 
                     if (accUnits.length === 0) {
                         // Aksesoris lama tanpa SN (stok manual) → tetap 1 baris ringkas.
                         exportRows.push({
-                            No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
+                            No: no++, Tipe: "AKSESORIS", "Nama Barang": row.nama,
                             Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                             CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
                             SN: "-", "Status Unit": "-",
                             "Harga Modal": acc.buy_price ?? 0, "Modal Sparepart": 0, "Harga Jual": row.harga_jual,
                             Sumber: "-", "Tgl Masuk": "-", Stok: row.stok ?? 0,
-                            "Status Audit": auditLabel, "Status SO": soLabel,
+                            "Status Audit": "Belum", "Status SO": "Belum",
                         });
                         return;
                     }
 
-                    // Per unit: SN + modal masing-masing SN (fallback ke acc.buy_price
-                    // kalau unit-nya belum punya buy_price sendiri).
                     accUnits.forEach((u) => {
                         exportRows.push({
-                            No: no++, Tipe: row.kategori || "Aksesoris", "Nama Barang": row.nama,
+                            No: no++, Tipe: "AKSESORIS", "Nama Barang": row.nama,
                             Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
                             CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
-                            SN: u.serial_number, "Status Unit": u.status,
+                            SN: u.serial_number, "Status Unit": statusUnitLabel(u.status),
                             "Harga Modal": u.buy_price ?? acc.buy_price ?? 0, "Modal Sparepart": 0,
                             "Harga Jual": row.harga_jual,
-                            Sumber: "-",
+                            Sumber: u.source ?? "-",
                             "Tgl Masuk": u.created_at ? new Date(u.created_at).toLocaleDateString("id-ID") : "-",
                             Stok: 1,
-                            "Status Audit": auditLabel, "Status SO": soLabel,
+                            "Status Audit": isUnitAuditActiveAccessory(u.audited_at) ? "Sudah" : "Belum",
+                            "Status SO": isUnitSoActive(u.so_at) ? "Sudah" : "Belum",
                         });
                     });
                 }
@@ -1377,7 +1395,8 @@ export default function UnifiedBarangContent() {
                 { wch: 12 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 12 },
                 { wch: 12 }, { wch: 6 }, { wch: 11 }, { wch: 10 },
             ];
-            writeStyledExcel(exportRows, cols, "Data Barang per-SN", "Data-Barang-perSN");
+            writeStyledExcel(exportRows, cols, "Data Barang per-SN", "Data-Barang-perSN",
+                ["Harga Modal", "Modal Sparepart", "Harga Jual"]);
             toast.success(`Export per-SN berhasil — ${exportRows.length} baris`);
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal export Excel");
@@ -2822,6 +2841,7 @@ function writeStyledExcel(
     colWidths: { wch: number }[],
     sheetName: string,
     filePrefix: string,
+    moneyColumnKeys: string[] = [],
 ) {
     const ws = XLSX.utils.json_to_sheet(exportRows);
     ws["!cols"] = colWidths;
@@ -2829,12 +2849,22 @@ function writeStyledExcel(
     const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
     const borderTipis = { style: "thin", color: { rgb: "D4D4D8" } } as const;
 
+    // Kolom mana yang diformat Rupiah (dicocokkan dari judul di baris header).
+    const headers = exportRows[0] ? Object.keys(exportRows[0]) : [];
+    const moneyColIdx = new Set(
+        moneyColumnKeys.map(k => headers.indexOf(k)).filter(i => i >= 0)
+    );
+
     for (let R = range.s.r; R <= range.e.r; R++) {
         const isHeader = R === 0;
         const isBanded = !isHeader && R % 2 === 0;
         for (let C = range.s.c; C <= range.e.c; C++) {
             const addr = XLSX.utils.encode_cell({ r: R, c: C });
             if (!ws[addr]) continue;
+            // Format Rupiah untuk sel data (bukan header) di kolom uang.
+            if (!isHeader && moneyColIdx.has(C) && typeof ws[addr].v === "number") {
+                ws[addr].z = '"Rp "#,##0';
+            }
             ws[addr].s = {
                 font: isHeader
                     ? { bold: true, sz: 10, color: { rgb: "FFFFFF" } }
@@ -2842,7 +2872,7 @@ function writeStyledExcel(
                 fill: isHeader
                     ? { fgColor: { rgb: "18181B" } }
                     : isBanded ? { fgColor: { rgb: "F4F4F5" } } : undefined,
-                alignment: { vertical: "center", horizontal: isHeader ? "center" : "left" },
+                alignment: { vertical: "center", horizontal: isHeader ? "center" : (moneyColIdx.has(C) ? "right" : "left") },
                 border: { top: borderTipis, bottom: borderTipis, left: borderTipis, right: borderTipis },
             };
         }

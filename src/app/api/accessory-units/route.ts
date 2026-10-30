@@ -72,7 +72,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     try { body = await req.json(); }
     catch { return NextResponse.json({ success: false, error: "Body tidak valid" }, { status: 400 }); }
 
-    const { accessory_id, serial_number, condition, buy_price, selling_price, notes } = body as Record<string, unknown>;
+    const { accessory_id, serial_number, condition, source, buy_price, selling_price, notes } = body as Record<string, unknown>;
 
     if (!accessory_id || typeof accessory_id !== "string") {
         return NextResponse.json({ success: false, error: "accessory_id wajib diisi" }, { status: 400 });
@@ -107,6 +107,7 @@ export const POST = withAuth(async (req: NextRequest) => {
         serial_number: serial_number.trim().toUpperCase(),
         condition: typeof condition === "string" && ["BARU", "BEKAS"].includes(condition) ? condition : "BARU",
         status: "TERSEDIA",
+        source: typeof source === "string" ? source.trim() || null : null,
         buy_price: typeof buy_price === "number" ? Math.max(0, buy_price) : 0,
         selling_price: finalSellingPrice,
         notes: typeof notes === "string" ? notes.trim() || null : null,

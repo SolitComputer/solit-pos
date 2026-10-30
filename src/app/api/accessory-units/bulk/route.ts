@@ -28,6 +28,7 @@ export const POST = withAuth(async (req: NextRequest) => {
             serial_number: string;
             condition?: string;
             status?: string;
+            source?: string;
             buy_price?: number;
             selling_price?: number;
             notes?: string;
@@ -110,6 +111,7 @@ export const POST = withAuth(async (req: NextRequest) => {
         status: VALID_STATUSES.includes(u.status ?? "")
             ? u.status!
             : "TERSEDIA",
+        source: u.source?.trim() || null,
         buy_price: Math.max(0, Math.round(Number(u.buy_price) || 0)),
         selling_price: Math.max(0, Math.round(Number(u.selling_price) || 0)),
         notes: u.notes?.trim() || null,

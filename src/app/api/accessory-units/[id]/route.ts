@@ -23,13 +23,9 @@ export const PATCH = withAuth(async (
     try { body = await req.json(); }
     catch { return NextResponse.json({ success: false, error: "Body tidak valid" }, { status: 400 }); }
 
-    const { serial_number, condition, status, selling_price, buy_price, notes } = body as Record<string, unknown>;
-    // ✅ FIX: field "source" DIHAPUS dari endpoint ini — kolom itu kemungkinan
-    // besar tidak pernah benar-benar ada di tabel accessory_units (tidak
-    // disebut di manapun file-file "asli" kamu), jadi kalau tetap dikirim ke
-    // .update() bisa memicu error Postgres "column does not exist". Kalau
-    // kamu memang sudah menjalankan migration ADD COLUMN source, kabari saya
-    // supaya ditambahkan lagi secara konsisten ke semua endpoint sekaligus.
+    const { serial_number, condition, status, source, selling_price, buy_price, notes } = body as Record<string, unknown>;
+    // source di-handle di bawah — kolom `source` sudah ada di accessory_units
+    // (via migration ADD COLUMN source).
 
     const updates: Record<string, unknown> = {};
 
@@ -50,6 +46,7 @@ export const PATCH = withAuth(async (
     }
 
     if (typeof condition === "string" && ["BARU", "BEKAS"].includes(condition)) updates.condition = condition;
+    if (typeof source === "string") updates.source = source.trim() || null;
     // ✅ NEW: MINUS_SIAP_JUAL ditambahkan — tanpa ini, status dari dropdown
     // modal akan DIBUANG diam-diam di server (tidak masuk updates) walau UI
     // sudah benar. Unit tetap kehitung stok (status !== TERJUAL), jadi tetap
