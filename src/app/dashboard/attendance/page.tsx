@@ -5956,6 +5956,9 @@ export default function AttendanceDashboardPage() {
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                         </button>
+                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center shadow-lg flex-shrink-0">
+                            <CalendarDays className="w-5 h-5 text-white" />
+                        </div>
                         <div>
                             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
                                 <span className="bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">{canManage ? "Laporan Absensi" : "Absensi Saya"}</span>
@@ -6055,15 +6058,17 @@ export default function AttendanceDashboardPage() {
                         { label: "Terlambat", value: thisMonthLate, icon: <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
                         { label: "Karyawan", value: uniqueUsers.length, icon: <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>, gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
                     ].map(c => (
-                        <div key={c.label} className={`bg-gradient-to-br ${c.gradient} rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 p-5 hover:scale-[1.02]`}>
-                            <div className="flex items-start justify-between mb-3">
+                        <div key={c.label} className={`relative overflow-hidden bg-gradient-to-br ${c.gradient} rounded-2xl ring-1 ring-black/5 shadow-sm hover:shadow-xl transition-all duration-300 p-5 hover:-translate-y-1`}>
+                            {/* lingkaran dekoratif samar di pojok kanan atas */}
+                            <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-white/30 blur-2xl" />
+                            <div className="relative flex items-start justify-between mb-3">
                                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{c.label}</p>
-                                <div className={`w-8 h-8 rounded-xl ${c.iconBg} flex items-center justify-center shadow-sm`}>{c.icon}</div>
+                                <div className={`w-9 h-9 rounded-xl ${c.iconBg} flex items-center justify-center shadow-sm ring-1 ring-white/60`}>{c.icon}</div>
                             </div>
-                            <p className="text-3xl font-black tracking-tight text-gray-800">
+                            <p className="relative text-3xl font-black tracking-tight text-gray-800">
                                 {loading ? <span className="inline-block w-10 h-8 bg-white/50 rounded-lg animate-pulse" /> : c.value}
                             </p>
-                            <p className="text-[10px] text-gray-400 font-medium mt-1">{MONTH_SHORT[calMonth]} {calYear}</p>
+                            <p className="relative text-[10px] text-gray-400 font-medium mt-1">{MONTH_SHORT[calMonth]} {calYear}</p>
                         </div>
                     ))}
                 </div>
@@ -6091,8 +6096,8 @@ export default function AttendanceDashboardPage() {
                         return tabs.map(t => (
                             <button key={t.id} onClick={() => handleSetActiveTab(t.id)}
                                 className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id
-                                    ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md"
-                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                                    ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md shadow-[#1a1a2e]/25 scale-[1.03]"
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/70"
                                     }`}>
                                 {t.label}
                             </button>
@@ -7015,10 +7020,10 @@ export default function AttendanceDashboardPage() {
                         {loading ? (
                             <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-20 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-[1000px] lg:min-w-0 w-full text-sm border-collapse lg:[&_th]:px-2 lg:[&_td]:px-2">
-                                    <thead>
-                                        <tr className="border-2 border-gray-300 bg-gray-50/60 sticky top-0">
+                            <div className="overflow-auto max-h-[75vh]">
+                                <table className="w-full text-sm border-collapse table-fixed [&_th]:px-1 [&_td]:px-1 [&_th]:py-2 [&_td]:py-2">
+                                    <thead className="sticky top-0 z-20 bg-white">
+                                        <tr className="border-2 border-gray-300 bg-gray-50/60">
                                             <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300 w-[160px]">Karyawan</th>
 
                                             {/* PENGHASILAN SECTION */}
