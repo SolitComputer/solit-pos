@@ -18,6 +18,7 @@ import {
     type InsightRowMode,
     type InsightSheet,
 } from "@/lib/marketing-insight";
+import MarketingSocialInsight, { detectSocialPlatform } from "./MarketingSocialInsight";
 
 export default function MarketingInsightBoard() {
     const [sheets, setSheets] = useState<InsightSheet[]>([]);
@@ -41,6 +42,8 @@ export default function MarketingInsightBoard() {
     const active = sheets.find((s) => s.id === activeId) ?? null;
     const isDaily = active?.row_mode === "daily";
     const effPeriod = active?.period || currentPeriodWib();
+    // IG/TikTok → tampilan dashboard (bukan grid Excel). null = sheet biasa.
+    const socialPlatform = active ? detectSocialPlatform(active.name) : null;
 
     const load = useCallback(async () => {
         try {
@@ -529,23 +532,28 @@ export default function MarketingInsightBoard() {
                                     <Pencil className="w-4 h-4" />
                                 </button>
 
-                                {/* Toggle mode Harian / Manual */}
-                                <div className="inline-flex items-center bg-gray-50 border border-gray-200 rounded-full p-0.5 h-10">
-                                    <button
-                                        onClick={() => setRowMode("daily")}
-                                        className={`inline-flex items-center gap-1 px-3 h-9 rounded-full text-xs font-semibold ${isDaily ? "bg-violet-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-                                    >
-                                        <CalendarDays className="w-3.5 h-3.5" /> Harian
-                                    </button>
-                                    <button
-                                        onClick={() => setRowMode("manual")}
-                                        className={`inline-flex items-center gap-1 px-3 h-9 rounded-full text-xs font-semibold ${!isDaily ? "bg-violet-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-                                    >
-                                        <List className="w-3.5 h-3.5" /> Manual
-                                    </button>
-                                </div>
+                                {/* Toggle mode & bulan — hanya sheet grid biasa (IG/TikTok tak pakai) */}
+                                {!socialPlatform && (
+                                    <>
+                                        {/* Toggle mode Harian / Manual */}
+                                        <div className="inline-flex items-center bg-gray-50 border border-gray-200 rounded-full p-0.5 h-10">
+                                            <button
+                                                onClick={() => setRowMode("daily")}
+                                                className={`inline-flex items-center gap-1 px-3 h-9 rounded-full text-xs font-semibold ${isDaily ? "bg-violet-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                                            >
+                                                <CalendarDays className="w-3.5 h-3.5" /> Harian
+                                            </button>
+                                            <button
+                                                onClick={() => setRowMode("manual")}
+                                                className={`inline-flex items-center gap-1 px-3 h-9 rounded-full text-xs font-semibold ${!isDaily ? "bg-violet-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                                            >
+                                                <List className="w-3.5 h-3.5" /> Manual
+                                            </button>
+                                                                             </div>
+                                    </>
+                                )}
 
-                                {/* Pemilih bulan (hanya mode harian) */}
+                                {/* Pemilih bulan (hanya mode harian) — tetap tampil di IG/TikTok juga */}
                                 {isDaily && (
                                     <input
                                         type="month"
@@ -607,6 +615,13 @@ export default function MarketingInsightBoard() {
                         <Plus className="w-4 h-4" /> Buat tabel baru
                     </button>
                 </div>
+            ) : socialPlatform ? (
+                <MarketingSocialInsight
+                    sheet={active}
+                    platform={socialPlatform}
+                    onMutate={mutateActive}
+                    saveState={saveState}
+                />
             ) : (
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     {/* Header kartu: judul + align global + export */}
