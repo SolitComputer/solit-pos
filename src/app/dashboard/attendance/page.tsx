@@ -4085,11 +4085,12 @@ export default function AttendanceDashboardPage() {
     });
 
     const handleSetActiveTab = useCallback((tab: ActiveTab) => {
-        setActiveTab(tab);
-        const params = new URLSearchParams(searchParams.toString());
+        setActiveTab(tab); // pindah tab langsung, instan
+        // Update URL TANPA lewat router Next → hindari soft-navigation/RSC refetch
+        const params = new URLSearchParams(window.location.search);
         params.set("tab", tab);
-        router.replace(`?${params.toString()}`, { scroll: false });
-    }, [router, searchParams]);
+        window.history.replaceState(null, "", `?${params.toString()}`);
+    }, []); // ⬅️ dependency jadi kosong, nggak butuh router & searchParams lagi
 
     // Modal state
     const [showDayOffModal, setShowDayOffModal] = useState(false);

@@ -106,6 +106,15 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href === "/dashboard/akutansi") {
     return pathname === "/dashboard/akutansi" || pathname.startsWith("/dashboard/akutansi/");
   }
+  // Kotak Surat: exact-match. Tanpa ini, "/dashboard/kotak-surat/admin" bakal
+  // bikin item "Kotak Surat" (parent) ikut ke-highlight karena fallback
+  // startsWith di bawah menganggap path admin diawali path parent.
+  if (href === "/dashboard/kotak-surat") {
+    return pathname === "/dashboard/kotak-surat";
+  }
+  if (href === "/dashboard/kotak-surat/admin") {
+    return pathname === "/dashboard/kotak-surat/admin";
+  }
   return pathname.startsWith(href);
 }
 
