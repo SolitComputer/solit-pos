@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -20,8 +19,8 @@ body {
   box-sizing: border-box;
     background: var(--app-bg);
   color: var(--app-fg);
-  font-family: 'Poppins', ui-sans-serif, system-ui, sans-serif;
-  transition: background-color 0.2s ease, color 0.2s ease;
+   font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * {
@@ -133,6 +132,100 @@ html.dark .border-indigo-200 { border-color:#2e3360; }
 html.dark .border-teal-200   { border-color:#1f4a40; }
 
 /* ---- Tombol utama (gradient navy) → cyan biar nonjol di dark ---- */
-html.dark .bg-gradient-to-br.from-\[\#0f0c29\] {
-  background-image:none; background-color:#2bb6cd; color:#06222a;
+
+/* =========================================================
+   DARK MODE v3 — tutup sisa celah "blentang-blentong".
+   Tambahan di atas v2 (native control, scrollbar, autofill,
+   putih arbitrary, skala 50/100 yang belum ada, shadow/ring).
+   Semua scoped html.dark → mode terang 100% tidak tersentuh.
+   ========================================================= */
+
+/* 1) Native color-scheme → scrollbar, <select>, date picker,
+      checkbox, autofill IKUT gelap. Ini penyebab utama "kedip
+      putih" di kontrol bawaan browser. */
+:root     { color-scheme: light; }
+html.dark { color-scheme: dark; }
+
+/* 2) Scrollbar WebKit senada (bukan abu terang) */
+html.dark ::-webkit-scrollbar       { width:10px; height:10px; }
+html.dark ::-webkit-scrollbar-track { background:#0e1417; }
+html.dark ::-webkit-scrollbar-thumb { background:#2b3742; border-radius:8px; }
+html.dark ::-webkit-scrollbar-thumb:hover { background:#394956; }
+
+/* 3) Seleksi teks + placeholder */
+html.dark ::selection   { background:rgba(43,182,205,.22); color:#e7eef2; }
+html.dark ::placeholder { color:#728390; opacity:1; }
+
+/* 4) Autofill login/form → hilangkan kotak putih khas Chrome */
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover,
+html.dark input:-webkit-autofill:focus,
+html.dark textarea:-webkit-autofill,
+html.dark select:-webkit-autofill {
+  -webkit-text-fill-color:#e7eef2;
+  -webkit-box-shadow:0 0 0 1000px #161e23 inset;
+  caret-color:#e7eef2;
+}
+
+/* 5) Putih arbitrary (ekuivalen hex Tailwind) yang bocor di card/section */
+html.dark .bg-\[\#fafafa\], html.dark .bg-\[\#FAFAFA\],
+html.dark .bg-\[\#f9fafb\], html.dark .bg-\[\#F9FAFB\],
+html.dark .bg-\[\#f8fafc\], html.dark .bg-\[\#F8FAFC\],
+html.dark .bg-\[\#f5f6fb\], html.dark .bg-\[\#F5F6FB\],
+html.dark .bg-\[\#f1f5f9\], html.dark .bg-\[\#F1F5F9\],
+html.dark .bg-\[\#f3f4f6\], html.dark .bg-\[\#F3F4F6\] { background-color:#161e23; }
+
+/* 6) Skala badge/status yang BELUM ada di v2 → semua senada */
+html.dark .bg-sky-50     { background-color:#17283d; }
+html.dark .bg-cyan-50    { background-color:#123038; }
+html.dark .bg-green-50   { background-color:#14301f; }
+html.dark .bg-lime-50    { background-color:#26300f; }
+html.dark .bg-yellow-50  { background-color:#342f12; }
+html.dark .bg-rose-50    { background-color:#3a1c22; }
+html.dark .bg-pink-50    { background-color:#3a1c2c; }
+html.dark .bg-violet-50  { background-color:#241d3d; }
+html.dark .bg-fuchsia-50 { background-color:#311a33; }
+
+html.dark .bg-blue-100    { background-color:#1b3350; }
+html.dark .bg-sky-100     { background-color:#1b3350; }
+html.dark .bg-emerald-100 { background-color:#193d28; }
+html.dark .bg-green-100   { background-color:#193d28; }
+html.dark .bg-teal-100    { background-color:#173d36; }
+html.dark .bg-amber-100   { background-color:#45361b; }
+html.dark .bg-red-100     { background-color:#4a2424; }
+html.dark .bg-indigo-100  { background-color:#262a52; }
+html.dark .bg-purple-100  { background-color:#32254d; }
+
+/* 7) Teks warna yang belum ada di v2 */
+html.dark .text-sky-700,    html.dark .text-sky-600    { color:#7fb2ec; }
+html.dark .text-cyan-700,   html.dark .text-cyan-600   { color:#5cc4cf; }
+html.dark .text-green-700,  html.dark .text-green-600  { color:#5fd089; }
+html.dark .text-rose-700,   html.dark .text-rose-600   { color:#e08a9a; }
+html.dark .text-pink-700,   html.dark .text-pink-600   { color:#e088b4; }
+html.dark .text-violet-700, html.dark .text-violet-600 { color:#b394e8; }
+
+/* 8) Shadow jangan bikin "halo" putih → bayangan hitam lembut */
+html.dark .shadow-sm { box-shadow:0 1px 2px rgba(0,0,0,.35); }
+html.dark .shadow,
+html.dark .shadow-md { box-shadow:0 2px 8px rgba(0,0,0,.40); }
+html.dark .shadow-lg { box-shadow:0 8px 24px rgba(0,0,0,.45); }
+html.dark .shadow-xl { box-shadow:0 12px 32px rgba(0,0,0,.50); }
+
+/* 9) Ring putih default → netral gelap */
+html.dark .ring-white { --tw-ring-color:#2b3742; }
+html.dark .ring-slate-200, html.dark .ring-gray-200 { --tw-ring-color:#263139; }
+
+
+/* =========================================================
+   DARK MODE v3.1 — ratakan SEMUA gradient jadi surface gelap
+   solid, biar nggak ada banner/section yang pucat nyangkut.
+   Tombol utama (from-[#0f0c29]) TIDAK kena, karena selector-nya
+   2-class → specificity lebih tinggi, jadi tetap cyan.
+   ========================================================= */
+html.dark .bg-gradient-to-t,  html.dark .bg-gradient-to-tr,
+html.dark .bg-gradient-to-r,  html.dark .bg-gradient-to-br,
+html.dark .bg-gradient-to-b,  html.dark .bg-gradient-to-bl,
+html.dark .bg-gradient-to-l,  html.dark .bg-gradient-to-tl {
+  background-image: none;
+  background-color: #161e23;
 }

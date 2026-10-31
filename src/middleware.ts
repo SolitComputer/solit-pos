@@ -731,5 +731,7 @@ export const config = {
     "/api/vehicles/:path*",
     "/api/pengajuan-dana/:path*",
     "/api/sop/:path*",
+    "/dashboard/kotak-surat/:path*",
+    "/api/kotak-surat/:path*",
   ],
 };

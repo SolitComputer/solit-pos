@@ -1,6 +1,6 @@
 // src/app/layout.tsx
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google"; // 1. Ubah import menjadi Plus Jakarta Sans
+import { Poppins, Spline_Sans_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import "@/lib/patchPointerCapture";
@@ -8,11 +8,20 @@ import NetworkStatus from "@/components/ui/NetworkStatus";
 import ServiceWorkerUpdater from "@/components/ui/ServiceWorkerUpdater";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
-// 2. Inisialisasi font Plus Jakarta Sans dan buat variabelnya
-const plusJakartaSans = Plus_Jakarta_Sans({
+// Font utama (UI/teks) — Poppins
+const poppins = Poppins({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-plus-jakarta",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-poppins",
+  display: "swap",
+});
+
+// Font angka & kode (harga, saldo, SN, invoice) — Spline Sans Mono
+const splineMono = Spline_Sans_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-spline-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -51,8 +60,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      {/* 3. Masukkan variabel font Plus Jakarta Sans */}
-      <body className={`${plusJakartaSans.variable} font-sans antialiased`}>
+      {/* Variabel font Geist (sans) + Geist Mono */}
+      {/* Variabel font Poppins (sans) + Spline Sans Mono */}
+      <body className={`${poppins.variable} ${splineMono.variable} font-sans antialiased`}>
         {/*  Disable Next.js auto scroll-to-top saat navigasi */}
         <script
           dangerouslySetInnerHTML={{

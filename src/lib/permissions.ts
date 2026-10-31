@@ -807,6 +807,16 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // Solit Coins (gamifikasi) — semua role. UI berupa popup di halaman profil,
   // jadi tidak ada route halaman terpisah; cukup gate endpoint API-nya.
   "/api/coins": [...ALL_ROLES],
+
+  // ── Kotak Surat (masukan anonim) ───────────────────────────────────────────
+  // Halaman + API KIRIM: semua role KECUALI PKL. Ditulis pakai filter supaya
+  // otomatis ikut kalau ada role non-PKL baru. Anonimitas di-enforce di layer
+  // API (response tidak mengembalikan user_id/nama).
+  "/dashboard/kotak-surat": ALL_ROLES.filter((r) => !isPKLRole(r)),
+  "/api/kotak-surat": ALL_ROLES.filter((r) => !isPKLRole(r)),
+  // Halaman + API ADMIN (lihat semua + hapus): FULL_ACCESS saja.
+  "/dashboard/kotak-surat/admin": [...FULL_ACCESS],
+  "/api/kotak-surat/admin": [...FULL_ACCESS],
 };
 
 export const PERMISSIONS = {

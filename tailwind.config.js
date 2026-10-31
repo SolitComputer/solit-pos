@@ -7,7 +7,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-plus-jakarta)', 'sans-serif'],
+        sans: ["var(--font-poppins)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-spline-mono)", "ui-monospace", "monospace"],
       },
     },
   },

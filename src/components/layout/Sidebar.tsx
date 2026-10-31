@@ -12,6 +12,7 @@ import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
 import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES, CONTRACT_EXPIRING_VIEW_ROLES, TRANSACTION_VIEW_EXTRA_USER_IDS } from "@/lib/permissions";
+import { KOTAK_SURAT_ADMIN_ROLES, canSubmitKotakSurat } from "@/lib/kotakSurat";
 import { hasSopAccess } from "@/lib/sop";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
@@ -193,6 +194,7 @@ const Icons = {
   kendaraan: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 11l1.5-4.5A2 2 0 018.4 5h7.2a2 2 0 011.9 1.5L19 11" /><path d="M3 11h18v5a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1z" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></svg>),
   salesReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" /><path d="M9 12l2 2 4-4" /></svg>),
   pelanggaran: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>),
+  kotakSurat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z" /><path d="M2 7l10 6 10-6" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -227,6 +229,8 @@ const ITEM_PENGAJUAN_DANA: MenuItem = {
 }; const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 const ITEM_LENCANA: MenuItem = { name: "Lencana", href: "/dashboard/lencana", icon: Icons.lencana };
 const ITEM_PELANGGARAN: MenuItem = { name: "Pelanggaran", href: "/dashboard/pelanggaran", icon: Icons.pelanggaran };
+const ITEM_KOTAK_SURAT: MenuItem = { name: "Kotak Surat", href: "/dashboard/kotak-surat", icon: Icons.kotakSurat };
+const ITEM_KOTAK_SURAT_ADMIN: MenuItem = { name: "Kotak Surat (Admin)", href: "/dashboard/kotak-surat/admin", icon: Icons.kotakSurat };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
@@ -1257,6 +1261,24 @@ function withPelanggaranInAbsensi(groups: MenuGroup[]): MenuGroup[] {
   return next;
 }
 
+// Kotak Surat: grup sendiri. "Kotak Surat" untuk semua karyawan (non-PKL),
+// "Kotak Surat (Admin)" hanya untuk FULL_ACCESS. Disuntik di level groups final
+// (pola identik withKendaraanGroup) supaya role dinamis pun kebagian. PKL murni
+// tidak dapat menu ini (canSubmitKotakSurat false → item admin pun tidak ada).
+function withKotakSuratGroup(groups: MenuGroup[], userEffectiveRoles: string[]): MenuGroup[] {
+  const items: MenuItem[] = [];
+  if (canSubmitKotakSurat(userEffectiveRoles)) items.push(ITEM_KOTAK_SURAT);
+  if (userEffectiveRoles.some((r) => (KOTAK_SURAT_ADMIN_ROLES as string[]).includes(r))) {
+    items.push(ITEM_KOTAK_SURAT_ADMIN);
+  }
+  if (items.length === 0) return groups;
+
+  const rest = groups.filter((g) => g.label !== "Kotak Surat");
+  const utamaIdx = rest.findIndex((g) => g.label === "Utama");
+  const at = utamaIdx >= 0 ? utamaIdx + 1 : 0;
+  return [...rest.slice(0, at), { label: "Kotak Surat", items }, ...rest.slice(at)];
+}
+
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
   KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
@@ -1877,7 +1899,7 @@ export default function Sidebar() {
       .map((g) => ({ ...g, items: g.items.filter((it) => it.href !== ITEM_PKL_REPORT.href) }))
       .filter((g) => g.items.length > 0);
 
-  const groups: MenuGroup[] = stripPklReports(withPelanggaranInAbsensi(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKendaraanGroup( 
+  const groups: MenuGroup[] = stripPklReports(withPelanggaranInAbsensi(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKotakSuratGroup(withKendaraanGroup(
     dedupeGroups([
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
@@ -1889,7 +1911,7 @@ export default function Sidebar() {
         items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
       })),
     ])
-   ), effectiveRoles)), {
+  ), effectiveRoles), effectiveRoles)), {
     showPerjanjian: !!(contractStatus && contractStatus !== "APPROVED"),
     showSign: isContractSigner,
     showExpiring: isContractExpiringAdmin,
