@@ -7027,26 +7027,26 @@ export default function AttendanceDashboardPage() {
                                             <th className="sticky left-0 z-30 bg-gray-50 px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300 w-[160px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.25)]">Karyawan</th>
 
                                             {/* PENGHASILAN SECTION */}
-                                            <th colSpan={5} className="px-4 py-4 text-center text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/40 border-2 border-gray-300 whitespace-nowrap">
+                                            <th colSpan={5} className="px-4 py-4 text-center text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 border-2 border-gray-300 whitespace-nowrap">
                                                 PENGHASILAN
                                             </th>
 
                                             {/* POTONGAN SECTION */}
-                                            <th colSpan={3} className="px-4 py-4 text-center text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50/40 border-2 border-gray-300 whitespace-nowrap">
+                                            <th colSpan={3} className="px-4 py-4 text-center text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50 border-2 border-gray-300 whitespace-nowrap">
                                                 POTONGAN
                                             </th>
 
                                             {/* TOTAL SECTION */}
-                                            <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50/40 border-2 border-gray-300 whitespace-nowrap">
+                                            <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 border-2 border-gray-300 whitespace-nowrap">
                                                 TOTAL
                                             </th>
 
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300">Aksi</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300 bg-gray-50">Aksi</th>
                                         </tr>
 
                                         {/* Sub-header */}
-                                        <tr className="border-2 border-gray-200 bg-gray-50/40">
-                                           <th className="sticky left-0 z-30 bg-gray-50 px-4 py-4 border-2 border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.25)]" />
+                                        <tr className="border-2 border-gray-200 bg-gray-50 [&>th]:bg-gray-50">
+                                            <th className="sticky left-0 z-30 bg-gray-50 px-4 py-4 border-2 border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.25)]" />
 
                                             {/* Penghasilan sub-headers */}
                                             <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200 whitespace-nowrap">Gaji Pokok</th>
@@ -7086,8 +7086,8 @@ export default function AttendanceDashboardPage() {
                                                 } = computeMonthlySalary(sal, allow, overtime, u);
 
                                                 return (
-                                                   <tr key={u.name} className="group hover:bg-gray-50/60 transition-colors duration-200 border-2 border-gray-200">
-                                                       <td className="sticky left-0 z-10 bg-white group-hover:bg-gray-50 px-4 py-4 border-r-2 border-gray-200 min-w-[160px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.25)]">
+                                                    <tr key={u.name} className="group hover:bg-gray-50/60 transition-colors duration-200 border-2 border-gray-200">
+                                                        <td className="sticky left-0 z-10 bg-white group-hover:bg-gray-50 px-4 py-4 border-r-2 border-gray-200 min-w-[160px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.25)]">
                                                             <div className="flex items-center gap-2.5">
                                                                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
                                                                     {initials(u.name)}

@@ -52,18 +52,6 @@ function formatFullDateIndo(dateStr: string | null | undefined): string {
   return `${DAYS_ID[d.getDay()]}, ${d.getDate()} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function formatOvertimeTimestamp(row: OvertimeTableRow): string {
-  const ts = row.completed_at || row.created_at;
-  if (ts) {
-    const d = new Date(ts);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Jakarta" }) + " WIB";
-    }
-  }
-  const s = fmtTime(row.actual_start || row.scheduled_start);
-  const e = fmtTime(row.actual_end || row.scheduled_end);
-  return `${s} – ${e} WIB`;
-}
 
 function detectLateFromTimeStr(timeStr: string | null | undefined, lateThresholdMinutes: number = 8 * 60): boolean {
   if (!timeStr) return false;
@@ -493,24 +481,6 @@ export function OvertimeTable({
 
             <div className="relative p-3 bg-black flex items-center justify-center min-h-[300px] max-h-[65vh] overflow-hidden">
               <img src={photoModalRow.proof_photo_url} alt="Bukti lembur" className="max-w-full max-h-[62vh] object-contain rounded-xl" />
-
-              {/* Floating Timestamp Badge Overlay */}
-              <div className="absolute bottom-5 left-5 right-5 sm:right-auto bg-slate-950/90 backdrop-blur-md border border-white/20 rounded-2xl p-3.5 text-white shadow-2xl space-y-1 max-w-sm pointer-events-none">
-                <div className="flex items-center gap-1.5 text-orange-400 font-bold text-[10px] tracking-wider uppercase">
-                  <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse inline-block" />
-                  SOLIT POS • BUKTI LEMBUR
-                </div>
-                <p className="font-mono font-bold text-base text-white leading-tight">
-                  {formatOvertimeTimestamp(photoModalRow)}
-                </p>
-                <p className="text-[11px] text-gray-200 font-medium">
-                  {formatFullDateIndo(photoModalRow.request_date)}
-                </p>
-                <div className="pt-1 mt-1 border-t border-white/10 flex items-center justify-between text-[10px] text-gray-400">
-                  <span>Karyawan: <strong className="text-white">{photoModalRow.users?.name ?? "Karyawan"}</strong></span>
-                  {photoModalRow.duration_minutes ? <span className="font-mono text-orange-300 font-semibold">{formatOvertimeMinutes(photoModalRow.duration_minutes)}</span> : null}
-                </div>
-              </div>
             </div>
 
             <div className="px-5 py-3 bg-gray-900 border-t border-gray-800 flex items-center justify-between text-xs text-gray-300">

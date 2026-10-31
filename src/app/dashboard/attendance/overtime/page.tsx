@@ -364,16 +364,6 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
 
 function ProofPhotoModal({ overtime: o, onClose, canViewPay: showPay }: { overtime: OvertimeRequest; onClose: () => void; canViewPay?: boolean }) {
   if (!o.proof_photo_url) return null;
-  const timeFormatted = (() => {
-    const ts = o.completed_at || o.created_at;
-    if (ts) {
-      const d = new Date(ts);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Jakarta" }) + " WIB";
-      }
-    }
-    return `${formatTime(o.actual_start ?? o.scheduled_start)} – ${formatTime(o.actual_end ?? o.scheduled_end)} WIB`;
-  })();
 
   const dateFormatted = new Date(o.request_date + (o.request_date.includes("T") ? "" : "T12:00:00")).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
@@ -383,22 +373,6 @@ function ProofPhotoModal({ overtime: o, onClose, canViewPay: showPay }: { overti
       <div className="px-5 py-4 space-y-3 max-h-[75vh] overflow-y-auto">
         <div className="relative rounded-2xl overflow-hidden bg-black flex items-center justify-center min-h-[220px] shadow-sm">
           <img src={o.proof_photo_url} alt="Bukti" className="w-full max-h-72 object-contain rounded-2xl" />
-          {/* Floating Timestamp Badge Overlay */}
-          <div className="absolute bottom-3 left-3 right-3 sm:right-auto bg-slate-950/90 backdrop-blur-md border border-white/20 rounded-2xl p-3 text-white shadow-2xl space-y-0.5 max-w-xs pointer-events-none">
-            <div className="flex items-center gap-1.5 text-orange-400 font-bold text-[9px] tracking-wider uppercase">
-              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse inline-block" />
-              SOLIT POS • BUKTI LEMBUR
-            </div>
-            <p className="font-mono font-bold text-sm text-white leading-tight">
-              {timeFormatted}
-            </p>
-            <p className="text-[10px] text-gray-200 font-medium">
-              {dateFormatted}
-            </p>
-            <p className="text-[9px] text-gray-400 pt-0.5 border-t border-white/10">
-              Karyawan: <strong className="text-white">{o.users?.name ?? "Karyawan"}</strong>
-            </p>
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
