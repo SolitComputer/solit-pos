@@ -64,7 +64,7 @@ export default function ItemLoansPage() {
 
     const [loans, setLoans] = useState<LoanRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState<"PENDING" | "APPROVED" | "DIPESAN" | "HISTORY">("PENDING");
+    const [tab, setTab] = useState<"PENDING" | "APPROVED" | "DIPESAN" | "RETURN_PENDING" | "HISTORY">("PENDING");
     const [actingId, setActingId] = useState<string | null>(null);
     const [expandedKey, setExpandedKey] = useState<string | null>(null); // kelompok yang sedang dibuka detailnya
     const [bulkBusyKey, setBulkBusyKey] = useState<string | null>(null);  // penanda aksi massal sedang berjalan
@@ -374,7 +374,7 @@ export default function ItemLoansPage() {
         if (tab === "PENDING") return l.status === "PENDING";
         // Tab APPROVED (Sedang Dipinjam) — bisa dicari peminjam/barang/SN/keterangan.
         if (tab === "APPROVED") {
-            if (l.status !== "APPROVED" && l.status !== "RETURN_PENDING") return false;
+            if (l.status !== "APPROVED") return false;
             const q = approvedSearch.trim().toLowerCase();
             if (q) {
                 const hay = [l.borrower_name, l.item_name, l.serial_number ?? "", l.notes ?? ""]
@@ -384,6 +384,10 @@ export default function ItemLoansPage() {
             return true;
         }
         if (tab === "DIPESAN") return l.status === "DIPESAN";
+
+        // Tab RETURN_PENDING (Menunggu ACC Pengembalian) — hanya pengajuan pengembalian
+        // yang belum di-ACC. Tetap di sini sampai di-Setujui (→ Riwayat) / di-Tolak (→ Sedang Dipinjam).
+        if (tab === "RETURN_PENDING") return l.status === "RETURN_PENDING";
 
         // Tab HISTORY (Riwayat): REJECTED / RETURNED / SOLD.
         const isHistory = l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD";
@@ -555,6 +559,7 @@ export default function ItemLoansPage() {
                                 { k: "PENDING", l: "Menunggu" },
                                 { k: "APPROVED", l: "Sedang Dipinjam" },
                                 { k: "DIPESAN", l: "Di Pesan" },
+                                { k: "RETURN_PENDING", l: "Menunggu ACC Pengembalian" },
                                 { k: "HISTORY", l: "Riwayat" },
                             ] as const).map(t => (
                                 <button key={t.k} onClick={() => setTab(t.k)}
