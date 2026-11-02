@@ -258,6 +258,7 @@ export async function PATCH(
       newStatus = "SEDANG_DIKERJAKAN";
       updatePayload = {
         dikerjakan_by: user.id,
+        tanggal_mulai: current.tanggal_mulai ?? new Date().toISOString(),
         ...(estimasi_harga !== undefined ? { estimasi_harga: Number(estimasi_harga) } : {}),
       };
       logCatatan = estimasi_harga
