@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { postSalarySlipToAccounting } from "@/lib/salaryAccounting";
 
 export const dynamic = "force-dynamic"; 
 
@@ -208,24 +209,37 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const { data, error } = await supabase
+        // 1) Ambil slip dulu (butuh angka bruto/net/potongan + id)
+    const { data: slip, error: fetchErr } = await supabase
       .from("salary_slips")
-      .update({
-        status: "FINALIZED",
-        finalized_at: new Date().toISOString(),
-      })
+      .select("*")
       .eq("user_id", user_id)
       .eq("year", parseInt(String(year)))
       .eq("month", parseInt(String(month)))
+      .single();
+
+    if (fetchErr || !slip) {
+      return NextResponse.json({ success: false, message: "Slip tidak ditemukan" }, { status: 404 });
+    }
+
+    // 2) Posting akuntansi (idempotent: skip kalau sudah/PKL/<Okt 2026).
+    //    Kalau GAGAL → jangan finalisasi, biar bisa diulang (all-or-nothing).
+    const posting = await postSalarySlipToAccounting(supabase, slip, user);
+    if (!posting.ok) {
+      return NextResponse.json({ success: false, message: posting.message }, { status: 400 });
+    }
+
+    // 3) Baru set FINALIZED
+    const { data, error } = await supabase
+      .from("salary_slips")
+      .update({ status: "FINALIZED", finalized_at: slip.finalized_at ?? new Date().toISOString() })
+      .eq("id", slip.id)
       .select()
       .single();
 
     if (error) {
       console.error("[salary-slip PATCH] error:", error);
-      return NextResponse.json(
-        { success: false, message: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data });
