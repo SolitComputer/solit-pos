@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -30,14 +29,14 @@ export async function GET(req: NextRequest) {
     "Cache-Control": "no-store",
   };
 
-
   const supabase = getAdmin();
 
-  // Hanya ambil order yang aktif (tidak expose history/sudah diambil)
+  // Hanya ambil order yang aktif + DONE (tidak expose history/sudah diambil)
+  // teknisi via FK dikerjakan_by → otomatis nama akun yang mengerjakan
   const { data, error } = await supabase
     .from("service_orders")
-    .select("no_urut, nama, type_laptop, status, tanggal_masuk, tanggal_selesai")
-    .in("status", ["ANTRIAN", "SEDANG_DIKERJAKAN", "MENUNGGU_SPAREPART", "DONE"])
+    .select("no_urut, nama, type_laptop, keluhan, status, tanggal_masuk, tanggal_selesai, teknisi:users!service_orders_dikerjakan_by_fkey(name)")
+    .in("status", ["ANTRIAN", "SEDANG_DIKERJAKAN", "MENUNGGU_SPAREPART", "GAGAL_DIPERBAIKI", "DONE"])
     .order("no_urut", { ascending: true });
 
   if (error) {
@@ -47,12 +46,12 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Sensor nama: hanya tampilkan nama depan + inisial belakang
-  // cth: "Budi Santoso" → "Budi S."
-  const sanitized = (data ?? []).map(o => ({
+  // Sensor nama customer: nama depan + inisial belakang. cth: "Budi Santoso" → "Budi S."
+  const sanitized = (data ?? []).map((o: any) => ({
     no_urut: o.no_urut,
     nama: sensorNama(o.nama),
     type_laptop: o.type_laptop,
+    teknisi: o.teknisi?.name ?? null, // ratakan object { name } → string utk frontend
     status: o.status,
     tanggal_masuk: o.tanggal_masuk,
     tanggal_selesai: o.tanggal_selesai ?? null,
