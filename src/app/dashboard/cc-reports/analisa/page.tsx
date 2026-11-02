@@ -454,13 +454,6 @@ export default function CCAnalisaPage() {
                 {syncing ? "Menarik data…" : "↻ Sync Metrik"}
               </button>
             </div>
-            <button
-              onClick={handleSyncAll}
-              disabled={syncing}
-              className="ml-auto rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-40"
-            >
-              {syncing ? "Menarik data…" : "↻ Sync Metrik"}
-            </button>
           </div>
 
           {/* ── Tab BRAND ── */}
