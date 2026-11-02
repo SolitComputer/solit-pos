@@ -26,8 +26,8 @@ export const BRANCH_LOCATIONS: BranchLocation[] = [
     branch: "JOGJA",
     label: "Cabang Jogja",
     // Titik toko Solit Jogja (Sinduadi, Sleman) — dari Google Maps.
-    lat: -7.762369,
-    lng: 110.367699,
+    lat: -7.762592,
+    lng: 110.367726,
     radius: 80,
   },
 ];
