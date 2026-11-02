@@ -35,7 +35,7 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         .from("item_loans")
         .select("id")
         .eq("unit_id", unit_id)
-        .in("status", ["PENDING", "APPROVED"])
+        .in("status", ["PENDING", "APPROVED", "DIPESAN"])
         .limit(1);
       if (existing && existing.length > 0) {
         return NextResponse.json(

@@ -89,3 +89,26 @@ export async function revertLoansOnCancel(
     if (error) console.error("[revertLoansOnCancel/sold]", error.message);
   }
 }
+
+/**
+ * Kebalikan dari service-consume: saat sparepart service DIBATALKAN (unit balik
+ * ke stok), pinjaman yang sempat jadi "Terjual" KARENA service itu dikembalikan
+ * ke "APPROVED" (Dipinjam). Hanya menyentuh loan dengan sold_invoice "SERVICE-%"
+ * supaya penjualan via transaksi (INV-...) tidak ikut ter-revert. Best-effort.
+ */
+export async function revertLoansOnServiceCancel(
+  supabase: SupabaseClient,
+  unitIds: string[],
+): Promise<void> {
+  const ids = Array.from(new Set((unitIds ?? []).filter(Boolean)));
+  if (ids.length === 0) return;
+
+  const { error } = await supabase
+    .from("item_loans")
+    .update({ status: "APPROVED", sold_at: null, sold_invoice: null })
+    .in("unit_id", ids)
+    .eq("status", "SOLD")
+    .like("sold_invoice", "SERVICE-%");
+
+  if (error) console.error("[revertLoansOnServiceCancel]", error.message);
+} 
