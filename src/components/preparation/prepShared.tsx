@@ -5,9 +5,12 @@ import { type LucideIcon, User, Bike, Package } from "lucide-react";
 
 export interface PrepItem {
   id: string; serial_number: string; laptop_name: string | null; is_checked: boolean;
+  is_cancelled?: boolean; // ← unit dibatalkan, tidak ikut dihitung di progres
   laptop_id?: string | null;
   laptop_spec?: { cpu: string | null; ram: string | null; storage: string | null; gpu: string | null } | null;
-}export interface PrepOrder {
+}
+
+export interface PrepOrder {
   id: string; order_number: string; customer_name: string; customer_phone: string | null;
   status: string; delivery_method: string | null;
   created_by: string | null;
@@ -57,9 +60,14 @@ interface OrderCardProps {
 export function OrderCard({ o, canReceive = false, receivingId = null, onReceive, isNew = false }: OrderCardProps) {
   const sm = STATUS_META[o.status] ?? STATUS_META.MENUNGGU;
   const dm = o.delivery_method ? DELIVERY_META[o.delivery_method] : null;
-  const checked = o.preparation_items.filter((it) => it.is_checked).length;
-  const total = o.preparation_items.length;
-  const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+  // Unit berstatus Dibatalkan tidak akan pernah bisa dicentang, jadi
+  // dikeluarkan dari perhitungan progres. Konsisten dengan `checkableItems`
+  // di halaman detail penyiapan → 2 dicek dari 2 unit aktif = 100%.
+  const activeItems = o.preparation_items.filter((it) => !it.is_cancelled);
+  const checked = activeItems.filter((it) => it.is_checked).length;
+  const activeTotal = activeItems.length;
+  const total = o.preparation_items.length; // tetap dipakai untuk badge "{total} unit"
+  const pct = activeTotal > 0 ? Math.round((checked / activeTotal) * 100) : 0;
   const showReceive = canReceive && o.status === "MENUNGGU" && !!onReceive;
 
   // Model unik dalam pesanan ini — dedup by laptop_id (fallback laptop_name)
@@ -100,7 +108,7 @@ export function OrderCard({ o, canReceive = false, receivingId = null, onReceive
         <span className="bg-gray-100 px-2 py-1 rounded-lg font-bold text-gray-700">{total} unit</span>
         {o.status === "DIPROSES" && (
           <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-lg font-bold border border-blue-100">
-            {checked}/{total} dicek · {pct}%
+            {checked}/{activeTotal} dicek · {pct}%
           </span>
         )}
       </div>

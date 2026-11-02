@@ -63,10 +63,24 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
     }
 
-    // Semua unit harus sudah dicek
-    const allChecked = items.length > 0 && items.every((it: any) => it.is_checked);
+    // Hanya unit yang MASIH AKTIF (belum dibatalkan) yang wajib dicek.
+    // Unit berstatus Dibatalkan tidak akan pernah bisa dicentang, jadi kalau
+    // ikut dihitung di sini, "Tandai Siap Kirim" akan selalu gagal walau semua
+    // unit aktif sudah dicek. Ini penyebab error "Masih ada N unit belum dicek"
+    // pada order yang punya unit batal. Konsisten dengan `checkableItems` di
+    // halaman detail penyiapan ([id]/page.tsx).
+    const activeItems = items.filter((it: any) => !it.is_cancelled);
+
+    if (activeItems.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: "Semua unit di penyiapan ini sudah dibatalkan. Batalkan seluruh penyiapan, bukan ditandai siap kirim.",
+      }, { status: 400 });
+    }
+
+    const allChecked = activeItems.every((it: any) => it.is_checked);
     if (!allChecked) {
-      const unchecked = items.filter((it: any) => !it.is_checked).length;
+      const unchecked = activeItems.filter((it: any) => !it.is_checked).length;
       return NextResponse.json({
         success: false,
         message: `Masih ada ${unchecked} unit belum dicek`,
