@@ -2575,7 +2575,16 @@ function EditTransactionModal({
             }
             setUnitDealPrices(map);
           } else if (laptopItemsList.length === 1) {
-            setSingleDealPrice(String(laptopItemsList[0].deal_price ?? item.deal_price ?? ""));
+            // deal_price di transaction_items kadang 0/null (harga asli ada di
+            // transactions.deal_price). Pakai `||` — bukan `??` — supaya nilai 0
+            // ikut jatuh ke harga transaksi, jadi form tak ter-init Rp 0 yang
+            // mengunci tombol simpan DAN berisiko menimpa harga jadi 0.
+            const firstDeal =
+              Number(laptopItemsList[0].deal_price) ||
+              Number(item.deal_price) ||
+              Number(item.amount) ||
+              0;
+            setSingleDealPrice(firstDeal > 0 ? String(firstDeal) : "");
           } else {
             setSingleDealPrice("0");
           }
@@ -2626,6 +2635,11 @@ function EditTransactionModal({
   const computedTotalDeal = computedLaptopDeal + computedAccDeal;
   const originalTotalDeal = Number(item.deal_price ?? item.amount ?? 0);
   const diffDeal = computedTotalDeal - originalTotalDeal;
+
+  // Harga deal efektif: hasil hitung form kalau valid; kalau 0 (mis. edit foto
+  // doang / harga belum ter-load) jatuh ke harga asli transaksi — supaya tombol
+  // tak terkunci dan harga lama tak tertimpa jadi Rp 0.
+  const effectiveTotalDeal = computedTotalDeal > 0 ? computedTotalDeal : originalTotalDeal;
 
   const isDP = item.status === "RESERVED" || Number(item.dp_amount || 0) > 0;
   const currentDP = Number(dpAmount) || 0;
@@ -2755,11 +2769,11 @@ function EditTransactionModal({
       setError("Alasan edit wajib diisi untuk catatan audit");
       return;
     }
-    if (computedTotalDeal <= 0) {
+    if (effectiveTotalDeal <= 0) {
       setError("Harga deal harus lebih besar dari Rp 0");
       return;
     }
-    if (isDP && currentDP > computedTotalDeal) {
+    if (isDP && currentDP > effectiveTotalDeal) {
       setError("Nominal DP tidak boleh melebihi total harga deal");
       return;
     }
@@ -2770,8 +2784,8 @@ function EditTransactionModal({
       // NOTE: Status pembayaran / status transaksi TIDAK dikirim di payload,
       // sehingga status transaksi (PAID, HELD, RESERVED, dll.) tetap terjaga dan tidak berubah.
       const payload: any = {
-        deal_price: computedTotalDeal,
-        amount: computedTotalDeal,
+        deal_price: effectiveTotalDeal,
+        amount: effectiveTotalDeal,
         customer_name: customerName.trim() || item.customer_name,
         customer_phone: customerPhone.trim() || null,
         branch, // ← cabang (koreksi kalau salah input saat payment)
@@ -3307,7 +3321,7 @@ function EditTransactionModal({
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || loadingItems || computedTotalDeal <= 0 || !reason.trim()}
+                       disabled={saving || loadingItems || effectiveTotalDeal <= 0 || !reason.trim()}
             className="flex-1 h-10 bg-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:bg-[#1a1545] transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-sm"
           >
             {saving ? (
@@ -3659,7 +3673,7 @@ export default function Page() {
             ? Number(grouped[0]?.unit_count ?? 1)
             : (sns.length > 0 ? sns.length : 1);
           rowNo += 1;
-                  tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", qty, item.laptop_name ?? "", item.cpu ?? "", item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal, Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.sales_name ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
+          tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", qty, item.laptop_name ?? "", item.cpu ?? "", item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal, Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.sales_name ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
         }
       }
 
