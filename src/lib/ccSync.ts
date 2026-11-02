@@ -18,9 +18,11 @@ const SYNC_BRAND: string = process.env.CC_SYNC_BRAND || DEFAULT_BRAND;
  * (SYNC_BRAND). YouTube bebas (API key publik). brand null/undefined → tidak diblok
  * (backward-compatible untuk pemanggil lama yang belum kirim brand).
  */
-export function brandCanAutoSync(platform: string, brand?: string | null): boolean {
-  if (platform !== "Instagram" && platform !== "TikTok") return true;
-  return !brand || brand === SYNC_BRAND;
+export function brandCanAutoSync(_platform: string, _brand?: string | null): boolean {
+  // Fase 2b: TikTok & Instagram keduanya sudah per-brand. Gate lama tidak dipakai lagi —
+  // brand yang belum connect ditangani per-platform (token null → UNSUPPORTED/manual).
+  // Fungsi tetap ada supaya pemanggil lama (bulk sync & route posting) tidak perlu diubah.
+  return true;
 }
 /**
  * null = API TIDAK mengembalikan metrik ini (bukan berarti nol).
@@ -305,9 +307,11 @@ async function igViewsFallback(mediaId: string, token: string): Promise<number |
 }
 
 async function syncInstagram(shortcode: string, opt: SyncOptions): Promise<SyncOutcome> {
-  const auth = await getValidIgToken();
+  const auth = await getValidIgToken(opt.brand || DEFAULT_BRAND);
   if (auth.token === null) {
-    return { ...fail("ERROR", auth.error), platform: "Instagram", externalId: shortcode };
+    // Belum connect / sesi mati → UNSUPPORTED (manual), bukan ERROR, biar brand yang
+    // belum terhubung tidak mengotori banner "posting bermasalah".
+    return { ...fail("UNSUPPORTED", auth.error), platform: "Instagram", externalId: shortcode };
   }
 
   try {
@@ -394,10 +398,13 @@ interface TikTokQueryResponse {
   error?: { code?: string; message?: string };
 }
 
-async function syncTikTok(videoId: string): Promise<SyncOutcome> {
-  const auth = await getValidAccessToken();
+async function syncTikTok(videoId: string, brand?: string | null): Promise<SyncOutcome> {
+  const b = brand || DEFAULT_BRAND;
+  const auth = await getValidAccessToken(b);
   if (auth.token === null) {
-    return { ...fail("ERROR", auth.error), platform: "TikTok", externalId: videoId };
+    // Belum connect / sesi mati → UNSUPPORTED (manual), bukan ERROR, biar tidak
+    // mengotori banner "posting bermasalah". Field View/Like/Komen tetap bisa diisi.
+    return { ...fail("UNSUPPORTED", auth.error), platform: "TikTok", externalId: videoId };
   }
 
   const res = await fetch(
@@ -426,12 +433,13 @@ async function syncTikTok(videoId: string): Promise<SyncOutcome> {
 
   const v = json.data?.videos?.[0];
   if (!v) {
-    const integ = await getIntegration();
-    const acc = integ?.account_name ? `@${integ.account_name}` : "akun yang terhubung";
+        const integ = await getIntegration(b);
+    const acc = integ?.account_name ? `@${integ.account_name}` : `akun TikTok brand ${b}`;
 
     // 🔎 log buat diagnosa di server (pm2 logs)
     console.warn("[cc-sync][tiktok] video_id tidak ada di akun terhubung", {
       videoId,
+      brand: b,
       connectedAccount: integ?.account_name ?? null,
       connectedOpenId: integ?.open_id ?? null,
     });
@@ -439,8 +447,8 @@ async function syncTikTok(videoId: string): Promise<SyncOutcome> {
     return {
       ...fail(
         "ERROR",
-        `Video ini tidak ada di ${acc}. TikTok cuma izinkan tarik metrik untuk video yang diposting DARI ${acc}. ` +
-          `Kalau konten ini diposting dari akun brand lain (mis. OnPoint/Sotech/Zenit), isi View/Like/Komen manual.`
+        `Video ini tidak ada di ${acc}. Pastikan video diposting DARI akun TikTok brand ${b} yang terhubung. ` +
+          `Kalau diposting dari akun lain, isi View/Like/Komen manual.`
       ),
       platform: "TikTok",
       externalId: videoId,
@@ -519,7 +527,7 @@ export async function syncPosting(
   switch (parsed.platform) {
     case "YouTube":   return syncYouTube(parsed.externalId, opt);
     case "Instagram": return syncInstagram(parsed.externalId, opt);
-    case "TikTok":    return syncTikTok(parsed.externalId);
+        case "TikTok":    return syncTikTok(parsed.externalId, opt.brand);
     default:
       return {
         ...fail("UNSUPPORTED", `${parsed.platform} belum didukung auto-sync`),

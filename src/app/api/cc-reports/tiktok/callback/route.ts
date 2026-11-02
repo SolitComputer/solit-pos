@@ -1,6 +1,7 @@
 // src/app/api/cc-reports/tiktok/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCode } from "@/lib/ccTikTok";
+import { normalizeBrand } from "@/lib/ccReports";
 
 export const dynamic = "force-dynamic";
 
@@ -59,14 +60,18 @@ export async function GET(req: NextRequest) {
       return back(req, "State tidak cocok — coba hubungkan ulang", false);
     }
 
-    const out = await exchangeCode(code);
+    // Brand yang sedang dihubungkan (di-set waktu connect). Default → Solit.
+    const brand = normalizeBrand(req.cookies.get("tiktok_oauth_brand")?.value);
+
+    const out = await exchangeCode(code, brand);
 
     const res = back(
       req,
-      out.ok ? "Akun TikTok berhasil terhubung" : out.error ?? "Gagal menghubungkan",
+      out.ok ? `Akun TikTok (${brand}) berhasil terhubung` : out.error ?? "Gagal menghubungkan",
       out.ok
     );
     res.cookies.set("tiktok_oauth_state", "", { path: "/", maxAge: 0 });
+    res.cookies.set("tiktok_oauth_brand", "", { path: "/", maxAge: 0 });
     return res;
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Kesalahan tak terduga";

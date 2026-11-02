@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { isStale, AUTO_SYNC_STALE_MINUTES, SYNC_STATUS_META } from "@/lib/ccMetrics";
 import {
-  ANALISA_FILTERS, PLATFORM_COLOR, BRAND_TABS, BRAND_META, CC_RANGES, DEFAULT_BRAND,
+   ANALISA_FILTERS, PLATFORM_COLOR, BRAND_TABS, BRAND_META, CC_RANGES, CC_BRANDS, DEFAULT_BRAND,
   fmtCompact, fmtNum, fmtMinutes, pctDelta, matchFilter, wibDateStr, isDateStr,
   type AnalisaFilter, type BrandFilter, type CCAnalytics, type CCBrand,
   type CCMetric, type CCMetricTotals, type CCRange,
@@ -76,19 +76,30 @@ export default function CCAnalisaPage() {
 
   const [visible, setVisible] = useState(DETAIL_PAGE_SIZE);
 
-  const [tt, setTt] = useState<ConnHealth | null>(null);
+   const [ttBrands, setTtBrands] = useState<Record<string, ConnHealth>>({});
   const [ig, setIg] = useState<ConnHealth | null>(null);
 
-  useEffect(() => {
+  // pesan hasil connect dari callback (?tiktok=ok&msg=...)
+  const [ttFlash, setTtFlash] = useState<{ ok: boolean; msg: string } | null>(null);
+
+    useEffect(() => {
     fetch("/api/cc-reports/tiktok/status")
       .then((r) => r.json())
-      .then((j) => j.success && setTt(j))
+      .then((j) => j.success && j.brands && setTtBrands(j.brands))
       .catch(() => { });
 
     fetch("/api/cc-reports/instagram/status")
       .then((r) => r.json())
       .then((j) => j.success && setIg(j))
       .catch(() => { });
+
+    // Hasil connect TikTok: callback redirect ke sini dgn ?tiktok=ok&msg=...
+    const sp = new URLSearchParams(window.location.search);
+    const tiktok = sp.get("tiktok");
+    if (tiktok) {
+      setTtFlash({ ok: tiktok === "ok", msg: sp.get("msg") ?? "" });
+      window.history.replaceState(null, "", window.location.pathname); // bersihkan query
+    }
   }, []);
 
   // ── Query string analytics ────────────────────────────────────────────────
@@ -296,52 +307,62 @@ export default function CCAnalisaPage() {
       <div className="min-h-screen bg-white px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
 
-          {/* ── Kesehatan koneksi TikTok ── */}
-          {tt && (
-            <div
-              className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-3 ${tt.level === "OK"
-                ? "border-emerald-100 bg-emerald-50"
-                : tt.level === "WARN"
-                  ? "border-amber-100 bg-amber-50"
-                  : "border-red-100 bg-red-50"
-                }`}
-            >
-              <p className={`text-xs font-medium ${tt.level === "OK"
-                ? "text-emerald-800"
-                : tt.level === "WARN" ? "text-amber-800" : "text-red-800"}`}>
-                {tt.level === "OK" && (
-                  <>
-                    <b>TikTok terhubung</b>
-                    {tt.accountName && <span className="ml-1">· @{tt.accountName}</span>}
-                    <span className="ml-1 opacity-70">
-                      — token diperbarui otomatis tiap hari
-                      {tt.daysLeft !== null && ` (aman ${tt.daysLeft} hari)`}
-                    </span>
-                  </>
-                )}
-                {tt.level === "WARN" && (
-                  <>
-                    <b> Koneksi TikTok perlu perhatian.</b>{" "}
-                    {tt.error ?? (tt.daysLeft !== null && `Sesi tersisa ${tt.daysLeft} hari.`)}
-                  </>
-                )}
-                {tt.level === "DEAD" && (
-                  <>
-                    <b> TikTok tidak terhubung.</b> Metrik TikTok tidak ter-update otomatis.
-                    {tt.error && <span className="ml-1 opacity-80">({tt.error})</span>}
-                  </>
-                )}
-              </p>
-              {tt.level !== "OK" && (
-                <a
-                  href="/api/cc-reports/tiktok/connect"
-                  className="flex-shrink-0 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-gray-800"
-                >
-                  {tt.level === "DEAD" ? "Hubungkan TikTok" : "Hubungkan Ulang"}
-                </a>
-              )}
+                   {/* ── Hasil connect TikTok (flash dari callback) ── */}
+          {ttFlash && (
+            <div className={`mb-4 flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs font-medium ${
+              ttFlash.ok ? "border-emerald-100 bg-emerald-50 text-emerald-800"
+                         : "border-red-100 bg-red-50 text-red-800"}`}>
+              <span className="min-w-0">
+                {ttFlash.msg || (ttFlash.ok ? "Berhasil terhubung" : "Gagal menghubungkan")}
+              </span>
+              <button onClick={() => setTtFlash(null)}
+                className="flex-shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-bold opacity-70 hover:opacity-100">
+                Tutup
+              </button>
             </div>
           )}
+
+          {/* ── Koneksi TikTok per Brand ── */}
+          <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
+              <p className="text-xs font-black text-gray-700">Koneksi TikTok per Brand</p>
+              <span className="text-[10px] text-gray-400">
+                Metrik TikTok otomatis hanya untuk konten dari akun brand yang terhubung.
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {CC_BRANDS.map((b) => {
+                const h = ttBrands[b];
+                const level = h?.level ?? "DEAD";
+                const statusDot =
+                  level === "OK" ? "bg-emerald-500" : level === "WARN" ? "bg-amber-500" : "bg-red-400";
+                return (
+                  <div key={b}
+                    className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/60 px-2.5 py-2">
+                    <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                      style={{ background: BRAND_META[b].color }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-bold text-gray-800">{BRAND_META[b].label}</p>
+                      <p className="truncate text-[10px] text-gray-400">
+                        {level === "OK"
+                          ? `@${h?.accountName ?? "?"}${h?.daysLeft != null ? ` · aman ${h.daysLeft} hr` : ""}`
+                          : level === "WARN"
+                            ? (h?.error ?? "perlu perhatian")
+                            : "belum terhubung"}
+                      </p>
+                    </div>
+                    <span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusDot}`} />
+                    {level !== "OK" && (
+                      <a href={`/api/cc-reports/tiktok/connect?brand=${encodeURIComponent(b)}`}
+                        className="flex-shrink-0 rounded-lg bg-gray-900 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-gray-800">
+                        {level === "DEAD" ? "Hubungkan" : "Perbarui"}
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {/* ── Kesehatan koneksi Instagram ── */}
           {ig && ig.level !== "OK" && (
