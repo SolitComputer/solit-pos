@@ -266,7 +266,7 @@ export default function UnitsPage() {
     const [borrowedUnitIds, setBorrowedUnitIds] = useState<Set<string>>(new Set());
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     // Admin Barang boleh kelola unit TAPI tidak boleh hapus; role lain tetap seperti semula.
-    const canDelete = canManageUnits && !userRoles.some(r => r === "ADMIN_BARANG");
+    const canDelete = canManageUnits && !userRoles.some(r => r === "ADMIN_BARANG" || r === "PKL_ADMIN_BARANG");
     const canAuditUnits = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canSOUnits = hasAnyRole(userRoles, SO_ROLES);
     // Barcode per unit — sama seperti halaman Kelola Unit Aksesoris.

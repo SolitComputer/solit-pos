@@ -7,6 +7,7 @@ export type UserRole =
   | "PENGELOLA_BARANG"
   | "KEPALA_ADMIN_BARANG"
   | "ADMIN_BARANG"
+  | "PKL_ADMIN_BARANG"
   | "TEKNISI"
   | "KEPALA_TEKNISI"
   | "PENGANTARAN"
@@ -53,6 +54,7 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   KEPALA_PENGELOLA_BARANG: "/dashboard/data-barang",
   KEPALA_ADMIN_BARANG: "/dashboard/data-barang",
   ADMIN_BARANG: "/dashboard/data-barang",
+  PKL_ADMIN_BARANG: "/dashboard/data-barang",
   TEKNISI: "/dashboard/service/antrian",
   KEPALA_TEKNISI: "/dashboard/service/antrian",
   PENGANTARAN: "/dashboard/preparation/pengantaran",
@@ -91,7 +93,7 @@ const ALL_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_CC",
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
-  "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG",
+  "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "PKL_ADMIN_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KEPALA_PENGELOLA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
@@ -873,8 +875,8 @@ export const PERMISSIONS = {
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
   ] as UserRole[],
-  CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
-  EDIT_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG"] as UserRole[],
+  CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "PKL_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
+  EDIT_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "PKL_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG"] as UserRole[],
 
   VIEW_BARCODE: [
     ...FULL_ACCESS, "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
@@ -1085,7 +1087,7 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
   // Kepala Admin Barang = kepala sub-tim Admin Barang. Boleh set absensi,
   // jadwal, lembur & ACC lembur bawahannya. Keputusan 30 Okt 2026: bawahan
   // HANYA ADMIN_BARANG — PKL_PENGELOLA_BARANG ranah Kepala Pengelola Barang.
-  KEPALA_ADMIN_BARANG: ["ADMIN_BARANG"],
+  KEPALA_ADMIN_BARANG: ["ADMIN_BARANG", "PKL_ADMIN_BARANG"],
   // CUSTOMER_SERVICE diperlakukan setara kepala divisi untuk bawahannya sendiri
   // (PKL_CUSTOMER_SERVICE): boleh atur jadwal/absensi/lembur mereka. Tidak bisa
   // mengatur role lain, dan dirinya sendiri tetap bawahan KEPALA_TEKNISI.
@@ -1177,6 +1179,7 @@ export const PKL_PARENT_ROLE: Partial<Record<UserRole, UserRole>> = {
   // Admin Barang — akses disamakan dgn PKL Pengelola Barang (via parent
   // PENGELOLA_BARANG), TAPI bukan role magang (tidak masuk PKL_ROLES/laporan PKL).
   ADMIN_BARANG: "PENGELOLA_BARANG",
+  PKL_ADMIN_BARANG: "PENGELOLA_BARANG", // parent identik dgn ADMIN_BARANG → akses efektif sama persis
   // PKL_ACCOUNTING SENGAJA TIDAK dimapping ke ACCOUNTING di sini — kalau
   // dimapping, dia bakal ikut ke-expand dapat semua akses ACCOUNTING
   // (termasuk Cashflow), padahal requirement-nya PKL Accounting cuma boleh
@@ -1402,6 +1405,7 @@ export const SO_ROLES: UserRole[] = [
   "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG",
   "PKL_PENGELOLA_BARANG",
   "ADMIN_BARANG",
+  "PKL_ADMIN_BARANG",
 ];
 
 // ── SO Terbatas (per-akun) ────────────────────────────────────────────────
@@ -1440,7 +1444,7 @@ export const CONDITION_CHECK_EDITOR_USER_IDS: string[] = [
   "7594367d-b27b-49a8-a427-5ecb7fa2d21f",
   "20c4df76-db02-4e36-977b-27b76c7fa803",
 ];
-export const CONDITION_CHECK_EDITOR_ROLES: UserRole[] = ["ADMIN", "PKL_PENGELOLA_BARANG", "ADMIN_BARANG", "PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG"];
+export const CONDITION_CHECK_EDITOR_ROLES: UserRole[] = ["ADMIN", "PKL_PENGELOLA_BARANG", "ADMIN_BARANG", "PKL_ADMIN_BARANG", "PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG"];
 
 export function canEditConditionChecks(
   userId: string | null | undefined,
@@ -1488,6 +1492,7 @@ export const SO_HISTORY_VIEW_ROLES: UserRole[] = [
   "KEPALA_PENGELOLA_BARANG",
   "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG",
   "ADMIN_BARANG",
+  "PKL_ADMIN_BARANG",
 ];
 
 // ── Data Barang: Role yang boleh melihat tab Data Laptop & Aksesoris ──────────
@@ -1496,7 +1501,7 @@ export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "ACCOUNTING",
   "PURCHASING",
-  "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG",
+  "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "PKL_ADMIN_BARANG",
   "KEPALA_PENGELOLA_BARANG",
   "PKL_PENGELOLA_BARANG",
   "TEKNISI",
@@ -1517,7 +1522,7 @@ export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
 // create/edit (cuma ada di view) — supaya perilaku existing tidak berubah.
 export const ACCESSORY_CREATE_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-  "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "PKL_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
   "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI",
 ];
 export const ACCESSORY_VIEW_ROLES: UserRole[] = [
@@ -1559,5 +1564,5 @@ export const ACCESSORY_UNIT_AUDIT_ROLES: UserRole[] = Array.from(new Set<UserRol
 // APPROVE: hanya Pengelola Barang, Kepala Pengelola Barang, Admin (+Programmer).
 export const ITEM_LOAN_VIEW_ROLES: UserRole[] = [...ALL_ROLES];
 export const ITEM_LOAN_APPROVE_ROLES: UserRole[] = [
-  "ADMIN", "PROGRAMMER", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG",
+  "ADMIN", "PROGRAMMER", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "PKL_ADMIN_BARANG",
 ];

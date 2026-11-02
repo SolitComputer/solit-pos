@@ -21,6 +21,7 @@ const LEGACY_LABEL_OVERRIDES: Record<string, string> = {
   PKL: "PKL (Umum)",
   ASISTEN_CEO: "Asisten CEO",
   CC: "Content Creator",
+  PKL_ADMIN_BARANG: "PKL Admin Barang",
 };
 
 // ── GET — daftar semua dynamic role + daftar role bawaan (legacy) ──────────
