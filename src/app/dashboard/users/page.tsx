@@ -176,6 +176,7 @@ const PKL_ROLE_SET = new Set([
   "PKL_CUSTOMER_SERVICE",
   "PKL_PENGELOLA_BARANG",
   "PKL_ACCOUNTING",
+  "PKL_ADMIN_BARANG",
 ]);
 function isPKLRole(role: string) { return PKL_ROLE_SET.has(role); }
 
