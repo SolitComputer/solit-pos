@@ -215,6 +215,15 @@ const TX_DIFF_FIELD_CONFIG: Record<string, { label: string; tier: "public" | "fi
     format: (v) => (Array.isArray(v) ? (v.length ? v.join(", ") : "(kosong)") : String(v ?? "—")),
   },
   item_kind: { label: "Jenis Barang", tier: "public" },
+  // ✅ Ganti foto bukti — tampilkan nama file-nya saja (URL penuh kepanjangan di diff)
+  payment_photo: {
+    label: "Bukti Pembayaran", tier: "public",
+    format: (v) => {
+      if (!v) return "(tidak ada)";
+      const name = String(v).split("/").pop()?.split("?")[0] ?? "foto";
+      return name.length > 28 ? "…" + name.slice(-26) : name;
+    },
+  },
 };
 
 function getTxDiffEntries(before: any, after: any, canSeeFinancials: boolean, canSeeModal: boolean) {
@@ -2494,6 +2503,12 @@ function EditTransactionModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // ── Bukti pembayaran — nilai awal dari transaksi; kalau sales salah foto,
+  // user upload ulang di sini dan URL-nya diganti. ──
+  const [paymentPhoto, setPaymentPhoto] = useState<string | null>(item.payment_photo ?? null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
   // Search & add accessory
   const [showAddAcc, setShowAddAcc] = useState(false);
   const [accSearch, setAccSearch] = useState("");
@@ -2710,6 +2725,31 @@ function EditTransactionModal({
     setAccResults([]);
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
+    setUploadingPhoto(true);
+    setError("");
+    try {
+      // Samakan kompresi dengan ConfirmPaymentModal (0.3MB / 1280px) biar hemat storage.
+      const file = await compressImage(rawFile, { maxSizeMB: 0.3, maxWidthOrHeight: 1280 });
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("invoice", item.invoice_number);
+      const res = await fetch("/api/receipt/upload-image", { method: "POST", body: fd });
+      const r = await res.json();
+      if (res.ok && r.url) {
+        setPaymentPhoto(r.url);
+      } else {
+        setError(r.error || r.message || "Gagal mengupload foto bukti");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Gagal mengupload foto bukti");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!reason.trim()) {
       setError("Alasan edit wajib diisi untuk catatan audit");
@@ -2747,6 +2787,12 @@ function EditTransactionModal({
           unit_id: a.unit_id ?? null,
         })),
       };
+
+      // Kirim payment_photo HANYA kalau user benar-benar ganti foto, supaya
+      // edit biasa (harga/aksesoris) tidak menimpa/menghapus kolom ini.
+      if (paymentPhoto !== (item.payment_photo ?? null)) {
+        payload.payment_photo = paymentPhoto;
+      }
 
       if (isDP) {
         payload.dp_amount = currentDP;
@@ -3161,6 +3207,53 @@ function EditTransactionModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Bukti Pembayaran — ganti kalau sales salah foto saat payment */}
+          <div className="space-y-2 bg-blue-50/40 border border-blue-100 rounded-xl p-3.5">
+            <label className="text-xs font-bold text-blue-950 uppercase tracking-wide flex items-center gap-1.5">
+              <ImageIcon size={14} className="text-blue-600" />
+              Bukti Pembayaran
+            </label>
+            {paymentPhoto ? (
+              <div className="relative rounded-xl overflow-hidden border border-blue-200 bg-white">
+                <img src={paymentPhoto} alt="Bukti pembayaran" className="w-full max-h-48 object-contain bg-gray-50" />
+                <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-blue-100 bg-blue-50/50">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700">
+                    <CheckCircle2 size={12} className="text-blue-600" /> Foto bukti terpasang
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    className="text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-100/80 hover:bg-blue-200/80 px-2.5 py-1 rounded-lg transition disabled:opacity-60"
+                  >
+                    {uploadingPhoto ? "Mengupload..." : "Ganti Foto"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="w-full border-2 border-dashed border-blue-200 rounded-xl py-5 flex flex-col items-center justify-center gap-1.5 text-blue-400 hover:border-blue-300 hover:bg-blue-50/60 transition disabled:opacity-60"
+              >
+                {uploadingPhoto ? (
+                  <><div className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" /><span className="text-xs">Mengupload...</span></>
+                ) : (
+                  <><ImageIcon size={22} /><span className="text-xs font-medium">Upload Foto Bukti</span></>
+                )}
+              </button>
+            )}
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoUpload}
+              className="hidden"
+            />
           </div>
 
           {/* Alasan Edit (Wajib untuk audit log) */}
