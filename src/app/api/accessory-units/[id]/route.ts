@@ -102,7 +102,7 @@ export const DELETE = withAuth(async (
     user: AuthUser
 ) => {
     // Admin Barang tidak boleh hapus unit; role lain tetap boleh.
-    if ((user.roles ?? [user.role]).includes("ADMIN_BARANG")) {
+    if ((user.roles ?? [user.role]).some((r) => r === "ADMIN_BARANG" || r === "PKL_ADMIN_BARANG")) {
         return NextResponse.json({ success: false, error: "Role Anda tidak boleh menghapus unit" }, { status: 403 });
     }
     const { id } = await params;

@@ -748,6 +748,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
+  // PKL Admin Barang — menu & akses IDENTIK ADMIN_BARANG (parent sama:
+  // PENGELOLA_BARANG). Sisa menu ikut otomatis lewat expandRolesWithParents.
+  PKL_ADMIN_BARANG: [
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Inventaris", items: [ITEM_DATA_BARANG] },
+    { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
+  ],
+
   MARKETING: [
     GROUP_ABSENSI,
     { label: "Management", items: [ITEM_USERS] },
@@ -993,7 +1002,7 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH",
   "KEPALA_MARKETING", "MARKETING", "KEPALA_PENYEDIA_BARANG",
   "PKL_PENGELOLA_BARANG", // samakan tampilan dgn Pengelola Barang: munculkan menu Data Barang
-  "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", // role baru — munculkan menu Data Barang
+  "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "PKL_ADMIN_BARANG", // role baru — munculkan menu Data Barang
 ]);
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
@@ -1298,6 +1307,7 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-800" },
   KEPALA_ADMIN_BARANG: { label: "Kepala Admin Barang", className: "bg-blue-50 text-blue-800" },
   ADMIN_BARANG: { label: "Admin Barang", className: "bg-sky-50 text-sky-700" },
+  PKL_ADMIN_BARANG: { label: "PKL Admin Barang", className: "bg-sky-50 text-sky-700" },
   TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
   KEPALA_TEKNISI: { label: "Kepala Teknisi", className: "bg-red-50 text-red-700" },
   PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },

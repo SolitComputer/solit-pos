@@ -1549,7 +1549,7 @@ export default function AccessoryUnitsPage() {
     const [userId, setUserId] = useState<string | null>(null);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     // Admin Barang boleh kelola unit TAPI tidak boleh hapus; role lain tetap seperti semula.
-    const canDelete = canManageUnits && !userRoles.some(r => r === "ADMIN_BARANG");
+    const canDelete = canManageUnits && !userRoles.some(r => r === "ADMIN_BARANG" || r === "PKL_ADMIN_BARANG");
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     // Audit per-unit aksesoris DIPISAH dari SO: Accounting (lewat
