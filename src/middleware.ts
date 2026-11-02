@@ -29,6 +29,7 @@ const PUBLIC_API_ROUTES = [
   "/api/auth/set-password",
   "/api/service/stream",
   "/api/service/public",
+  "/api/preparation/public",
   "/api/public/catalog",
   "/api/webhooks/whatsapp",
   "/api/webhooks/facebook", // ✅ FIX: biar Meta bisa hit webhook tanpa cookie login
