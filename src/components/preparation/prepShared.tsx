@@ -5,7 +5,7 @@ import { type LucideIcon, User, Bike, Package } from "lucide-react";
 
 export interface PrepItem {
   id: string; serial_number: string; laptop_name: string | null; is_checked: boolean;
-  is_cancelled?: boolean; // ← unit dibatalkan, tidak ikut dihitung di progres
+  is_cancelled?: boolean; // ← unit dibatalkan, tidak ikut dihitung di progresss
   laptop_id?: string | null;
   laptop_spec?: { cpu: string | null; ram: string | null; storage: string | null; gpu: string | null } | null;
 }
