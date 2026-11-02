@@ -55,7 +55,7 @@ export default function SignaturePad({ onChange }: { onChange: (dataUrl: string 
   };
 
   return (
-    <div>
+    <div className="relative">
       <canvas
         ref={canvasRef}
         width={500}
@@ -70,7 +70,11 @@ export default function SignaturePad({ onChange }: { onChange: (dataUrl: string 
         onTouchMove={move}
         onTouchEnd={end}
       />
-      <button type="button" onClick={clear} className="mt-2 text-xs font-bold text-gray-400 hover:text-red-500">
+      <button
+        type="button"
+        onClick={clear}
+        className="absolute top-2 right-2 z-10 px-2.5 py-1 rounded-lg bg-white/90 border border-gray-200 text-[11px] font-bold text-gray-400 shadow-sm backdrop-blur-sm hover:text-red-500 hover:border-red-200"
+      >
         Hapus & Ulangi
       </button>
     </div>
