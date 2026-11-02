@@ -76,11 +76,16 @@ export default function CCAnalisaPage() {
 
   const [visible, setVisible] = useState(DETAIL_PAGE_SIZE);
 
-   const [ttBrands, setTtBrands] = useState<Record<string, ConnHealth>>({});
-  const [ig, setIg] = useState<ConnHealth | null>(null);
+  const [ttBrands, setTtBrands] = useState<Record<string, ConnHealth>>({});
+  const [igBrands, setIgBrands] = useState<Record<string, ConnHealth>>({});
 
   // pesan hasil connect dari callback (?tiktok=ok&msg=...)
   const [ttFlash, setTtFlash] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // form seed IG per-brand: brand yang lagi dibuka + input + status submit
+  const [igForm, setIgForm] = useState<string | null>(null);
+  const [igInput, setIgInput] = useState<{ token: string; igUserId: string }>({ token: "", igUserId: "" });
+  const [igSaving, setIgSaving] = useState(false);
 
     useEffect(() => {
     fetch("/api/cc-reports/tiktok/status")
@@ -90,7 +95,7 @@ export default function CCAnalisaPage() {
 
     fetch("/api/cc-reports/instagram/status")
       .then((r) => r.json())
-      .then((j) => j.success && setIg(j))
+      .then((j) => j.success && j.brands && setIgBrands(j.brands))
       .catch(() => { });
 
     // Hasil connect TikTok: callback redirect ke sini dgn ?tiktok=ok&msg=...
@@ -181,6 +186,39 @@ export default function CCAnalisaPage() {
       clearInterval(t);
     };
   }, [live, load]);
+
+  const reloadIgStatus = async () => {
+    try {
+      const j = await (await fetch("/api/cc-reports/instagram/status")).json();
+      if (j.success && j.brands) setIgBrands(j.brands);
+    } catch { /* diamkan */ }
+  };
+
+  const submitIgSeed = async (brand: string) => {
+    if (!igInput.token.trim() || !igInput.igUserId.trim()) {
+      alert("Token dan IG User ID wajib diisi");
+      return;
+    }
+    setIgSaving(true);
+    try {
+      const res = await fetch("/api/cc-reports/instagram/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand, token: igInput.token.trim(), igUserId: igInput.igUserId.trim() }),
+      });
+      const j = await res.json();
+      if (!j.success) {
+        alert(j.error ?? "Gagal menghubungkan Instagram");
+        return;
+      }
+      setIgForm(null);
+      setIgInput({ token: "", igUserId: "" });
+      await reloadIgStatus();
+      alert(`Instagram brand ${brand} terhubung${j.accountName ? ` · @${j.accountName}` : ""}`);
+    } finally {
+      setIgSaving(false);
+    }
+  };
 
   const handleSyncAll = async () => {
     setSyncing(true);
@@ -364,25 +402,74 @@ export default function CCAnalisaPage() {
             </div>
           </div>
 
-          {/* ── Kesehatan koneksi Instagram ── */}
-          {ig && ig.level !== "OK" && (
-            <div className={`mb-4 rounded-2xl border p-3 ${ig.level === "WARN"
-              ? "border-amber-100 bg-amber-50" : "border-red-100 bg-red-50"}`}>
-              <p className={`text-xs font-medium ${ig.level === "WARN" ? "text-amber-800" : "text-red-800"}`}>
-                {ig.level === "WARN" ? (
-                  <>
-                    <b> Token Instagram perlu perhatian.</b>{" "}
-                    {ig.error ?? (ig.daysLeft !== null && `Sisa ${ig.daysLeft} hari sebelum kedaluwarsa.`)}
-                  </>
-                ) : (
-                  <>
-                    <b> Token Instagram kedaluwarsa.</b> Metrik IG tidak ter-update.
-                    {ig.error && <span className="ml-1 opacity-80">({ig.error})</span>}
-                  </>
-                )}
-              </p>
+                   {/* ── Koneksi Instagram per Brand ── */}
+          <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
+              <p className="text-xs font-black text-gray-700">Koneksi Instagram per Brand</p>
+              <span className="text-[10px] text-gray-400">
+                Tempel long-lived token + IG User ID tiap brand. Token diperbarui otomatis.
+              </span>
             </div>
-          )}
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {CC_BRANDS.map((b) => {
+                const h = igBrands[b];
+                const level = h?.level ?? "DEAD";
+                const statusDot =
+                  level === "OK" ? "bg-emerald-500" : level === "WARN" ? "bg-amber-500" : "bg-red-400";
+                const open = igForm === b;
+                return (
+                  <div key={b} className="rounded-xl border border-gray-100 bg-gray-50/60 px-2.5 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                        style={{ background: BRAND_META[b].color }} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-bold text-gray-800">{BRAND_META[b].label}</p>
+                        <p className="truncate text-[10px] text-gray-400">
+                          {level === "OK"
+                            ? `@${h?.accountName ?? "?"}${h?.daysLeft != null ? ` · aman ${h.daysLeft} hr` : ""}`
+                            : level === "WARN"
+                              ? (h?.error ?? "perlu perhatian")
+                              : "belum terhubung"}
+                        </p>
+                      </div>
+                      <span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusDot}`} />
+                      <button
+                        onClick={() => { setIgForm(open ? null : b); setIgInput({ token: "", igUserId: "" }); }}
+                        className="flex-shrink-0 rounded-lg bg-gray-900 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-gray-800"
+                      >
+                        {open ? "Tutup" : level === "OK" ? "Ganti" : "Hubungkan"}
+                      </button>
+                    </div>
+
+                    {open && (
+                      <div className="mt-2 space-y-1.5 border-t border-gray-100 pt-2">
+                        <input
+                          value={igInput.igUserId}
+                          onChange={(e) => setIgInput((s) => ({ ...s, igUserId: e.target.value }))}
+                          placeholder="IG User ID (angka)"
+                          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:ring-4 focus:ring-gray-900/5"
+                        />
+                        <textarea
+                          value={igInput.token}
+                          onChange={(e) => setIgInput((s) => ({ ...s, token: e.target.value }))}
+                          placeholder="Long-lived access token"
+                          rows={2}
+                          className="w-full resize-none rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:ring-4 focus:ring-gray-900/5"
+                        />
+                        <button
+                          onClick={() => submitIgSeed(b)}
+                          disabled={igSaving}
+                          className="w-full rounded-lg bg-emerald-600 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                        >
+                          {igSaving ? "Menyimpan…" : "Simpan & Hubungkan"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {/* ── Posting bermasalah ── */}
           {data && data.problems.length > 0 && (

@@ -46,6 +46,19 @@ const CRON_ROUTES = [
 function isCronRoute(pathname: string): boolean {
   return CRON_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 }
+
+// OAuth TikTok: connect (mulai authorize) + callback (balik dari TikTok). GET dari
+// browser user yang SUDAH login (butuh cookie `token`), tapi handler-nya sendiri
+// yang urus CSRF state + tukar code → tidak boleh lewat gate role /api/cc-reports
+// (yang menolak & membuang redirect-nya). Hanya butuh user terautentikasi.
+const OAUTH_PASSTHROUGH_ROUTES = [
+  "/api/cc-reports/tiktok/connect",
+  "/api/cc-reports/tiktok/callback",
+];
+
+function isOAuthPassthrough(pathname: string): boolean {
+  return OAUTH_PASSTHROUGH_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+}
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
   "/api/auth/face-enroll",
@@ -419,7 +432,13 @@ export async function middleware(request: NextRequest) {
     return clearSessionAndRedirect(new URL("/login", request.url));
   }
 
-
+  // ── OAuth TikTok connect/callback: user sudah login (lolos cek token di atas),
+  //    biarkan handler-nya jalan tanpa gate role/absensi. Tanpa ini, callback GET
+  //    ditolak gate /api/cc-reports → user dibuang ke dashboard & token TikTok
+  //    tidak pernah ketukar.
+  if (isOAuthPassthrough(pathname)) {
+    return forward();
+  }
 
   const userRoles: string[] = user.roles ?? [user.role];
   //  Expand: PKL_SALES → ["PKL_SALES", "CREW_SALES"], dst.
