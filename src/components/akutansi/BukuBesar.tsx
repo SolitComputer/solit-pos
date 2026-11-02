@@ -689,17 +689,17 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
                     </div>
 
                     {/* ── Desktop/tablet: Tabel Buku Besar ── */}
-                    <div className="hidden md:block overflow-x-auto">
+                    <div className="hidden md:block overflow-auto max-h-[70vh]">
                         <table className="w-full border-collapse" style={{ minWidth: "960px" }}>
                             <thead>
                                 <tr className="border-b border-gray-100 bg-gray-50">
-                                    <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[92px]">Tanggal</th>
-                                    <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[120px]">No. Jurnal</th>
-                                    <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
-                                    <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[130px]">Debit</th>
-                                    <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[130px]">Kredit</th>
-                                    <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[150px]">Saldo</th>
-                                    <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[64px] border-l-2 border-gray-200">
+                                    <th className="sticky top-0 z-20 bg-gray-50 shadow-[inset_0_-1px_0_#f3f4f6] px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[92px]">Tanggal</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 shadow-[inset_0_-1px_0_#f3f4f6] px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[120px]">No. Jurnal</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 shadow-[inset_0_-1px_0_#f3f4f6] px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 shadow-[inset_0_-1px_0_#f3f4f6] px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[130px]">Debit</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 shadow-[inset_0_-1px_0_#f3f4f6] px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[130px]">Kredit</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 shadow-[inset_0_-1px_0_#f3f4f6] px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[150px]">Saldo</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 shadow-[inset_0_-1px_0_#f3f4f6] px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[64px] border-l-2 border-gray-200">
                                         <div>Cek</div>
                                         {data && data.lines.length > 0 && (
                                             <div className="mt-1 text-[10px] font-bold text-gray-400 normal-case tracking-normal font-mono whitespace-nowrap">
@@ -864,24 +864,24 @@ export default function BukuBesar({ period, branch = "ALL" }: { period: string; 
                             </tbody>
 
                             {data && data.lines.length > 0 && (
-                                <tfoot>
+                                                            <tfoot>
                                     <tr className="border-t-2 border-gray-300 bg-gray-50">
-                                        <td colSpan={3} className="px-4 py-3">
+                                        <td colSpan={3} className="sticky bottom-0 z-20 bg-gray-50 shadow-[inset_0_2px_0_#d1d5db] px-4 py-3">
                                             <span className="text-xs font-bold text-gray-600 uppercase">Saldo Akhir</span>
                                         </td>
-                                        <td className="px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">
+                                        <td className="sticky bottom-0 z-20 bg-gray-50 shadow-[inset_0_2px_0_#d1d5db] px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">
                                             {rp(data.totals.debit)}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">
+                                        <td className="sticky bottom-0 z-20 bg-gray-50 shadow-[inset_0_2px_0_#d1d5db] px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">
                                             {rp(data.totals.kredit)}
                                         </td>
-                                        <td className="px-4 py-3 text-right">
+                                        <td className="sticky bottom-0 z-20 bg-gray-50 shadow-[inset_0_2px_0_#d1d5db] px-4 py-3 text-right">
                                             <span className="inline-flex items-center justify-end gap-1.5 text-sm font-black text-gray-900 font-mono">
                                                 {rp(Math.abs(data.totals.saldo_akhir))}
                                                 <SaldoBadge amount={data.totals.saldo_akhir} size="md" normalSide={normalSide} />
                                             </span>
                                         </td>
-                                        <td className="px-3 py-3 text-center border-l-2 border-gray-200" />
+                                        <td className="sticky bottom-0 z-20 bg-gray-50 shadow-[inset_0_2px_0_#d1d5db] px-3 py-3 text-center border-l-2 border-gray-200" />
                                     </tr>
                                 </tfoot>
                             )}
