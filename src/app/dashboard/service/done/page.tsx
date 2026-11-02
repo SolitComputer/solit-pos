@@ -946,7 +946,8 @@ export default function DonePage() {
       o.nama.toLowerCase().includes(q) ||
       o.no_hp.includes(q) ||
       o.type_laptop.toLowerCase().includes(q) ||
-      o.keluhan.toLowerCase().includes(q))
+      o.keluhan.toLowerCase().includes(q) ||
+      (o.sparepart_items ?? "").toLowerCase().includes(q))
     : orders;
 
   const COLUMNS = ["No", "Pelanggan", "Laptop", "Masuk", "Selesai", "Total Waktu", "Teknisi", "Sparepart", "Payment", "Status", "Aksi"];
@@ -1012,7 +1013,7 @@ export default function DonePage() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Cari nama, no HP, laptop, keluhan..."
+                          placeholder="Cari nama, no HP, laptop, keluhan, SN sparepart..."
               className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-9 pr-9 text-sm outline-none transition placeholder:text-gray-300 focus:border-[#1a1a2e]/30 focus:ring-2 focus:ring-[#1a1a2e]/10"
             />
             {search && (

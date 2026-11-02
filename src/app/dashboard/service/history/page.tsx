@@ -550,6 +550,50 @@ function HistoryDetailModal({
 
 
 
+          {/* ── SPAREPART ── */}
+          {(() => {
+            const spareLines = (order.sparepart_items ?? "")
+              .split("\n").map(s => s.trim()).filter(Boolean);
+            if (spareLines.length === 0) return null;
+            return (
+              <div className="mx-4 mt-3">
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/30 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="grid h-6 w-6 place-items-center rounded-lg bg-indigo-100 text-indigo-500">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.7 2.7-2-2z" />
+                      </svg>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
+                      Sparepart Terpakai
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {spareLines.map((ln, i) => {
+                      const [label, hargaRaw] = ln.split("§");
+                      const harga = Number(hargaRaw ?? 0);
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-white px-3 py-2.5"
+                        >
+                          <span className="min-w-0 flex-1 text-[12px] font-semibold leading-snug text-indigo-700">
+                            {label}
+                          </span>
+                          {isAdmin && harga > 0 && (
+                            <span className="shrink-0 text-[11px] font-black tabular-nums text-gray-500">
+                              {fmtRupiah(harga)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── TIM ── */}
           <div className="mx-4 mt-3">
             <div className="rounded-2xl border border-gray-100 bg-white p-4">
@@ -1055,7 +1099,8 @@ function HistoryPageContent() {
       o.nama.toLowerCase().includes(q) ||
       o.no_hp.includes(q) ||
       o.type_laptop.toLowerCase().includes(q) ||
-      o.keluhan.toLowerCase().includes(q);
+      o.keluhan.toLowerCase().includes(q) ||
+      (o.sparepart_items ?? "").toLowerCase().includes(q);
     const matchStatus = filterStatus === "ALL" || o.status === filterStatus;
     return matchSearch && matchStatus;
   });
@@ -1124,7 +1169,7 @@ function HistoryPageContent() {
               <input
                 value={search}
                 onChange={e => { setSearch(e.target.value); setHighlightId(null); }}
-                placeholder="Cari nama, no HP, laptop..."
+                           placeholder="Cari nama, no HP, laptop, SN sparepart..."
                 className="h-9 w-full rounded-xl border border-gray-100 bg-gray-50 pl-9 pr-8 text-[13px] outline-none transition placeholder:text-gray-300 focus:border-[#1a1a2e]/30 focus:bg-white focus:ring-2 focus:ring-[#1a1a2e]/10"
               />
               {search && (
