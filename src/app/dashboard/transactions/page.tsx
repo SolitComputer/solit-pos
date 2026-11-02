@@ -2636,10 +2636,19 @@ function EditTransactionModal({
   const originalTotalDeal = Number(item.deal_price ?? item.amount ?? 0);
   const diffDeal = computedTotalDeal - originalTotalDeal;
 
-  // Harga deal efektif: hasil hitung form kalau valid; kalau 0 (mis. edit foto
-  // doang / harga belum ter-load) jatuh ke harga asli transaksi — supaya tombol
-  // tak terkunci dan harga lama tak tertimpa jadi Rp 0.
-  const effectiveTotalDeal = computedTotalDeal > 0 ? computedTotalDeal : originalTotalDeal;
+  // Harga deal efektif: pakai hasil hitung form kalau > 0; kalau 0 (mis.
+  // transaksi aksesoris full-bonus atau edit foto doang) jatuh ke harga asli
+  // transaksi — supaya tombol tak terkunci & harga lama tak tertimpa jadi Rp 0.
+  // Fallback bertingkat untuk UNLOCK tombol & validasi (bukan buat nimpa DB):
+  // hasil hitung form → harga asli transaksi → nominal DP. DP jadi lantai
+  // terakhir supaya transaksi bonus-only yang deal_price-nya terlanjur 0 (tapi
+  // DP terisi, mis. INV-20261023-008) tetap bisa dibuka & disimpan.
+  const effectiveTotalDeal =
+    computedTotalDeal > 0
+      ? computedTotalDeal
+      : originalTotalDeal > 0
+        ? originalTotalDeal
+        : Number(item.dp_amount || 0);
 
   const isDP = item.status === "RESERVED" || Number(item.dp_amount || 0) > 0;
   const currentDP = Number(dpAmount) || 0;
@@ -2784,8 +2793,6 @@ function EditTransactionModal({
       // NOTE: Status pembayaran / status transaksi TIDAK dikirim di payload,
       // sehingga status transaksi (PAID, HELD, RESERVED, dll.) tetap terjaga dan tidak berubah.
       const payload: any = {
-        deal_price: effectiveTotalDeal,
-        amount: effectiveTotalDeal,
         customer_name: customerName.trim() || item.customer_name,
         customer_phone: customerPhone.trim() || null,
         branch, // ← cabang (koreksi kalau salah input saat payment)
@@ -2801,6 +2808,14 @@ function EditTransactionModal({
           unit_id: a.unit_id ?? null,
         })),
       };
+
+      // Harga deal hanya dikirim kalau user benar-benar isi harga (computed > 0).
+      // Transaksi bonus / cuma ganti foto → JANGAN kirim deal_price, biarkan
+      // nilai DB apa adanya (backend juga sudah dijaga di guard newDealTotal).
+      if (computedTotalDeal > 0) {
+        payload.deal_price = computedTotalDeal;
+        payload.amount = computedTotalDeal;
+      }
 
       // Kirim payment_photo HANYA kalau user benar-benar ganti foto, supaya
       // edit biasa (harga/aksesoris) tidak menimpa/menghapus kolom ini.

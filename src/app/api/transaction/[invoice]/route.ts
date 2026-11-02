@@ -1090,8 +1090,15 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     allowedFields.other = Number(dealPrice) - Number(inventoryPrice);
 
     if (newDealTotal !== null) {
-      allowedFields.deal_price = newDealTotal;
-      allowedFields.amount = newDealTotal;
+      // Jangan sampai hasil hitung ulang yang 0 (mis. transaksi isinya cuma
+      // aksesoris bonus) menimpa deal_price lama yang masih berisi — persis
+      // kasus INV-20261023-008. Kalau hasil 0 TAPI transaksi sebelumnya punya
+      // nilai, pertahankan nilai lama.
+      const prevDeal = Number(before?.deal_price ?? before?.amount ?? 0);
+      if (!(newDealTotal === 0 && prevDeal > 0)) {
+        allowedFields.deal_price = newDealTotal;
+        allowedFields.amount = newDealTotal;
+      }
     }
 
     if (newInventoryPrice !== null) {
