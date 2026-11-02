@@ -101,7 +101,19 @@ const daysDiff = (nextISO: string) =>
   Math.floor((new Date(nextISO).getTime() - Date.now()) / 86400000);
 
 function toWaNumber(phone: string): string {
-  let p = (phone || "").replace(/\D/g, "");
+  const raw = (phone || "").trim();
+  // "+" atau "00" di depan = nomor internasional; kode negara sudah ditulis user
+  const isInternational = raw.startsWith("+") || raw.startsWith("00");
+
+  let p = raw.replace(/\D/g, ""); // buang "+", spasi, "-" — sisakan digit saja
+
+  if (isInternational) {
+    // wa.me butuh nomor tanpa "+" dan tanpa awalan "00"
+    if (p.startsWith("00")) p = p.slice(2);
+    return p; // JANGAN dipaksa 62 — hormati kode negara asli (44 = UK, dst)
+  }
+
+  // Nomor lokal Indonesia
   if (p.startsWith("0")) p = "62" + p.slice(1);
   else if (!p.startsWith("62")) p = "62" + p;
   return p;
