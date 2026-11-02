@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { revertLoansOnServiceCancel } from "@/lib/itemLoanSync"; //  NEW — unit balik stok → pinjaman balik "Dipinjam"
+import { markLoansSoldOnSale } from "@/lib/itemLoanSync";
 
 type OutflowSource = "transaction" | "service" | "manual";
 type RoleType = "SALES" | "TEKNISI" | "PENGELOLA_BARANG";
@@ -34,6 +34,16 @@ export async function recordOutflow(data: OutflowData) {
       console.error("[recordOutflow] DB Error:", error.message);
       return false;
     }
+
+    //  NEW — unit keluar PERMANEN (service / pengambilan manual): kalau lagi
+    //  DIPINJAM, pinjaman otomatis jadi "Terjual". Sumber "transaction" sengaja
+    //  TIDAK di sini (biar DP/pending nggak keburu ditutup) — itu diurus
+    //  auto-rekonsiliasi di /api/item-loans yang cek transaksi final dulu.
+    if (data.unit_id && (data.source_type === "service" || data.source_type === "manual")) {
+      const ref = data.source_type === "service" ? `SERVICE-${data.service_id ?? ""}` : "PENGAMBILAN";
+      try { await markLoansSoldOnSale(supabaseAdmin, [data.unit_id], ref); } catch { /* best-effort */ }
+    }
+
     return true;
   } catch (err) {
     console.error("[recordOutflow] Exception:", err);
@@ -111,9 +121,6 @@ export async function cancelOutflowByService(serviceId: string) {
 
     if (outflows && outflows.length > 0) {
       await restockActiveOutflows(outflows);
-      //  NEW — unit balik stok: pinjaman yg "Terjual" krn service ini balik "Dipinjam"
-      const loanUnitIds = outflows.map(o => o.unit_id).filter(Boolean) as string[];
-      try { await revertLoansOnServiceCancel(supabaseAdmin, loanUnitIds); } catch { /* best-effort */ }
     }
 
     const { error } = await supabaseAdmin

@@ -3,9 +3,21 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { ITEM_LOAN_VIEW_ROLES } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
+import { reconcileClosedLoans } from "@/lib/itemLoanSync";
+
+// Throttle auto-rekonsiliasi: cukup 1x per 60 detik per instance server.
+let lastReconcileAt = 0;
 
 async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
   try {
+    // ✅ Auto-rekonsiliasi: pinjaman yg unitnya udah kejual (transaksi final) /
+    // kepakai service / diambil → otomatis "Terjual" & masuk Riwayat.
+    // Aman: transaksi CANCELLED/pending TIDAK ikut ditutup. Best-effort.
+    if (Date.now() - lastReconcileAt > 60_000) {
+      lastReconcileAt = Date.now();
+      try { await reconcileClosedLoans(supabaseAdmin); } catch { /* best-effort */ }
+    }
+
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
@@ -35,7 +47,7 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         .from("item_loans")
         .select("id")
         .eq("unit_id", unit_id)
-        .in("status", ["PENDING", "APPROVED", "DIPESAN"])
+        .in("status", ["PENDING", "APPROVED"])
         .limit(1);
       if (existing && existing.length > 0) {
         return NextResponse.json(
