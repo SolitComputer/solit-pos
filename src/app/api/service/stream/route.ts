@@ -1,5 +1,6 @@
 // src/app/api/service/stream/route.ts
 // PUBLIC SSE — DONE hanya tampil 3 hari, tambah GAGAL_DIPERBAIKI
+// Teknisi diambil dari dikerjakan_by (FK users) → otomatis nama akun yang mengerjakan
 
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -26,6 +27,10 @@ function sensorNama(nama: string): string {
   return `${first} ${rest.map(p => `${p[0].toUpperCase()}.`).join(" ")}`;
 }
 
+// Kolom select dipakai di 2 query (aktif & done) — teknisi via FK dikerjakan_by
+const SELECT_COLS =
+  "no_urut, nama, type_laptop, keluhan, status, tanggal_masuk, tanggal_selesai, teknisi:users!service_orders_dikerjakan_by_fkey(name)";
+
 async function fetchPublicOrders() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,23 +43,25 @@ async function fetchPublicOrders() {
 
   const { data: aktif } = await supabase
     .from("service_orders")
-    .select("no_urut, nama, type_laptop, status, tanggal_masuk, tanggal_selesai")
+    .select(SELECT_COLS)
     .in("status", ["ANTRIAN", "SEDANG_DIKERJAKAN", "MENUNGGU_SPAREPART", "GAGAL_DIPERBAIKI"])
     .order("no_urut", { ascending: true });
 
   const { data: done } = await supabase
     .from("service_orders")
-    .select("no_urut, nama, type_laptop, status, tanggal_masuk, tanggal_selesai")
+    .select(SELECT_COLS)
     .eq("status", "DONE")
     .gte("tanggal_selesai", threeDaysAgo) // ✅ DONE hanya 3 hari
     .order("no_urut", { ascending: true });
 
-  const all = [...(aktif ?? []), ...(done ?? [])].sort((a, b) => a.no_urut - b.no_urut);
+  const all = [...(aktif ?? []), ...(done ?? [])].sort((a: any, b: any) => a.no_urut - b.no_urut);
 
-  return all.map(o => ({
+  return all.map((o: any) => ({
     no_urut: o.no_urut,
     nama: sensorNama(o.nama),
     type_laptop: o.type_laptop,
+    keluhan: o.keluhan ?? null,
+    teknisi: o.teknisi?.name ?? null, // ratakan object { name } → string utk frontend
     status: o.status,
     tanggal_masuk: o.tanggal_masuk,
     tanggal_selesai: o.tanggal_selesai ?? null,
