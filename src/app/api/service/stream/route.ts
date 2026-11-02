@@ -29,7 +29,7 @@ function sensorNama(nama: string): string {
 
 // Kolom select dipakai di 2 query (aktif & done) — teknisi via FK dikerjakan_by
 const SELECT_COLS =
-  "no_urut, nama, type_laptop, keluhan, status, tanggal_masuk, tanggal_selesai, teknisi:users!service_orders_dikerjakan_by_fkey(name)";
+  "no_urut, nama, type_laptop, keluhan, status, tanggal_masuk, tanggal_mulai, tanggal_selesai, teknisi:users!service_orders_dikerjakan_by_fkey(name)";
 
 async function fetchPublicOrders() {
   const supabase = createClient(
@@ -64,6 +64,7 @@ async function fetchPublicOrders() {
     teknisi: o.teknisi?.name ?? null, // ratakan object { name } → string utk frontend
     status: o.status,
     tanggal_masuk: o.tanggal_masuk,
+    tanggal_mulai: o.tanggal_mulai ?? null,
     tanggal_selesai: o.tanggal_selesai ?? null,
   }));
 }
