@@ -3,9 +3,8 @@
 
 import { NextRequest } from "next/server";
 import { verifyToken } from "@/lib/auth";
-import { SERVICE_VIEW_ROLES } from "@/lib/permissions";
+import { SERVICE_VIEW_ROLES, expandRolesWithParents, hasAnyRole } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
-import type { UserRole } from "@/lib/permissions";
 
 async function fetchAllOrders() {
   const supabase = createClient(
@@ -21,7 +20,11 @@ async function fetchAllOrders() {
       created_by_user:users!service_orders_created_by_fkey(id, name),
       dikerjakan_by_user:users!service_orders_dikerjakan_by_fkey(id, name),
       diambil_by_user:users!service_orders_diambil_by_fkey(id, name),
-      payment_by_user:users!service_orders_payment_by_fkey(id, name)
+      payment_by_user:users!service_orders_payment_by_fkey(id, name),
+      warning_logs:service_order_warning_logs(
+        id, action, reason, created_at,
+        created_by_user:users!service_order_warning_logs_created_by_fkey(id, name)
+      )
     `)
     .order("tanggal_masuk", { ascending: false });
 
@@ -35,7 +38,10 @@ export async function GET(req: NextRequest) {
   if (!token) return new Response("Unauthorized", { status: 401 });
 
   const user = await verifyToken(token);
-  if (!user || !SERVICE_VIEW_ROLES.includes(user.role as UserRole)) {
+  // multi-role + expand PKL (PKL_CUSTOMER_SERVICE → CUSTOMER_SERVICE) biar konsisten
+  // dengan gate di route lain. Sebelumnya cuma cek user.role tunggal → PKL CS & user
+  // multi-role bisa ketolak 403 walau berhak, bikin SSE mati & jatuh ke polling.
+  if (!user || !hasAnyRole(expandRolesWithParents(user.roles ?? [user.role]), SERVICE_VIEW_ROLES)) {
     return new Response("Forbidden", { status: 403 });
   }
 

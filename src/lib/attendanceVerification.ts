@@ -12,6 +12,7 @@ import {
   computeHolidayOvertimeMinutes,
   type OvertimeDirection,
 } from "@/lib/overtimeEngine";
+import { resolveBranchByLocation, type Branch } from "@/lib/attendanceLocations"; // ✅ NEW — geofence + cabang
 
 // ✅ NEW — pergantian "hari absensi" jam 04:00 WIB (bukan 00:00 WIB). Jam
 // 00:00–03:59 WIB masih dihitung sebagai kelanjutan hari sebelumnya.
@@ -39,6 +40,9 @@ interface ProcessAttendanceParams {
   overrideNowISO?: string;
   /** Untuk endpoint manual-checkout admin: pastikan hasilnya memang OUT, bukan diam-diam jadi IN */
   forceDirection?: "IN" | "OUT";
+  /** ✅ NEW — cabang untuk absen MANUAL_ADMIN (tanpa GPS). Default "UTAMA".
+   *  FACE/BIOMETRIC menentukan cabang otomatis dari GPS; param ini diabaikan untuk mereka. */
+  branch?: Branch | null;
 }
 
 export type AttendanceOutcome =
@@ -46,6 +50,7 @@ export type AttendanceOutcome =
   | {
     ok: true;
     direction: "IN" | "OUT";
+    branch: Branch; // ✅ NEW — cabang tempat absen tercatat
     message: string;
     overtimeOptions: {
       beforeInMinutes: number;
@@ -66,6 +71,27 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
   const todayDow = new Date(`${todayDate}T12:00:00Z`).getUTCDay();
   const attendanceDayStart = `${todayDate}T04:00:00+07:00`;
   const attendanceDayEnd = `${addDaysToDateStr(todayDate, 1)}T03:59:59+07:00`;
+
+  // ✅ NEW — tentukan cabang + enforce geofence di SERVER (anti-bypass).
+  // FACE/BIOMETRIC yang mengirim GPS → divalidasi ke titik cabang di
+  // src/lib/attendanceLocations.ts, lalu cabang-nya ditentukan dari situ.
+  // Tanpa GPS (fallback sidik jari saat GPS gagal, atau MANUAL_ADMIN) →
+  // geofence dilewati, cabang pakai default/param (non-breaking).
+  // Mau "wajib GPS" buat semua? Hapus syarat `!= null`, lalu untuk GPS
+  // kosong kembalikan { ok:false, status:400, code:"NO_LOCATION", ... }.
+  let branch: Branch = p.branch ?? "UTAMA";
+  if (p.method !== "MANUAL_ADMIN" && p.latitude != null && p.longitude != null) {
+    const geo = resolveBranchByLocation(p.latitude, p.longitude);
+    if (!geo.branch) {
+      return {
+        ok: false,
+        status: 403,
+        code: "OUT_OF_RANGE",
+        message: `Lokasi di luar radius semua cabang (terdekat ${geo.nearest.label}, ${geo.nearestDistance}m). Absen hanya bisa dari lokasi kantor.`,
+      };
+    }
+    branch = geo.branch;
+  }
 
   const [
     { data: todayIn },
@@ -201,6 +227,7 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     // sudah di-resolve di `schedule`). Dikunci saat absen supaya rekap hari
     // lampau TIDAK ikut berubah kalau shift default diganti belakangan.
     shift_snapshot: shiftLabel,
+    branch, // ✅ NEW — cabang absensi (UTAMA/JOGJA), untuk filter Model A
   };
   if (p.latitude != null) insertPayload.latitude = p.latitude;
   if (p.longitude != null) insertPayload.longitude = p.longitude;
@@ -242,7 +269,7 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
   }
 
   return {
-    ok: true, direction,
+    ok: true, direction, branch,
     message: direction === "IN" ? "Absen masuk berhasil" : "Absen pulang berhasil",
     overtimeOptions,
   };

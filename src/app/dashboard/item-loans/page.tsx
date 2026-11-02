@@ -64,7 +64,7 @@ export default function ItemLoansPage() {
 
     const [loans, setLoans] = useState<LoanRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState<"PENDING" | "APPROVED" | "DIPESAN" | "HISTORY">("PENDING");
+    const [tab, setTab] = useState<"PENDING" | "APPROVED" | "DIPESAN" | "RETURN_PENDING" | "HISTORY">("PENDING");
     const [actingId, setActingId] = useState<string | null>(null);
     const [expandedKey, setExpandedKey] = useState<string | null>(null); // kelompok yang sedang dibuka detailnya
     const [bulkBusyKey, setBulkBusyKey] = useState<string | null>(null);  // penanda aksi massal sedang berjalan
@@ -374,7 +374,7 @@ export default function ItemLoansPage() {
         if (tab === "PENDING") return l.status === "PENDING";
         // Tab APPROVED (Sedang Dipinjam) — bisa dicari peminjam/barang/SN/keterangan.
         if (tab === "APPROVED") {
-            if (l.status !== "APPROVED" && l.status !== "RETURN_PENDING") return false;
+            if (l.status !== "APPROVED") return false;
             const q = approvedSearch.trim().toLowerCase();
             if (q) {
                 const hay = [l.borrower_name, l.item_name, l.serial_number ?? "", l.notes ?? ""]
@@ -384,6 +384,10 @@ export default function ItemLoansPage() {
             return true;
         }
         if (tab === "DIPESAN") return l.status === "DIPESAN";
+
+        // Tab RETURN_PENDING (Menunggu ACC Pengembalian) — hanya pengajuan pengembalian
+        // yang belum di-ACC. Tetap di sini sampai di-Setujui (→ Riwayat) / di-Tolak (→ Sedang Dipinjam).
+        if (tab === "RETURN_PENDING") return l.status === "RETURN_PENDING";
 
         // Tab HISTORY (Riwayat): REJECTED / RETURNED / SOLD.
         const isHistory = l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD";
@@ -420,6 +424,24 @@ export default function ItemLoansPage() {
             return acc;
         }, {}),
     ).sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+    // Jumlah data per tab (untuk badge angka di tombol tab) — dihitung dari status mentah.
+    const tabCount = (k: typeof tab): number => {
+        if (k === "PENDING") return loans.filter(l => l.status === "PENDING").length;
+        if (k === "APPROVED") return loans.filter(l => l.status === "APPROVED").length;
+        if (k === "DIPESAN") return loans.filter(l => l.status === "DIPESAN").length;
+        if (k === "RETURN_PENDING") return loans.filter(l => l.status === "RETURN_PENDING").length;
+        return loans.filter(l => l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD").length;
+    };
+
+    // Pesan kosong kontekstual per tab (lebih informatif daripada "Belum ada data").
+    const emptyText: Record<typeof tab, string> = {
+        PENDING: "Belum ada pengajuan peminjaman yang menunggu persetujuan",
+        APPROVED: "Belum ada barang yang sedang dipinjam",
+        DIPESAN: "Belum ada barang yang dipesan",
+        RETURN_PENDING: "Belum ada pengajuan pengembalian yang menunggu ACC",
+        HISTORY: "Belum ada riwayat peminjaman",
+    };
 
     return (
         <DashboardLayout>
@@ -550,18 +572,28 @@ export default function ItemLoansPage() {
                     </div>
 
                     <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-                        <div className="flex gap-1.5 p-2 border-b border-zinc-100">
+                        <div className="flex flex-wrap gap-1.5 p-2 border-b border-zinc-100">
                             {([
                                 { k: "PENDING", l: "Menunggu" },
                                 { k: "APPROVED", l: "Sedang Dipinjam" },
                                 { k: "DIPESAN", l: "Di Pesan" },
+                                { k: "RETURN_PENDING", l: "Menunggu ACC Pengembalian" },
                                 { k: "HISTORY", l: "Riwayat" },
-                            ] as const).map(t => (
-                                <button key={t.k} onClick={() => setTab(t.k)}
-                                    className={`px-3 h-9 rounded-xl text-xs font-semibold transition ${tab === t.k ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
-                                    {t.l}
-                                </button>
-                            ))}
+                            ] as const).map(t => {
+                                const active = tab === t.k;
+                                const count = tabCount(t.k);
+                                return (
+                                    <button key={t.k} onClick={() => setTab(t.k)}
+                                        className={`flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-semibold whitespace-nowrap transition ${active ? "bg-zinc-900 text-white shadow-sm shadow-zinc-900/20" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                        {t.l}
+                                        {count > 0 && (
+                                            <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${active ? "bg-white/20 text-white" : "bg-white text-zinc-500 border border-zinc-200"}`}>
+                                                {count}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
 
                         {tab === "APPROVED" && (
@@ -618,8 +650,8 @@ export default function ItemLoansPage() {
                                 <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center">
                                     <Package size={26} className="text-zinc-300" />
                                 </div>
-                                <p className="text-sm font-medium text-zinc-400">Belum ada data</p>
-                                <p className="text-xs text-zinc-300 mt-1">Data peminjaman akan muncul di sini</p>
+                                <p className="text-sm font-medium text-zinc-400">{emptyText[tab]}</p>
+                                <p className="text-xs text-zinc-300 mt-1">Data akan muncul di sini otomatis</p>
                             </div>
                         ) : (
                             <div className="overflow-auto max-h-[70vh]">

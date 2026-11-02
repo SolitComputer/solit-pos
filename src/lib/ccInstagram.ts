@@ -1,6 +1,7 @@
 // src/lib/ccInstagram.ts
 // ⚠️ SERVER ONLY — jangan di-import dari komponen "use client"
 import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { CC_BRANDS, DEFAULT_BRAND } from "./ccReports";
 
 const PROVIDER = "instagram";
 const DAY_MS = 86_400_000;
@@ -15,6 +16,7 @@ export type IgAuth =
     | { token: null; igUserId: null; error: string };
 
 interface IgRow {
+    brand: string;
     access_token: string;
     expires_at: string | null;      // null = token tidak kedaluwarsa (page token)
     open_id: string | null;         // IG User ID
@@ -30,22 +32,23 @@ interface FbTokenResponse {
     error?: { message?: string };
 }
 
-async function readRow(): Promise<IgRow | null> {
+async function readRow(brand: string): Promise<IgRow | null> {
     const { data } = await supabaseAdmin
         .from("cc_integrations")
         .select(
-            "access_token, expires_at, open_id, account_name, last_refresh_at, last_refresh_error, refresh_fail_count"
+            "brand, access_token, expires_at, open_id, account_name, last_refresh_at, last_refresh_error, refresh_fail_count"
         )
         .eq("provider", PROVIDER)
+        .eq("brand", brand)
         .maybeSingle();
 
     return (data as IgRow | null) ?? null;
 }
 
-async function writeRow(patch: Record<string, unknown>): Promise<void> {
+async function writeRow(brand: string, patch: Record<string, unknown>): Promise<void> {
     const { error } = await supabaseAdmin.from("cc_integrations").upsert(
-        { provider: PROVIDER, ...patch, updated_at: new Date().toISOString() },
-        { onConflict: "provider" }
+        { provider: PROVIDER, brand, ...patch, updated_at: new Date().toISOString() },
+        { onConflict: "provider,brand" }
     );
 
     if (error) {
@@ -82,7 +85,6 @@ async function exchangeLongLived(
             return { token: null, error: json.error?.message ?? `IG token HTTP ${res.status}` };
         }
 
-        // expires_in absent → Page Access Token yang tidak pernah expired
         const expiresAt = json.expires_in
             ? new Date(Date.now() + json.expires_in * 1000).toISOString()
             : null;
@@ -108,14 +110,14 @@ async function fetchUsername(igUserId: string, token: string): Promise<string | 
 }
 
 function daysLeftOf(expiresAt: string | null): number | null {
-    if (!expiresAt) return null; // tidak pernah expired
+    if (!expiresAt) return null;
     return Math.floor((new Date(expiresAt).getTime() - Date.now()) / DAY_MS);
 }
 
-/** Simpan / perbarui token hasil exchange. */
-async function persist(token: string, expiresAt: string | null, igUserId: string): Promise<void> {
+/** Simpan / perbarui token hasil exchange untuk satu brand. */
+async function persist(brand: string, token: string, expiresAt: string | null, igUserId: string): Promise<void> {
     const username = await fetchUsername(igUserId, token);
-    await writeRow({
+    await writeRow(brand, {
         access_token: token,
         expires_at: expiresAt,
         open_id: igUserId,
@@ -128,107 +130,118 @@ async function persist(token: string, expiresAt: string | null, igUserId: string
 }
 
 /**
- * Token IG yang valid & siap pakai.
- *
- * Alur:
- *  1. Belum ada row → seed dari IG_ACCESS_TOKEN di env, tukar jadi long-lived, simpan.
- *  2. Ada row & masih segar → pakai apa adanya.
- *  3. Ada row & mau habis (<10 hari) → refresh otomatis, simpan yang baru.
- *  4. expires_at = null → Page Token permanen, tidak perlu refresh.
+ * Token IG valid & siap pakai untuk SATU brand.
+ *  - Brand default (Solit) tanpa row → bootstrap dari env (IG_ACCESS_TOKEN + IG_USER_ID).
+ *  - Brand lain tanpa row → error "belum terhubung" (seed dulu lewat form admin).
+ *  - IG User ID diambil dari row.open_id (per brand), BUKAN env.
  */
-export async function getValidIgToken(): Promise<IgAuth> {
-    const igUserId = process.env.IG_USER_ID ?? null;
-    if (!igUserId) {
-        return { token: null, igUserId: null, error: "IG_USER_ID belum di-set di env" };
-    }
+export async function getValidIgToken(brand: string = DEFAULT_BRAND): Promise<IgAuth> {
+    const row = await readRow(brand);
 
-    const row = await readRow();
-
-    // ── (1) Bootstrap dari env ────────────────────────────────────────────────
+    // ── Belum ada row ─────────────────────────────────────────────────────────
     if (!row) {
-        const seed = process.env.IG_ACCESS_TOKEN;
-        if (!seed) {
-            return {
-                token: null,
-                igUserId: null,
-                error: "IG_ACCESS_TOKEN belum di-set di env",
-            };
+        // Bootstrap env HANYA untuk brand default (backward-compat Solit lama)
+        if (brand === DEFAULT_BRAND) {
+            const seed = process.env.IG_ACCESS_TOKEN;
+            const envIgUserId = process.env.IG_USER_ID ?? null;
+            if (seed && envIgUserId) {
+                const out = await exchangeLongLived(seed);
+                if (out.token === null) return { token: null, igUserId: null, error: out.error };
+                try {
+                    await persist(brand, out.token, out.expiresAt, envIgUserId);
+                } catch (e) {
+                    return { token: null, igUserId: null, error: e instanceof Error ? e.message : "Gagal menyimpan token IG" };
+                }
+                return { token: out.token, igUserId: envIgUserId, error: null };
+            }
         }
-
-        const out = await exchangeLongLived(seed);
-        if (out.token === null) {
-            return { token: null, igUserId: null, error: out.error };
-        }
-
-        try {
-            await persist(out.token, out.expiresAt, igUserId);
-        } catch (e) {
-            return {
-                token: null,
-                igUserId: null,
-                error: e instanceof Error ? e.message : "Gagal menyimpan token IG",
-            };
-        }
-
-        return { token: out.token, igUserId, error: null };
+        return { token: null, igUserId: null, error: `Instagram brand ${brand} belum terhubung` };
     }
 
-    // ── (4) Page token permanen ───────────────────────────────────────────────
+    const igUserId = row.open_id;
+    if (!igUserId) {
+        return { token: null, igUserId: null, error: `IG User ID brand ${brand} belum tersimpan — hubungkan ulang` };
+    }
+
+    // ── Page token permanen ───────────────────────────────────────────────────
     const daysLeft = daysLeftOf(row.expires_at);
-    if (daysLeft === null) {
-        return { token: row.access_token, igUserId, error: null };
-    }
+    if (daysLeft === null) return { token: row.access_token, igUserId, error: null };
 
-    // ── (2) Masih segar ───────────────────────────────────────────────────────
-    if (daysLeft > REFRESH_BEFORE_DAYS) {
-        return { token: row.access_token, igUserId, error: null };
-    }
+    // ── Masih segar ───────────────────────────────────────────────────────────
+    if (daysLeft > REFRESH_BEFORE_DAYS) return { token: row.access_token, igUserId, error: null };
 
-    // ── (3) Refresh ───────────────────────────────────────────────────────────
+    // ── Refresh ───────────────────────────────────────────────────────────────
     const out = await exchangeLongLived(row.access_token);
     if (out.token === null) {
-        await writeRow({
+        await writeRow(brand, {
             last_refresh_at: new Date().toISOString(),
             last_refresh_error: out.error,
             refresh_fail_count: (row.refresh_fail_count ?? 0) + 1,
         });
-
-        // token lama masih hidup? pakai dulu, jangan matikan sync
         if (daysLeft > 0) return { token: row.access_token, igUserId, error: null };
-
         return { token: null, igUserId: null, error: out.error };
     }
 
-    await persist(out.token, out.expiresAt, igUserId);
+    await persist(brand, out.token, out.expiresAt, igUserId);
     return { token: out.token, igUserId, error: null };
 }
 
-export async function keepAliveIg(): Promise<{
-    ok: boolean;
-    error: string | null;
-    accountName?: string | null;
-    daysLeft?: number | null;
-}> {
-    const auth = await getValidIgToken();
-    if (auth.token === null) {
-        return { ok: false, error: auth.error };
+/**
+ * Seed / perbarui token IG satu brand dari token yang dipaste admin.
+ * token mentah → long-lived → simpan bareng IG User ID brand tsb.
+ */
+export async function seedIgToken(
+    brand: string,
+    rawToken: string,
+    igUserId: string
+): Promise<{ ok: boolean; error?: string; accountName?: string | null }> {
+    const t = rawToken.trim();
+    const uid = igUserId.trim();
+    if (!t || !uid) return { ok: false, error: "Token dan IG User ID wajib diisi" };
+
+    const out = await exchangeLongLived(t);
+    if (out.token === null) return { ok: false, error: out.error };
+
+    try {
+        await persist(brand, out.token, out.expiresAt, uid);
+    } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "Gagal menyimpan token IG" };
     }
+
+    const row = await readRow(brand);
+    return { ok: true, accountName: row?.account_name ?? null };
+}
+
+export async function keepAliveIg(brand: string = DEFAULT_BRAND): Promise<{
+    ok: boolean; error: string | null; accountName?: string | null; daysLeft?: number | null;
+}> {
+    const auth = await getValidIgToken(brand);
+    if (auth.token === null) return { ok: false, error: auth.error };
 
     const username = await fetchUsername(auth.igUserId, auth.token);
-    if (!username) {
-        return { ok: false, error: "Token tersimpan tapi ditolak Graph API — hubungkan ulang" };
-    }
+    if (!username) return { ok: false, error: "Token tersimpan tapi ditolak Graph API — hubungkan ulang" };
 
-    const row = await readRow();
-    return {
-        ok: true,
-        error: null,
-        accountName: username,
-        daysLeft: daysLeftOf(row?.expires_at ?? null),
-    };
+    const row = await readRow(brand);
+    return { ok: true, error: null, accountName: username, daysLeft: daysLeftOf(row?.expires_at ?? null) };
+}
+
+/** Keep-alive SEMUA brand IG yang terhubung — dipanggil cron harian. */
+export async function keepAliveIgAll(): Promise<{ brand: string; ok: boolean; error: string | null }[]> {
+    const { data } = await supabaseAdmin
+        .from("cc_integrations")
+        .select("brand")
+        .eq("provider", PROVIDER);
+
+    const out: { brand: string; ok: boolean; error: string | null }[] = [];
+    for (const r of data ?? []) {
+        const res = await keepAliveIg(r.brand as string);
+        out.push({ brand: r.brand as string, ok: res.ok, error: res.error ?? null });
+    }
+    return out;
 }
 
 export interface IgHealth {
+    brand: string;
     connected: boolean;
     accountName: string | null;
     daysLeft: number | null;
@@ -236,32 +249,23 @@ export interface IgHealth {
     error: string | null;
 }
 
-export async function getIgHealth(): Promise<IgHealth> {
-    const missing: string[] = [];
-    if (!process.env.IG_USER_ID) missing.push("IG_USER_ID");
-    if (!process.env.FB_APP_ID) missing.push("FB_APP_ID");
-    if (!process.env.FB_APP_SECRET) missing.push("FB_APP_SECRET");
-
-    const row = await readRow();
-
-    if (missing.length > 0 && !row) {
-        return {
-            connected: false,
-            accountName: null,
-            daysLeft: null,
-            level: "DEAD",
-            error: `Env belum lengkap: ${missing.join(", ")}`,
-        };
-    }
+export async function getIgHealth(brand: string = DEFAULT_BRAND): Promise<IgHealth> {
+    const row = await readRow(brand);
 
     if (!row) {
-        return {
-            connected: false,
-            accountName: null,
-            daysLeft: null,
-            level: "DEAD",
-            error: "Instagram belum terhubung — jalankan keepalive",
-        };
+        // env-check hanya relevan utk brand default yang belum punya row
+        if (brand === DEFAULT_BRAND) {
+            const missing: string[] = [];
+            if (!process.env.IG_USER_ID) missing.push("IG_USER_ID");
+            if (!process.env.FB_APP_ID) missing.push("FB_APP_ID");
+            if (!process.env.FB_APP_SECRET) missing.push("FB_APP_SECRET");
+            if (!process.env.IG_ACCESS_TOKEN) missing.push("IG_ACCESS_TOKEN");
+            return {
+                brand, connected: false, accountName: null, daysLeft: null, level: "DEAD",
+                error: missing.length ? `Belum terhubung (env: ${missing.join(", ")})` : "Belum terhubung — jalankan keepalive",
+            };
+        }
+        return { brand, connected: false, accountName: null, daysLeft: null, level: "DEAD", error: "belum terhubung" };
     }
 
     const daysLeft = daysLeftOf(row.expires_at);
@@ -272,6 +276,7 @@ export async function getIgHealth(): Promise<IgHealth> {
     else if (failing || (daysLeft !== null && daysLeft <= REFRESH_BEFORE_DAYS)) level = "WARN";
 
     return {
+        brand,
         connected: level !== "DEAD",
         accountName: row.account_name,
         daysLeft,
@@ -280,6 +285,14 @@ export async function getIgHealth(): Promise<IgHealth> {
     };
 }
 
-export async function disconnectIg(): Promise<void> {
-    await supabaseAdmin.from("cc_integrations").delete().eq("provider", PROVIDER);
+/** Health semua brand IG — dipakai UI connect per-brand (Part 2). */
+export async function getIgHealthAll(): Promise<Record<string, IgHealth>> {
+    const entries = await Promise.all(
+        CC_BRANDS.map(async (b) => [b, await getIgHealth(b)] as const)
+    );
+    return Object.fromEntries(entries);
+}
+
+export async function disconnectIg(brand: string = DEFAULT_BRAND): Promise<void> {
+    await supabaseAdmin.from("cc_integrations").delete().eq("provider", PROVIDER).eq("brand", brand);
 }

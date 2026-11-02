@@ -5,6 +5,7 @@ import type { ReactNode, CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import * as faceapi from "face-api.js";
 import { startAuthentication, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from "@simplewebauthn/browser";
+import { resolveBranchByLocation } from "@/lib/attendanceLocations"; // ✅ NEW — geofence multi-cabang
 
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
@@ -29,8 +30,9 @@ const MIN_SHARPNESS = 12;
 // Berapa frame berturut-turut gambar harus "bagus" sebelum auto-capture jalan.
 const QUALITY_HOLD_FRAMES = 2;
 
-const COMPANY_LAT = -6.402123;
-const COMPANY_LNG = 106.787296;
+// ✅ Koordinat per cabang pindah ke src/lib/attendanceLocations.ts (UTAMA/Depok & JOGJA).
+// MAX_DISTANCE_METERS di sini dipakai untuk TAMPILAN saja (teks "radius 80m",
+// bar jarak di layar out-of-range). Radius asli per cabang ada di lib itu.
 const MAX_DISTANCE_METERS = 80;
 const GPS_ACCEPT_ACCURACY_METERS = 100;
 const GPS_ACCURACY_FALLBACK_METERS = 200;
@@ -552,39 +554,43 @@ export default function FaceVerifyPage() {
 
   useEffect(() => { attemptsRef.current = attempts; }, [attempts]);
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371000;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2
-      + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  };
+  // const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  //   const R = 6371000;
+  //   const dLat = (lat2 - lat1) * Math.PI / 180;
+  //   const dLon = (lon2 - lon1) * Math.PI / 180;
+  //   const a = Math.sin(dLat / 2) ** 2
+  //     + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  //   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  // };
 
   // Dipakai baik untuk percobaan pertama maupun fallback timeout,
   // biar logic sukses tidak duplikat.
-  const handleGpsSuccess = useCallback((position: GeolocationPosition) => {
+   const handleGpsSuccess = useCallback((position: GeolocationPosition) => {
     const { latitude, longitude, accuracy } = position.coords;
-    const distance = calculateDistance(latitude, longitude, COMPANY_LAT, COMPANY_LNG);
-    const distRound = Math.round(distance);
+    // ✅ NEW — cek ke SEMUA cabang (UTAMA/Depok & JOGJA). Ambil cabang yang
+    // user-nya ada di dalam radius; kalau di luar semua → out-of-range dengan
+    // jarak ke cabang TERDEKAT. (Mau kunci 1 cabang? tambahkan arg ke-3, mis.
+    // resolveBranchByLocation(latitude, longitude, "JOGJA").)
+    const geo = resolveBranchByLocation(latitude, longitude);
+    const distRound = geo.nearestDistance;
     setCurrentDistance(distRound);
     setGpsCoords({ latitude, longitude, accuracy });
     setGpsLoading(false);
     addLog(
-      `GPS: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} | ±${Math.round(accuracy)}m | jarak ${distRound}m`,
-      distance <= MAX_DISTANCE_METERS ? "ok" : "warn"
+      `GPS: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} | ±${Math.round(accuracy)}m | ${geo.nearest.label} ${distRound}m`,
+      geo.branch ? "ok" : "warn"
     );
-    if (distance > MAX_DISTANCE_METERS) {
+    if (!geo.branch) {
       setStage("out-of-range");
-      setMessage(`Anda berada di luar radius (${distRound}m)`);
+      setMessage(`Anda di luar radius semua cabang (terdekat: ${geo.nearest.label}, ${distRound}m)`);
     } else {
-      addLog(`Lokasi valid — dalam radius ${MAX_DISTANCE_METERS}m`, "ok");
+      addLog(`Lokasi valid — ${geo.nearest.label} (radius ${geo.nearest.radius}m)`, "ok");
       if (needEnrollState) {
         setStage("enroll");
-        setMessage("Lokasi valid. Daftarkan wajah Anda sekarang");
+        setMessage(`Lokasi valid (${geo.nearest.label}). Daftarkan wajah Anda sekarang`);
       } else {
         setStage("verify");
-        setMessage("Lokasi valid. Silakan lakukan verifikasi wajah");
+        setMessage(`Lokasi valid (${geo.nearest.label}). Silakan lakukan verifikasi wajah`);
       }
     }
   }, [addLog, needEnrollState, attendanceDirection]);

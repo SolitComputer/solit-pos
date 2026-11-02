@@ -1,6 +1,7 @@
 // src/lib/ccTikTok.ts
 // ⚠️ SERVER ONLY
 import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { CC_BRANDS, DEFAULT_BRAND } from "./ccReports";
 
 const AUTH_BASE = "https://www.tiktok.com/v2/auth/authorize/";
 const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";
@@ -12,8 +13,8 @@ const REFRESH_MARGIN_MS = 5 * 60_000;
 interface TikTokTokenResponse {
   access_token?: string;
   refresh_token?: string;
-  expires_in?: number;         // detik (≈86400)
-  refresh_expires_in?: number; // detik (≈31536000)
+  expires_in?: number;
+  refresh_expires_in?: number;
   open_id?: string;
   scope?: string;
   error?: string;
@@ -26,6 +27,7 @@ export type TikTokTokenResult =
 
 export interface TikTokIntegration {
   provider: string;
+  brand: string;
   access_token: string;
   refresh_token: string;
   expires_at: string;
@@ -61,11 +63,12 @@ async function postToken(body: Record<string, string>): Promise<TikTokTokenRespo
   return (await res.json()) as TikTokTokenResponse;
 }
 
-async function saveTokens(t: TikTokTokenResponse, accountName?: string | null): Promise<void> {
+async function saveTokens(brand: string, t: TikTokTokenResponse, accountName?: string | null): Promise<void> {
   const now = Date.now();
   const { error } = await supabaseAdmin.from("cc_integrations").upsert(
     {
       provider: "tiktok",
+      brand,
       access_token: t.access_token!,
       refresh_token: t.refresh_token!,
       expires_at: new Date(now + (t.expires_in ?? 86400) * 1000).toISOString(),
@@ -75,13 +78,14 @@ async function saveTokens(t: TikTokTokenResponse, accountName?: string | null): 
       ...(accountName !== undefined ? { account_name: accountName } : {}),
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "provider" }
+    { onConflict: "provider,brand" }
   );
 
   if (error) throw new Error(`Gagal simpan token: ${error.message}`);
 }
-/** Tukar `code` dari callback → token, lalu simpan. */
-export async function exchangeCode(code: string): Promise<{ ok: boolean; error?: string }> {
+
+/** Tukar `code` dari callback → token, lalu simpan untuk brand tsb. */
+export async function exchangeCode(code: string, brand: string): Promise<{ ok: boolean; error?: string }> {
   const t = await postToken({
     client_key: process.env.TIKTOK_CLIENT_KEY!,
     client_secret: process.env.TIKTOK_CLIENT_SECRET!,
@@ -95,7 +99,7 @@ export async function exchangeCode(code: string): Promise<{ ok: boolean; error?:
   }
 
   const name = await fetchDisplayName(t.access_token);
-  await saveTokens(t, name);
+  await saveTokens(brand, t, name);
   return { ok: true };
 }
 
@@ -112,33 +116,31 @@ async function fetchDisplayName(accessToken: string): Promise<string | null> {
   }
 }
 
-export async function getIntegration(): Promise<TikTokIntegration | null> {
+export async function getIntegration(brand: string = DEFAULT_BRAND): Promise<TikTokIntegration | null> {
   const { data } = await supabaseAdmin
     .from("cc_integrations")
     .select("*")
     .eq("provider", "tiktok")
+    .eq("brand", brand)
     .maybeSingle();
   return (data as TikTokIntegration) ?? null;
 }
 
-
 /**
- * Access token yang dijamin valid.
- * Auto-refresh kalau sudah/hampir expired.
- * token === null → belum connect atau refresh_token mati (harus connect ulang).
+ * Access token yang dijamin valid untuk SATU brand.
+ * token === null → brand itu belum connect atau refresh_token mati.
  */
-export async function getValidAccessToken(): Promise<TikTokTokenResult> {
-  const row = await getIntegration();
-  if (!row) return { token: null, error: "Akun TikTok belum terhubung" };
+export async function getValidAccessToken(brand: string = DEFAULT_BRAND): Promise<TikTokTokenResult> {
+  const row = await getIntegration(brand);
+  if (!row) return { token: null, error: `Akun TikTok brand ${brand} belum terhubung` };
 
   const expiresAt = new Date(row.expires_at).getTime();
   if (Date.now() < expiresAt - REFRESH_MARGIN_MS) {
     return { token: row.access_token };
   }
 
-  // refresh_token juga sudah mati?
   if (row.refresh_expires_at && Date.now() >= new Date(row.refresh_expires_at).getTime()) {
-    return { token: null, error: "Sesi TikTok kedaluwarsa — hubungkan ulang akun" };
+    return { token: null, error: `Sesi TikTok brand ${brand} kedaluwarsa — hubungkan ulang akun` };
   }
 
   const t = await postToken({
@@ -150,22 +152,22 @@ export async function getValidAccessToken(): Promise<TikTokTokenResult> {
 
   if (!t.access_token || !t.refresh_token) {
     const err = t.error_description ?? t.error ?? "Gagal refresh token TikTok — hubungkan ulang akun";
-    await markRefresh(false, err);
+    await markRefresh(brand, false, err);
     return { token: null, error: err };
   }
 
-  await saveTokens(t);
-  await markRefresh(true);
+  await saveTokens(brand, t);
+  await markRefresh(brand, true);
   return { token: t.access_token };
 }
 
-export async function disconnect(): Promise<void> {
-  await supabaseAdmin.from("cc_integrations").delete().eq("provider", "tiktok");
+export async function disconnect(brand: string = DEFAULT_BRAND): Promise<void> {
+  await supabaseAdmin.from("cc_integrations").delete().eq("provider", "tiktok").eq("brand", brand);
 }
 
-/** Catat hasil refresh untuk monitoring kesehatan token. */
-async function markRefresh(ok: boolean, error?: string): Promise<void> {
-  const row = await getIntegration();
+/** Catat hasil refresh untuk monitoring kesehatan token (per brand). */
+async function markRefresh(brand: string, ok: boolean, error?: string): Promise<void> {
+  const row = await getIntegration(brand);
   if (!row) return;
 
   await supabaseAdmin
@@ -175,18 +177,14 @@ async function markRefresh(ok: boolean, error?: string): Promise<void> {
       last_refresh_error: ok ? null : error ?? "Unknown",
       refresh_fail_count: ok ? 0 : (row.refresh_fail_count ?? 0) + 1,
     })
-    .eq("provider", "tiktok");
+    .eq("provider", "tiktok")
+    .eq("brand", brand);
 }
 
-/**
- * Keep-alive: dipanggil cron harian.
- * Memaksa refresh walau access_token masih valid — supaya refresh_token
- * ikut diperbarui dan masa 365 hari nya ter-reset terus. Selama ini jalan,
- * token TikTok tidak akan pernah expired.
- */
-export async function keepAlive(): Promise<{ ok: boolean; error?: string }> {
-  const row = await getIntegration();
-  if (!row) return { ok: false, error: "Akun TikTok belum terhubung" };
+/** Keep-alive satu brand: paksa refresh supaya masa 365 hari refresh_token ter-reset. */
+export async function keepAlive(brand: string = DEFAULT_BRAND): Promise<{ ok: boolean; error?: string }> {
+  const row = await getIntegration(brand);
+  if (!row) return { ok: false, error: `Akun TikTok brand ${brand} belum terhubung` };
 
   const t = await postToken({
     client_key: process.env.TIKTOK_CLIENT_KEY!,
@@ -197,31 +195,46 @@ export async function keepAlive(): Promise<{ ok: boolean; error?: string }> {
 
   if (!t.access_token || !t.refresh_token) {
     const err = t.error_description ?? t.error ?? "Gagal refresh";
-    await markRefresh(false, err);
+    await markRefresh(brand, false, err);
     return { ok: false, error: err };
   }
 
-  await saveTokens(t);
-  await markRefresh(true);
+  await saveTokens(brand, t);
+  await markRefresh(brand, true);
   return { ok: true };
 }
 
-/** Kesehatan token untuk banner di dashboard. */
+/** Keep-alive SEMUA brand TikTok yang terhubung — dipanggil cron harian. */
+export async function keepAliveAll(): Promise<{ brand: string; ok: boolean; error: string | null }[]> {
+  const { data } = await supabaseAdmin
+    .from("cc_integrations")
+    .select("brand")
+    .eq("provider", "tiktok");
+
+  const out: { brand: string; ok: boolean; error: string | null }[] = [];
+  for (const r of data ?? []) {
+    const res = await keepAlive(r.brand as string);
+    out.push({ brand: r.brand as string, ok: res.ok, error: res.error ?? null });
+  }
+  return out;
+}
+
 export interface TikTokHealth {
+  brand: string;
   connected: boolean;
   accountName: string | null;
-  daysLeft: number | null;      // sisa umur refresh_token
+  daysLeft: number | null;
   lastRefreshAt: string | null;
   failCount: number;
   error: string | null;
   level: "OK" | "WARN" | "DEAD";
 }
 
-export async function getHealth(): Promise<TikTokHealth> {
-  const row = await getIntegration();
+export async function getHealth(brand: string = DEFAULT_BRAND): Promise<TikTokHealth> {
+  const row = await getIntegration(brand);
   if (!row) {
     return {
-      connected: false, accountName: null, daysLeft: null,
+      brand, connected: false, accountName: null, daysLeft: null,
       lastRefreshAt: null, failCount: 0, error: null, level: "DEAD",
     };
   }
@@ -232,8 +245,6 @@ export async function getHealth(): Promise<TikTokHealth> {
 
   const fails = row.refresh_fail_count ?? 0;
 
-  // DEAD  → sudah tidak bisa dipakai, wajib connect ulang
-  // WARN  → masih jalan tapi butuh perhatian
   const level: TikTokHealth["level"] =
     (daysLeft !== null && daysLeft <= 0) || fails >= 3
       ? "DEAD"
@@ -242,6 +253,7 @@ export async function getHealth(): Promise<TikTokHealth> {
         : "OK";
 
   return {
+    brand,
     connected: level !== "DEAD",
     accountName: row.account_name,
     daysLeft,
@@ -250,4 +262,12 @@ export async function getHealth(): Promise<TikTokHealth> {
     error: row.last_refresh_error ?? null,
     level,
   };
+}
+
+/** Health semua brand sekaligus — dipakai UI connect per-brand (Part 2). */
+export async function getHealthAll(): Promise<Record<string, TikTokHealth>> {
+  const entries = await Promise.all(
+    CC_BRANDS.map(async (b) => [b, await getHealth(b)] as const)
+  );
+  return Object.fromEntries(entries);
 }

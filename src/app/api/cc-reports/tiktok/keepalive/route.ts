@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { keepAlive } from "@/lib/ccTikTok";
+import { keepAliveAll } from "@/lib/ccTikTok";
 
 export const dynamic = "force-dynamic";
 
 export async function POST() {
-  const out = await keepAlive();
-  return NextResponse.json(
-    { success: out.ok, error: out.error ?? null },
-    { status: out.ok ? 200 : 500 }
-  );
+  const results = await keepAliveAll();
+  const ok = results.every((r) => r.ok); // true juga kalau belum ada brand terhubung
+  return NextResponse.json({ success: ok, results }, { status: 200 });
 }
