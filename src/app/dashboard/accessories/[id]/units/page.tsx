@@ -1683,12 +1683,19 @@ export default function AccessoryUnitsPage() {
     };
 
     // ── Filter ──
-    const filteredUnits = units.filter(u => {
+    // Basis dari activeUnits (sudah buang TERJUAL) — Terjual di-hidden total
+    // dari tabel, sama seperti halaman Kelola Unit Laptop. Hitungannya tetap
+    // tampil di kartu "Terjual" (counts.terjual) di atas.
+    const filteredUnits = activeUnits.filter(u => {
         // Unit KELUAR = sudah diambil lewat Pengambilan Barang → hidden dari
         // Kelola Unit (muncul lagi otomatis setelah di-Restore di Pengambilan
         // Barang, karena status balik ke TERSEDIA). Konsisten dgn stok induk
         // yang juga tidak menghitung KELUAR.
         if (u.status === "KELUAR") return false;
+        //  Unit TERJUAL disembunyikan dari tampilan utama / "Semua Status" —
+        //  hanya muncul kalau tab "Terjual" dipilih eksplisit. Kartu & tab
+        //  "Terjual" tetap pakai counts.terjual (dihitung dari `units`).
+        if (u.status === "TERJUAL" && filterStatus !== "TERJUAL") return false;
         if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
         if (filterCondition !== "ALL" && u.condition !== filterCondition) return false;
         if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
@@ -2060,11 +2067,10 @@ export default function AccessoryUnitsPage() {
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-2">
                         <div className="flex flex-wrap gap-1.5">
                             {[
-                                { value: "ALL", label: "Semua Status", count: units.length },
+                                { value: "ALL", label: "Semua Status", count: counts.total },
                                 { value: "TERSEDIA", label: "Siap Jual", count: counts.tersedia },
                                 { value: "BELUM_SIAP", label: "Belum Siap Jual", count: counts.belumSiap },
                                 { value: "MINUS_SIAP_JUAL", label: "Minus Siap Jual", count: counts.minusSiapJual },
-                                { value: "TERJUAL", label: "Terjual", count: counts.terjual },
                             ].map(opt => (
                                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterStatus === opt.value ? "bg-gray-800 text-white shadow-sm" : "bg-white text-gray-500 hover:bg-gray-50"}`}>

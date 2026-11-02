@@ -5,6 +5,7 @@ import { SERVICE_VIEW_ROLES, SERVICE_TEKNISI_ROLES, expandRolesWithParents, hasA
 import { createClient } from "@supabase/supabase-js";
 import type { ServiceStatus } from "@/types/service";
 import { recordOutflow } from "@/lib/accessoryOutflow";
+import { markLoansSoldOnSale } from "@/lib/itemLoanSync"; //  NEW — unit dipakai service → pinjaman jadi "Terjual"
 import { AKUN, jakartaDate, periodFromDate, totalOf } from "@/lib/accounting";
 import { draftToLineRows } from "@/lib/accountingSource";
 
@@ -295,9 +296,11 @@ export async function PATCH(
       if (accessories_used && accessories_used.length > 0) {
         // ── DARI STOK → cuma catat keluarnya stok. Jurnal muncul sbg DRAFT PENDING
         //    (buildSparepartDrafts) utk dikonfirmasi — bukan jurnal instan.
+        const usedUnitIds: string[] = []; //  NEW — unit ber-SN yang keluar utk sparepart
         for (const acc of accessories_used) {
           if (acc.unit_id) {
             await supabase.from("accessory_units").update({ status: "KELUAR" }).eq("id", acc.unit_id);
+            usedUnitIds.push(acc.unit_id); //  NEW
           }
           await recordOutflow({
             accessory_id: acc.accessory_id,
@@ -314,6 +317,8 @@ export async function PATCH(
             p_qty: acc.qty,
           });
         }
+        //  NEW — unit yg dipakai kalau lagi DIPINJAM → pinjaman jadi "Terjual" & masuk Riwayat
+        try { await markLoansSoldOnSale(supabase, usedUnitIds, `SERVICE-${current.no_urut || id}`); } catch { /* best-effort */ }
         updatePayload = {};
       } else if (sparepart_mode === "manual" && Number(sparepart_modal) > 0) {
         // ── MANUAL → simpan modal di biaya_sparepart. Draft pending yang jurnalkan.
@@ -349,9 +354,11 @@ export async function PATCH(
         : "Pekerjaan selesai";
 
       if (accessories_used && accessories_used.length > 0) {
+        const usedUnitIds: string[] = []; //  NEW — unit ber-SN yang keluar saat Selesai
         for (const acc of accessories_used) {
           if (acc.unit_id) {
             await supabase.from("accessory_units").update({ status: "KELUAR" }).eq("id", acc.unit_id);
+            usedUnitIds.push(acc.unit_id); //  NEW
           }
           await recordOutflow({
             accessory_id: acc.accessory_id,
@@ -368,6 +375,8 @@ export async function PATCH(
             p_qty: acc.qty,
           });
         }
+        //  NEW — unit yg dipakai kalau lagi DIPINJAM → pinjaman jadi "Terjual" & masuk Riwayat
+        try { await markLoansSoldOnSale(supabase, usedUnitIds, `SERVICE-${current.no_urut || id}`); } catch { /* best-effort */ }
       }
 
       //  CHANGED — sparepart kini dijurnal SAAT ditambahkan (case "sparepart"), tidak lagi di sini (hindari dobel).

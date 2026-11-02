@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { revertLoansOnServiceCancel } from "@/lib/itemLoanSync"; //  NEW — unit balik stok → pinjaman balik "Dipinjam"
 
 type OutflowSource = "transaction" | "service" | "manual";
 type RoleType = "SALES" | "TEKNISI" | "PENGELOLA_BARANG";
@@ -110,6 +111,9 @@ export async function cancelOutflowByService(serviceId: string) {
 
     if (outflows && outflows.length > 0) {
       await restockActiveOutflows(outflows);
+      //  NEW — unit balik stok: pinjaman yg "Terjual" krn service ini balik "Dipinjam"
+      const loanUnitIds = outflows.map(o => o.unit_id).filter(Boolean) as string[];
+      try { await revertLoansOnServiceCancel(supabaseAdmin, loanUnitIds); } catch { /* best-effort */ }
     }
 
     const { error } = await supabaseAdmin
