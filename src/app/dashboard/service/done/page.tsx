@@ -12,6 +12,7 @@ import ServicePrepaymentModal from "@/components/service/ServicePrepaymentModal"
 import { useAuthUser } from "@/hooks/useAuthUser"; //  NEW — cek role admin utk nominal sparepart
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { SERVICE_WARNING_ROLES } from "@/lib/permissions";
 
 //  CHANGED — Data Services = SEMUA order yang belum tuntas diambil/dibatalkan
 const DONE_STATUSES: ServiceStatus[] = [
@@ -424,12 +425,217 @@ function SkeletonCard() {
   );
 }
 
+// ── Penanda Bermasalah (meniru WarningToggle di Jurnal Umum) ──────────────────
+function ServiceWarningToggle({
+  order,
+  canWarn,
+  onChanged,
+  showToast,
+}: {
+  order: ServiceOrder;
+  canWarn: boolean;
+  onChanged: () => void;
+  showToast: (msg: string, type?: "success" | "error") => void;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [popPos, setPopPos] = useState<{ top: number; left: number } | null>(null);
+  const [showPopover, setShowPopover] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const hasWarning = !!order.has_warning;
+  const logs = [...(order.warning_logs ?? [])].sort(
+    (a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")
+  );
+
+  const computePos = () => {
+    const btn = btnRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const POPOVER_H = 420;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top = spaceBelow < POPOVER_H ? Math.max(8, rect.top - POPOVER_H - 6) : rect.bottom + 6;
+    setPopPos({ top, left: Math.max(8, rect.right - 256) });
+  };
+
+  useEffect(() => {
+    if (!showPopover) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setShowPopover(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [showPopover]);
+
+  // user tanpa akses & order tanpa penanda → tidak render apa pun
+  if (!canWarn && !hasWarning) return null;
+
+  const activate = async () => {
+    if (!reason.trim() || busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/service/${order.id}/warning`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+      const json = await res.json();
+      if (!json.success) { showToast(json.message || "Gagal menandai", "error"); return; }
+      setReason("");
+      setShowPopover(false);
+      showToast("Penanda ditambahkan");
+      onChanged();
+    } catch {
+      showToast("Koneksi bermasalah", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deactivate = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/service/${order.id}/warning`, { method: "DELETE" });
+      const json = await res.json();
+      if (!json.success) { showToast(json.message || "Gagal menghapus penanda", "error"); return; }
+      setShowPopover(false);
+      showToast("Penanda dihapus");
+      onChanged();
+    } catch {
+      showToast("Koneksi bermasalah", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const WarnIcon = ({ size = 15 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+
+  return (
+    <div ref={wrapperRef} className="inline-block" onClick={e => e.stopPropagation()}>
+      <button
+        ref={btnRef}
+        onClick={() => { computePos(); setShowPopover(v => !v); }}
+        disabled={busy}
+        title={hasWarning ? "Lihat / ubah penanda" : "Beri penanda bermasalah"}
+        className={`grid h-7 w-7 place-items-center rounded-lg border transition-all active:scale-90 ${
+          hasWarning
+            ? "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
+            : "border-gray-200 bg-white text-gray-300 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+        }`}
+      >
+        <WarnIcon />
+      </button>
+
+      {showPopover && popPos && (hasWarning ? (
+        // ── sudah ada penanda ──
+        <div
+          className="fixed z-[80] max-h-[80vh] w-64 overflow-y-auto rounded-xl border border-rose-200 bg-white p-3 text-left shadow-xl"
+          style={{ top: popPos.top, left: popPos.left }}
+        >
+          <div className="mb-2 flex items-center justify-between border-b border-gray-100 pb-1.5">
+            <p className="inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-rose-700">
+              <WarnIcon size={14} /> Ditandai Bermasalah
+            </p>
+            {canWarn && (
+              <button
+                onClick={deactivate}
+                disabled={busy}
+                className="rounded-md bg-rose-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-rose-700 active:scale-95 disabled:opacity-40"
+              >
+                Hapus Penanda
+              </button>
+            )}
+          </div>
+
+          {canWarn && (
+            <div className="mb-3">
+              <p className="mb-1 text-[10px] font-bold text-slate-500">Tandai Ulang / Catatan Baru:</p>
+              <textarea
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                rows={2}
+                placeholder="Alasan / catatan baru..."
+                className="w-full resize-none rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-400/30"
+              />
+              {reason.trim() && (
+                <button
+                  onClick={activate}
+                  disabled={busy}
+                  className="mt-1.5 w-full rounded-lg bg-amber-600 py-1 text-[11px] font-bold text-white hover:bg-amber-700 disabled:opacity-40"
+                >
+                  Simpan Catatan Baru
+                </button>
+              )}
+            </div>
+          )}
+
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Riwayat Penanda</p>
+          <div className="max-h-40 space-y-2 overflow-y-auto">
+            {logs.length === 0 ? (
+              <p className="text-[11px] text-gray-400">Belum ada riwayat.</p>
+            ) : (
+              logs.map(w => (
+                <div key={w.id} className="border-b border-gray-50 pb-1.5 text-[11px] last:border-0 last:pb-0">
+                  <p className={`font-bold ${w.action === "ACTIVATE" ? "text-rose-700" : "text-gray-400"}`}>
+                    {w.action === "ACTIVATE" ? "Diaktifkan" : "Dinonaktifkan"} · {w.created_by_user?.name ?? "—"}
+                  </p>
+                  {w.reason && <p className="mt-0.5 text-gray-600">{w.reason}</p>}
+                  <p className="mt-0.5 text-[9px] text-gray-300">{formatDate(w.created_at)}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : (
+        // ── belum ada penanda — form isi alasan ──
+        <div
+          className="fixed z-[80] w-64 rounded-xl border border-rose-200 bg-white p-3 shadow-xl"
+          style={{ top: popPos.top, left: popPos.left }}
+        >
+          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-700">Alasan Penanda</p>
+          <textarea
+            autoFocus
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={2}
+            placeholder="Tulis alasan penanda..."
+            className="w-full resize-none rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-400/30"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => { setShowPopover(false); setReason(""); }}
+              className="h-7 flex-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+            >
+              Batal
+            </button>
+            <button
+              onClick={activate}
+              disabled={busy || !reason.trim()}
+              className="h-7 flex-1 rounded-lg bg-rose-600 text-[11px] font-bold text-white hover:bg-rose-700 disabled:opacity-40"
+            >
+              Simpan
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function DonePage() {
   const { orders, loading, connected, refresh } = useDoneRealtime();
   const { user } = useAuthUser(); //  NEW
   const userRoles = user?.roles ?? (user?.role ? [user.role] : []); //  NEW
   const isAdmin = userRoles.some(r => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r)); //  NEW
+  const canWarn = userRoles.some(r => (SERVICE_WARNING_ROLES as string[]).includes(r)); //  NEW — boleh beri/hapus penanda
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<ServiceOrder | null>(null);
@@ -979,9 +1185,22 @@ export default function DonePage() {
                             <PaymentValue order={o} />
                           </td>
 
-                          {/* Status */}
-                          <td className="whitespace-nowrap px-4 py-4 align-middle">
-                            <ServiceStatusBadge status={o.status} />
+                          {/* Status + Penanda */}
+                          <td className="px-4 py-4 align-middle">
+                            <div className="flex flex-col items-start gap-1.5">
+                              <ServiceStatusBadge status={o.status} />
+                              {(o.has_warning || canWarn) && (
+                                <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                  {o.has_warning && (
+                                    <span className="inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold text-rose-600">
+                                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+                                      Penanda
+                                    </span>
+                                  )}
+                                  <ServiceWarningToggle order={o} canWarn={canWarn} onChanged={refresh} showToast={showToast} />
+                                </div>
+                              )}
+                            </div>
                           </td>
 
                           {/* Aksi — selalu 1 baris, rata kanan, lebar tombol seragam */}
@@ -1084,6 +1303,17 @@ export default function DonePage() {
                       className="mt-3 border-t border-gray-50 bg-slate-50/40 px-4 py-3"
                       onClick={e => e.stopPropagation()}
                     >
+                      {(o.has_warning || canWarn) && (
+                        <div className="mb-2.5 flex items-center gap-2">
+                          {o.has_warning && (
+                            <span className="inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+                              Penanda Bermasalah
+                            </span>
+                          )}
+                          <ServiceWarningToggle order={o} canWarn={canWarn} onChanged={refresh} showToast={showToast} />
+                        </div>
+                      )}
                       <ActionGroup actions={getActions(o)} variant="card" />
                     </div>
                   </div>

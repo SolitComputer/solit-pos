@@ -27,7 +27,11 @@ export const GET = withAuth(async (req, _ctx, user) => {
       *,
       created_by_user:users!service_orders_created_by_fkey(id, name),
       dikerjakan_by_user:users!service_orders_dikerjakan_by_fkey(id, name),
-      diambil_by_user:users!service_orders_diambil_by_fkey(id, name)
+      diambil_by_user:users!service_orders_diambil_by_fkey(id, name),
+      warning_logs:service_order_warning_logs(
+        id, action, reason, created_at,
+        created_by_user:users!service_order_warning_logs_created_by_fkey(id, name)
+      )
     `)
     .order("tanggal_masuk", { ascending: false });
 

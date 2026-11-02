@@ -361,6 +361,22 @@ export const SERVICE_CREATE_ROLES: UserRole[] = [
 export const SERVICE_TEKNISI_ROLES: UserRole[] = [
   ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI",
 ];
+// ── Data Services (halaman /dashboard/service/done) ──────────────────────────
+// SENGAJA dipisah dari SERVICE_VIEW_ROLES: halaman "done" (Data Services) lebih
+// ketat — hanya CS, PKL CS, Admin (full access) & Kepala Teknisi. Halaman
+// service lain (antrian/history/statistik) tetap pakai SERVICE_VIEW_ROLES.
+// Hanya dipakai di ROUTE_PERMISSIONS["/dashboard/service/done"] — /api/service
+// TIDAK dibatasi ini karena dipakai bareng halaman Antrian.
+export const SERVICE_DONE_VIEW_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE", "KEPALA_TEKNISI",
+];
+// ── Penanda "Bermasalah" di Data Services ────────────────────────────────────
+// Siapa yang boleh MEMBERI / MENGHAPUS penanda. Badge penanda tetap TERLIHAT
+// oleh semua yang bisa buka halaman — ini cuma gate untuk tombol tandai/hapus.
+// Keputusan: Admin (full access), Customer Service & PKL Customer Service.
+export const SERVICE_WARNING_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
+];
 export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING"];
 
 export const ACCESSORY_ONLY_SALES_ROLES: UserRole[] = ["CUSTOMER_SERVICE"];
@@ -587,7 +603,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   "/dashboard/service": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
-  "/dashboard/service/done": [...SERVICE_VIEW_ROLES],
+  "/dashboard/service/done": [...SERVICE_DONE_VIEW_ROLES],
   "/dashboard/service/history": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/statistik": [...SERVICE_VIEW_ROLES],
 

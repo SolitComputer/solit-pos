@@ -64,7 +64,19 @@ export interface ServiceOrder {
   diambil_by_user?: { id: string; name: string };
   payment_by_user?: { id: string; name: string };
 
+  //  NEW — penanda bermasalah (meniru Jurnal Umum)
+  has_warning?: boolean;
+  warning_logs?: ServiceWarningLog[];
+
   updated_at: string;
+}
+
+export interface ServiceWarningLog {
+  id: string;
+  action: "ACTIVATE" | "DEACTIVATE";
+  reason: string | null;
+  created_at: string;
+  created_by_user?: { id: string; name: string } | null;
 }
 
 export interface ServiceOrderLog {
