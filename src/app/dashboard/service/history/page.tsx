@@ -232,11 +232,38 @@ function KetCell({ order, align = "left" }: { order: ServiceOrder; align?: "left
   return <span className="text-[11px] font-medium text-gray-300">—</span>;
 }
 
+// ── Sparepart Cell (daftar part, format tiap baris "label§harga") ──────────────
+function SparepartCell({ order, showNominal = false }: { order: ServiceOrder; showNominal?: boolean }) {
+  const lines = (order.sparepart_items ?? "").split("\n").map(s => s.trim()).filter(Boolean);
+  if (lines.length === 0) return <span className="text-[11px] font-medium text-gray-300">—</span>;
+  return (
+    <div className="flex flex-col gap-1">
+      {lines.map((ln, i) => {
+        const [label, hargaRaw] = ln.split("§");
+        const harga = Number(hargaRaw ?? 0);
+        return (
+          <span key={i} className="inline-flex w-fit items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.7 2.7-2-2z" />
+            </svg>
+            <span className="max-w-[200px] truncate">
+              {label}
+              {showNominal && harga > 0 && (
+                <span className="ml-1 font-bold text-gray-600">· {fmtRupiah(harga)}</span>
+              )}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Skeletons ──────────────────────────────────────────────────────────────────
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-50">
-      {[28, 110, 120, 150, 90, 90, 90, 70, 90, 80, 80, 80, 80, 110].map((w, i) => (
+          {[28, 110, 120, 150, 90, 90, 90, 70, 150, 90, 80, 80, 80, 80, 110].map((w, i) => (
         <td key={i} className="px-4 py-3.5 first:pl-5 last:pr-5">
           <div className="h-3 animate-pulse rounded-full bg-gray-100" style={{ width: w }} />
         </td>
@@ -1111,7 +1138,7 @@ function HistoryPageContent() {
   const COLUMNS = [
     "No", "Pelanggan", "Laptop", "Keluhan",
     "Jam Masuk", "Jam Done", "Jam Diambil", "Durasi Servis",
-    "Payment", "Dibuat oleh", "Dikerjakan oleh", "Diambil oleh",
+    "Sparepart", "Payment", "Dibuat oleh", "Dikerjakan oleh", "Diambil oleh",
     "Status", "Ket.",
   ];
 
@@ -1450,6 +1477,11 @@ function HistoryPageContent() {
                               <span className="inline-flex items-center rounded-lg bg-gray-50 px-2 py-0.5 font-mono text-[11px] font-black tabular-nums text-gray-500">
                                 {getDuration(o.tanggal_masuk, o.tanggal_selesai)}
                               </span>
+                            </td>
+
+                            {/* Sparepart */}
+                            <td className="min-w-[150px] max-w-[220px] px-4 py-3.5 align-top">
+                              <SparepartCell order={o} showNominal={isAdmin} />
                             </td>
 
                             {/* Payment + breakdown estimasi/sparepart */}
