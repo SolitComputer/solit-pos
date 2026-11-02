@@ -7,6 +7,8 @@ import { createClient } from "@supabase/supabase-js";
 const ALLOWED_ORIGINS = [
   "https://solit03.com",
   "https://www.solit03.com",
+  "https://solit.id",
+  "https://www.solit.id",
   "http://localhost:5173",
   "http://localhost:3001",
   "http://localhost:3000",
@@ -14,7 +16,7 @@ const ALLOWED_ORIGINS = [
 
 function getCorsOrigin(req: NextRequest) {
   const origin = req.headers.get("origin") ?? "";
-  return ALLOWED_ORIGINS.includes(origin) ? origin : "*";
+  return ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
 }
 
 function sensorNama(nama: string): string {

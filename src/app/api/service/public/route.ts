@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
   const allowedOrigins = [
     "https://solit03.com",
     "https://www.solit03.com",
+    "https://solit.id",
+    "https://www.solit.id",
     "http://localhost:5173",
     "http://localhost:3001",
   ];
@@ -28,10 +30,6 @@ export async function GET(req: NextRequest) {
     "Cache-Control": "no-store",
   };
 
-  // Handle OPTIONS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
 
   const supabase = getAdmin();
 
