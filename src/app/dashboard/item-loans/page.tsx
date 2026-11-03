@@ -576,7 +576,6 @@ export default function ItemLoansPage() {
                             {([
                                 { k: "PENDING", l: "Menunggu" },
                                 { k: "APPROVED", l: "Sedang Dipinjam" },
-                                { k: "DIPESAN", l: "Di Pesan" },
                                 { k: "RETURN_PENDING", l: "Menunggu ACC Pengembalian" },
                                 { k: "HISTORY", l: "Riwayat" },
                             ] as const).map(t => {

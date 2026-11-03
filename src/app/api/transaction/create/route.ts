@@ -7,7 +7,7 @@ import { logActivity } from "@/lib/activityLogger";
 import { recordOutflow } from "@/lib/accessoryOutflow";
 import { ACCESSORY_ONLY_SALES_ROLES, UserRole } from "@/lib/permissions";
 import { buildLineItemsFromTxItems } from "@/lib/receiptItems";
-import { markLoansSoldOnSale, markLoansOrderedOnPending } from "@/lib/itemLoanSync";
+import { markLoansSoldOnSale } from "@/lib/itemLoanSync";
 
 function toNumber(value: any): number {
     if (value === null || value === undefined) return 0;
@@ -694,19 +694,17 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         // PENDING (DP/HELD/PACKING) unit BELUM terjual di sini, jadi sengaja
         // tidak disentuh — penutupan pinjamannya terjadi nanti di confirm-payment.
         // Non-blocking: gagal sinkron tidak membatalkan transaksi yang sukses.
-        if (txStatus === "PAID") {
+        // ✅ Peminjaman: unit yang dipakai di transaksi ini — LUNAS (PAID) MAUPUN
+        // PENDING (DP/Ambil Dulu/Packing) — kalau lagi DIPINJAM langsung jadi
+        // "Terjual" & pindah ke Riwayat. Kalau nanti transaksinya dibatalkan/
+        // di-restore, pinjaman balik "Dipinjam" lewat revertLoansOnCancel.
+        // Non-blocking: gagal sinkron tidak membatalkan transaksi yang sukses.
+        {
             const soldUnitIds = [
                 ...laptopUnitIds,
                 ...accessoryUnits.map(u => u.unit_id),
             ];
             try { await markLoansSoldOnSale(supabase, soldUnitIds, invoice_number); } catch { /* best-effort */ }
-        } else {
-            // ✅ Pending (DP/Ambil Dulu/Packing): unit yang LAGI DIPINJAM → pinjaman "DIPESAN".
-            const orderedUnitIds = [
-                ...laptopUnitIds,
-                ...accessoryUnits.map(u => u.unit_id),
-            ];
-            try { await markLoansOrderedOnPending(supabase, orderedUnitIds, invoice_number); } catch { /* best-effort */ }
         }
 
         // 10. Seller follow-up — SKIP untuk E-Commerce (PACKING), biar tidak masuk Manajemen Seller

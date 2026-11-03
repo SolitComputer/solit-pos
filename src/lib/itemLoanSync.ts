@@ -28,28 +28,6 @@ export async function markLoansSoldOnSale(
 }
 
 /**
- * Sales input transaksi PENDING pakai unit yang LAGI DIPINJAM (APPROVED) →
- * pinjaman jadi "DIPESAN" + dicatat invoice pemesanannya. Hanya APPROVED yang
- * disentuh. Best-effort.
- */
-export async function markLoansOrderedOnPending(
-  supabase: SupabaseClient,
-  unitIds: string[],
-  invoiceNumber: string,
-): Promise<void> {
-  const ids = Array.from(new Set((unitIds ?? []).filter(Boolean)));
-  if (ids.length === 0) return;
-
-  const { error } = await supabase
-    .from("item_loans")
-    .update({ status: "DIPESAN", ordered_invoice: invoiceNumber })
-    .in("unit_id", ids)
-    .eq("status", "APPROVED");
-
-  if (error) console.error("[markLoansOrderedOnPending]", error.message);
-}
-
-/**
  * Transaksi (pending ATAU lunas) dibatalkan/di-restore → pinjaman yang sempat
  * "DIPESAN"/"SOLD" KARENA transaksi ini balik ke "APPROVED" (Dipinjam).
  * Dicocokkan lewat invoice supaya tidak menyentuh pinjaman lain untuk unit yang
@@ -113,24 +91,44 @@ export async function revertLoansOnServiceCancel(
   if (error) console.error("[revertLoansOnServiceCancel]", error.message);
 } 
 /**
- * AUTO-REKONSILIASI pinjaman. Pinjaman aktif (APPROVED/DIPESAN) yang unitnya
- * SUDAH keluar permanen → ditutup "SOLD" & pindah ke Riwayat Peminjaman.
- *   - Aksesoris: status unit TERJUAL/KELUAR, ATAU outflow aktif dari service /
- *     pengambilan / transaksi yang SUDAH FINAL (bukan pending, bukan cancelled).
- *   - Laptop: status unit SOLD.
- * Transaksi pending (RESERVED/HELD/PACKING/PENDING) & CANCELLED TIDAK menutup
- * pinjaman. Idempoten & best-effort. Return: jumlah pinjaman yang ditutup.
+ * AUTO-REKONSILIASI pinjaman. "Di Pesan" (DIPESAN) sudah DIHAPUS — begitu unit
+ * dipakai di transaksi (PENDING maupun lunas) / service / pengambilan, pinjaman
+ * langsung jadi "Terjual" & pindah ke Riwayat.
+ *   0) Pinjaman DIPESAN lama → dikonversi jadi SOLD (sisa data lama).
+ *   1) Pinjaman aktif (APPROVED) yang unitnya sudah keluar → SOLD:
+ *      - Aksesoris: status TERJUAL/KELUAR, ATAU outflow aktif dari service /
+ *        pengambilan / transaksi yang BELUM dibatalkan (pending pun dihitung).
+ *      - Laptop: status unit SOLD.
+ * Hanya transaksi CANCELLED yang TIDAK menutup pinjaman. Idempoten & best-effort.
  */
 export async function reconcileClosedLoans(supabase: SupabaseClient): Promise<number> {
+  let closed = 0;
+
+  // 0) Fitur "Di Pesan" dihapus — DIPESAN lama → SOLD. ordered_invoice dipindah
+  //    ke sold_invoice supaya kalau transaksi pending-nya dibatalkan, pinjaman
+  //    tetap bisa balik "Dipinjam" lewat revertLoansOnCancel.
+  const { data: dipesan } = await supabase
+    .from("item_loans").select("id, ordered_invoice").eq("status", "DIPESAN");
+  if (dipesan && dipesan.length > 0) {
+    const ts = new Date().toISOString();
+    for (const l of dipesan) {
+      const { error } = await supabase.from("item_loans")
+        .update({ status: "SOLD", sold_at: ts, sold_invoice: l.ordered_invoice ?? "BACKFILL", ordered_invoice: null })
+        .eq("id", l.id).eq("status", "DIPESAN");
+      if (!error) closed++;
+    }
+  }
+
+  // 1) Pinjaman aktif (APPROVED) yang unitnya sudah keluar.
   const { data: loans } = await supabase
     .from("item_loans")
     .select("id, unit_id, item_type")
-    .in("status", ["APPROVED", "DIPESAN"])
+    .eq("status", "APPROVED")
     .not("unit_id", "is", null);
-  if (!loans || loans.length === 0) return 0;
+  if (!loans || loans.length === 0) return closed;
 
   const unitIds = Array.from(new Set(loans.map(l => l.unit_id).filter(Boolean))) as string[];
-  if (unitIds.length === 0) return 0;
+  if (unitIds.length === 0) return closed;
 
   const [accRes, lapRes, outRes] = await Promise.all([
     supabase.from("accessory_units").select("id, status").in("id", unitIds),
@@ -155,7 +153,9 @@ export async function reconcileClosedLoans(supabase: SupabaseClient): Promise<nu
     for (const t of txs ?? []) txStatus.set(t.invoice_number, t.status);
   }
 
-  const NOT_FINAL = new Set(["CANCELLED", "RESERVED", "HELD", "PACKING", "PENDING"]);
+  // Transaksi PENDING sekarang DIHITUNG "keluar" (pinjaman → Terjual). Hanya
+  // transaksi CANCELLED yang TIDAK menutup pinjaman.
+  const NOT_FINAL = new Set(["CANCELLED"]);
 
   const goneByOutflow = new Map<string, string>(); // unit_id -> ref sold_invoice
   for (const o of outflows) {
@@ -164,7 +164,7 @@ export async function reconcileClosedLoans(supabase: SupabaseClient): Promise<nu
     else if (o.source_type === "manual") goneByOutflow.set(o.unit_id, "PENGAMBILAN");
     else if (o.source_type === "transaction" && o.transaction_invoice) {
       const st = txStatus.get(o.transaction_invoice);
-      if (st && !NOT_FINAL.has(st)) goneByOutflow.set(o.unit_id, o.transaction_invoice);
+      if (!st || !NOT_FINAL.has(st)) goneByOutflow.set(o.unit_id, o.transaction_invoice);
     }
   }
 
@@ -186,13 +186,12 @@ export async function reconcileClosedLoans(supabase: SupabaseClient): Promise<nu
   }
 
   const nowIso = new Date().toISOString();
-  let closed = 0;
   for (const [ref, ids] of idsByRef) {
     const { error } = await supabase
       .from("item_loans")
       .update({ status: "SOLD", sold_at: nowIso, sold_invoice: ref })
       .in("id", ids)
-      .in("status", ["APPROVED", "DIPESAN"]);
+      .eq("status", "APPROVED");
     if (!error) closed += ids.length;
   }
   return closed;
