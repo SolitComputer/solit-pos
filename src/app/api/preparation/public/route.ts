@@ -135,7 +135,7 @@ export async function GET(req: NextRequest) {
 
     return {
       order_number: o.order_number,
-      nama: sensorNama(o.customer_name),
+      nama: o.customer_name ?? "—", 
       no_hp: sensorHp(o.customer_phone),
       status: o.status,
       qty,
