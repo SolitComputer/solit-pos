@@ -1004,7 +1004,10 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       // dipanggil ulang tiap edit, dan status unit ikut round-trip otomatis.
       await cancelOutflowByInvoice(invoice);
       for (const a of body.accessories) {
-        if (!a.accessory_id || Number(a.quantity) <= 0) continue;
+        // accId & unitId di-resolve DULU, baru diputuskan skip-nya (di bawah).
+        // Baris lama bisa punya accessory_id null (ditambah via modal versi lama)
+        // — jangan di-skip buta kalau SN-nya masih bisa dipakai nemu unit.
+        let accId = a.accessory_id ? String(a.accessory_id).trim() : null;
 
         // Resolusi unit SN: pakai unit_id dari form; kalau kosong (kasus re-edit,
         // unit_id tidak terbawa ulang dari GET) → backfill dari serial_number.
@@ -1016,13 +1019,16 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
           //   - case-insensitive (ilike), jadi beda kapital tidak bikin gagal
           //   - .limit(1) + ambil [0], bukan .maybeSingle() yang error diam-diam
           //     kalau kebetulan ada >1 baris SN mirip.
+          // ✅ FIX Bug A: lookup GLOBAL by SN (SN unik per unit) — TIDAK di-scope
+          // accessory_id, supaya baris yang accessory_id-nya null tetap ke-resolve.
+          // accessory_id lalu di-backfill dari unit yang ketemu.
           const { data: us } = await supabase
             .from("accessory_units")
-            .select("id")
-            .eq("accessory_id", a.accessory_id)
+            .select("id, accessory_id")
             .ilike("serial_number", accSn)
             .limit(1);
           unitId = us?.[0]?.id ?? null;
+          if (us?.[0]?.accessory_id && !accId) accId = String(us[0].accessory_id);
           // ⚠️ Kalau unit_id dari form kosong DAN lookup SN juga gagal, unit
           // TIDAK akan pernah di-set KELUAR → nyangkut muncul di Data Barang.
           // Biasanya karena SN di transaksi beda ejaan dengan SN di
@@ -1033,8 +1039,11 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
           }
         }
 
+             // Skip HANYA kalau benar-benar tak ada identitas (bukan cuma accessory_id kosong).
+        if (!accId || Number(a.quantity) <= 0) continue;
+
         await recordOutflow({
-          accessory_id: a.accessory_id,
+          accessory_id: accId,
           unit_id: unitId, // ✅ simpan unit_id → cancel/restore bisa balikin unit ini
           source_type: "transaction",
           transaction_invoice: invoice,
@@ -1072,13 +1081,13 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         const { data: acc } = await supabase
           .from("accessories")
           .select("stock")
-          .eq("id", a.accessory_id)
+          .eq("id", accId)
           .maybeSingle();
         if (acc) {
           await supabase
             .from("accessories")
             .update({ stock: Math.max(0, (Number(acc.stock) || 0) - Number(a.quantity)) })
-            .eq("id", a.accessory_id);
+            .eq("id", accId);
         }
       }
 
