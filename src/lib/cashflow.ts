@@ -28,7 +28,7 @@ export const CASHFLOW_CATEGORIES = {
   AKSESORIS: "Belanja Aksesoris",                    // 170
   SPAREPART_SERVICE: "Sparepart Service",            // 171
   DANA_MARKETING: "Dana Marketing",                  // 181
-  DOMPET_LAIN_LAIN: "Dompet Lain-lain",              // 190
+  DOMPET_LAIN_LAIN: "Dana Pensiun",                  // 190
   HUTANG: "Hutang",                                  // 210
   MODAL_LAPTOP_KELUAR: "Modal Laptop Keluar",        // 440
   BIAYA_PRINTILAN: "Biaya Printilan Barang",         // 450

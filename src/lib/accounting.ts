@@ -67,7 +67,7 @@ export const ACCOUNTS: Account[] = [
   { code: AKUN.DOMPET_FINANCE, name: "Dompet Finance", type: "ASET", normal: "DEBIT" },
   { code: AKUN.DOMPET_MARKETING, name: "Dompet Marketing", type: "ASET", normal: "DEBIT" },
   { code: AKUN.DOMPET_CEO, name: "Dompet CEO", type: "ASET", normal: "DEBIT" },
-  { code: AKUN.DOMPET_LAIN, name: "Dompet Lain-lain", type: "ASET", normal: "DEBIT" },
+  { code: AKUN.DOMPET_LAIN, name: "Dana Pensiun", type: "ASET", normal: "DEBIT" },
   { code: AKUN.ECOMMERS, name: "Ecommerce", type: "ASET", normal: "DEBIT" },
 
   // ── Hutang ──
