@@ -25,6 +25,7 @@ import {
 import { getAuthUser } from "@/hooks/useAuthUser";
 import TargetUserSelect from "@/components/kasbon/TargetUserSelect"; // ⬅️ BARU
 import BranchPaymentFields, { type BranchPaymentValue, cashSourceLabel } from "@/components/cashflow/BranchPaymentFields";
+import TesSinkronModal from "@/components/cashflow/TesSinkronModal"; // ⬅️ BARU — modal Tes Sinkron Kas vs Cashflow
 import CategorySelect, { getCategoryOptions, formatCategoryOptionLabel } from "@/components/cashflow/CategorySelect";
 import { CASHFLOW_ACCOUNT } from "@/lib/accounting"; // ⬅️ BARU: peta kategori → kode akun, dipakai CategoryBadge (ID samar)
 import InlineDateRange from "@/components/common/InlineDateRange"; // dipindah ke komponen bersama (dipakai juga di Laporan Marketing)
@@ -1840,7 +1841,8 @@ export default function CashflowPage() {
     const [customTo, setCustomTo] = useState("");
     const [showModal, setShowModal] = useState(false);
     const [showModalAwal, setShowModalAwal] = useState(false);
-    const [showIncomeModal, setShowIncomeModal] = useState(false);
+        const [showIncomeModal, setShowIncomeModal] = useState(false);
+    const [showTesSinkron, setShowTesSinkron] = useState(false); // ⬅️ BARU — modal Tes Sinkron
     const [detailEntry, setDetailEntry] = useState<Entry | null>(null);
     const [editEntry, setEditEntry] = useState<Entry | null>(null);
     const [showFilter, setShowFilter] = useState(false);
@@ -2274,6 +2276,7 @@ export default function CashflowPage() {
             {showModal && <ExpenseModal onClose={() => setShowModal(false)} onSaved={() => fetchData(true)} />}
             {showModalAwal && <ModalAwalModal onClose={() => setShowModalAwal(false)} onSaved={() => fetchData(true)} />}
             {showIncomeModal && <IncomeModal onClose={() => setShowIncomeModal(false)} onSaved={() => fetchData(true)} />}
+            {showTesSinkron && <TesSinkronModal onClose={() => setShowTesSinkron(false)} />}
             {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} onEdit={(e) => setEditEntry(e)} />}
             {editEntry && <EditEntryModal entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => fetchData(true)} />}
             {showAuditAccessModal && <AuditAccessModal onClose={() => setShowAuditAccessModal(false)} />}
@@ -2306,7 +2309,13 @@ export default function CashflowPage() {
                             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-200 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${BRAND_RING}`}
                             title="Export semua data cashflow ke Excel (2 sheet)">
                             <IconDownload />
-                            <span className="hidden sm:inline text-sm">{exporting ? "Mengekspor..." : "Export Excel"}</span>
+                                                       <span className="hidden sm:inline text-sm">{exporting ? "Mengekspor..." : "Export Excel"}</span>
+                        </button>
+                        <button onClick={() => setShowTesSinkron(true)} disabled={loading}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-violet-200 text-sm font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${BRAND_RING}`}
+                            title="Cek sinkronisasi saldo Kas (Buku Besar 110/120/121) dengan Saldo Cashflow per tanggal">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3 4 7l4 4" /><path d="M4 7h16" /><path d="m16 21 4-4-4-4" /><path d="M20 17H4" /></svg>
+                            <span className="hidden sm:inline text-sm">Tes Sinkron</span>
                         </button>
                         <button onClick={handleManualRefresh} disabled={loading || refreshing} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 hover:border-violet-200 hover:text-violet-700 active:scale-95 transition-all disabled:opacity-50 ${BRAND_RING}`}>
                             <span className={(loading || refreshing) ? "inline-flex animate-spin" : "inline-flex"}><IconRefresh /></span>
