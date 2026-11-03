@@ -449,6 +449,11 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
         selling_price: Number(it.selling_price ?? 0),
         is_bonus: Boolean(it.is_bonus || Number(it.deal_price) === 0),
         serial_number: it.serial_number && it.serial_number !== "-" ? it.serial_number : null,
+        // ✅ FIX: ikut kirim unit_id aksesoris supaya saat Edit disimpan ulang,
+        // PUT bisa nandai unit KELUAR lewat ID (reliable) — tidak bergantung
+        // lookup serial_number yang bisa gagal kalau SN di transaksi beda
+        // (typo/ejaan) dengan SN di accessory_units.
+        unit_id: it.unit_id ?? null,
       }));
 
     // Enrich names from accessories table if missing or generic
@@ -1006,12 +1011,26 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         let unitId = a.unit_id ? String(a.unit_id).trim() : null;
         const accSn = a.serial_number ? String(a.serial_number).trim() : null;
         if (!unitId && accSn) {
-          const { data: u } = await supabase
+          // ✅ FIX Bug A: lookup SN dibuat tahan banting —
+          //   - di-scope ke accessory_id yang sama
+          //   - case-insensitive (ilike), jadi beda kapital tidak bikin gagal
+          //   - .limit(1) + ambil [0], bukan .maybeSingle() yang error diam-diam
+          //     kalau kebetulan ada >1 baris SN mirip.
+          const { data: us } = await supabase
             .from("accessory_units")
             .select("id")
-            .eq("serial_number", accSn)
-            .maybeSingle();
-          unitId = u?.id ?? null;
+            .eq("accessory_id", a.accessory_id)
+            .ilike("serial_number", accSn)
+            .limit(1);
+          unitId = us?.[0]?.id ?? null;
+          // ⚠️ Kalau unit_id dari form kosong DAN lookup SN juga gagal, unit
+          // TIDAK akan pernah di-set KELUAR → nyangkut muncul di Data Barang.
+          // Biasanya karena SN di transaksi beda ejaan dengan SN di
+          // accessory_units (typo saat input). Di-log biar ketahuan, bukan
+          // gagal diam-diam.
+          if (!unitId) {
+            console.warn(`[PUT transaction] aksesoris SN "${accSn}" tidak ketemu di accessory_units — unit tidak bisa di-set KELUAR (cek ejaan SN).`);
+          }
         }
 
         await recordOutflow({
@@ -1035,11 +1054,17 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         // KELUAR gagal diam-diam → unit nyangkut "Belum Siap Jual" di Data
         // Barang padahal harusnya hilang. Terima dua-duanya.
         if (unitId) {
-          await supabase
+          // ✅ FIX Bug A: tambah error-check (dulu gagal diam-diam) + perluas guard
+          // ke status "aktif" lain. RESERVED/TERJUAL/KELUAR/RETURNED sengaja TIDAK
+          // disentuh supaya tidak menimpa unit yang sudah final.
+          const { error: keluarErr } = await supabase
             .from("accessory_units")
             .update({ status: "KELUAR" })
             .eq("id", unitId)
-            .in("status", ["TERSEDIA", "BELUM_SIAP"]);
+            .in("status", ["TERSEDIA", "SIAP_JUAL", "BELUM_SIAP", "MINUS_SIAP_JUAL", "DALAM_PENYIAPAN"]);
+          if (keluarErr) {
+            console.error(`[PUT transaction] gagal set KELUAR unit ${unitId}:`, keluarErr.message);
+          }
         }
 
         // Stok bulk tetap dikurangi seperti sebelumnya (kolom ini dipakai aksesoris
