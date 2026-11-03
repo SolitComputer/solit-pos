@@ -338,7 +338,7 @@ export default function ItemLoansPage() {
                 </div>
             );
         }
-        if (l.status === "APPROVED" && (canApprove || l.borrower_id === userId)) {
+        if (l.status === "APPROVED" && l.borrower_id === userId) {
             return (
                 <button onClick={() => act(l.id, "request-return")} disabled={actingId === l.id}
                     className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
@@ -728,7 +728,7 @@ export default function ItemLoansPage() {
                                                                             </button>
                                                                         </>
                                                                     )}
-                                                                    {(canApprove || g.borrower_id === userId) && approvedIds.length > 0 && (
+                                                                    {g.borrower_id === userId && approvedIds.length > 0 && (
                                                                         <button onClick={() => actMany(approvedIds, "request-return")} disabled={busy}
                                                                             className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
                                                                             <RotateCcw size={12} /> Ajukan Pengembalian Semua

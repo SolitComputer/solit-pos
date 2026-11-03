@@ -15,7 +15,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (!loan) return NextResponse.json({ success: false, message: "Data pinjaman tidak ditemukan" }, { status: 404 });
 
     // approve/reject/approve-return/reject-return = khusus role ACC.
-    // request-return = peminjam (pemilik) ATAU role ACC (boleh ajukan atas nama).
+    // request-return = HANYA peminjam (pemilik) — admin/approver pun TIDAK boleh.
     const userRoles = user.roles ?? [user.role];
     const isApprover = hasAnyRole(userRoles, ITEM_LOAN_APPROVE_ROLES);
     const isBorrower = loan.borrower_id === user.id;
@@ -32,7 +32,8 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         return NextResponse.json({ success: false, message: "Pengajuan sudah diproses" }, { status: 409 });
       updates = { status: "REJECTED", approved_by: user.id, approved_by_name: user.name, approved_at: new Date().toISOString() };
     } else if (action === "request-return") {
-      if (!isBorrower && !isApprover) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+      // ✅ Hanya PEMINJAM yang boleh ajukan pengembalian — admin/approver pun tidak.
+      if (!isBorrower) return NextResponse.json({ success: false, message: "Hanya peminjam yang bisa mengajukan pengembalian barangnya sendiri" }, { status: 403 });
       if (loan.status !== "APPROVED")
         return NextResponse.json({ success: false, message: "Hanya pinjaman aktif yang bisa diajukan pengembalian" }, { status: 409 });
       updates = { status: "RETURN_PENDING" };
