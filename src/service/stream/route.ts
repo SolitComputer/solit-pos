@@ -42,7 +42,7 @@ async function fetchCurrentOrders() {
 
   return (data ?? []).map((o) => ({
     no_urut: o.no_urut,
-    nama: sensorNama(o.nama),
+    nama: o.nama,
     type_laptop: o.type_laptop,
     status: o.status,
     tanggal_masuk: o.tanggal_masuk,

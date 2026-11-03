@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
   // Sensor nama customer: nama depan + inisial belakang. cth: "Budi Santoso" → "Budi S."
   const sanitized = (data ?? []).map((o: any) => ({
     no_urut: o.no_urut,
-    nama: sensorNama(o.nama),
+    nama: o.nama,
     type_laptop: o.type_laptop,
     teknisi: o.teknisi?.name ?? null, // ratakan object { name } → string utk frontend
     status: o.status,
