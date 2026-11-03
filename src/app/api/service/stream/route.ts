@@ -38,25 +38,15 @@ async function fetchPublicOrders() {
     { auth: { persistSession: false } }
   );
 
-  // DONE hanya tampil 3 hari terakhir
-  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-
-  const { data: aktif } = await supabase
+  // Samakan dengan /api/service/public: tampil sampai diambil (A1), tanpa batas
+  // 3 hari, dan GAGAL_DIPERBAIKI tidak ditampilkan.
+  const { data } = await supabase
     .from("service_orders")
     .select(SELECT_COLS)
-    .in("status", ["ANTRIAN", "SEDANG_DIKERJAKAN", "MENUNGGU_SPAREPART", "GAGAL_DIPERBAIKI"])
+    .in("status", ["ANTRIAN", "SEDANG_DIKERJAKAN", "MENUNGGU_SPAREPART", "DONE"])
     .order("no_urut", { ascending: true });
 
-  const { data: done } = await supabase
-    .from("service_orders")
-    .select(SELECT_COLS)
-    .eq("status", "DONE")
-    .gte("tanggal_selesai", threeDaysAgo) // ✅ DONE hanya 3 hari
-    .order("no_urut", { ascending: true });
-
-  const all = [...(aktif ?? []), ...(done ?? [])].sort((a: any, b: any) => a.no_urut - b.no_urut);
-
-  return all.map((o: any) => ({
+  return (data ?? []).map((o: any) => ({
     no_urut: o.no_urut,
     nama: sensorNama(o.nama),
     type_laptop: o.type_laptop,
