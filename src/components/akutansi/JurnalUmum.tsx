@@ -47,7 +47,7 @@ interface JournalEntry {
     keterangan: string;
     ref: string | null;
     journal_no?: string | null; // ⬅️ BARU — kode jurnal GJ-YYYYMMDD-NNN (entry baru)
-    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN";
+    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN" | "SALARY";
     source_id: string | null;
     branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU — tag cabang dari journal_entries
     total: number;
@@ -73,7 +73,7 @@ interface JournalEntry {
 }
 
 interface PendingDraft {
-    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "KEBUTUHAN";
+    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "KEBUTUHAN" | "SALARY";
     source_id: string;
     branch?: "UTAMA" | "JOGJA"; // ⬅️ BARU — tag cabang dari draft
     tanggal: string;
@@ -116,6 +116,8 @@ const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
     SPAREPART_SERVICE: { label: "Service", color: "bg-violet-50 text-violet-700 border-violet-200" },
     // Kebutuhan: modal aksesoris pindah ke laptop (Pengambilan Barang).
     KEBUTUHAN: { label: "Kebutuhan", color: "bg-cyan-50 text-cyan-700 border-cyan-200" },
+    // Gaji: draft dari slip gaji karyawan yang sudah Final.
+    SALARY: { label: "Gaji", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };
 
 const SOURCE_GROUP_RANK: Record<string, number> = {
@@ -124,6 +126,7 @@ const SOURCE_GROUP_RANK: Record<string, number> = {
     TRANSACTION: 2,
     CASHFLOW: 3,
     KEBUTUHAN: 4,
+    SALARY: 5,
 };
 
 const key = (d: { source_type: string; source_id: string }) => `${d.source_type}:${d.source_id}`;
