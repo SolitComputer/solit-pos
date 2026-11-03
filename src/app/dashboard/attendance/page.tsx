@@ -12,6 +12,7 @@ import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
 import { canManageAttendance, DIVISION_MAP, isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
 import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
+import { resolveBranchByLocation } from "@/lib/attendanceLocations"; // ✅ NEW — jarak diukur ke cabang terdekat
 import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Inbox, CalendarDays, GraduationCap, Briefcase, Trophy } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
 import type ExcelJS from "exceljs";
@@ -172,8 +173,7 @@ const PKL_LATE_RATE = 5000;
 const CHECKOUT_REQUIRED_FROM = "2026-08-13";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
-const OFFICE_LAT = -6.402593;
-const OFFICE_LNG = 106.787233;
+// Titik kantor per cabang ada di src/lib/attendanceLocations.ts (dipakai badge jarak).
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
@@ -235,12 +235,6 @@ const ABSENCE_REASON_LABELS: Record<AbsenceReason, { label: string; emoji: strin
     NO_CHECKOUT: { label: "Tidak Absen Pulang", emoji: "clock", bg: "bg-orange-50", color: "text-orange-600", border: "border-orange-200" },
 };
 
-
-function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
-    const R = 6371000, dLat = ((lat2 - lat1) * Math.PI) / 180, dLng = ((lng2 - lng1) * Math.PI) / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function toWIBTime(iso: string): string {
     return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
@@ -6524,13 +6518,21 @@ export default function AttendanceDashboardPage() {
                                                                     {a.source === "MANUAL" ? "Manual" : a.method === "FACE" ? "Wajah" : a.method === "BIOMETRIC" ? "Sidik Jari" : "Skip"}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-4">
-                                                                {a.latitude && a.longitude ? (
-                                                                    <a href={`https://maps.google.com/?q=${a.latitude},${a.longitude}`} target="_blank" rel="noopener noreferrer"
-                                                                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-full border no-underline transition-all hover:shadow-md ${Math.round(haversine(a.latitude, a.longitude, OFFICE_LAT, OFFICE_LNG)) <= 80 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>
-                                                                        {Math.round(haversine(a.latitude, a.longitude, OFFICE_LAT, OFFICE_LNG))}m
-                                                                    </a>
-                                                                ) : <span className="text-[10px] text-gray-200 font-bold">—</span>}
+                                                                                                                   <td className="px-4 py-4">
+                                                                {a.latitude && a.longitude ? (() => {
+                                                                    // ✅ NEW — ukur ke cabang TERDEKAT (Depok/UTAMA atau Jogja),
+                                                                    // bukan lagi cuma ke titik Depok. Hijau = dalam radius cabang,
+                                                                    // merah = di luar semua cabang.
+                                                                    const geo = resolveBranchByLocation(a.latitude, a.longitude);
+                                                                    const inRange = geo.branch !== null;
+                                                                    return (
+                                                                        <a href={`https://maps.google.com/?q=${a.latitude},${a.longitude}`} target="_blank" rel="noopener noreferrer"
+                                                                            title={`${geo.nearest.label}${inRange ? "" : " — di luar radius"}`}
+                                                                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-full border no-underline transition-all hover:shadow-md ${inRange ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>
+                                                                            {geo.nearestDistance}m
+                                                                        </a>
+                                                                    );
+                                                                })() : <span className="text-[10px] text-gray-200 font-bold">—</span>}
                                                             </td>
                                                             <td className="px-4 py-4 hidden lg:table-cell">
                                                                 <div className="space-y-0.5">
