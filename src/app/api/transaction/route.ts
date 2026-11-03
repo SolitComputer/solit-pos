@@ -584,8 +584,10 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
               name: it.item_name || it.laptop_name || "Aksesori",
               quantity: Number(it.quantity) || 1,
               deal_price: Number(it.deal_price ?? 0),
-              selling_price: Number(it.selling_price ?? 0),
+                          selling_price: Number(it.selling_price ?? 0),
               is_bonus: Boolean(it.is_bonus || Number(it.deal_price) === 0),
+              // ✅ FIX Bug B: ikutkan SN aksesoris supaya tampil di list Riwayat Transaksi.
+              serial_number: it.serial_number && it.serial_number !== "-" ? it.serial_number : null,
             }));
           if (fromTxItems.length > 0) return fromTxItems;
 
@@ -596,8 +598,9 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             name: o.name,
             quantity: o.qty,
             deal_price: 0,
-            selling_price: o.buy_price,
+                     selling_price: o.buy_price,
             is_bonus: false,
+            serial_number: null, // fallback outflow tak menyimpan SN per unit
           }));
         })(),
         is_multi_laptop: grouped_items.length > 1,

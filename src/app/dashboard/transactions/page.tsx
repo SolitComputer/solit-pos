@@ -1723,6 +1723,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
         {accs.map((a: any, idx: number) => (
           <div key={idx} className="text-[10px] font-semibold text-emerald-700 leading-snug truncate">
             {a.name} <span className="text-gray-400 font-normal">({a.quantity}x)</span>
+            {a.serial_number && <span className="ml-1 font-mono text-[9px] text-gray-400">· {a.serial_number}</span>}
           </div>
         ))}
       </div>
@@ -1766,6 +1767,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
           {accs.map((a: any, idx: number) => (
             <div key={idx} className="text-xs font-bold text-emerald-700 leading-snug truncate">
               {a.name} <span className="text-[10px] text-gray-400 font-normal">({a.quantity}x)</span>
+              {a.serial_number && <span className="ml-1 font-mono text-[9px] text-gray-400">· {a.serial_number}</span>}
             </div>
           ))}
         </div>
@@ -2704,19 +2706,24 @@ function EditTransactionModal({
     }
     setSearchingAcc(true);
     try {
-      // ✅ Cari by SERIAL NUMBER (param ?sn=). Endpoint balikin 1 baris per unit
-      // fisik: { accessory_id, name, deal_price, selling_price, serial_number, unit_id }.
-      const res = await fetch(`/api/accessories/search?sn=${encodeURIComponent(q.trim())}`);
+      // ✅ FIX: endpoint lama (/api/accessories/search) baca param ?q= & query
+      // tabel `accessories` (level model) — TIDAK pernah balikin serial_number/
+      // unit_id, jadi aksesoris yang ditambah lewat modal ini tak punya unit_id
+      // → di PUT loop ke-`continue` (accessory_id null) → unit tak pernah KELUAR.
+      // Pindah ke /api/accessory-units/search-sn (1 baris per UNIT fisik), persis
+      // seperti halaman Edit penuh. Field: { id(=unit_id), serial_number,
+      // accessory_id, accessory_name, selling_price(jual), buy_price(modal) }.
+      const res = await fetch(`/api/accessory-units/search-sn?q=${encodeURIComponent(q.trim())}`);
       const json = await res.json();
       if (json.success) {
-        // Dedup pakai serial_number / unit_id — BUKAN accessory_id — karena 1
-        // model aksesoris bisa punya banyak unit SN berbeda.
+        // Dedup pakai serial_number / unit_id (= field `id`) — BUKAN accessory_id,
+        // karena 1 model aksesoris bisa punya banyak unit SN berbeda.
         const usedSN = new Set(accessories.map((a) => (a.serial_number ?? "").toUpperCase()).filter(Boolean));
         const usedUnitIds = new Set(accessories.map((a) => a.unit_id).filter(Boolean));
         setAccResults(
           (json.data || []).filter(
             (a: any) =>
-              !usedUnitIds.has(a.unit_id) &&
+              !usedUnitIds.has(a.id) &&
               !usedSN.has(String(a.serial_number ?? "").toUpperCase())
           )
         );
@@ -2732,14 +2739,14 @@ function EditTransactionModal({
     setAccessories((prev) => [
       ...prev,
       {
-        accessory_id: a.accessory_id,              // ← endpoint SN balikin accessory_id, bukan id
-        name: a.name,
-        quantity: 1,                               // ← 1 SN = 1 unit fisik, dikunci
-        deal_price: Number(a.deal_price ?? 0),     // harga jual
-        selling_price: Number(a.selling_price ?? 0), // harga modal
+        accessory_id: a.accessory_id,                 // search-sn balikin accessory_id (bukan id unit)
+        name: a.accessory_name || a.display_name || "Aksesori",
+        quantity: 1,                                  // 1 SN = 1 unit fisik, dikunci
+        deal_price: Number(a.selling_price ?? 0),     // selling_price = harga jual
+        selling_price: Number(a.buy_price ?? 0),      // buy_price = harga modal
         is_bonus: false,
-        serial_number: a.serial_number,            // ✅ SN unit terpilih
-        unit_id: a.unit_id,                        // ✅ id unit di accessory_units
+        serial_number: a.serial_number,               // ✅ SN unit terpilih
+        unit_id: a.id,                                // ✅ field `id` = unit_id di accessory_units
       },
     ]);
     // Panel dibiarkan TERBUKA + search dikosongkan → bisa langsung scan SN
@@ -3027,17 +3034,17 @@ function EditTransactionModal({
                 {accResults.length > 0 && (
                   <div className="border border-purple-200 rounded-lg bg-white divide-y divide-gray-100 max-h-36 overflow-y-auto shadow-md">
                     {accResults.map((res) => (
-                      <button
-                        key={res.unit_id ?? res.serial_number}
+                                          <button
+                        key={res.id ?? res.serial_number}
                         type="button"
                         onClick={() => handleAddAccessory(res)}
                         className="w-full px-3 py-1.5 text-left text-xs hover:bg-purple-50 flex items-center justify-between gap-2 transition"
                       >
                         <span className="min-w-0">
-                          <span className="font-medium text-gray-800 truncate block">{res.name}</span>
+                          <span className="font-medium text-gray-800 truncate block">{res.accessory_name || res.display_name || "Aksesori"}</span>
                           <span className="font-mono text-[10px] text-gray-400">SN: {res.serial_number}</span>
                         </span>
-                        <span className="font-mono text-purple-700 font-bold shrink-0">{fmtRupiah(res.deal_price)}</span>
+                        <span className="font-mono text-purple-700 font-bold shrink-0">{fmtRupiah(res.selling_price)}</span>
                       </button>
                     ))}
                   </div>
