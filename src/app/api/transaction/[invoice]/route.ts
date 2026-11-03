@@ -449,6 +449,11 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
         selling_price: Number(it.selling_price ?? 0),
         is_bonus: Boolean(it.is_bonus || Number(it.deal_price) === 0),
         serial_number: it.serial_number && it.serial_number !== "-" ? it.serial_number : null,
+        // ✅ FIX: ikut kirim unit_id aksesoris supaya saat Edit disimpan ulang,
+        // PUT bisa nandai unit KELUAR lewat ID (reliable) — tidak bergantung
+        // lookup serial_number yang bisa gagal kalau SN di transaksi beda
+        // (typo/ejaan) dengan SN di accessory_units.
+        unit_id: it.unit_id ?? null,
       }));
 
     // Enrich names from accessories table if missing or generic
@@ -1012,6 +1017,14 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
             .eq("serial_number", accSn)
             .maybeSingle();
           unitId = u?.id ?? null;
+          // ⚠️ Kalau unit_id dari form kosong DAN lookup SN juga gagal, unit
+          // TIDAK akan pernah di-set KELUAR → nyangkut muncul di Data Barang.
+          // Biasanya karena SN di transaksi beda ejaan dengan SN di
+          // accessory_units (typo saat input). Di-log biar ketahuan, bukan
+          // gagal diam-diam.
+          if (!unitId) {
+            console.warn(`[PUT transaction] aksesoris SN "${accSn}" tidak ketemu di accessory_units — unit tidak bisa di-set KELUAR (cek ejaan SN).`);
+          }
         }
 
         await recordOutflow({
@@ -1039,7 +1052,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
             .from("accessory_units")
             .update({ status: "KELUAR" })
             .eq("id", unitId)
-            .in("status", ["TERSEDIA", "BELUM_SIAP"]);
+            .in("status", ["TERSEDIA", "SIAP_JUAL", "BELUM_SIAP"]);
         }
 
         // Stok bulk tetap dikurangi seperti sebelumnya (kolom ini dipakai aksesoris
