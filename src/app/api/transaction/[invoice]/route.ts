@@ -1024,17 +1024,22 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
           taken_by_role: "SALES",
         });
 
-        // ✅ Tandai unit SN-nya KELUAR (atomic, cuma kalau masih TERSEDIA) supaya
-        // HILANG dari Data Barang & halaman Kelola Unit. Dipilih "KELUAR" (bukan
-        // "TERJUAL") karena status itulah yang sudah di-hide di semua halaman unit,
-        // DAN restockActiveOutflows mengembalikannya ke TERSEDIA saat transaksi
-        // dibatalkan — jadi unit otomatis muncul lagi kalau di-restore.
+        // ✅ Tandai unit SN-nya KELUAR supaya HILANG dari Data Barang & halaman
+        // Kelola Unit. Dipilih "KELUAR" (bukan "TERJUAL") karena status itulah
+        // yang sudah di-hide di semua halaman unit.
+        // ⚠️ FIX: guard dulu cuma `.eq("status","TERSEDIA")`. Padahal
+        // cancelOutflowByInvoice() di atas (via restockActiveOutflows)
+        // mengembalikan unit yang MASIH dipakai transaksi ini ke BELUM_SIAP,
+        // BUKAN TERSEDIA. Jadi saat transaksi di-EDIT ulang, unit yang tetap
+        // dipakai sudah jadi BELUM_SIAP → guard TERSEDIA tidak match → update
+        // KELUAR gagal diam-diam → unit nyangkut "Belum Siap Jual" di Data
+        // Barang padahal harusnya hilang. Terima dua-duanya.
         if (unitId) {
           await supabase
             .from("accessory_units")
             .update({ status: "KELUAR" })
             .eq("id", unitId)
-            .eq("status", "TERSEDIA");
+            .in("status", ["TERSEDIA", "BELUM_SIAP"]);
         }
 
         // Stok bulk tetap dikurangi seperti sebelumnya (kolom ini dipakai aksesoris
