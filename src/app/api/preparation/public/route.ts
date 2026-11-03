@@ -1,5 +1,6 @@
 // src/app/api/preparation/public/route.ts
-// PUBLIC — penyiapan untuk display board solit03.com (tanpa auth, CORS). Niru service/public.
+// PUBLIC — penyiapan untuk board solit03.com. Pakai kolom native received_*/done_*,
+// + enrichment type barang & spek (cpu/ram/storage) dari item utama tiap order.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -26,10 +27,19 @@ function getCorsOrigin(req: NextRequest) {
   return ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
 }
 
-// Status penyiapan yang tampil di board publik (Menunggu → Diproses → Selesai)
-const PUBLIC_STATUSES = ["MENUNGGU", "DIPROSES", "SELESAI"];
+// Barang masih di toko → tampil. DIKIRIM/SELESAI/DIBATALKAN tidak tampil.
+const PUBLIC_STATUSES = ["MENUNGGU", "DIPROSES", "SIAP_KIRIM"];
 
-function sensorNama(nama: string): string {
+// 00:00 WIB hari ini dalam ISO (untuk filter "data hari ini saja")
+function startOfTodayWIBISO(): string {
+  const nowWIB = new Date(Date.now() + 7 * 3600_000);
+  const y = nowWIB.getUTCFullYear();
+  const m = nowWIB.getUTCMonth();
+  const d = nowWIB.getUTCDate();
+  return new Date(Date.UTC(y, m, d, -7, 0, 0)).toISOString();
+}
+
+function sensorNama(nama: string | null): string {
   if (!nama) return "—";
   const parts = nama.trim().split(/\s+/);
   if (parts.length === 1) return parts[0];
@@ -55,15 +65,15 @@ export async function GET(req: NextRequest) {
 
   const supabase = getAdmin();
 
-  // SELESAI hanya 1 hari terakhir biar board tidak penuh riwayat lama
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
+  const { data: orders, error } = await supabase
     .from("preparation_orders")
-    .select("order_number, customer_name, customer_phone, status, created_at, scheduled_delivery_date, created_by_name, preparation_items(id)")
+    .select(
+      `order_number, customer_name, customer_phone, status, created_at, received_by_name, received_at, done_at,
+       preparation_items ( serial_number, laptop_name, laptop_id, item_type, is_cancelled )`
+    )
     .in("status", PUBLIC_STATUSES)
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .gte("created_at", startOfTodayWIBISO()) // reset harian
+    .order("created_at", { ascending: false }); // terbaru dulu
 
   if (error) {
     return NextResponse.json(
@@ -72,20 +82,71 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const filtered = (data ?? []).filter((o: any) =>
-    o.status !== "SELESAI" ? true : o.created_at >= oneDayAgo
-  );
+  // ── Enrichment type barang + spek (pola sama dengan GET /api/preparation/[id]) ──
+  const allItems = (orders ?? []).flatMap((o: any) => o.preparation_items ?? []);
+  const laptopItems = allItems.filter((it: any) => it.item_type !== "accessory" && !it.is_cancelled);
 
-  const sanitized = filtered.map((o: any) => ({
-    order_number: o.order_number,
-    nama: sensorNama(o.customer_name),
-    no_hp: sensorHp(o.customer_phone),
-    status: o.status,
-    qty: Array.isArray(o.preparation_items) ? o.preparation_items.length : 0,
-    created_at: o.created_at,
-    scheduled_delivery_date: o.scheduled_delivery_date ?? null,
-    penyedia: o.created_by_name ?? null,
-  }));
+  // resolve laptop_id dari SN untuk item yang belum punya
+  const missingSns = [
+    ...new Set(laptopItems.filter((it: any) => !it.laptop_id && it.serial_number).map((it: any) => it.serial_number)),
+  ] as string[];
+  let snToLaptop = new Map<string, string>();
+  if (missingSns.length > 0) {
+    const { data: units } = await supabase
+      .from("laptop_units")
+      .select("serial_number, laptop_id")
+      .in("serial_number", missingSns);
+    snToLaptop = new Map((units ?? []).filter((u: any) => u.laptop_id).map((u: any) => [u.serial_number, u.laptop_id]));
+  }
+
+  const laptopIds = [
+    ...new Set(laptopItems.map((it: any) => it.laptop_id ?? snToLaptop.get(it.serial_number)).filter(Boolean)),
+  ] as string[];
+  let laptopMap = new Map<string, any>();
+  if (laptopIds.length > 0) {
+    const { data: laptops } = await supabase
+      .from("laptops")
+      .select("id, laptop_name, cpu, ram, storage")
+      .in("id", laptopIds);
+    laptopMap = new Map((laptops ?? []).map((l: any) => [l.id, l]));
+  }
+
+  const sanitized = (orders ?? []).map((o: any) => {
+    const items = o.preparation_items ?? [];
+    // model utama = laptop pertama yang belum dibatalkan (fallback item pertama)
+    const primary =
+      items.find((it: any) => it.item_type !== "accessory" && !it.is_cancelled) ??
+      items.find((it: any) => !it.is_cancelled) ??
+      items[0] ??
+      null;
+
+    let type_barang: string | null = primary?.laptop_name ?? null;
+    let spek: { cpu: string | null; ram: string | null; storage: string | null } | null = null;
+    if (primary) {
+      const lid = primary.laptop_id ?? snToLaptop.get(primary.serial_number) ?? null;
+      const lap = lid ? laptopMap.get(lid) : null;
+      if (lap) {
+        type_barang = type_barang ?? lap.laptop_name ?? null;
+        spek = { cpu: lap.cpu ?? null, ram: lap.ram ?? null, storage: lap.storage ?? null };
+      }
+    }
+
+    const qty = items.filter((it: any) => !it.is_cancelled).length;
+
+    return {
+      order_number: o.order_number,
+      nama: sensorNama(o.customer_name),
+      no_hp: sensorHp(o.customer_phone),
+      status: o.status,
+      qty,
+      type_barang: type_barang ?? "—",
+      spek, // { cpu, ram, storage } | null
+      disiapkan_oleh: o.received_by_name ?? null, // titik 2
+      tanggal_masuk: o.created_at,                // titik 1
+      tanggal_diproses: o.received_at ?? null,    // titik 2 (native)
+      tanggal_selesai: o.done_at ?? null,         // titik 3 (native)
+    };
+  });
 
   return NextResponse.json(
     { success: true, data: sanitized, total: sanitized.length },

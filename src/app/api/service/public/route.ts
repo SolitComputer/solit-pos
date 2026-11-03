@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from("service_orders")
     .select("no_urut, nama, type_laptop, keluhan, status, tanggal_masuk, tanggal_selesai, teknisi:users!service_orders_dikerjakan_by_fkey(name)")
-    .in("status", ["ANTRIAN", "SEDANG_DIKERJAKAN", "MENUNGGU_SPAREPART", "GAGAL_DIPERBAIKI", "DONE"])
+    .in("status", ["ANTRIAN", "SEDANG_DIKERJAKAN", "MENUNGGU_SPAREPART", "DONE"])
     .order("no_urut", { ascending: true });
 
   if (error) {
