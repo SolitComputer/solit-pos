@@ -13,9 +13,16 @@ import {
   kasAccountFromPaymentMethod,
   mergeLines,
   periodFromDate,
+  periodLabel,
   periodRange,
   totalOf,
 } from "@/lib/accounting";
+import {
+  buildSalaryJournalLines,
+  isSalaryAccountingEligible,
+  isPKLRole,
+  lastDayOfMonthStr,
+} from "@/lib/salaryAccounting";
 
 export interface JournalDraft {
   source_type: DerivedSourceType;
@@ -2126,13 +2133,74 @@ async function buildItemReturnReversalDrafts(
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
+// ── GAJI: slip Final → draft jurnal 5-baris utk dikonfirmasi ─────────────────
+// Sumber = salary_slips FINALIZED pada periode ini (non-PKL). Jurnal dirakit dari
+// data slip (bukan cashflow, biar breakdown kasbon/cicilan/pensiun utuh). Tanggal
+// = hari terakhir bulan slip. source_id = id slip → anti-dobel via getPostedKeys
+// begitu di-confirm. Hanya mulai Okt 2026 (SALARY_ACCOUNTING_START).
+async function buildSalaryDrafts(
+  supabase: SupabaseClient,
+  period: string
+): Promise<JournalDraft[]> {
+  const [yStr, mStr] = period.split("-");
+  const year = Number(yStr);
+  const month = Number(mStr);
+  if (!isSalaryAccountingEligible(year, month)) return [];
+
+  const { data: slips, error } = await supabase
+    .from("salary_slips")
+    .select("id, user_id, total_income, net_salary, deduction_loan, deduction_cicilan, deduction_pension, cashflow_entry_id")
+    .eq("year", year)
+    .eq("month", month)
+    .eq("status", "FINALIZED");
+
+  if (error) {
+    console.error("[akuntansi] fetch salary slips:", error.message);
+    return [];
+  }
+  if (!slips || slips.length === 0) return [];
+
+  const userIds = [...new Set((slips as any[]).map((s) => s.user_id).filter(Boolean))];
+  const infoById = new Map<string, { name: string; role: string }>();
+  if (userIds.length > 0) {
+    const { data: users } = await supabase.from("users").select("id, name, role").in("id", userIds);
+    for (const u of (users ?? []) as any[]) infoById.set(u.id, { name: u.name, role: u.role });
+  }
+
+  const tanggal = lastDayOfMonthStr(year, month);
+  const drafts: JournalDraft[] = [];
+
+  for (const s of slips as any[]) {
+    const info = infoById.get(s.user_id);
+    if (info && isPKLRole(info.role)) continue; // PKL tidak dijurnal
+    const built = buildSalaryJournalLines(s);
+    if (!built.ok) continue; // bruto 0 / tidak balance → bukan draft
+    const empName = info?.name ?? "Karyawan";
+    drafts.push({
+      source_type: "SALARY",
+      source_id: String(s.id),
+      source_category: "SALARY_SLIP",
+      tanggal,
+      sort_ts: `${tanggal}T00:00:00+07:00`,
+      keterangan: `Gaji ${periodLabel(period)} - ${empName}`,
+      ref: s.cashflow_entry_id ? String(s.cashflow_entry_id) : null,
+      lines: built.lines,
+      total: Math.round(Number(s.total_income || 0)),
+      branch: "UTAMA",
+      meta: { kind: "SALARY", user_id: s.user_id },
+    });
+  }
+
+  return drafts;
+}
+
 export async function buildDraftsForPeriod(
   supabase: SupabaseClient,
   period: string
 ): Promise<JournalDraft[]> {
   const { startISO, endISO, startDate, endDateExclusive } = periodRange(period);
 
-  const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal, sparepart, itemReturn, itemReturnReversal] = await Promise.all([
+    const [tx, accrual, pay, svc, cf, reversal, kebutuhan, kebutuhanReversal, sparepart, itemReturn, itemReturnReversal, salary] = await Promise.all([
     buildTransactionDrafts(supabase, startISO, endISO),
     buildTransactionAccrualDrafts(supabase, startISO, endISO),
     buildTransactionPaymentDrafts(supabase, startISO, endISO),
@@ -2144,9 +2212,10 @@ export async function buildDraftsForPeriod(
     buildSparepartDrafts(supabase, period), //  NEW
     buildItemReturnDrafts(supabase, startISO, endISO),         // ⬅️ retur masuk pending
     buildItemReturnReversalDrafts(supabase, startISO, endISO), // ⬅️ pembatalan retur masuk pending
+    buildSalaryDrafts(supabase, period),                       // ⬅️ BARU — gaji Final → draft jurnal
   ]);
 
-  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan, ...kebutuhanReversal, ...sparepart, ...itemReturn, ...itemReturnReversal].sort((a, b) => {
+  return [...tx, ...accrual, ...pay, ...svc, ...cf, ...reversal, ...kebutuhan, ...kebutuhanReversal, ...sparepart, ...itemReturn, ...itemReturnReversal, ...salary].sort((a, b) => {
     if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
     return a.sort_ts.localeCompare(b.sort_ts);
   });
