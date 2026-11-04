@@ -118,7 +118,7 @@ const BRAND_FOCUS = "focus:ring-2 focus:ring-violet-500/20 focus:border-violet-3
 const BRAND_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 // ⬅️ BARU: shadow berlapis (bukan cuma satu shadow rata) + ring tipis buat kedalaman
 // yang lebih halus dibanding border polos — dipakai di semua kartu utama.
-const CARD_BASE = "bg-white rounded-2xl border border-gray-100 ring-1 ring-black/[0.02] shadow-[0_1px_2px_rgba(15,12,41,0.04),0_6px_16px_-8px_rgba(15,12,41,0.08)]";
+const CARD_BASE = "bg-white rounded-2xl border border-gray-100 ring-1 ring-black/[0.02] shadow-[0_1px_2px_rgba(15,12,41,0.04),0_6px_16px_-8px_rgba(15,12,41,0.08)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_2px_rgba(0,0,0,0.4),0_10px_28px_-12px_rgba(0,0,0,0.85)]";
 
 // ⬅️ BARU: avatar inisial berwarna buat nama pengisi/customer di tabel & kartu mobile —
 // warnanya deterministik dari nama (hash sederhana), murni presentasional, tidak
@@ -2537,7 +2537,7 @@ export default function CashflowPage() {
                     </div>
                 )}
                 {tab === "IN" && (
-                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-blue-50/80 border border-blue-100 shadow-sm text-[12px] text-blue-700">
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 shadow-sm text-[12px] text-blue-700">
                         <IconInfo />
                         <span>Klik baris untuk membuka sumbernya di <b>Riwayat Transaksi</b> atau <b>Service</b>. Uang masuk otomatis sync dari transaksi PAID & service DONE sejak <b>{startDateFormatted}</b>.</span>
                     </div>
@@ -2634,7 +2634,7 @@ export default function CashflowPage() {
                         <div className="hidden sm:block overflow-x-auto">
                             <table className="w-full text-sm" style={{ minWidth: 860 }}>
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b-2 border-gray-100">
+                                    <tr className="bg-gray-50/80 dark:bg-white/[0.03] border-b-2 border-gray-100">
                                         {[
                                             { label: "Tanggal", align: "left" },
                                             { label: "Sumber", align: "left" },
@@ -2679,10 +2679,10 @@ export default function CashflowPage() {
                                             const isClickable = clickable(e);
                                             // ⬅️ BARU: zebra striping halus buat keterbacaan baris — tetap kalah prioritas
                                             // dari state voided/audited di bawah, jadi tidak mengubah makna warna yang sudah ada.
-                                            const zebra = idx % 2 === 1 ? "bg-gray-50/40" : "";
+                                            const zebra = idx % 2 === 1 ? "bg-gray-50/40 dark:bg-white/[0.02]" : "";
                                             return (
                                                 <tr key={e.id} onClick={() => isClickable && handleRowClick(e)}
-                                                    className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : zebra} ${isClickable ? "cursor-pointer hover:bg-violet-50/40" : "hover:bg-gray-50/50"}`}>
+                                                    className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : zebra} ${isClickable ? "cursor-pointer hover:bg-violet-50/40 dark:hover:bg-white/[0.04]" : "hover:bg-gray-50/50 dark:hover:bg-white/[0.03]"}`}>
                                                     <td className="pl-5 pr-3 py-3 whitespace-nowrap">
                                                         <span className="text-[11px] font-semibold text-gray-600">
                                                             {e.created_at
@@ -2775,7 +2775,7 @@ export default function CashflowPage() {
 
                     {/* Pagination */}
                     {!loading && rows.length > 0 && (
-                        <div className="px-4 sm:px-5 py-3.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between flex-wrap gap-3">
+                        <div className="px-4 sm:px-5 py-3.5 border-t border-gray-100 bg-gray-50/40 dark:bg-white/[0.02] flex items-center justify-between flex-wrap gap-3">
                             <p className="text-[11px] text-gray-400 font-medium">
                                 Menampilkan <span className="font-bold text-gray-600">{(safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, rows.length)}</span> dari <span className="font-bold text-gray-600">{rows.length}</span> entry
                                 {rows.length !== allRows.length && <span className="text-gray-300"> (total {allRows.length})</span>}

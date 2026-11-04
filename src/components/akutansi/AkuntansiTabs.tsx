@@ -109,20 +109,20 @@ export default function AkuntansiTabs({ period }: { period: string }) {
               </h1>
 
               {/* Segmented Month Switcher Pill */}
-              <div className="bg-slate-100/90 border border-slate-200/80 rounded-full px-1.5 py-1 flex items-center gap-1 shrink-0">
+              <div className="bg-slate-100/90 dark:bg-white/[0.04] border border-slate-200/80 rounded-full px-1.5 py-1 flex items-center gap-1 shrink-0">
                 <Link
                   href={`/dashboard/akutansi/${prevPeriod}`}
-                  className="w-7 h-7 rounded-full bg-white hover:bg-slate-200/70 text-slate-700 font-bold flex items-center justify-center shadow-2xs active:scale-90 transition-all shrink-0"
+                  className="w-7 h-7 rounded-full bg-white dark:bg-white/[0.08] text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-white/[0.16] font-bold flex items-center justify-center shadow-2xs active:scale-90 transition-all shrink-0"
                   title={`Bulan sebelumnya (${periodLabel(prevPeriod)})`}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Link>
-                <span className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-800 px-2.5">
+                <span className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-800 dark:text-slate-100 px-2.5">
                   {periodLabel(period)}
                 </span>
                 <Link
                   href={`/dashboard/akutansi/${nextPeriod}`}
-                  className="w-7 h-7 rounded-full bg-white hover:bg-slate-200/70 text-slate-700 font-bold flex items-center justify-center shadow-2xs active:scale-90 transition-all shrink-0"
+                  className="w-7 h-7 rounded-full bg-white dark:bg-white/[0.08] text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-white/[0.16] font-bold flex items-center justify-center shadow-2xs active:scale-90 transition-all shrink-0"
                   title={`Bulan berikutnya (${periodLabel(nextPeriod)})`}
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -177,7 +177,7 @@ export default function AkuntansiTabs({ period }: { period: string }) {
       )}
 
       {/* Segmented Control Bar Nav Tabs */}
-      <div className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/60 inline-flex flex-wrap gap-1">
+      <div className="bg-slate-100/90 dark:bg-white/[0.04] p-1.5 rounded-2xl border border-slate-200/60 inline-flex flex-wrap gap-1">
         {TABS.map((t) => {
           const active = tab === t.key;
           return (
@@ -186,7 +186,7 @@ export default function AkuntansiTabs({ period }: { period: string }) {
               onClick={() => setTab(t.key)}
               className={`px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 whitespace-nowrap ${active
                   ? "bg-white text-slate-900 font-bold shadow-xs"
-                  : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
+                  : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-white/40 dark:hover:bg-white/[0.06]"
                 }`}
             >
               {t.label}

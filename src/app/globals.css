@@ -353,3 +353,31 @@ html.dark .shadow-xl { box-shadow: 0 16px 40px rgba(0, 0, 0, .65); }
 /* Ring defaults */
 html.dark .ring-white { --tw-ring-color: #24344d; }
 html.dark .ring-slate-200, html.dark .ring-gray-200 { --tw-ring-color: #1e293b; }
+
+/* =========================================================
+   DARK MODE v5 — tutup celah opacity-variant yang lolos v4.
+   Penyebab "band" pucat/milky di tabel & panel (amber draft,
+   slate/blue detail). Scoped html.dark → mode terang aman.
+   ========================================================= */
+
+/* Netral (gray/slate) → overlay putih super tipis = lift seragam */
+html.dark .bg-gray-50\/40,
+html.dark .bg-slate-50\/50        { background-color: rgba(255,255,255,.02); }
+html.dark .bg-slate-100\/80       { background-color: rgba(255,255,255,.04); }
+
+/* Amber (draft / pending / penanda) → dark amber, intensitas ikut kelas */
+html.dark .bg-amber-50\/20                 { background-color: rgba(43,27,6,.30); }
+html.dark .bg-amber-50\/30,
+html.dark .bg-amber-50\/40,
+html.dark .hover\:bg-amber-50\/40:hover    { background-color: rgba(43,27,6,.45); }
+html.dark .bg-amber-50\/50,
+html.dark .bg-amber-50\/60                 { background-color: rgba(43,27,6,.60); }
+html.dark .bg-amber-50\/70                 { background-color: rgba(43,27,6,.72); }
+html.dark .hover\:bg-amber-100\/40:hover   { background-color: rgba(66,42,9,.50); }
+
+/* Border amber draft (garis atas baris Draft) senada */
+html.dark .border-amber-200\/80,
+html.dark .border-amber-200\/60            { border-color: #5c390a; }
+
+/* Blue (detail terpilih) → dark blue senada badge info */
+html.dark .bg-blue-50\/40                  { background-color: rgba(12,30,54,.55); }
