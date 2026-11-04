@@ -170,10 +170,17 @@ export const GET = withAuth(async (req) => {
 
     const syntheticIds = new Set<string>();
     const syntheticLines: LineRow[] = [];
-    if (accountCode === AKUN.HPP || accountCode === AKUN.MODAL_KELUAR) {
+     if (accountCode === AKUN.HPP || accountCode === AKUN.MODAL_KELUAR) {
       for (const entry of entryMap.values()) {
         if (entry.source_type !== "TRANSACTION" || !entry.source_id) continue;
-        const hasHppLine = allLines.some((l) => l.entry_id === entry.id && l.account_code === AKUN.HPP);
+        const entryLines = allLines.filter((l) => l.entry_id === entry.id);
+        // (fix) Baris "Modal Rp0" HANYA untuk penjualan yang modalnya memang 130/440,
+        // yaitu yang ADA penjualan laptop (410). Penjualan AKSESORIS MURNI modalnya
+        // 450/170 — tidak pernah menyentuh 130/440 — jadi jangan dibuatkan baris
+        // sintetis (ini sumber "spam Modal Rp0" di buku besar 130 & 440).
+        const hasLaptopRevenue = entryLines.some((l) => l.account_code === AKUN.PENJUALAN_LAPTOP);
+        if (!hasLaptopRevenue) continue;
+        const hasHppLine = entryLines.some((l) => l.account_code === AKUN.HPP);
         if (hasHppLine) continue; // modal sudah diinput normal — tidak perlu baris sintetis
         const syntheticId = `${entry.id}-${accountCode === AKUN.HPP ? "hpp" : "modal-keluar"}-missing`;
         syntheticIds.add(syntheticId);
