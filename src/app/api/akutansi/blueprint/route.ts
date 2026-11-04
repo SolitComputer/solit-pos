@@ -1,9 +1,8 @@
 // src/app/api/akutansi/blueprint/route.ts
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
-import { AKUNTANSI_ROLES } from "@/lib/permissions";
+import { AKUNTANSI_ROLES, AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { getWeekKey } from "@/lib/blueprint";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -13,64 +12,69 @@ function getAdmin(): SupabaseClient {
   );
 }
 
-// ── GET — misi tambahan (aktif) + status selesai minggu berjalan ────────────
+// ── GET — semua misi + rincian + status centang ─────────────────────────────
 export const GET = withAuth(async () => {
   const supabase = getAdmin();
-  const weekKey = getWeekKey();
 
-  const [tasksRes, doneRes] = await Promise.all([
+  const [missionsRes, itemsRes, checksRes] = await Promise.all([
     supabase
-      .from("accounting_blueprint_tasks")
-      .select("id, keterangan, days, created_at")
-      .eq("is_active", true)
-      .order("created_at", { ascending: true }),
+      .from("accounting_blueprint_missions")
+      .select("id, nama, day, position")
+      .order("position", { ascending: true }),
     supabase
-      .from("accounting_blueprint_completions")
-      .select("task_key, day, completed_by_name")
-      .eq("week_key", weekKey),
+      .from("accounting_blueprint_items")
+      .select("id, mission_id, keterangan, position")
+      .order("position", { ascending: true }),
+    supabase.from("accounting_blueprint_checks").select("item_id, checked_by_name"),
   ]);
 
-  if (tasksRes.error) {
-    console.error("[blueprint GET tasks]", tasksRes.error);
-    return NextResponse.json({ success: false, message: tasksRes.error.message }, { status: 500 });
-  }
-  if (doneRes.error) {
-    console.error("[blueprint GET completions]", doneRes.error);
-    return NextResponse.json({ success: false, message: doneRes.error.message }, { status: 500 });
+  for (const r of [missionsRes, itemsRes, checksRes]) {
+    if (r.error) {
+      console.error("[blueprint GET]", r.error);
+      return NextResponse.json({ success: false, message: r.error.message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({
     success: true,
-    data: { weekKey, tasks: tasksRes.data ?? [], completions: doneRes.data ?? [] },
+    data: {
+      missions: missionsRes.data ?? [],
+      items: itemsRes.data ?? [],
+      checks: checksRes.data ?? [],
+    },
   });
 }, AKUNTANSI_ROLES);
 
-// ── POST — tambah misi tambahan (custom) ────────────────────────────────────
+// ── POST — buat misi baru (manage saja) ─────────────────────────────────────
+// Body: { nama: string; day?: number|null (0-6) }
 export const POST = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
-  const { keterangan, days } = body as { keterangan: string; days: number[] };
+  const { nama, day } = body as { nama: string; day?: number | null };
 
-  if (!keterangan?.trim())
-    return NextResponse.json({ success: false, message: "Keterangan misi wajib diisi" }, { status: 400 });
+  if (!nama?.trim())
+    return NextResponse.json({ success: false, message: "Nama misi wajib diisi" }, { status: 400 });
 
-  // Bersihkan: unik, hanya hari kerja 1–6, urut.
-  const cleanDays = Array.isArray(days)
-    ? [...new Set(days)].filter((d) => Number.isInteger(d) && d >= 1 && d <= 6).sort((a, b) => a - b)
-    : [];
-  if (cleanDays.length === 0)
-    return NextResponse.json({ success: false, message: "Pilih minimal 1 hari (Senin–Sabtu)" }, { status: 400 });
+  const d = day === null || day === undefined ? null : Number(day);
+  if (d !== null && (!Number.isInteger(d) || d < 0 || d > 6))
+    return NextResponse.json({ success: false, message: "Hari tidak valid (0–6)" }, { status: 400 });
 
   const supabase = getAdmin();
+
+  // 1 hari = 1 misi: kalau dipasangin ke suatu hari, lepas misi lain di hari itu.
+  if (d !== null) {
+    await supabase.from("accounting_blueprint_missions").update({ day: null }).eq("day", d);
+  }
+
   const { data: inserted, error } = await supabase
-    .from("accounting_blueprint_tasks")
-    .insert({ keterangan: keterangan.trim(), days: cleanDays, is_active: true, created_by: user.id })
-    .select("id, keterangan, days, created_at")
+    .from("accounting_blueprint_missions")
+    .insert({ nama: nama.trim(), day: d, position: Date.now(), created_by: user.id })
+    .select("id, nama, day, position")
     .single();
 
   if (error) {
-    console.error("[blueprint POST]", error);
+    console.error("[blueprint missions POST]", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, data: inserted }, { status: 201 });
-}, AKUNTANSI_ROLES);
+}, AKUNTANSI_MANAGE_ROLES);
