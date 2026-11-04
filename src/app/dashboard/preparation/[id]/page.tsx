@@ -1268,8 +1268,8 @@ export default function PreparationDetailPage() {
                             )}
                         </div>
 
-                        {/* Penyedia bisa menambah unit/aksesoris SELAMA diproses */}
-                        {order.status === "DIPROSES" && canDone && (
+                        {/* Penyedia bisa menambah unit/aksesoris SELAMA diproses & setelah siap kirim */}
+                                               {(order.status === "DIPROSES" || order.status === "SIAP_KIRIM" || order.status === "MENUNGGU_PENGANTAR") && canDone && (
                             <button onClick={() => setShowAddItems(true)}
                                 className="w-full mb-3 h-10 border-2 border-dashed border-emerald-300 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition flex items-center justify-center gap-1.5">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>

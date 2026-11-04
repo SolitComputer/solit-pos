@@ -26,14 +26,23 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       return NextResponse.json({ success: false, message: "Data penyiapan tidak ditemukan" }, { status: 404 });
     }
 
-    // ── GUARD: cuma boleh nambah saat status DIPROSES ──
-    // Disamakan dengan syarat tombol di frontend supaya tidak ada celah.
-    if (order.status !== "DIPROSES") {
+    // ── GUARD: boleh nambah saat status DIPROSES atau SIAP_KIRIM ──
+    // SIAP_KIRIM ditambahkan supaya aksesoris yang telat diinput sales masih
+    // bisa disusulkan sebelum barang benar-benar dikirim. Disamakan dengan
+    // syarat tombol di frontend supaya tidak ada celah.
+    const ALLOWED_ADD_STATUS = ["DIPROSES", "SIAP_KIRIM", "MENUNGGU_PENGANTAR"];
+    if (!ALLOWED_ADD_STATUS.includes(order.status)) {
       return NextResponse.json(
-        { success: false, message: `Hanya bisa menambah unit saat status "Diproses" (sekarang "${order.status}")` },
+        { success: false, message: `Unit hanya bisa ditambah sebelum barang dikirim (sekarang "${order.status}")` },
         { status: 400 }
       );
     }
+
+    // Kalau order SUDAH SIAP_KIRIM, fase checklist penyedia sudah lewat — item
+    // susulan langsung ditandai is_checked = true biar daftar unit tidak
+    // terlihat "setengah kecek". Saat masih DIPROSES, biarkan false supaya
+    // penyedia tetap mencentangnya manual sebelum "Tandai Siap Kirim".
+    const autoChecked = order.status !== "DIPROSES";
 
     const cleanItems = items
       .map((it: any) => ({
@@ -45,6 +54,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         accessory_id: it.accessory_id ?? null,
         unit_id: it.unit_id ?? null,
         accessory_unit_id: it.accessory_unit_id ?? null,
+        is_checked: autoChecked,
       }))
       .filter((it) => it.serial_number);
 
