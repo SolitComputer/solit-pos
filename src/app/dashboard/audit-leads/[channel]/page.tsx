@@ -338,6 +338,8 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
           /* Grid garis penuh ala Excel — diatur sekali di sini, berlaku ke semua sel. */
           .al-grid th { border: 1px solid #ddd6fe; }  /* violet-200 — garis header, nyambung ke tema */
           .al-grid td { border: 1px solid #e5e7eb; }  /* gray-200 — garis antar sel, seragam */
+          html.dark .al-grid th { border-color: #2e2650; }  /* violet gelap senada header dark */
+          html.dark .al-grid td { border-color: #263139; }  /* sama dgn --border dark, grid nyatu */
         `}</style>
 
         {/* Hero header */}
@@ -466,36 +468,36 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
           <div className="overflow-x-auto hidden md:block">
             <table className="al-grid w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-gradient-to-r from-violet-50 via-fuchsia-50/60 to-violet-50 border-b border-violet-100">
-                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider w-14">No</th>
-                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                <tr className="bg-gradient-to-r from-violet-50 via-fuchsia-50/60 to-violet-50 dark:from-white/[0.04] dark:via-white/[0.04] dark:to-white/[0.04] border-b border-violet-100">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider w-14">No</th>
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><User className="w-3 h-3" /> Nama/No Telpon</span>
                   </th>
-                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><Tag className="w-3 h-3" /> Minat</span>
                   </th>
-                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider whitespace-nowrap">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider whitespace-nowrap">
                     <span className="inline-flex items-center gap-1.5"><Wallet className="w-3 h-3" /> Range Harga</span>
                   </th>
-                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><MessageSquare className="w-3 h-3" /> Keterangan</span>
                   </th>
-                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><Link2 className="w-3 h-3" /> Sumber</span>
                   </th>
-                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><ShoppingBag className="w-3 h-3" /> Transaksi</span>
                   </th>
-                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><Megaphone className="w-3 h-3" /> Ads</span>
                   </th>
-                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><ShieldCheck className="w-3 h-3" /> Audit</span>
                   </th>
-                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 uppercase tracking-wider hidden lg:table-cell">
+                  <th className="px-4 py-3.5 text-left text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider hidden lg:table-cell">
                     <span className="inline-flex items-center gap-1.5"><UserCircle2 className="w-3 h-3" /> Diinput Oleh</span>
                   </th>
-                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 uppercase tracking-wider">
+                  <th className="px-4 py-3.5 text-center text-[11px] font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5"><Pencil className="w-3 h-3" /> Aksi</span>
                   </th>
                 </tr>
