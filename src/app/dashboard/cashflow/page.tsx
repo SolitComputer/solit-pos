@@ -1,7 +1,7 @@
 "use client";
 // src/app/dashboard/cashflow/page.tsx
 
-import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, useSyncExternalStore } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, useSyncExternalStore, memo } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES, humanizeRoleKey } from "@/lib/permissions";
@@ -70,6 +70,10 @@ const compareEntries = (a: Entry, b: Entry): number => {
 };
 
 const sortEntries = (list: Entry[]): Entry[] => [...list].sort(compareEntries);
+
+// Pure, tanpa dependency state → aman jadi fungsi module-level supaya handler bisa di-useCallback.
+const isDetailRow = (e: Entry): boolean =>
+    e.direction === "OUT" || (e.direction === "IN" && e.source_type === "MANUAL");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Entry = {
@@ -1828,6 +1832,161 @@ function useIsMobile(): boolean {
     );
 }
 
+// ── Table Row (desktop) — di-memo. Klik audit cuma render ULANG baris yang diklik:
+//    `busy` berubah hanya utk 1 baris, baris lain props-nya sama → memo skip.
+//    `entry` ganti referensi hanya kalau isinya berubah (optimistic update pakai .map). ──
+const CashflowTableRow = memo(function CashflowTableRow({
+    entry: e, zebra, busy, canAudit, onRowClick, onAudit, onPhoto,
+}: {
+    entry: Entry; zebra: string; busy: boolean; canAudit: boolean;
+    onRowClick: (e: Entry) => void; onAudit: (e: Entry) => void; onPhoto: (e: Entry) => void;
+}) {
+    const isClickable = e.source_type !== "MODAL_AWAL";
+    return (
+        <tr onClick={() => isClickable && onRowClick(e)}
+            className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : zebra} ${isClickable ? "cursor-pointer hover:bg-violet-50/40 dark:hover:bg-white/[0.04]" : "hover:bg-gray-50/50 dark:hover:bg-white/[0.03]"}`}>
+            <td className="pl-5 pr-3 py-3 whitespace-nowrap">
+                <span className="text-[11px] font-semibold text-gray-600">
+                    {e.created_at
+                        ? new Date(e.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })
+                        : "—"}
+                </span>
+                <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtTanggal(e.tanggal)}</p>
+            </td>
+            <td className="px-3 py-3 whitespace-nowrap"><SourceBadge sourceType={e.source_type} /></td>
+            <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
+                {e.payment_method ? (
+                    e.payment_method === "SALDO"
+                        ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={11} /> Saldo</span>
+                        : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={11} /> {cashSourceLabel(e.payment_method, e.cash_location ?? null)}</span>
+                ) : e.direction === "IN" &&
+                    (e.source_type === "TRANSACTION" || e.source_type === "TRANSACTION_PAYMENT" || e.source_type === "TRANSACTION_DP") &&
+                    e.tx_payment_method ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-100 whitespace-nowrap">
+                        {e.tx_payment_method === "Tunai" ? <Banknote size={11} /> : <Landmark size={11} />} {e.tx_payment_method}
+                    </span>
+                ) : <span className="text-gray-300 text-[11px]">—</span>}
+            </td>
+            <td className="px-3 py-3 max-w-[150px]">
+                {(() => {
+                    const rowName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama;
+                    return (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            {e.source_type !== "MODAL_AWAL" && <NameAvatar name={rowName} />}
+                            <div className="min-w-0">
+                                <p className="text-[12px] font-semibold text-gray-800 truncate">{rowName}</p>
+                                {e.source_type === "SERVICE" && <p className="text-[9px] text-orange-500 font-semibold">Teknisi</p>}
+                                {e.source_type === "TRANSACTION" && <p className="text-[9px] text-blue-500 font-semibold">Customer</p>}
+                                {e.source_type === "MODAL_AWAL" && <p className="text-[9px] text-violet-500 font-semibold">Modal Awal</p>}
+                                {e.source_type === "PENGAJUAN_DANA" && <p className="text-[9px] text-teal-600 font-semibold">Pengajuan Dana</p>}
+                            </div>
+                        </div>
+                    );
+                })()}
+            </td>
+            <td className="px-3 py-3 whitespace-nowrap">
+                {e.source_type === "MODAL_AWAL" ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-100"><Wallet size={11} /> Modal Awal</span>
+                ) : (
+                    <CategoryBadge direction={e.direction} category={e.category} />
+                )}
+            </td>
+            <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.is_voided ? "text-gray-400 line-through decoration-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
+                {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
+                {e.is_stale && e.source_nominal != null && (
+                    <p className="text-[9px] font-sans font-bold text-amber-600 mt-0.5"
+                        title={`Harga deal di transaksi sudah berubah jadi ${fmtRupiah(e.source_nominal)}, tapi entry ini sudah diaudit sehingga nominalnya dikunci.`}>
+                        <AlertTriangle size={11} className="inline align-[-1px]" /> Kini {fmtRupiah(e.source_nominal)}
+                    </p>
+                )}
+            </td>
+            <td className="px-3 py-3 max-w-[200px]">
+                <span className="truncate block text-[11px] text-gray-500">{e.keterangan || "—"}</span>
+                {e.photo_url && (
+                    <button type="button" onClick={(ev) => { ev.stopPropagation(); onPhoto(e); }} className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-blue-600 hover:underline">
+                        <Camera size={11} /> Foto
+                    </button>
+                )}
+            </td>
+            <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
+                <AuditCell entry={e} busy={busy} onAudit={() => onAudit(e)} canAudit={canAudit} />
+            </td>
+            <td className="px-3 py-3 whitespace-nowrap">
+                {e.audited_by_user?.name ? (
+                    <>
+                        <span className="text-[11px] text-emerald-600 font-semibold"> {e.audited_by_user.name}</span>
+                        {e.audited_at && <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtWaktuAudit(e.audited_at)}</p>}
+                    </>
+                ) : (
+                    <span className="text-gray-300 text-[11px]">—</span>
+                )}
+            </td>
+            <td className="px-3 pr-5 py-3 text-right whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
+                <span className="text-[10px] text-gray-400 font-mono whitespace-nowrap">
+                    {e.is_audited && e.audited_at ? fmtWaktuAudit(e.audited_at) : "—"}
+                </span>
+            </td>
+        </tr>
+    );
+});
+
+// ── Mobile Card — di-memo dengan alasan yang sama seperti CashflowTableRow. ──
+const CashflowMobileCard = memo(function CashflowMobileCard({
+    entry: e, busy, canAudit, onRowClick, onAudit, onPhoto,
+}: {
+    entry: Entry; busy: boolean; canAudit: boolean;
+    onRowClick: (e: Entry) => void; onAudit: (e: Entry) => void; onPhoto: (e: Entry) => void;
+}) {
+    const isClickable = e.source_type !== "MODAL_AWAL";
+    const displayName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama;
+    return (
+        <div onClick={() => isClickable && onRowClick(e)}
+            className={`relative p-4 pl-5 space-y-2.5 transition-colors ${e.is_voided && e.is_audited ? "bg-red-50/70" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "active:bg-blue-50/60" : ""}`}>
+            <span className={`absolute left-0 top-0 h-full w-1 ${e.is_voided ? "bg-gray-300" : e.direction === "IN" ? "bg-emerald-400" : "bg-red-400"}`} />
+            <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <SourceBadge sourceType={e.source_type} />
+                    <span className="text-[10px] font-mono text-gray-400">{fmtTanggal(e.tanggal)}</span>
+                </div>
+                <span className="text-[10px] font-semibold text-gray-500 shrink-0">
+                    {e.created_at ? new Date(e.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : ""}
+                </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {e.source_type !== "MODAL_AWAL" && <NameAvatar name={displayName} size={20} />}
+                        <p className="text-sm font-bold text-gray-900 truncate">{displayName}</p>
+                        {e.source_type === "PENGAJUAN_DANA" && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 shrink-0">Dana</span>
+                        )}
+                    </div>
+                    <span className="inline-flex mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        {e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel(e.direction, e.category)}
+                    </span>
+                </div>
+                <div className="text-right shrink-0">
+                    <p className={`font-mono font-black text-base tabular-nums ${e.is_voided ? "text-gray-400 line-through decoration-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
+                        {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
+                    </p>
+                    {e.is_stale && e.source_nominal != null && (
+                        <p className="text-[9px] font-bold text-amber-600 mt-0.5">Kini {fmtRupiah(e.source_nominal)}</p>
+                    )}
+                </div>
+            </div>
+            {e.keterangan && <p className="text-[11px] text-gray-500 line-clamp-2">{e.keterangan}</p>}
+            <div className="flex items-center justify-between gap-2 pt-1" onClick={(ev) => ev.stopPropagation()}>
+                <AuditCell entry={e} busy={busy} onAudit={() => onAudit(e)} canAudit={canAudit} />
+                {e.photo_url && (
+                    <button type="button" onClick={() => onPhoto(e)} className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600">
+                        <Camera size={12} /> Foto
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+});
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CashflowPage() {
     const router = useRouter();
@@ -2057,7 +2216,7 @@ export default function CashflowPage() {
         try { await fetchData(true, "force"); } finally { setRefreshing(false); }
     };
 
-    const toggleAudit = async (entry: Entry) => {
+        const toggleAudit = useCallback(async (entry: Entry) => {
         if (entry.direction === "OUT" && !canAuditOut) return;
         setAuditingId(entry.id);
         try {
@@ -2078,8 +2237,8 @@ export default function CashflowPage() {
                 scheduleRefresh();
             }
             else alert(json.message || "Gagal mengubah status audit");
-        } finally { setAuditingId(null); }
-    };
+               } finally { setAuditingId(null); }
+    }, [canAuditOut, scheduleRefresh]);
 
     const deleteEntry = async (entry: Entry) => {
         if (!confirm(`Hapus entry "${entry.keterangan || entry.nama}"?`)) return;
@@ -2089,9 +2248,7 @@ export default function CashflowPage() {
         else alert(json.message || "Gagal menghapus");
     };
 
-    const isDetailRow = (e: Entry) => e.direction === "OUT" || (e.direction === "IN" && e.source_type === "MANUAL");
-
-    const handleRowClick = (e: Entry) => {
+        const handleRowClick = useCallback((e: Entry) => {
         if (e.source_type === "MODAL_AWAL") return;
         // Refund transaksi batal → langsung buka transaksi sumbernya
         if (e.source_type === "TRANSACTION_REFUND") {
@@ -2109,10 +2266,10 @@ export default function CashflowPage() {
             // ⬅️ FIX: kirim id service order lewat query param, supaya halaman History
             // langsung buka detail modal 1 baris itu saja — bukan daftar penuh.
             if (e.source_id) router.push(`/dashboard/service/history?id=${encodeURIComponent(e.source_id.split("__")[0])}`);
-            else router.push("/dashboard/service/history");
+                       else router.push("/dashboard/service/history");
             return;
         }
-    };
+    }, [router]);
 
     // ── ⬅️ PERF: semua hitungan berat di-memo ──────────────────────────────────
     // Dulu dihitung ulang di SETIAP render (buka modal, hover, ketik 1 huruf di search,
@@ -2268,8 +2425,7 @@ export default function CashflowPage() {
             ? `Saldo kumulatif (semua transaksi sejak awal) sampai ${fmtTanggal(customTo)}`
             : "Saldo kumulatif (semua transaksi sejak awal) sampai tanggal ini";
 
-    const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-    const clickable = (e: Entry) => e.source_type !== "MODAL_AWAL";
+       const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 
     return (
         <DashboardLayout>
@@ -2574,56 +2730,17 @@ export default function CashflowPage() {
                                     )}
                                 </div>
                             ) : (
-                                paginatedRows.map((e) => {
-                                    const isClickable = clickable(e);
-                                    const displayName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama;
-                                    return (
-                                        <div key={e.id} onClick={() => isClickable && handleRowClick(e)}
-                                            className={`relative p-4 pl-5 space-y-2.5 transition-colors ${e.is_voided && e.is_audited ? "bg-red-50/70" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "active:bg-blue-50/60" : ""}`}>
-                                            <span className={`absolute left-0 top-0 h-full w-1 ${e.is_voided ? "bg-gray-300" : e.direction === "IN" ? "bg-emerald-400" : "bg-red-400"}`} />
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <SourceBadge sourceType={e.source_type} />
-                                                    <span className="text-[10px] font-mono text-gray-400">{fmtTanggal(e.tanggal)}</span>
-                                                </div>
-                                                <span className="text-[10px] font-semibold text-gray-500 shrink-0">
-                                                    {e.created_at ? new Date(e.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : ""}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        {e.source_type !== "MODAL_AWAL" && <NameAvatar name={displayName} size={20} />}
-                                                        <p className="text-sm font-bold text-gray-900 truncate">{displayName}</p>
-                                                        {e.source_type === "PENGAJUAN_DANA" && (
-                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 shrink-0">Dana</span>
-                                                        )}
-                                                    </div>
-                                                    <span className="inline-flex mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                                                        {e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel(e.direction, e.category)}
-                                                    </span>
-                                                </div>
-                                                <div className="text-right shrink-0">
-                                                    <p className={`font-mono font-black text-base tabular-nums ${e.is_voided ? "text-gray-400 line-through decoration-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
-                                                        {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
-                                                    </p>
-                                                    {e.is_stale && e.source_nominal != null && (
-                                                        <p className="text-[9px] font-bold text-amber-600 mt-0.5">Kini {fmtRupiah(e.source_nominal)}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            {e.keterangan && <p className="text-[11px] text-gray-500 line-clamp-2">{e.keterangan}</p>}
-                                            <div className="flex items-center justify-between gap-2 pt-1" onClick={(ev) => ev.stopPropagation()}>
-                                                <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} canAudit={e.direction === "OUT" ? canAuditOut : true} />
-                                                {e.photo_url && (
-                                                    <button type="button" onClick={() => setDetailEntry(e)} className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600">
-                                                        <Camera size={12} /> Foto
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })
+                                                               paginatedRows.map((e) => (
+                                    <CashflowMobileCard
+                                        key={e.id}
+                                        entry={e}
+                                        busy={auditingId === e.id}
+                                        canAudit={e.direction === "OUT" ? canAuditOut : true}
+                                        onRowClick={handleRowClick}
+                                        onAudit={toggleAudit}
+                                        onPhoto={setDetailEntry}
+                                    />
+                                ))
                             )}
                         </div>
                     )}
@@ -2675,98 +2792,18 @@ export default function CashflowPage() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        paginatedRows.map((e, idx) => {
-                                            const isClickable = clickable(e);
-                                            // ⬅️ BARU: zebra striping halus buat keterbacaan baris — tetap kalah prioritas
-                                            // dari state voided/audited di bawah, jadi tidak mengubah makna warna yang sudah ada.
-                                            const zebra = idx % 2 === 1 ? "bg-gray-50/40 dark:bg-white/[0.02]" : "";
-                                            return (
-                                                <tr key={e.id} onClick={() => isClickable && handleRowClick(e)}
-                                                    className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : zebra} ${isClickable ? "cursor-pointer hover:bg-violet-50/40 dark:hover:bg-white/[0.04]" : "hover:bg-gray-50/50 dark:hover:bg-white/[0.03]"}`}>
-                                                    <td className="pl-5 pr-3 py-3 whitespace-nowrap">
-                                                        <span className="text-[11px] font-semibold text-gray-600">
-                                                            {e.created_at
-                                                                ? new Date(e.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })
-                                                                : "—"}
-                                                        </span>
-                                                        <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtTanggal(e.tanggal)}</p>
-                                                    </td>
-                                                    <td className="px-3 py-3 whitespace-nowrap"><SourceBadge sourceType={e.source_type} /></td>
-                                                    <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                        {e.payment_method ? (
-                                                            e.payment_method === "SALDO"
-                                                                ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={11} /> Saldo</span>
-                                                                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={11} /> {cashSourceLabel(e.payment_method, e.cash_location ?? null)}</span>
-                                                        ) : e.direction === "IN" &&
-                                                            (e.source_type === "TRANSACTION" || e.source_type === "TRANSACTION_PAYMENT" || e.source_type === "TRANSACTION_DP") &&
-                                                            e.tx_payment_method ? (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-100 whitespace-nowrap">
-                                                                {e.tx_payment_method === "Tunai" ? <Banknote size={11} /> : <Landmark size={11} />} {e.tx_payment_method}
-                                                            </span>
-                                                        ) : <span className="text-gray-300 text-[11px]">—</span>}
-                                                    </td>
-                                                    <td className="px-3 py-3 max-w-[150px]">
-                                                        {(() => {
-                                                            const rowName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama;
-                                                            return (
-                                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                                    {e.source_type !== "MODAL_AWAL" && <NameAvatar name={rowName} />}
-                                                                    <div className="min-w-0">
-                                                                        <p className="text-[12px] font-semibold text-gray-800 truncate">{rowName}</p>
-                                                                        {e.source_type === "SERVICE" && <p className="text-[9px] text-orange-500 font-semibold">Teknisi</p>}
-                                                                        {e.source_type === "TRANSACTION" && <p className="text-[9px] text-blue-500 font-semibold">Customer</p>}
-                                                                        {e.source_type === "MODAL_AWAL" && <p className="text-[9px] text-violet-500 font-semibold">Modal Awal</p>}
-                                                                        {e.source_type === "PENGAJUAN_DANA" && <p className="text-[9px] text-teal-600 font-semibold">Pengajuan Dana</p>}
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })()}
-                                                    </td>
-                                                    <td className="px-3 py-3 whitespace-nowrap">
-                                                        {e.source_type === "MODAL_AWAL" ? (
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-100"><Wallet size={11} /> Modal Awal</span>
-                                                        ) : (
-                                                            <CategoryBadge direction={e.direction} category={e.category} />
-                                                        )}
-                                                    </td>
-                                                    <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.is_voided ? "text-gray-400 line-through decoration-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
-                                                        {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
-                                                        {e.is_stale && e.source_nominal != null && (
-                                                            <p className="text-[9px] font-sans font-bold text-amber-600 mt-0.5"
-                                                                title={`Harga deal di transaksi sudah berubah jadi ${fmtRupiah(e.source_nominal)}, tapi entry ini sudah diaudit sehingga nominalnya dikunci.`}>
-                                                                <AlertTriangle size={11} className="inline align-[-1px]" /> Kini {fmtRupiah(e.source_nominal)}
-                                                            </p>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-3 max-w-[200px]">
-                                                        <span className="truncate block text-[11px] text-gray-500">{e.keterangan || "—"}</span>
-                                                        {e.photo_url && (
-                                                            <button type="button" onClick={(ev) => { ev.stopPropagation(); setDetailEntry(e); }} className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-blue-600 hover:underline">
-                                                                <Camera size={11} /> Foto
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                        <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} canAudit={e.direction === "OUT" ? canAuditOut : true} />
-                                                    </td>
-                                                    <td className="px-3 py-3 whitespace-nowrap">
-                                                        {e.audited_by_user?.name ? (
-                                                            <>
-                                                                <span className="text-[11px] text-emerald-600 font-semibold"> {e.audited_by_user.name}</span>
-                                                                {e.audited_at && <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtWaktuAudit(e.audited_at)}</p>}
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-gray-300 text-[11px]">—</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 pr-5 py-3 text-right whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                        <span className="text-[10px] text-gray-400 font-mono whitespace-nowrap">
-                                                            {e.is_audited && e.audited_at ? fmtWaktuAudit(e.audited_at) : "—"}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
+                                                                                paginatedRows.map((e, idx) => (
+                                            <CashflowTableRow
+                                                key={e.id}
+                                                entry={e}
+                                                zebra={idx % 2 === 1 ? "bg-gray-50/40 dark:bg-white/[0.02]" : ""}
+                                                busy={auditingId === e.id}
+                                                canAudit={e.direction === "OUT" ? canAuditOut : true}
+                                                onRowClick={handleRowClick}
+                                                onAudit={toggleAudit}
+                                                onPhoto={setDetailEntry}
+                                            />
+                                        ))
                                     )}
                                 </tbody>
                             </table>
