@@ -23,7 +23,7 @@ const fmtShort = (n: number): string => {
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.min(100, Math.max(4, (value / max) * 100)) : 4;
   return (
-    <div className="w-full h-1.5 rounded-full overflow-hidden mt-3" style={{ background: "#F4F4F5" }}>
+    <div className="w-full h-1.5 rounded-full overflow-hidden mt-3" style={{ background: "var(--c-inset)" }}>
       <div
         className="h-full rounded-full transition-all duration-700 ease-out"
         style={{ width: `${pct}%`, background: color }}
@@ -100,84 +100,103 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-        .rdm-overlay { font-family: 'Inter', sans-serif; }
+        /* ===========================================================
+           SOLIT THEME BRIDGE — satu-satunya tempat warna dipetakan.
+           Semua surface/teks/border tarik dari token global (:root &
+           html.dark di globals.css), jadi modal ini AUTO ikut light/dark.
+           Aksen indigo sengaja tetap hardcode (jaga desain existing).
+           =========================================================== */
+        .rdm-overlay {
+          font-family: 'Inter', sans-serif;
+          --c-surface:       rgb(var(--surface));        /* card / shell          */
+          --c-canvas:        rgb(var(--bg));             /* body scroll (paling dasar) */
+          --c-inset:         rgb(var(--surface-2));      /* chip / inset / track  */
+          --c-fg:            rgb(var(--fg));             /* teks utama            */
+          --c-fg-muted:      rgb(var(--fg-muted));       /* teks sekunder         */
+          --c-fg-subtle:     rgb(var(--fg-subtle));      /* label / hint          */
+          --c-border:        rgb(var(--border));         /* garis halus           */
+          --c-border-strong: rgb(var(--border-strong));  /* garis tegas / hover   */
+          --c-accent:        #6366f1;
+          --c-accent-deep:   #4f46e5;
+          --c-accent-soft:   #818cf8;
+        }
 
         .rdm-shell {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
-          box-shadow: 0 4px 20px -4px rgba(0,0,0,0.05);
+          background: var(--c-surface);
+          border: 1px solid var(--c-border);
+          box-shadow: 0 4px 20px -4px rgba(0,0,0,0.25);
         }
 
         .rdm-header {
-          background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%);
-          border-bottom: 1px solid #E4E4E7;
+          background: linear-gradient(135deg, var(--c-surface) 0%, var(--c-inset) 100%);
+          border-bottom: 1px solid var(--c-border);
         }
 
         .rdm-stat {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+          background: var(--c-surface);
+          border: 1px solid var(--c-border);
+          box-shadow: 0 2px 10px rgba(0,0,0,0.06);
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .rdm-stat:hover {
-          box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.25);
           transform: translateY(-2px);
         }
 
         .rdm-tabs-wrap {
-          background: #F4F4F5;
+          background: var(--c-inset);
           border-radius: 14px;
           padding: 4px;
         }
         .rdm-tab-active {
-          background: #6366f1;
+          background: var(--c-accent);
           color: #FFFFFF;
           font-weight: 700;
           box-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.08);
         }
         .rdm-tab-inactive {
-          color: #A1A1AA;
+          color: var(--c-fg-subtle);
           font-weight: 500;
         }
         .rdm-tab-inactive:hover {
-          color: #52525B;
-          background: rgba(0,0,0,0.03);
+          color: var(--c-fg-muted);
+          background: var(--c-inset);
         }
 
         .rdm-row-card {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+          background: var(--c-surface);
+          border: 1px solid var(--c-border);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.10);
           transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
         }
         .rdm-row-card:hover {
-          box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+          box-shadow: 0 4px 16px rgba(0,0,0,0.25);
           transform: translateX(4px);
-          border-color: #A1A1AA;
+          border-color: var(--c-border-strong);
         }
 
         .badge-revenue {
-          background: #6366f1;
+          background: var(--c-accent);
           color: #FFFFFF;
-          border: 1px solid #6366f1;
+          border: 1px solid var(--c-accent);
           font-size: 9px;
           font-weight: 700;
           padding: 2px 6px;
           border-radius: 6px;
         }
         .badge-profit {
-          background: #F4F4F5;
-          color: #3F3F46;
-          border: 1px solid #F1F5F9;
+          background: var(--c-inset);
+          color: var(--c-fg-muted);
+          border: 1px solid var(--c-border);
           font-size: 9px;
           font-weight: 700;
           padding: 2px 6px;
           border-radius: 6px;
         }
         .badge-weekly {
-          background: #4f46e5;
+          background: var(--c-accent-deep);
           color: #FFFFFF;
-          border: 1px solid #4f46e5;
+          border: 1px solid var(--c-accent-deep);
           font-size: 9px;
           font-weight: 700;
           padding: 2px 6px;
@@ -186,10 +205,10 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
         .rdm-scroll::-webkit-scrollbar { width: 4px; }
         .rdm-scroll::-webkit-scrollbar-track { background: transparent; }
-        .rdm-scroll::-webkit-scrollbar-thumb { background: #D4D4D8; border-radius: 4px; }
+        .rdm-scroll::-webkit-scrollbar-thumb { background: var(--c-border-strong); border-radius: 4px; }
 
         .rdm-shimmer {
-          background: linear-gradient(90deg, #FAFAFA 25%, #F4F4F5 50%, #FAFAFA 75%);
+          background: linear-gradient(90deg, var(--c-inset) 25%, var(--c-surface) 50%, var(--c-inset) 75%);
           background-size: 200% 100%;
           animation: rdm-shimmer 1.5s infinite;
         }
@@ -206,27 +225,27 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
         }
 
         .rdm-monthly-card {
-          background: #FAFAFA;
-          border: 1px solid #F1F5F9;
+          background: var(--c-inset);
+          border: 1px solid var(--c-border);
           border-radius: 14px;
           transition: box-shadow 0.2s;
         }
-        .rdm-monthly-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+        .rdm-monthly-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.22); }
 
         .rdm-close {
-          background: #F4F4F5;
-          color: #A1A1AA;
+          background: var(--c-inset);
+          color: var(--c-fg-subtle);
           transition: background 0.2s, color 0.2s;
         }
-        .rdm-close:hover { background: #6366f1; color: #FFFFFF; }
+        .rdm-close:hover { background: var(--c-accent); color: #FFFFFF; }
 
-        .rdm-handle { background: #D4D4D8; }
+        .rdm-handle { background: var(--c-border-strong); }
       `}</style>
 
       {/* ── Overlay ── */}
       <div
         className="rdm-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-        style={{ background: "rgba(9,9,11,0.50)", backdropFilter: "blur(6px)" }}
+        style={{ background: "rgba(2,6,12,0.60)", backdropFilter: "blur(6px)" }}
         onClick={onClose}
       >
         {/* ── Modal shell ── */}
@@ -255,8 +274,8 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                 </svg>
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0f172a" }}>Detail Omzet</h2>
-                <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Rincian penjualan per hari, minggu &amp; bulan</p>
+                <h2 className="text-base sm:text-lg font-bold" style={{ color: "var(--c-fg)" }}>Detail Omzet</h2>
+                <p className="text-xs font-medium" style={{ color: "var(--c-fg-subtle)" }}>Rincian penjualan per hari, minggu &amp; bulan</p>
               </div>
             </div>
             <button
@@ -270,7 +289,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
           </div>
 
           {/* ── Scrollable body ── */}
-          <div className="rdm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
+          <div className="rdm-scroll flex-1 overflow-y-auto" style={{ background: "var(--c-canvas)" }}>
 
             {/* ── Memuat ── */}
             {isMemuat ? (
@@ -286,44 +305,44 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                   <div className="rdm-stat rounded-2xl overflow-hidden">
                     <div className="h-1" style={{ background: "linear-gradient(90deg,#6366f1,#818cf8)" }} />
                     <div className="p-3">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5" style={{ background: "#F4F4F5" }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5" style={{ background: "var(--c-inset)" }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
                           <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
                         </svg>
                       </div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Omzet Hari Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0f172a" }}>{fmtRupiah(data.today.revenue)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>{data.today.count} transaksi</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--c-fg-subtle)" }}>Omzet Hari Ini</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "var(--c-fg)" }}>{fmtRupiah(data.today.revenue)}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "var(--c-fg-muted)" }}>{data.today.count} transaksi</p>
                     </div>
                   </div>
 
                   {/* Omzet Bulan Ini */}
                   <div className="rdm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg,#52525B,#71717A)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg, var(--c-border-strong), var(--c-fg-subtle))" }} />
                     <div className="p-3">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5" style={{ background: "#F4F4F5" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5" style={{ background: "var(--c-inset)" }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--c-fg-muted)" }} strokeWidth="2.5" strokeLinecap="round">
                           <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                         </svg>
                       </div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Bulan Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0f172a" }}>{fmtRupiah(data.monthly.revenue)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>{data.monthly.count} transaksi</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--c-fg-subtle)" }}>Bulan Ini</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "var(--c-fg)" }}>{fmtRupiah(data.monthly.revenue)}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "var(--c-fg-muted)" }}>{data.monthly.count} transaksi</p>
                     </div>
                   </div>
 
                   {/* Profit Hari Ini */}
                   <div className="rdm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg,#A1A1AA,#D4D4D8)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg, var(--c-border-strong), var(--c-border))" }} />
                     <div className="p-3">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5" style={{ background: "#F4F4F5" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#71717A" strokeWidth="2.5" strokeLinecap="round">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5" style={{ background: "var(--c-inset)" }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--c-fg-muted)" }} strokeWidth="2.5" strokeLinecap="round">
                           <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                         </svg>
                       </div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Profit Hari Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0f172a" }}>{fmtRupiah(data.today.profit)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#71717A" }}>hari ini</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--c-fg-subtle)" }}>Profit Hari Ini</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "var(--c-fg)" }}>{fmtRupiah(data.today.profit)}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "var(--c-fg-muted)" }}>hari ini</p>
                     </div>
                   </div>
 
@@ -347,13 +366,13 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                   <div className="space-y-2">
                     {data.daily.length === 0 ? (
                       <div className="text-center py-14">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#F4F4F5" }}>
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4D4D8" strokeWidth="1.8">
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "var(--c-inset)" }}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--c-fg-subtle)" }} strokeWidth="1.8">
                             <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                           </svg>
                         </div>
-                        <p className="text-sm font-semibold" style={{ color: "#A1A1AA" }}>Belum ada data harian</p>
-                        <p className="text-xs mt-1" style={{ color: "#D4D4D8" }}>Transaksi akan muncul di sini</p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--c-fg-subtle)" }}>Belum ada data harian</p>
+                        <p className="text-xs mt-1" style={{ color: "var(--c-fg-subtle)" }}>Transaksi akan muncul di sini</p>
                       </div>
                     ) : (
                       data.daily.map((day, idx) => (
@@ -367,12 +386,12 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                                 {String(idx + 1).padStart(2, "0")}
                               </div>
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold truncate" style={{ color: "#0f172a" }}>{day.label}</p>
-                                <p className="text-[10px] mt-0.5 font-medium" style={{ color: "#A1A1AA" }}>{day.count} transaksi</p>
+                                <p className="text-sm font-semibold truncate" style={{ color: "var(--c-fg)" }}>{day.label}</p>
+                                <p className="text-[10px] mt-0.5 font-medium" style={{ color: "var(--c-fg-subtle)" }}>{day.count} transaksi</p>
                               </div>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="text-sm font-bold" style={{ color: "#0f172a" }}>{fmtRupiah(day.revenue)}</p>
+                              <p className="text-sm font-bold" style={{ color: "var(--c-fg)" }}>{fmtRupiah(day.revenue)}</p>
                               <div className="flex items-center justify-end gap-1 mt-1">
                                 <span className="badge-revenue">{fmtShort(day.revenue)}</span>
                                 <span className="badge-profit">+{fmtShort(day.profit)}</span>
@@ -391,13 +410,13 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                   <div className="space-y-2">
                     {data.weekly.length === 0 ? (
                       <div className="text-center py-14">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#F4F4F5" }}>
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4D4D8" strokeWidth="1.8">
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "var(--c-inset)" }}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--c-fg-subtle)" }} strokeWidth="1.8">
                             <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                           </svg>
                         </div>
-                        <p className="text-sm font-semibold" style={{ color: "#A1A1AA" }}>Belum ada data mingguan</p>
-                        <p className="text-xs mt-1" style={{ color: "#D4D4D8" }}>Transaksi akan muncul di sini</p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--c-fg-subtle)" }}>Belum ada data mingguan</p>
+                        <p className="text-xs mt-1" style={{ color: "var(--c-fg-subtle)" }}>Transaksi akan muncul di sini</p>
                       </div>
                     ) : (
                       data.weekly.map((week) => (
@@ -406,26 +425,26 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                             <div className="flex items-center gap-3 min-w-0">
                               <div
                                 className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                                style={{ background: "#F4F4F5", border: "1px solid #E4E4E7" }}
+                                style={{ background: "var(--c-inset)", border: "1px solid var(--c-border)" }}
                               >
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--c-fg-muted)" }} strokeWidth="2.5">
                                   <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
                                 </svg>
                               </div>
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold truncate" style={{ color: "#0f172a" }}>{week.label}</p>
-                                <p className="text-[10px] mt-0.5 font-medium" style={{ color: "#A1A1AA" }}>{week.count} transaksi</p>
+                                <p className="text-sm font-semibold truncate" style={{ color: "var(--c-fg)" }}>{week.label}</p>
+                                <p className="text-[10px] mt-0.5 font-medium" style={{ color: "var(--c-fg-subtle)" }}>{week.count} transaksi</p>
                               </div>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="text-sm font-bold" style={{ color: "#0f172a" }}>{fmtRupiah(week.revenue)}</p>
+                              <p className="text-sm font-bold" style={{ color: "var(--c-fg)" }}>{fmtRupiah(week.revenue)}</p>
                               <div className="flex items-center justify-end gap-1 mt-1">
                                 <span className="badge-weekly">{fmtShort(week.revenue)}</span>
                                 <span className="badge-profit">+{fmtShort(week.profit)}</span>
                               </div>
                             </div>
                           </div>
-                          <MiniBar value={week.revenue} max={maxWeekly} color="linear-gradient(90deg,#52525B,#71717A)" />
+                          <MiniBar value={week.revenue} max={maxWeekly} color="linear-gradient(90deg, var(--c-fg-subtle), var(--c-fg-muted))" />
                         </div>
                       ))
                     )}
@@ -439,59 +458,59 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                     {/* Total Omzet */}
                     <div className="rdm-monthly-card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "var(--c-surface)" }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.2" strokeLinecap="round">
                             <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
                           </svg>
                         </div>
                         <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#A1A1AA" }}>Total Omzet</p>
-                          <p className="text-[9px] font-medium" style={{ color: "#D4D4D8" }}>Bulan ini</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--c-fg-subtle)" }}>Total Omzet</p>
+                          <p className="text-[9px] font-medium" style={{ color: "var(--c-fg-subtle)" }}>Bulan ini</p>
                         </div>
                       </div>
-                      <p className="text-xl font-extrabold" style={{ color: "#0f172a" }}>{fmtRupiah(data.monthly.revenue)}</p>
+                      <p className="text-xl font-extrabold" style={{ color: "var(--c-fg)" }}>{fmtRupiah(data.monthly.revenue)}</p>
                     </div>
 
                     {/* Total Profit */}
                     <div className="rdm-monthly-card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.2" strokeLinecap="round">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "var(--c-surface)" }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--c-fg-muted)" }} strokeWidth="2.2" strokeLinecap="round">
                             <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                           </svg>
                         </div>
                         <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#A1A1AA" }}>Total Profit</p>
-                          <p className="text-[9px] font-medium" style={{ color: "#D4D4D8" }}>Bulan ini</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--c-fg-subtle)" }}>Total Profit</p>
+                          <p className="text-[9px] font-medium" style={{ color: "var(--c-fg-subtle)" }}>Bulan ini</p>
                         </div>
                       </div>
-                      <p className="text-xl font-extrabold" style={{ color: "#0f172a" }}>{fmtRupiah(data.monthly.profit)}</p>
+                      <p className="text-xl font-extrabold" style={{ color: "var(--c-fg)" }}>{fmtRupiah(data.monthly.profit)}</p>
                     </div>
 
                     {/* Total Transaksi */}
                     <div className="rdm-monthly-card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.2" strokeLinecap="round">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "var(--c-surface)" }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--c-fg-muted)" }} strokeWidth="2.2" strokeLinecap="round">
                             <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
                             <rect x="9" y="3" width="6" height="4" rx="1" />
                             <line x1="9" y1="12" x2="15" y2="12" /><line x1="9" y1="16" x2="13" y2="16" />
                           </svg>
                         </div>
                         <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#A1A1AA" }}>Total Transaksi</p>
-                          <p className="text-[9px] font-medium" style={{ color: "#D4D4D8" }}>Bulan ini</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--c-fg-subtle)" }}>Total Transaksi</p>
+                          <p className="text-[9px] font-medium" style={{ color: "var(--c-fg-subtle)" }}>Bulan ini</p>
                         </div>
                       </div>
-                      <p className="text-xl font-extrabold" style={{ color: "#0f172a" }}>{data.monthly.count.toLocaleString("id-ID")}</p>
+                      <p className="text-xl font-extrabold" style={{ color: "var(--c-fg)" }}>{data.monthly.count.toLocaleString("id-ID")}</p>
                     </div>
 
                     {/* Profit vs Omzet bar */}
-                    <div className="rounded-2xl p-4" style={{ background: "linear-gradient(135deg,#FAFAFA 0%,#F4F4F5 100%)", border: "1px solid #E4E4E7" }}>
+                    <div className="rounded-2xl p-4" style={{ background: "linear-gradient(135deg, var(--c-surface) 0%, var(--c-inset) 100%)", border: "1px solid var(--c-border)" }}>
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#A1A1AA" }}>Profit vs Omzet</p>
-                          <p className="text-[9px] font-medium mt-0.5" style={{ color: "#D4D4D8" }}>Deal Price − Inventory Price = Gross Profit</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--c-fg-subtle)" }}>Profit vs Omzet</p>
+                          <p className="text-[9px] font-medium mt-0.5" style={{ color: "var(--c-fg-subtle)" }}>Deal Price − Inventory Price = Gross Profit</p>
                         </div>
                         <span
                           className="text-sm font-extrabold px-3 py-1 rounded-xl"
@@ -502,14 +521,14 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                             : "0%"}
                         </span>
                       </div>
-                      <div className="w-full h-2 rounded-full" style={{ background: "#E4E4E7" }}>
+                      <div className="w-full h-2 rounded-full" style={{ background: "var(--c-inset)" }}>
                         <div
                           className="h-full rounded-full transition-all duration-1000"
                           style={{
                             width: data.monthly.revenue > 0
                               ? `${Math.min(100, (data.monthly.profit / data.monthly.revenue) * 100)}%`
                               : "0%",
-                            background: "linear-gradient(90deg,#18181B,#52525B)",
+                            background: "linear-gradient(90deg, var(--c-fg-muted), var(--c-fg))",
                           }}
                         />
                       </div>
@@ -523,13 +542,13 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
             ) : (
               /* ── Error state ── */
               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "var(--c-inset)" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--c-fg-subtle)" }} strokeWidth="2">
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
-                <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Coba tutup dan buka kembali</p>
+                <p className="text-sm font-semibold" style={{ color: "var(--c-fg-muted)" }}>Gagal memuat data</p>
+                <p className="text-xs font-medium" style={{ color: "var(--c-fg-subtle)" }}>Coba tutup dan buka kembali</p>
               </div>
             )}
 

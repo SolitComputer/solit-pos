@@ -4,12 +4,44 @@
 
 :root {
   --app-bg: #f8fafc;
-  --app-fg: #1a1a2e;
+  --app-fg: #0f172a;
+
+  /* ===== SOLIT DESIGN TOKENS (LIGHT) — format "R G B" untuk Tailwind alpha-value ===== */
+  --bg:            248 250 252; /* #f8fafc  background halaman / canvas */
+  --surface:       255 255 255; /* #ffffff  card / container / modal / sidebar */
+  --surface-2:     241 245 249; /* #f1f5f9  panel inset / table header / input bg */
+  --surface-hover: 226 232 240; /* #e2e8f0  hover row / button ghost */
+  --fg:             15  23  42; /* #0f172a  teks utama (Slate-900) */
+  --fg-muted:      100 116 139; /* #64748b  teks sekunder (Slate-500) */
+  --fg-subtle:     148 163 184; /* #94a3b8  teks tersier / placeholder */
+  --border:        226 232 240; /* #e2e8f0  garis pembatas halus */
+  --border-strong: 203 213 225; /* #cbd5e1  garis tegas / card border */
+  --primary:         8 145 178; /* #0891b2  aksen cyan solid light */
+  --primary-hover:  14 116 144; /* #0e7490 */
+  --primary-fg:    255 255 255; /* teks di atas tombol primary */
+  --primary-glow:    8 145 178;
+  color-scheme: light;
 }
 
 html.dark {
-  --app-bg: #0e1417;
-  --app-fg: #e7eef2;
+  --app-bg: #090d16;
+  --app-fg: #f1f5f9;
+
+  /* ===== SOLIT DESIGN TOKENS (DARK: CYBER OBSIDIAN NAVY & NEON CYAN) ===== */
+  --bg:              9  13  22; /* #090d16  base canvas: deep midnight obsidian navy */
+  --surface:        16  24  39; /* #101827  elevasi level 1: card, sidebar, modal */
+  --surface-2:      26  38  58; /* #1a263a  elevasi level 2: input, table header, inset box */
+  --surface-hover:  34  50  75; /* #22324b  elevasi level 3: hover state row / dropdown */
+  --fg:            241 245 249; /* #f1f5f9  teks utama: high contrast crisp slate */
+  --fg-muted:      148 163 184; /* #94a3b8  teks sekunder: slate-400 */
+  --fg-subtle:     100 116 139; /* #64748b  teks tersier: slate-500 */
+  --border:         30  41  59; /* #1e293b  garis pembatas modern slate-800 */
+  --border-strong:  51  65  85; /* #334155  garis tegas slate-700 */
+  --primary:         6 182 212; /* #06b6d4  aksen electric cyan */
+  --primary-hover:  56 189 248; /* #38bdf8  neon cyan glow hover */
+  --primary-fg:      3  15  24; /* #030f18  teks kontras tinggi di atas cyan */
+  --primary-glow:    6 182 212;
+  color-scheme: dark;
 }
 
 html,
@@ -17,10 +49,10 @@ body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-    background: var(--app-bg);
+  background: var(--app-bg);
   color: var(--app-fg);
-   font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
-    transition: background-color 0.2s ease, color 0.2s ease;
+  font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * {
@@ -37,195 +69,287 @@ body {
 }
 
 /* =========================================================
-   DARK MODE v2 — tutup celah opacity & semua skala netral.
-   Scoped ke html.dark → mode terang tidak tersentuh.
-   Palet: deep teal-navy + aksen cyan (prototipe akuntansi).
+   DARK MODE STANDARDIZATION & COMPATIBILITY LAYER (v4)
+   - Mengadaptasi seluruh utility class lama secara seamless
+   - Menghilangkan benturan warna & flat canvas
+   - Preserves custom gradients & dynamic states
    ========================================================= */
 
-/* Page shell */
-html.dark .bg-gradient-to-br.from-\[\#F5F6FB\] { background-image:none; background-color:#0e1417; }
-
-/* ---- Surface: putih solid + SEMUA varian transparan (toolbar/sticky/backdrop) ---- */
-html.dark .bg-white      { background-color:#161e23; }
-html.dark .bg-white\/98  { background-color:rgba(22,30,35,.98); }
-html.dark .bg-white\/95  { background-color:rgba(22,30,35,.95); }
-html.dark .bg-white\/90  { background-color:rgba(22,30,35,.90); }
-html.dark .bg-white\/85  { background-color:rgba(22,30,35,.85); }
-html.dark .bg-white\/80  { background-color:rgba(22,30,35,.80); }
-html.dark .bg-white\/75  { background-color:rgba(22,30,35,.75); }
-html.dark .bg-white\/70  { background-color:rgba(22,30,35,.70); }
-html.dark .bg-white\/60  { background-color:rgba(22,30,35,.60); }
-html.dark .bg-white\/50  { background-color:rgba(22,30,35,.50); }
-html.dark .bg-\[\#ffffff\], html.dark .bg-\[\#fff\],
-html.dark .bg-\[\#FFFFFF\], html.dark .bg-\[\#FFF\] { background-color:#161e23; }
-
-/* ---- Surface netral (slate/gray/zinc/neutral) ---- */
-html.dark .bg-slate-50,  html.dark .bg-gray-50,  html.dark .bg-zinc-50,  html.dark .bg-neutral-50  { background-color:#1b242a; }
-html.dark .bg-slate-100, html.dark .bg-gray-100, html.dark .bg-zinc-100, html.dark .bg-neutral-100 { background-color:#232e35; }
-html.dark .bg-slate-200, html.dark .bg-gray-200, html.dark .bg-zinc-200, html.dark .bg-neutral-200 { background-color:#2b3742; }
-html.dark .bg-slate-50\/90, html.dark .bg-slate-50\/70, html.dark .bg-slate-50\/60,
-html.dark .bg-gray-50\/70,  html.dark .bg-gray-50\/60,  html.dark .bg-slate-100\/70 { background-color:rgba(27,36,42,.9); }
-
-/* ---- Teks netral ---- */
-html.dark .text-\[\#1a1a2e\],
-html.dark .text-slate-900, html.dark .text-gray-900, html.dark .text-zinc-900, html.dark .text-neutral-900 { color:#e7eef2; }
-html.dark .text-slate-800, html.dark .text-gray-800, html.dark .text-zinc-800, html.dark .text-neutral-800 { color:#d4dbe2; }
-html.dark .text-slate-700, html.dark .text-gray-700, html.dark .text-zinc-700, html.dark .text-neutral-700 { color:#c3ccd6; }
-html.dark .text-slate-600, html.dark .text-gray-600, html.dark .text-zinc-600, html.dark .text-neutral-600 { color:#a1b1bc; }
-html.dark .text-slate-500, html.dark .text-gray-500, html.dark .text-zinc-500, html.dark .text-neutral-500 { color:#8d9bab; }
-html.dark .text-slate-400, html.dark .text-gray-400, html.dark .text-zinc-400, html.dark .text-neutral-400 { color:#728390; }
-html.dark .text-slate-300, html.dark .text-gray-300, html.dark .text-zinc-300, html.dark .text-neutral-300 { color:#566573; }
-
-/* ---- Border netral ---- */
-html.dark .border-slate-100, html.dark .border-gray-100, html.dark .border-zinc-100, html.dark .border-neutral-100,
-html.dark .border-slate-50,  html.dark .border-gray-50 { border-color:#1f2a31; }
-html.dark .border-slate-200, html.dark .border-gray-200, html.dark .border-zinc-200, html.dark .border-neutral-200,
-html.dark .border-slate-200\/80, html.dark .border-slate-200\/70, html.dark .border-slate-200\/60,
-html.dark .border-slate-100\/90 { border-color:#263139; }
-html.dark .border-slate-300, html.dark .border-gray-300, html.dark .border-zinc-300, html.dark .border-neutral-300 { border-color:#303c45; }
-
-/* ---- Divider (divide-*) biar garis tipis nggak nyala putih ---- */
-html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
-html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
-html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
-html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color:#263139; }
-html.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
-html.dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]) { border-color:#1a232a; }
-
-/* ---- Hover surface ---- */
-html.dark .hover\:bg-slate-50:hover,  html.dark .hover\:bg-gray-50:hover,
-html.dark .hover\:bg-zinc-50:hover,   html.dark .hover\:bg-neutral-50:hover { background-color:#1f2a31; }
-html.dark .hover\:bg-slate-100:hover, html.dark .hover\:bg-gray-100:hover   { background-color:#26323a; }
-html.dark .hover\:bg-white:hover { background-color:#1b242a; }
-html.dark .hover\:bg-blue-50\/30:hover { background-color:rgba(43,182,205,.08); }
-html.dark .bg-blue-50\/30 { background-color:rgba(43,182,205,.08); }
-html.dark .bg-blue-50\/50 { background-color:rgba(43,182,205,.12); }
-
-/* ---- Badge & status: background gelap lembut ---- */
-html.dark .bg-blue-50    { background-color:#17283d; }
-html.dark .bg-emerald-50 { background-color:#14301f; }
-html.dark .bg-amber-50   { background-color:#352a14; }
-html.dark .bg-red-50     { background-color:#3a1c1c; }
-html.dark .bg-purple-50  { background-color:#271d3d; }
-html.dark .bg-orange-50  { background-color:#352414; }
-html.dark .bg-indigo-50  { background-color:#1e2140; }
-html.dark .bg-teal-50    { background-color:#13302a; }
-
-/* ---- Teks berwarna (debit/kredit/status/badge) ---- */
-html.dark .text-blue-700,    html.dark .text-blue-600    { color:#7fb2ec; }
-html.dark .text-emerald-700, html.dark .text-emerald-600 { color:#5fd089; }
-html.dark .text-red-700,     html.dark .text-red-600     { color:#e07b7b; }
-html.dark .text-amber-800,   html.dark .text-amber-700, html.dark .text-amber-600 { color:#e2ab5c; }
-html.dark .text-purple-700  { color:#b394e8; }
-html.dark .text-orange-700  { color:#e0a15c; }
-html.dark .text-indigo-700  { color:#9aa0e8; }
-html.dark .text-teal-700    { color:#5cc4a1; }
-
-/* ---- Border berwarna (badge) ---- */
-html.dark .border-blue-200,  html.dark .border-blue-100  { border-color:#284862; }
-html.dark .border-emerald-200 { border-color:#1f4a30; }
-html.dark .border-amber-200, html.dark .border-amber-100 { border-color:#4a3a1c; }
-html.dark .border-red-200    { border-color:#4e2a2a; }
-html.dark .border-purple-200 { border-color:#3a2d55; }
-html.dark .border-orange-200 { border-color:#4a361c; }
-html.dark .border-indigo-200 { border-color:#2e3360; }
-html.dark .border-teal-200   { border-color:#1f4a40; }
-
-/* ---- Tombol utama (gradient navy) → cyan biar nonjol di dark ---- */
-
-/* =========================================================
-   DARK MODE v3 — tutup sisa celah "blentang-blentong".
-   Tambahan di atas v2 (native control, scrollbar, autofill,
-   putih arbitrary, skala 50/100 yang belum ada, shadow/ring).
-   Semua scoped html.dark → mode terang 100% tidak tersentuh.
-   ========================================================= */
-
-/* 1) Native color-scheme → scrollbar, <select>, date picker,
-      checkbox, autofill IKUT gelap. Ini penyebab utama "kedip
-      putih" di kontrol bawaan browser. */
-:root     { color-scheme: light; }
-html.dark { color-scheme: dark; }
-
-/* 2) Scrollbar WebKit senada (bukan abu terang) */
-html.dark ::-webkit-scrollbar       { width:10px; height:10px; }
-html.dark ::-webkit-scrollbar-track { background:#0e1417; }
-html.dark ::-webkit-scrollbar-thumb { background:#2b3742; border-radius:8px; }
-html.dark ::-webkit-scrollbar-thumb:hover { background:#394956; }
-
-/* 3) Seleksi teks + placeholder */
-html.dark ::selection   { background:rgba(43,182,205,.22); color:#e7eef2; }
-html.dark ::placeholder { color:#728390; opacity:1; }
-
-/* 4) Autofill login/form → hilangkan kotak putih khas Chrome */
-html.dark input:-webkit-autofill,
-html.dark input:-webkit-autofill:hover,
-html.dark input:-webkit-autofill:focus,
-html.dark textarea:-webkit-autofill,
-html.dark select:-webkit-autofill {
-  -webkit-text-fill-color:#e7eef2;
-  -webkit-box-shadow:0 0 0 1000px #161e23 inset;
-  caret-color:#e7eef2;
+/* 1. Page Shell & Dashboard Root */
+html.dark .bg-gradient-to-br.from-\[\#F5F6FB\] {
+  background-image: linear-gradient(135deg, #070a12 0%, #0d1424 100%) !important;
+  background-color: #070a12 !important;
 }
 
-/* 5) Putih arbitrary (ekuivalen hex Tailwind) yang bocor di card/section */
+/* 2. Primary Surfaces: Card, Container, Sidebar, Dialog (Level 1 Elevation) */
+html.dark .bg-white,
+html.dark .bg-\[\#ffffff\],
+html.dark .bg-\[\#fff\],
+html.dark .bg-\[\#FFFFFF\],
+html.dark .bg-\[\#FFF\] {
+  background-color: #101827;
+}
+
+/* Translucent surfaces */
+html.dark .bg-white\/98  { background-color: rgba(16, 24, 39, .98); }
+html.dark .bg-white\/95  { background-color: rgba(16, 24, 39, .95); }
+html.dark .bg-white\/90  { background-color: rgba(16, 24, 39, .90); }
+html.dark .bg-white\/85  { background-color: rgba(16, 24, 39, .85); }
+html.dark .bg-white\/80  { background-color: rgba(16, 24, 39, .80); }
+html.dark .bg-white\/75  { background-color: rgba(16, 24, 39, .75); }
+html.dark .bg-white\/70  { background-color: rgba(16, 24, 39, .70); }
+html.dark .bg-white\/60  { background-color: rgba(16, 24, 39, .60); }
+html.dark .bg-white\/50  { background-color: rgba(16, 24, 39, .50); }
+
+/* 3. Secondary Surfaces: Table Header, Inset Panels, Sub-cards (Level 2 Elevation) */
+html.dark .bg-slate-50,
+html.dark .bg-gray-50,
+html.dark .bg-zinc-50,
+html.dark .bg-neutral-50 {
+  background-color: #151f30;
+}
+
+html.dark .bg-slate-100,
+html.dark .bg-gray-100,
+html.dark .bg-zinc-100,
+html.dark .bg-neutral-100 {
+  background-color: #1a263a;
+}
+
+html.dark .bg-slate-200,
+html.dark .bg-gray-200,
+html.dark .bg-zinc-200,
+html.dark .bg-neutral-200 {
+  background-color: #24344d;
+}
+
+html.dark .bg-slate-50\/90,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/60,
+html.dark .bg-gray-50\/70,
+html.dark .bg-gray-50\/60,
+html.dark .bg-slate-100\/70 {
+  background-color: rgba(21, 31, 48, 0.85);
+}
+
+/* Light arbitrary page backgrounds mapped to card/canvas appropriately */
 html.dark .bg-\[\#fafafa\], html.dark .bg-\[\#FAFAFA\],
 html.dark .bg-\[\#f9fafb\], html.dark .bg-\[\#F9FAFB\],
 html.dark .bg-\[\#f8fafc\], html.dark .bg-\[\#F8FAFC\],
 html.dark .bg-\[\#f5f6fb\], html.dark .bg-\[\#F5F6FB\],
 html.dark .bg-\[\#f1f5f9\], html.dark .bg-\[\#F1F5F9\],
-html.dark .bg-\[\#f3f4f6\], html.dark .bg-\[\#F3F4F6\] { background-color:#161e23; }
-
-/* 6) Skala badge/status yang BELUM ada di v2 → semua senada */
-html.dark .bg-sky-50     { background-color:#17283d; }
-html.dark .bg-cyan-50    { background-color:#123038; }
-html.dark .bg-green-50   { background-color:#14301f; }
-html.dark .bg-lime-50    { background-color:#26300f; }
-html.dark .bg-yellow-50  { background-color:#342f12; }
-html.dark .bg-rose-50    { background-color:#3a1c22; }
-html.dark .bg-pink-50    { background-color:#3a1c2c; }
-html.dark .bg-violet-50  { background-color:#241d3d; }
-html.dark .bg-fuchsia-50 { background-color:#311a33; }
-
-html.dark .bg-blue-100    { background-color:#1b3350; }
-html.dark .bg-sky-100     { background-color:#1b3350; }
-html.dark .bg-emerald-100 { background-color:#193d28; }
-html.dark .bg-green-100   { background-color:#193d28; }
-html.dark .bg-teal-100    { background-color:#173d36; }
-html.dark .bg-amber-100   { background-color:#45361b; }
-html.dark .bg-red-100     { background-color:#4a2424; }
-html.dark .bg-indigo-100  { background-color:#262a52; }
-html.dark .bg-purple-100  { background-color:#32254d; }
-
-/* 7) Teks warna yang belum ada di v2 */
-html.dark .text-sky-700,    html.dark .text-sky-600    { color:#7fb2ec; }
-html.dark .text-cyan-700,   html.dark .text-cyan-600   { color:#5cc4cf; }
-html.dark .text-green-700,  html.dark .text-green-600  { color:#5fd089; }
-html.dark .text-rose-700,   html.dark .text-rose-600   { color:#e08a9a; }
-html.dark .text-pink-700,   html.dark .text-pink-600   { color:#e088b4; }
-html.dark .text-violet-700, html.dark .text-violet-600 { color:#b394e8; }
-
-/* 8) Shadow jangan bikin "halo" putih → bayangan hitam lembut */
-html.dark .shadow-sm { box-shadow:0 1px 2px rgba(0,0,0,.35); }
-html.dark .shadow,
-html.dark .shadow-md { box-shadow:0 2px 8px rgba(0,0,0,.40); }
-html.dark .shadow-lg { box-shadow:0 8px 24px rgba(0,0,0,.45); }
-html.dark .shadow-xl { box-shadow:0 12px 32px rgba(0,0,0,.50); }
-
-/* 9) Ring putih default → netral gelap */
-html.dark .ring-white { --tw-ring-color:#2b3742; }
-html.dark .ring-slate-200, html.dark .ring-gray-200 { --tw-ring-color:#263139; }
-
-
-/* =========================================================
-   DARK MODE v3.1 — ratakan SEMUA gradient jadi surface gelap
-   solid, biar nggak ada banner/section yang pucat nyangkut.
-   Tombol utama (from-[#0f0c29]) TIDAK kena, karena selector-nya
-   2-class → specificity lebih tinggi, jadi tetap cyan.
-   ========================================================= */
-html.dark .bg-gradient-to-t,  html.dark .bg-gradient-to-tr,
-html.dark .bg-gradient-to-r,  html.dark .bg-gradient-to-br,
-html.dark .bg-gradient-to-b,  html.dark .bg-gradient-to-bl,
-html.dark .bg-gradient-to-l,  html.dark .bg-gradient-to-tl {
-  background-image: none;
-  background-color: #161e23;
+html.dark .bg-\[\#f3f4f6\], html.dark .bg-\[\#F3F4F6\] {
+  background-color: #101827;
 }
+
+/* 4. High-Contrast Typography Hierarchy */
+html.dark .text-\[\#1a1a2e\],
+html.dark .text-slate-900,
+html.dark .text-gray-900,
+html.dark .text-zinc-900,
+html.dark .text-neutral-900 {
+  color: #f1f5f9; /* Slate-100 (Primary text) */
+}
+
+html.dark .text-slate-800,
+html.dark .text-gray-800,
+html.dark .text-zinc-800,
+html.dark .text-neutral-800 {
+  color: #e2e8f0; /* Slate-200 */
+}
+
+html.dark .text-slate-700,
+html.dark .text-gray-700,
+html.dark .text-zinc-700,
+html.dark .text-neutral-700 {
+  color: #cbd5e1; /* Slate-300 */
+}
+
+html.dark .text-slate-600,
+html.dark .text-gray-600,
+html.dark .text-zinc-600,
+html.dark .text-neutral-600 {
+  color: #94a3b8; /* Slate-400 (Secondary text) */
+}
+
+html.dark .text-slate-500,
+html.dark .text-gray-500,
+html.dark .text-zinc-500,
+html.dark .text-neutral-500 {
+  color: #64748b; /* Slate-500 (Tertiary text) */
+}
+
+html.dark .text-slate-400,
+html.dark .text-gray-400,
+html.dark .text-zinc-400,
+html.dark .text-neutral-400 {
+  color: #475569; /* Slate-600 */
+}
+
+html.dark .text-slate-300,
+html.dark .text-gray-300,
+html.dark .text-zinc-300,
+html.dark .text-neutral-300 {
+  color: #334155;
+}
+
+/* 5. Borders & Dividers */
+html.dark .border-slate-100,
+html.dark .border-gray-100,
+html.dark .border-zinc-100,
+html.dark .border-neutral-100,
+html.dark .border-slate-50,
+html.dark .border-gray-50 {
+  border-color: #162030;
+}
+
+html.dark .border-slate-200,
+html.dark .border-gray-200,
+html.dark .border-zinc-200,
+html.dark .border-neutral-200,
+html.dark .border-slate-200\/80,
+html.dark .border-slate-200\/70,
+html.dark .border-slate-200\/60,
+html.dark .border-slate-100\/90 {
+  border-color: #1e293b;
+}
+
+html.dark .border-slate-300,
+html.dark .border-gray-300,
+html.dark .border-zinc-300,
+html.dark .border-neutral-300 {
+  border-color: #334155;
+}
+
+html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #162030;
+}
+
+html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b;
+}
+
+html.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #162030;
+}
+
+/* 6. Interactive & Hover States */
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-zinc-50:hover,
+html.dark .hover\:bg-neutral-50:hover {
+  background-color: #182335;
+}
+
+html.dark .hover\:bg-slate-100:hover,
+html.dark .hover\:bg-gray-100:hover {
+  background-color: #202d42;
+}
+
+html.dark .hover\:bg-white:hover {
+  background-color: #182335;
+}
+
+html.dark .hover\:bg-blue-50\/30:hover,
+html.dark .bg-blue-50\/30 {
+  background-color: rgba(6, 182, 212, 0.08);
+}
+html.dark .bg-blue-50\/50 {
+  background-color: rgba(6, 182, 212, 0.14);
+}
+
+/* 7. Status Badges (Financial, Cashflow & Operational POS) */
+/* Emerald / Green (Debit / Cash In / Lunas / Selesai) */
+html.dark .bg-emerald-50, html.dark .bg-green-50   { background-color: #072517; }
+html.dark .bg-emerald-100, html.dark .bg-green-100 { background-color: #0d3824; }
+html.dark .text-emerald-700, html.dark .text-emerald-600,
+html.dark .text-green-700, html.dark .text-green-600 { color: #34d399; }
+html.dark .border-emerald-200, html.dark .border-emerald-100,
+html.dark .border-green-200, html.dark .border-green-100 { border-color: #134e2f; }
+
+/* Rose / Red (Kredit / Cash Out / Void / Ditolak / Beban) */
+html.dark .bg-red-50, html.dark .bg-rose-50     { background-color: #2d0e17; }
+html.dark .bg-red-100, html.dark .bg-rose-100   { background-color: #451522; }
+html.dark .text-red-700, html.dark .text-red-600,
+html.dark .text-rose-700, html.dark .text-rose-600 { color: #fb7185; }
+html.dark .border-red-200, html.dark .border-red-100,
+html.dark .border-rose-200, html.dark .border-rose-100 { border-color: #5f1525; }
+
+/* Amber / Yellow / Orange (Kasbon / Cicilan / Pending / Audit) */
+html.dark .bg-amber-50, html.dark .bg-yellow-50, html.dark .bg-orange-50 { background-color: #2b1b06; }
+html.dark .bg-amber-100, html.dark .bg-yellow-100, html.dark .bg-orange-100 { background-color: #422a09; }
+html.dark .text-amber-800, html.dark .text-amber-700, html.dark .text-amber-600,
+html.dark .text-yellow-700, html.dark .text-orange-700 { color: #fbbf24; }
+html.dark .border-amber-200, html.dark .border-amber-100,
+html.dark .border-yellow-200, html.dark .border-orange-200 { border-color: #5c390a; }
+
+/* Blue / Sky / Indigo / Cyan (Info / Transfer Bank / Saldo / Metode) */
+html.dark .bg-blue-50, html.dark .bg-sky-50, html.dark .bg-indigo-50, html.dark .bg-cyan-50 { background-color: #0c1e36; }
+html.dark .bg-blue-100, html.dark .bg-sky-100, html.dark .bg-indigo-100, html.dark .bg-cyan-100 { background-color: #142e50; }
+html.dark .text-blue-700, html.dark .text-blue-600,
+html.dark .text-sky-700, html.dark .text-sky-600,
+html.dark .text-indigo-700, html.dark .text-cyan-700, html.dark .text-cyan-600 { color: #60a5fa; }
+html.dark .border-blue-200, html.dark .border-blue-100,
+html.dark .border-sky-200, html.dark .border-indigo-200, html.dark .border-cyan-200 { border-color: #1a3c6c; }
+
+/* Purple / Violet (Special / Solit Coins / Gamification) */
+html.dark .bg-purple-50, html.dark .bg-violet-50, html.dark .bg-fuchsia-50 { background-color: #1d1236; }
+html.dark .bg-purple-100, html.dark .bg-violet-100 { background-color: #2e1c55; }
+html.dark .text-purple-700, html.dark .text-violet-700 { color: #c084fc; }
+html.dark .border-purple-200, html.dark .border-violet-200 { border-color: #442177; }
+
+/* Teal */
+html.dark .bg-teal-50 { background-color: #0a2524; }
+html.dark .bg-teal-100 { background-color: #123d3b; }
+html.dark .text-teal-700 { color: #2dd4bf; }
+html.dark .border-teal-200 { border-color: #164e4b; }
+
+/* 8. Input, Textarea, Select Form Controls */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]),
+html.dark textarea,
+html.dark select {
+  background-color: #131d2e;
+  color: #f1f5f9;
+  border-color: #22324a;
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]):focus,
+html.dark textarea:focus,
+html.dark select:focus {
+  border-color: #06b6d4;
+  outline: none;
+  box-shadow: 0 0 0 1px #06b6d4, 0 0 12px rgba(6, 182, 212, 0.25);
+}
+
+/* 9. Native Browser Controls & Autofill */
+html.dark ::-webkit-scrollbar       { width: 10px; height: 10px; }
+html.dark ::-webkit-scrollbar-track { background: #090d16; }
+html.dark ::-webkit-scrollbar-thumb { background: #22324a; border-radius: 8px; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #2d4160; }
+
+html.dark ::selection   { background: rgba(6, 182, 212, 0.25); color: #f1f5f9; }
+html.dark ::placeholder { color: #64748b; opacity: 1; }
+
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover,
+html.dark input:-webkit-autofill:focus,
+html.dark textarea:-webkit-autofill,
+html.dark select:-webkit-autofill {
+  -webkit-text-fill-color: #f1f5f9;
+  -webkit-box-shadow: 0 0 0 1000px #131d2e inset;
+  caret-color: #f1f5f9;
+}
+
+/* 10. Ambient Dark Shadows (No white halo effects) */
+html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0, 0, 0, .45); }
+html.dark .shadow,
+html.dark .shadow-md { box-shadow: 0 4px 12px rgba(0, 0, 0, .50); }
+html.dark .shadow-lg { box-shadow: 0 8px 24px rgba(0, 0, 0, .55); }
+html.dark .shadow-xl { box-shadow: 0 16px 40px rgba(0, 0, 0, .65); }
+
+/* Ring defaults */
+html.dark .ring-white { --tw-ring-color: #24344d; }
+html.dark .ring-slate-200, html.dark .ring-gray-200 { --tw-ring-color: #1e293b; }
