@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, useSyncExternalStore, memo } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES, humanizeRoleKey } from "@/lib/permissions";
+import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES, humanizeRoleKey, isJogjaBranchLockedRole } from "@/lib/permissions";
 import type ExcelJS from "exceljs";
 import {
     categoryLabel,
@@ -2022,8 +2022,9 @@ export default function CashflowPage() {
     const [canAuditOut, setCanAuditOut] = useState(false);
     const [canManageAuditAccess, setCanManageAuditAccess] = useState(false);
     // ── Multi-cabang: "ALL" = Semua Cabang (konsolidasi/Utama), "JOGJA" = eksklusif Jogja ──
-    const [branchView, setBranchView] = useState<"ALL" | "JOGJA">("ALL");
+     const [branchView, setBranchView] = useState<"ALL" | "JOGJA">("ALL");
     const [canSwitchBranch, setCanSwitchBranch] = useState(false); // hanya Admin & Accounting
+    const [isJogjaLocked, setIsJogjaLocked] = useState(false); // ⬅️ BARU: role Solit Jogja — dikunci Jogja
     const [showAuditAccessModal, setShowAuditAccessModal] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(() => (cashflowCache ? new Date(cashflowCache.at) : null));
     const ITEMS_PER_PAGE = 70;
@@ -2043,6 +2044,14 @@ export default function CashflowPage() {
             setCanManageAuditAccess(roles.some((x) => (CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES as string[]).includes(x)));
             // Switcher cabang sementara hanya untuk Admin & Accounting
             setCanSwitchBranch(roles.some((x) => ["ADMIN", "ACCOUNTING"].includes(x)));
+
+            // ⬅️ BARU: role Solit Jogja — data dikunci cabang Jogja (backend sudah
+            // memaksa; di sini kita samakan tampilan + matikan switcher). branchView
+            // di-set "JOGJA" supaya URL ikut kirim ?branch=JOGJA (konsisten, walau
+            // server tetap memaksa Jogja apa pun paramnya).
+            const jogjaLocked = isJogjaBranchLockedRole(roles);
+            setIsJogjaLocked(jogjaLocked);
+            if (jogjaLocked) setBranchView("JOGJA");
 
             if (!isAllowed) return;
             // /api/cashflow/audit-access adalah sumber kebenaran final: Admin/Programmer bisa
@@ -2480,9 +2489,18 @@ export default function CashflowPage() {
                     </div>
                 </div>
 
-                {/* Switcher Cabang — dipindah ke baris sendiri di bawah header biar jelas
-                    "lagi lihat data cabang mana" & toolbar bawah nggak sesak. Fungsi sama persis. */}
-                {canSwitchBranch && (
+                  {/* Switcher Cabang — dipindah ke baris sendiri di bawah header biar jelas
+                    "lagi lihat data cabang mana" & toolbar bawah nggak sesak. Fungsi sama persis.
+                    Role Solit Jogja TIDAK dapat switcher (canSwitchBranch false utk role itu),
+                    diganti badge statis "Cabang Jogja (terkunci)". */}
+                {isJogjaLocked ? (
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Tampilan</span>
+                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                            <Lock size={13} /> 📍 Cabang Jogja (terkunci)
+                        </span>
+                    </div>
+                ) : canSwitchBranch && (
                     <div className="flex items-center gap-2.5 flex-wrap">
                         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Tampilan</span>
                         <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">

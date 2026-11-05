@@ -75,6 +75,7 @@ const ALL_ROLES = [
   "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",
   "PKL_PENGELOLA_BARANG", "PKL_ACCOUNTING",
   "CUSTOMER_SERVICE",
+  "SOLIT_JOGJA",
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -98,8 +99,8 @@ const ROLE_LABEL: Record<string, string> = {
   PKL_PENGELOLA_BARANG: "PKL Pengelola Barang",
   PURCHASING: "Purchasing",
   PKL_ZENITH: "PKL Zenith", PKL_ACCOUNTING: "PKL Accounting",
+  SOLIT_JOGJA: "Solit Jogja",
 };
-
 const RI = "w-3.5 h-3.5";
 const ROLE_ICON: Record<string, React.ReactNode> = {
   ADMIN: <Crown className={RI} />, PROGRAMMER: <Code2 className={RI} />, ASISTEN_CEO: <Handshake className={RI} />,
@@ -115,6 +116,7 @@ const ROLE_ICON: Record<string, React.ReactNode> = {
   CUSTOMER_SERVICE: <Headset className={RI} />, PKL_CUSTOMER_SERVICE: <GraduationCap className={RI} />,
   PKL_PENGELOLA_BARANG: <GraduationCap className={RI} />, PURCHASING: <ShoppingCart className={RI} />, KEPALA_ZENITH: <Zap className={RI} />,
   PKL_ZENITH: <GraduationCap className={RI} />, PKL_ACCOUNTING: <GraduationCap className={RI} />,
+  SOLIT_JOGJA: <MapPin className={RI} />,
 };
 
 const PKL_BADGE = { bg: "#fefce8", text: "#854d0e", border: "#fde68a" };
@@ -155,6 +157,7 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   KEPALA_ZENITH: { bg: "#fdf4ff", text: "#7e22ce", border: "#e9d5ff" },
   PKL_ZENITH: PKL_BADGE,
   PKL_ACCOUNTING: PKL_BADGE,
+  SOLIT_JOGJA: { bg: "#f3f0ff", text: "#6d28d9", border: "#ddd6fe" },
 };
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"]);
@@ -205,6 +208,7 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   PKL_ONPOINT: "#b45309", PKL_TEKNISI: "#b45309", PKL_KONTEN: "#b45309", PKL_PENGANTARAN: "#b45309",
   CUSTOMER_SERVICE: "#0369a1", PKL_CUSTOMER_SERVICE: "#b45309",
   PKL_PENGELOLA_BARANG: "#b45309", PURCHASING: "#9333ea", PKL_ACCOUNTING: "#b45309",
+  SOLIT_JOGJA: "#7c3aed",
 };
 function getAvatarColor(role: string) {
   return ROLE_AVATAR_COLOR[role] ?? "#6b7280";
@@ -493,7 +497,7 @@ function MultiRoleSelect({
         roles: [
           "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
           "PENGELOLA_BARANG", "ADMIN_BARANG", "TEKNISI", "PENGANTARAN",
-          "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"
+          "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE", "SOLIT_JOGJA"
         ]
       },
       { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_CC"] },

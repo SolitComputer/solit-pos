@@ -92,13 +92,20 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     // justru sudah terduplikasi (>1 baris).
     const { data: existingRows } = await supabase
       .from("laptop_units")
-      .select("id")
+      .select("id, status, laptop:laptops(laptop_name)")
       .eq("serial_number", serial_number)
       .limit(1);
 
     if (existingRows && existingRows.length > 0) {
+      const dup = existingRows[0] as any;
+      const lap = Array.isArray(dup.laptop) ? dup.laptop[0] : dup.laptop;
+      const lokasi = lap?.laptop_name ? ` pada unit "${lap.laptop_name}"` : "";
       return NextResponse.json(
-        { success: false, message: `Serial number "${serial_number}" sudah terdaftar` },
+        {
+          success: false,
+          message: `Serial number "${serial_number}" sudah terdaftar${lokasi} (status: ${dup.status ?? "—"}). Cek di Data Barang → Reset filter, lalu filter Status Stok "Minus".`,
+          status_unit: dup.status ?? null,
+        },
         { status: 409 }
       );
     }
