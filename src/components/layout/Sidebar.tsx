@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
@@ -1389,7 +1389,7 @@ function RoleBadges({ user }: { user: any }) {
   );
 }
 
-function NavItem({ item, isActive, onClick, badge, rail, isPinned, onTogglePin }: {
+const NavItem = React.memo(function NavItem({ item, isActive, onClick, badge, rail, isPinned, onTogglePin }: {
   item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number; rail?: boolean;
   isPinned?: boolean; onTogglePin?: (e: React.MouseEvent) => void;
 }) {
@@ -1465,9 +1465,9 @@ function NavItem({ item, isActive, onClick, badge, rail, isPinned, onTogglePin }
       )}
     </Link>
   );
-}
+});
 
-function SidebarContent({
+const SidebarContent = React.memo(function SidebarContent({
   user, loading, groups, pathname, onClose, onLogout, badges, rail, onToggleRail, openMap, onToggleGroup, searchQuery, onSearchChange,
   pinnedItems, pinnedHrefs, onTogglePin,
 }: {
@@ -1736,10 +1736,10 @@ function SidebarContent({
           <span className="flex-shrink-0 group-hover:text-red-500">{Icons.logout}</span>
           {!rail && <span>Keluar</span>}
         </button>
-      </div>
+          </div>
     </div>
   );
-}
+});
 
 function dedupeGroups(groups: MenuGroup[]): MenuGroup[] {
   const byLabel = new Map<string, MenuGroup>();
@@ -1923,17 +1923,21 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
-  const userRoles: string[] =
+    const userRoles = useMemo<string[]>(() =>
     Array.isArray(user?.roles) && user.roles.length > 0
       ? user.roles
-      : user?.role ? [user.role] : [];
+      : user?.role ? [user.role] : [],
+    [user?.roles, user?.role]
+  );
 
-  const effectiveRoles = expandRolesWithParents(userRoles);
+    const effectiveRoles = useMemo(() => expandRolesWithParents(userRoles), [userRoles]);
 
-  const staticGroups: MenuGroup[] =
+    const staticGroups = useMemo<MenuGroup[]>(() =>
     effectiveRoles.length > 0
       ? dedupeGroups(mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles))
-      : [];
+      : [],
+    [effectiveRoles]
+  );
 
   const isContractSigner = user?.id === YOGA_ADMIN_ID || user?.id === REINALDY_ADMIN_ID;
   const isContractExpiringAdmin = userRoles.some((r) => (CONTRACT_EXPIRING_VIEW_ROLES as string[]).includes(r));
@@ -1945,7 +1949,7 @@ export default function Sidebar() {
       .map((g) => ({ ...g, items: g.items.filter((it) => it.href !== ITEM_PKL_REPORT.href) }))
       .filter((g) => g.items.length > 0);
 
-  const groups: MenuGroup[] = stripPklReports(withPelanggaranInAbsensi(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKotakSuratGroup(withKendaraanGroup(
+    const groups = useMemo<MenuGroup[]>(() => stripPklReports(withPelanggaranInAbsensi(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKotakSuratGroup(withKendaraanGroup(
     dedupeGroups([
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
@@ -1961,7 +1965,8 @@ export default function Sidebar() {
     showPerjanjian: !!(contractStatus && contractStatus !== "APPROVED"),
     showSign: isContractSigner,
     showExpiring: isContractExpiringAdmin,
-  })));
+  }))),
+  [needsBiometricEnroll, staticGroups, canViewTransaksiByUserId, dynamicGroups, effectiveRoles, contractStatus, isContractSigner, isContractExpiringAdmin]);
 
   const groupsSig = groups.map((g) => g.label).join("|");
 
@@ -2062,7 +2067,7 @@ export default function Sidebar() {
   const reminderUnread = useReminderBadge(isSilentAdmin ? null : user?.id);
   const onTanyaCeoPage = pathname.startsWith("/dashboard/tanya-ceo");
   const aiCeoEscalationCount = useEscalationBadge(user?.id, userRoles.some(r => AI_CEO_ROLES.includes(r as any)));
-  const badges: Record<string, number> = {
+   const badges = useMemo<Record<string, number>>(() => ({
     "/dashboard/preparation/pengantaran": deliveryBadge,
     "/dashboard/preparation/antrian": prep.menungguUnacked.length,
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
@@ -2071,24 +2076,28 @@ export default function Sidebar() {
     "/dashboard/pengajuan-dana": onPengajuanDanaPage ? 0 : pengajuanDanaBadge.count,
     "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
     "/dashboard/ai-ceo": aiCeoEscalationCount,
-
     "/dashboard/leads-chat": leadsChat.unreadCount,
     "/dashboard/contract-expiring": expiringContracts.count,
-  };
+  }), [deliveryBadge, prep.menungguUnacked.length, prep.siapKirimUnacked.length,
+    onOvertimePage, overtimeNotify.count, onKendaraanPage, vehiclePending.count,
+    onPengajuanDanaPage, pengajuanDanaBadge.count, onTanyaCeoPage, reminderUnread,
+    aiCeoEscalationCount, leadsChat.unreadCount, expiringContracts.count]);
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
-  const displayGroups: MenuGroup[] = groups.map((g) => ({
+   const displayGroups = useMemo<MenuGroup[]>(() => groups.map((g) => ({
     ...g,
     items: g.items.map((it) =>
       it.href === "/dashboard/users" && !isUserMgmtAdmin ? { ...it, name: "Akun" } : it
     ),
-  }));
+  })), [groups, isUserMgmtAdmin]);
 
   const searchTerm = searchQuery.trim().toLowerCase();
-  const filteredGroups: MenuGroup[] = searchTerm
+  const filteredGroups = useMemo<MenuGroup[]>(() => searchTerm
     ? displayGroups
       .map((g) => ({ ...g, items: g.items.filter((it) => it.name.toLowerCase().includes(searchTerm)) }))
       .filter((g) => g.items.length > 0)
-    : displayGroups;
+    : displayGroups,
+    [searchTerm, displayGroups]
+  );
 
   const allAvailableItems = useMemo(() => {
     const map = new Map<string, MenuItem>();
