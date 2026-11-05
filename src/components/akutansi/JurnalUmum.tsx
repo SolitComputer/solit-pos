@@ -2690,9 +2690,10 @@ function EntryFormModal({
         const today = jakartaDate(new Date().toISOString());
         return today.startsWith(period) ? today : `${period}-01`;
     });
-    const [keterangan, setKeterangan] = useState(entry?.keterangan ?? "");
+        const [keterangan, setKeterangan] = useState(entry?.keterangan ?? "");
     const [ref, setRef] = useState(entry?.ref ?? "");
     const [template, setTemplate] = useState("CUSTOM");
+    const [isClosing, setIsClosing] = useState(false); // ⬅️ BARU — tandai jurnal ini sebagai Jurnal Penutup
 
     const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
@@ -2843,11 +2844,12 @@ function EntryFormModal({
             const res = await fetch(url, {
                 method: isEdit ? "PUT" : "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+                                body: JSON.stringify({
                     tanggal,
                     keterangan: keterangan.trim(),
                     ref: ref.trim() || null,
                     source_category: isEdit ? undefined : template,
+                    is_closing: isEdit ? undefined : isClosing, // ⬅️ BARU — tandai jurnal penutup
                     lines: lines.map(({ _id, ...rest }) => rest),
                 }),
             });
@@ -2990,13 +2992,35 @@ function EntryFormModal({
 
                     <div>
                         <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Keterangan</label>
-                        <input
+                                                <input
                             value={keterangan}
                             onChange={(e) => setKeterangan(e.target.value)}
                             placeholder="Tipe laptop - SN - Nama customer"
                             className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                         />
                     </div>
+
+                    {/* ⬅️ BARU — Jurnal Penutup (cuma saat buat baru, bukan edit). Baris penutup
+                        di-exclude dari Laba Rugi periode berjalan, jadi pendapatan/beban bulan ini
+                        tetap tampil utuh walau akun-akunnya sudah di-nol-kan di Buku Besar. */}
+                    {!isEdit && (
+                        <label className="flex items-start gap-2.5 p-3 rounded-xl border border-amber-200 bg-amber-50/60 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={isClosing}
+                                onChange={(e) => setIsClosing(e.target.checked)}
+                                className="w-4 h-4 mt-0.5 rounded border-amber-300 accent-amber-600 shrink-0"
+                            />
+                            <span className="text-[11.5px] leading-snug">
+                                <b className="text-amber-800">Tandai sebagai Jurnal Penutup</b>
+                                <span className="block text-amber-700/80 mt-0.5">
+                                    Dipakai saat tutup buku (biasanya akhir tahun) untuk me-nol-kan akun
+                                    Pendapatan &amp; Beban ke akun Laba. Baris penutup tidak mengurangi Laba
+                                    Rugi periode berjalan.
+                                </span>
+                            </span>
+                        </label>
+                    )}
 
                     <div>
                         <div className="flex items-center justify-between mb-1.5">

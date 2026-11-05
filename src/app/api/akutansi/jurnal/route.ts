@@ -334,11 +334,12 @@ export const GET = withAuth(async (req) => {
 // ── POST /api/akuntansi/jurnal — jurnal MANUAL ───────────────────────────────
 export const POST = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
-  const { tanggal, keterangan, ref, source_category, lines } = body as {
+   const { tanggal, keterangan, ref, source_category, is_closing, lines } = body as {
     tanggal: string;
     keterangan: string;
     ref?: string | null;
     source_category?: string | null;
+    is_closing?: boolean;
     lines: DraftLine[];
   };
 
@@ -383,8 +384,9 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       journal_no: journalNo,
       source_type: "MANUAL",
       source_id: null,
-      source_category: source_category ?? null,
+            source_category: source_category ?? null,
       total: totalOf(merged),
+      is_closing: is_closing === true, // ⬅️ BARU — jurnal penutup; di-exclude dari Laba Rugi periode berjalan
       created_by: user.id,
     })
     .select("id")

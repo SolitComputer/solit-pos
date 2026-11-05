@@ -249,7 +249,7 @@ export async function computeLabaRugi(
     while (true) {
       let lrQ = supabase
         .from("journal_lines")
-        .select("account_code, side, nominal, journal_entries!inner(period)")
+               .select("account_code, side, nominal, journal_entries!inner(period, is_closing)")
         .lte("journal_entries.period", period);
       if (branchFilter) lrQ = lrQ.eq("journal_entries.branch", branchFilter);
       const { data: page, error: lineErr } = await lrQ
@@ -263,7 +263,10 @@ export async function computeLabaRugi(
         const signed = l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
         const code = l.account_code as string;
         mutasiKumulatif.set(code, (mutasiKumulatif.get(code) ?? 0) + signed);
-        if (l.journal_entries?.period === period) {
+               // Baris jurnal penutup (is_closing) di-exclude dari Laba Rugi periode
+        // berjalan — supaya setelah tutup buku, pendapatan/beban bulan ini tetap
+        // tampil utuh, tidak ter-nol-kan oleh jurnal penutupnya sendiri.
+        if (l.journal_entries?.period === period && !l.journal_entries?.is_closing) {
           mutasiPeriode.set(code, (mutasiPeriode.get(code) ?? 0) + signed);
         }
       }
