@@ -108,7 +108,7 @@ export default function AsetKeuanganContent() {
       {tab === "aset" && <FixedAssetsContent />}
       {tab === "utang" && <FinancialEntriesContent entryType="utang" />}
       {tab === "piutang" && <FinancialEntriesContent entryType="piutang" />}
-      {tab === "modal_service" && <FinancialEntriesContent entryType="modal_service" />}
+            {tab === "modal_service" && <FinancialEntriesContent entryType="modal_service" layout="row" />}
     </DashboardLayout>
   );
 }

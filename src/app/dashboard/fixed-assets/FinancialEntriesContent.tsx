@@ -153,9 +153,17 @@ function errMsg(e: unknown, fallback: string): string {
 // ═════════════════════════════════════════════════════════════════════════════
 // Component
 // ═════════════════════════════════════════════════════════════════════════════
-export default function FinancialEntriesContent({ entryType }: { entryType: EntryType }) {
+export default function FinancialEntriesContent({
+  entryType,
+  layout = "grid",
+}: {
+  entryType: EntryType;
+  /** "grid" (default) = kartu 1-3 kolom. "row" = list memanjang full width, satu entri per baris. */
+  layout?: "grid" | "row";
+}) {
   const cfg = CONFIG[entryType];
   const Icon = cfg.Icon;
+  const isRow = layout === "row";
 
   const [entries, setEntries] = useState<FinancialEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -518,6 +526,20 @@ export default function FinancialEntriesContent({ entryType }: { entryType: Entr
             </button>
           )}
         </div>
+           ) : isRow ? (
+        <ul className="flex flex-col gap-2.5">
+          {filtered.map((entry) => (
+            <EntryRow
+              key={entry.id}
+              entry={entry}
+              tile={cfg.tile}
+              Icon={Icon}
+              onEdit={() => openEditModal(entry)}
+              onDelete={() => setDeleteTarget(entry)}
+              onHistory={() => openHistory(entry)}
+            />
+          ))}
+        </ul>
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
           {filtered.map((entry) => (
@@ -922,13 +944,111 @@ function EntryCard({
           <span className="flex-shrink-0 tabular-nums">{formatDate(edited ? entry.updated_at : entry.created_at)}</span>
         </div>
 
-        <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex items-center">
+             <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex items-center">
           <button
             onClick={onHistory}
             className="inline-flex items-center gap-1.5 rounded-lg text-gray-500 text-xs font-semibold px-2.5 py-1.5 hover:bg-gray-100 transition ml-auto"
           >
             <HistoryIcon size={13} />
             Riwayat
+          </button>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Row entri — layout memanjang full width (untuk tab Modal Service)
+// ═════════════════════════════════════════════════════════════════════════════
+function EntryRow({
+  entry,
+  tile,
+  Icon,
+  onEdit,
+  onDelete,
+  onHistory,
+}: {
+  entry: FinancialEntry;
+  tile: string;
+  Icon: (p: { size?: number; className?: string }) => ReactNode;
+  onEdit: () => void;
+  onDelete: () => void;
+  onHistory: () => void;
+}) {
+  const edited = entry.updated_at && entry.updated_at !== entry.created_at;
+
+  return (
+    <li className="group relative rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition">
+      <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4">
+        {/* Ikon */}
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${tile}`}>
+          <Icon size={20} />
+        </div>
+
+        {/* Identitas: nama + badge kategori + tanggal + keterangan */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-bold text-gray-900 leading-snug break-words line-clamp-1">
+              {entry.nama}
+            </p>
+            {entry.kategori && (
+              <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 flex-shrink-0">
+                {entry.kategori}
+              </span>
+            )}
+            {entry.tanggal && (
+              <span className="text-[11px] text-gray-500 tabular-nums flex-shrink-0">
+                · {formatDate(entry.tanggal)}
+              </span>
+            )}
+          </div>
+          {entry.keterangan && (
+            <p className="text-xs text-gray-500 leading-relaxed line-clamp-1 break-words mt-0.5">
+              {entry.keterangan}
+            </p>
+          )}
+          <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+            {edited
+              ? `Diubah ${entry.updated_by_name || ""} · ${formatDate(entry.updated_at)}`.trim()
+              : entry.created_by_name
+                ? `Dicatat ${entry.created_by_name} · ${formatDate(entry.created_at)}`
+                : `Dicatat · ${formatDate(entry.created_at)}`}
+          </p>
+        </div>
+
+        {/* Nominal — kanan, selalu rata kanan */}
+        <div className="flex flex-col items-end flex-shrink-0 min-w-[110px] sm:min-w-[140px]">
+          <p className="text-base sm:text-lg font-black text-[#1a1a2e] tabular-nums tracking-tight whitespace-nowrap">
+            {formatIDR(toNum(entry.nominal))}
+          </p>
+        </div>
+
+        {/* Tombol aksi — kanan */}
+        <div className="flex items-center gap-0.5 flex-shrink-0 border-l border-gray-100 pl-2 sm:pl-3 ml-1">
+          <button
+            onClick={onHistory}
+            className="p-2 rounded-lg text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition"
+            aria-label={`Riwayat ${entry.nama}`}
+            title="Riwayat"
+          >
+            <HistoryIcon size={15} />
+          </button>
+          <button
+            onClick={onEdit}
+            className="p-2 rounded-lg text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition"
+            aria-label={`Edit ${entry.nama}`}
+            title="Edit"
+          >
+            <EditIcon />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+            aria-label={`Hapus ${entry.nama}`}
+            title="Hapus"
+          >
+            <TrashIcon />
           </button>
         </div>
       </div>
