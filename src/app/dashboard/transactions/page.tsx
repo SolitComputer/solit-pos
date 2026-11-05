@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasPermission, hasAnyRole, isJogjaBranchLockedRole } from "@/lib/permissions";
 import DateRangeCalendarPicker from "@/components/ui/DateRangeCalendarPicker";
 import { createPortal } from "react-dom";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -3399,6 +3399,7 @@ export default function Page() {
   const sortDir = sort.dir;
   const [companyName, setCompanyName] = useState("ALL");
   const [itemKind, setItemKind] = useState("ALL");
+  const [branch, setBranch] = useState("ALL"); // ⬅️ BARU: filter cabang
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = isMobile ? 10 : 25;
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -3458,6 +3459,9 @@ export default function Page() {
   const canSeeModal = userRoles.some((r) => MODAL_VISIBLE_ROLES.includes(r));
   // ── Hanya role yang punya akses /api/activity-logs yang boleh lihat Riwayat ──
   const canViewActivityLog = hasAnyRole(userRoles, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"]);
+  // ⬅️ BARU: role Solit Jogja — filter cabang dikunci ke Jogja (UI + backend).
+  const isJogjaLocked = isJogjaBranchLockedRole(userRoles);
+  useEffect(() => { if (isJogjaLocked) setBranch("JOGJA"); }, [isJogjaLocked]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
@@ -3521,6 +3525,7 @@ export default function Page() {
         if (sourcePlatform !== "ALL") params.set("sourcePlatform", sourcePlatform);
         if (companyName !== "ALL") params.set("companyName", companyName);
         if (itemKind !== "ALL") params.set("itemKind", itemKind);
+        if (branch !== "ALL") params.set("branch", branch);
       }
 
       const response = await fetch(`/api/transaction?${params.toString()}`);
@@ -3538,12 +3543,12 @@ export default function Page() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, bulkSNList, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortBy, sortDir, companyName, itemKind, itemsPerPage]);
+  }, [debouncedSearch, bulkSNList, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortBy, sortDir, companyName, itemKind, branch, itemsPerPage]);
 
   useEffect(() => {
     fetchTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage, status, sortBy, sortDir, debouncedSearch, bulkSNList, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, itemKind, focusInvoice]);
+  }, [currentPage, itemsPerPage, status, sortBy, sortDir, debouncedSearch, bulkSNList, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, itemKind, branch, focusInvoice]);
 
   const paginatedTransactions = useMemo(() => {
     if (!CLIENT_SIDE_SORT_KEYS.includes(sortBy)) return allTransactions;
@@ -3559,13 +3564,15 @@ export default function Page() {
   const uniquePaymentMethods = useMemo(() => ["ALL", ...paymentMethodOptions], [paymentMethodOptions]);
   const uniqueSourcePlatforms = useMemo(() => ["ALL", ...sourcePlatformOptions], [sourcePlatformOptions]);
 
-  const hasActiveFilter = status !== "ALL" || customerType !== "ALL" || !!dateFrom || !!dateTo || paymentMethod !== "ALL" || sourcePlatform !== "ALL" || companyName !== "ALL" || itemKind !== "ALL";
-  const activeFilterCount = [status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL", itemKind !== "ALL"].filter(Boolean).length;
+  const branchFilterActive = !isJogjaLocked && branch !== "ALL";
+  const hasActiveFilter = status !== "ALL" || customerType !== "ALL" || !!dateFrom || !!dateTo || paymentMethod !== "ALL" || sourcePlatform !== "ALL" || companyName !== "ALL" || itemKind !== "ALL" || branchFilterActive;
+  const activeFilterCount = [status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL", itemKind !== "ALL", branchFilterActive].filter(Boolean).length;
 
   const resetFilters = () => {
     setSearch(""); setDebouncedSearch(""); setBulkSNInput(""); setDebouncedBulkSN("");
     setStatus("ALL"); setCustomerType("ALL"); setDateFrom(""); setDateTo("");
     setPaymentMethod("ALL"); setSourcePlatform("ALL"); setCompanyName("ALL"); setItemKind("ALL");
+    setBranch(isJogjaLocked ? "JOGJA" : "ALL");
   };
 
   // ─── Hitung rentang tanggal 1 bulan penuh dari <input type="month"> (format "YYYY-MM") ──
@@ -4072,6 +4079,33 @@ export default function Page() {
                   ))}
                 </div>
               </div>
+
+              {/* ⬅️ BARU: Filter Cabang. Role Solit Jogja → disembunyikan & dikunci
+                  Jogja (backend juga memaksa, jadi tidak bisa di-bypass). */}
+              {!isJogjaLocked ? (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Cabang</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { value: "ALL", label: "Semua" },
+                      { value: "UTAMA", label: "🏢 Utama" },
+                      { value: "JOGJA", label: "📍 Jogja" },
+                    ].map((c) => (
+                      <button key={c.value} onClick={() => setBranch(c.value)}
+                        className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${branch === c.value ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Cabang</p>
+                  <span className="inline-flex items-center h-8 px-3 rounded-lg text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                    📍 Jogja (terkunci)
+                  </span>
+                </div>
+              )}
 
               {hasActiveFilter && (
                 <button onClick={resetFilters} className="w-full h-8 text-xs text-gray-400 border border-gray-200 rounded-xl hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition font-semibold">

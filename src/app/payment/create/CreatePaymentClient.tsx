@@ -8,7 +8,7 @@ import { createPaymentSchema, CreatePaymentType, UnitItem } from "@/lib/validati
 import { supabase } from "@/services/supabase";
 import imageCompression from "browser-image-compression";
 import { useSearchParams } from "next/navigation";
-import { UserRole, PERMISSIONS, hasPermission, ACCESSORY_ONLY_SALES_ROLES } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasPermission, ACCESSORY_ONLY_SALES_ROLES, isJogjaBranchLockedRole } from "@/lib/permissions";
 import { getAuthUser } from "@/hooks/useAuthUser";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -138,6 +138,7 @@ export default function CreatePaymentPage() {
     const [submitting, setSubmitting] = useState(false);
     const [warrantyDuration, setWarrantyDuration] = useState<number>(30);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
+    const [userRoles, setUserRoles] = useState<string[]>([]); // ⬅️ BARU
     const [draftRestored, setDraftRestored] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [pendingSubmitData, setPendingSubmitData] = useState<CreatePaymentType | null>(null);
@@ -269,14 +270,23 @@ export default function CreatePaymentPage() {
 
     useEffect(() => {
         getAuthUser().then(u => ({ success: true, user: u }))
-            .then(r => setUserRole(r.user?.role ?? null))
-            .catch(() => setUserRole(null));
+            .then(r => {
+                setUserRole(r.user?.role ?? null);
+                const roles = Array.isArray(r.user?.roles) && r.user.roles.length > 0
+                    ? r.user.roles
+                    : r.user?.role ? [r.user.role] : [];
+                setUserRoles(roles);
+            })
+            .catch(() => { setUserRole(null); setUserRoles([]); });
     }, []);
 
     const canSeeMargin = userRole
         ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"])
         : false;
     const isAccessoryOnlyRole = userRole ? ACCESSORY_ONLY_SALES_ROLES.includes(userRole) : false;
+    // ⬅️ BARU: role Solit Jogja — Cabang dipaksa & dikunci ke "JOGJA".
+    const isJogjaLocked = isJogjaBranchLockedRole(userRoles);
+    useEffect(() => { if (isJogjaLocked) setBranch("JOGJA"); }, [isJogjaLocked]);
 
     // ── Fetch price list pedagang saat sellerType = PEDAGANG ──────────────────
     useEffect(() => {
@@ -1104,20 +1114,28 @@ export default function CreatePaymentPage() {
                                     {[
                                         { value: "UTAMA", label: "Cabang Utama", icon: <Store size={20} />, desc: "Pusat" },
                                         { value: "JOGJA", label: "Cabang Jogja", icon: <MapPin size={20} />, desc: "Jogja" },
-                                    ].map(o => (
-                                        <button key={o.value} type="button"
-                                            onClick={() => setBranch(o.value as "UTAMA" | "JOGJA")}
-                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all duration-200 ${branch === o.value
-                                                ? "border-gray-600 bg-gray-50 ring-2 ring-gray-600/20"
-                                                : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
-                                                }`}
-                                        >
-                                            <span className="text-xl">{o.icon}</span>
-                                            <span className={`text-xs font-medium ${branch === o.value ? "text-gray-800" : "text-gray-600"}`}>{o.label}</span>
-                                            <span className="text-[9px] text-gray-400">{o.desc}</span>
-                                        </button>
-                                    ))}
+                                    ].map(o => {
+                                        // Role Solit Jogja: dikunci ke Jogja — opsi lain dinonaktifkan.
+                                        const locked = isJogjaLocked && o.value !== "JOGJA";
+                                        return (
+                                            <button key={o.value} type="button"
+                                                disabled={locked}
+                                                onClick={() => { if (!isJogjaLocked) setBranch(o.value as "UTAMA" | "JOGJA"); }}
+                                                className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all duration-200 ${branch === o.value
+                                                    ? "border-gray-600 bg-gray-50 ring-2 ring-gray-600/20"
+                                                    : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                                                    } ${locked ? "opacity-40 cursor-not-allowed" : ""}`}
+                                            >
+                                                <span className="text-xl">{o.icon}</span>
+                                                <span className={`text-xs font-medium ${branch === o.value ? "text-gray-800" : "text-gray-600"}`}>{o.label}</span>
+                                                <span className="text-[9px] text-gray-400">{o.desc}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+                                {isJogjaLocked && (
+                                    <p className="text-[10px] text-violet-600 mt-1.5">Cabang dikunci ke Jogja untuk akun ini.</p>
+                                )}
                             </div>
 
                             <input type="text" placeholder="Nama Perusahaan" className={inputClass} {...register("company_name")} />

@@ -1,7 +1,7 @@
 // src/app/api/cashflow/[id]/route.ts
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
-import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES } from "@/lib/permissions";
+import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, isJogjaBranchLockedRole } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { isValidCategory, isKasbonCicilanCategory } from "@/lib/cashflow";
 
@@ -165,7 +165,7 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
 }, CASHFLOW_ROLES);
 
 // ── PUT /api/cashflow/[id] — edit uang keluar manual / pengajuan dana ────────
-export const PUT = withAuth(async (req, ctx, _user: any) => {
+export const PUT = withAuth(async (req, ctx, user: any) => {
     const { id } = await ctx.params;
     if (!id) return NextResponse.json({ success: false, message: "ID tidak valid" }, { status: 400 });
 
@@ -239,8 +239,12 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
                 ? (body.cash_location === "JOGJA" ? "JOGJA" : "UTAMA")
                 : null;
     }
-    // ⬅️ BARU: Cabang (dimensi laba-rugi) — boleh diubah saat edit
-    if (body.branch === "UTAMA" || body.branch === "JOGJA") {
+    // ⬅️ Cabang (dimensi laba-rugi). Role Solit Jogja dikunci: apa pun yang
+    // dikirim, branch selalu dipaksa JOGJA.
+    const puRoles = user?.roles ?? [user?.role];
+    if (isJogjaBranchLockedRole(puRoles)) {
+        updatePayload.branch = "JOGJA";
+    } else if (body.branch === "UTAMA" || body.branch === "JOGJA") {
         updatePayload.branch = body.branch;
     }
     if (photo_url !== undefined) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
-import { canViewTransactions } from "@/lib/permissions";
+import { canViewTransactions, isJogjaBranchLockedRole } from "@/lib/permissions";
 
 function splitSerials(raw: any): string[] {
   // ✅ Array bisa berisi elemen yang sendirinya comma-joined ("MIN-1, MIN-2"),
@@ -185,6 +185,19 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       if (sourcePlatform !== "ALL") query = query.eq("source_platform", sourcePlatform);
       if (companyName !== "ALL") query = applyCompanyFilter(query, companyName);
       if (itemKind !== "ALL") query = query.eq("item_kind", itemKind);
+    }
+
+    // ── Filter Cabang (+ HARD-LOCK untuk role Solit Jogja) ───────────────────
+    // Berlaku untuk mode normal, export, DAN deep-link invoiceExact — supaya
+    // role Jogja tidak bisa "mengintip" invoice cabang lain via ?invoice=...
+    const forceJogja = isJogjaBranchLockedRole(roles);
+    const branchParam = url.searchParams.get("branch") ?? "ALL";
+    const effectiveBranch = forceJogja ? "JOGJA" : branchParam;
+    if (effectiveBranch === "JOGJA") {
+      query = query.eq("branch", "JOGJA");
+    } else if (effectiveBranch === "UTAMA") {
+      // Data lama tanpa branch (NULL) dihitung sebagai cabang Utama.
+      query = query.or("branch.eq.UTAMA,branch.is.null");
     }
 
     // Baris yang nilainya NULL selalu ditaruh paling belakang, biar mirip perilaku sort Excel.

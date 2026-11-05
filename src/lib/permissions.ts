@@ -39,7 +39,8 @@ export type UserRole =
   | "PKL_ACCOUNTING"
   | "KEPALA_PENGELOLA_BARANG"
   | "KEPALA_CC"
-  | "CUSTOMER_SERVICE";
+  | "CUSTOMER_SERVICE"
+  | "SOLIT_JOGJA";
 
 
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
@@ -84,8 +85,8 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   PKL_ZENITH: "/dashboard/laptops/ready", // sama kayak PKL_SALES
   PKL_ACCOUNTING: "/dashboard/akutansi",  // landing langsung ke halaman kerja mereka
   KEPALA_CC: "/dashboard",
+  SOLIT_JOGJA: "/dashboard",
 };
-
 // ─── Base Role Groups ─────────────────────────────────────────────────────────
 const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
@@ -102,8 +103,8 @@ const ALL_ROLES: UserRole[] = [
   "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",
   "PKL_PENGELOLA_BARANG", "PKL_ACCOUNTING",
   "CUSTOMER_SERVICE",
+  "SOLIT_JOGJA",
 ];
-
 export const ALL_STATIC_ROLES: string[] = [...ALL_ROLES];
 
 const SALES_ACCESS: UserRole[] = [
@@ -266,6 +267,7 @@ const PREPARATION_SALES_ROLES: UserRole[] = [
 const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
   "PKL_PENYEDIA_BARANG",
+  "SOLIT_JOGJA", // akses Penyiapan Barang (Penyedia) — propagate ke DONE/VIEW/ANTRIAN
 ];
 
 const PREPARATION_PENYEDIA_EXTRA_ROLES: UserRole[] = [
@@ -377,7 +379,7 @@ export const SERVICE_DONE_VIEW_ROLES: UserRole[] = [
 export const SERVICE_WARNING_ROLES: UserRole[] = [
   ...FULL_ACCESS, "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
 ];
-export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING"];
+export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING", "SOLIT_JOGJA"];
 
 export const ACCESSORY_ONLY_SALES_ROLES: UserRole[] = ["CUSTOMER_SERVICE"];
 export const CASHFLOW_AUDIT_OUT_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
@@ -543,14 +545,15 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_ONPOINT", "ONPOINT", "PKL", "KEPALA_SOTECH",
     "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
+       "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
     "KEPALA_CC", // khusus Barang Siap Jual saja (lihat LAPTOP_READY_VIEW_ROLES)
+    "SOLIT_JOGJA",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"],
   // Minus Siap Jual — ditulis literal (bukan spread) karena
   // LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES didefinisikan SETELAH ROUTE_PERMISSIONS.
   // HARUS disamakan manual dengan konstanta itu kalau daftar role diubah.
-  "/dashboard/laptops/minus-siap-jual": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES"], "/dashboard/laptops/monitoring": [
+   "/dashboard/laptops/minus-siap-jual": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES", "SOLIT_JOGJA"], "/dashboard/laptops/monitoring": [
     ...FULL_ACCESS, "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
   ],
   // Riwayat SO gabungan (lintas semua laptop). Sengaja ditulis literal, BUKAN
@@ -565,16 +568,18 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI",
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGANTARAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
-    "KEPALA_ONPOINT", "KEPALA_SOTECH",
+        "KEPALA_ONPOINT", "KEPALA_SOTECH",
     "PKL_SALES", "PKL_ZENITH",
+    "SOLIT_JOGJA",
   ],
 
   "/dashboard/transactions": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
-    ...TRANSACTION_VIEW,
+     ...TRANSACTION_VIEW,
     "PKL_SALES", "PKL_ZENITH", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
+    "SOLIT_JOGJA",
   ],
   // ✅ FIX: dulu "/dashboard/pending-orders" TIDAK terdaftar di sini, jadi
   // getEffectivePermissions() tidak pernah memasukkannya ke permission efektif
@@ -585,13 +590,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
     "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "ACCOUNTING",
     "PENGANTARAN", "KEPALA_SOTECH", "SOTECH", "KEPALA_ONPOINT", "ONPOINT",
-    "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
+    "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",  "SOLIT_JOGJA",
   ],
   "/api/transaction/pending": [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
     "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "ACCOUNTING",
     "PENGANTARAN", "KEPALA_SOTECH", "SOTECH", "KEPALA_ONPOINT", "ONPOINT",
-    "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
+    "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "SOLIT_JOGJA",
   ],
   "/dashboard": [...ALL_ROLES],
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
@@ -610,7 +615,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
-    "PKL_SALES", "PKL_ZENITH", "KEPALA_ZENITH", "CUSTOMER_SERVICE",
+    "PKL_SALES", "PKL_ZENITH", "KEPALA_ZENITH", "CUSTOMER_SERVICE", "SOLIT_JOGJA",
   ],
 
   "/api/messages": ALL_ROLES.filter(r => !r.startsWith("PKL")),
@@ -628,15 +633,16 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "CUSTOMER_SERVICE",
-    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
+     "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
     "KEPALA_CC", // dipakai halaman Barang Siap Jual untuk fetch data
+    "SOLIT_JOGJA",
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"],
-  "/api/laptops/minus-siap-jual-units": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES"],
+    "/api/laptops/minus-siap-jual-units": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES", "SOLIT_JOGJA"],
   // Kelompok MSJ — ditulis literal (bukan spread) karena MSJ_GROUP_VIEW_ROLES
   // didefinisikan SETELAH ROUTE_PERMISSIONS. Samakan manual kalau daftar diubah.
   // Prefix ini menutup /api/msj-groups, /api/msj-groups/[id], /api/msj-groups/search-sn.
-  "/api/msj-groups": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES"],
+   "/api/msj-groups": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES", "SOLIT_JOGJA"],
   "/api/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG"],
   "/api/dashboard": [...ALL_ROLES],
   "/api/transaction/create": [
@@ -644,7 +650,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    "CUSTOMER_SERVICE",
+    "CUSTOMER_SERVICE", "SOLIT_JOGJA",
   ],
   "/api/transaction": [
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "PURCHASING", "CREW_SALES", "SOTECH",
@@ -652,13 +658,15 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     ...TRANSACTION_VIEW,
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL_SALES", "PKL_ZENITH", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
+    "SOLIT_JOGJA",
   ],
 
   "/api/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI", "KEPALA_SALES",
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING",
-    "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
+       "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
     "PKL_SALES", "PKL_ZENITH",
+    "SOLIT_JOGJA",
   ],
 
   "/api/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
@@ -849,6 +857,7 @@ export const PERMISSIONS = {
     ...TRANSACTION_VIEW,
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
     "PKL_SALES", "PKL_ZENITH", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
+    "SOLIT_JOGJA",
   ] as UserRole[],
 
   CREATE_TRANSACTION: [
@@ -857,6 +866,7 @@ export const PERMISSIONS = {
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "CUSTOMER_SERVICE",
+    "SOLIT_JOGJA",
   ] as UserRole[],
 
   EDIT_TRANSACTION: [
@@ -918,7 +928,7 @@ export const PERMISSIONS = {
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI", "KEPALA_SALES", "CREW_SALES",
     "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
     "KEPALA_ONPOINT", "KEPALA_SOTECH",
-    "PKL_SALES", "PKL_ZENITH",
+    "PKL_SALES", "PKL_ZENITH", "SOLIT_JOGJA",
   ] as UserRole[],
   EDIT_WARRANTY: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"] as UserRole[],
 
@@ -930,8 +940,9 @@ export const PERMISSIONS = {
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    "CUSTOMER_SERVICE",
+      "CUSTOMER_SERVICE",
     "KEPALA_CC", // FIX: sebelumnya belum ditambahkan, padahal LAPTOP_READY_VIEW_ROLES sudah — bikin akses "Barang Siap Jual" untuk KEPALA_CC tetap ketolak
+    "SOLIT_JOGJA",
   ] as UserRole[],
   VIEW_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"] as UserRole[],
   EDIT_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"] as UserRole[],
@@ -1140,6 +1151,7 @@ export const LAPTOP_VIEW_ROLES: UserRole[] = [
 export const LAPTOP_READY_VIEW_ROLES: UserRole[] = [
   ...LAPTOP_VIEW_ROLES,
   "KEPALA_CC", // khusus: KEPALA_CC hanya boleh lihat Barang Siap Jual, TIDAK boleh akses Data Barang penuh (LAPTOP_VIEW_ROLES)
+  "SOLIT_JOGJA", // sama: hanya Barang Siap Jual, bukan Data Barang penuh
 ];
 
 // ── Minus Siap Jual (unit minus yang sudah boleh dijual / bisa dibikin payment) ──
@@ -1155,6 +1167,7 @@ export const LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES: UserRole[] = [
   "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG",
   "KEPALA_PENGELOLA_BARANG",
   "PKL_SALES",
+  "SOLIT_JOGJA",
 ];
 
 // ── Kelompok Minus Siap Jual (MSJ Groups) ───────────────────────────────────
@@ -1223,6 +1236,15 @@ export function getEffectivePrimaryRole(userRoles: string[]): UserRole {
 export function isPKLRole(role?: string): boolean {
   if (!role) return false;
   return role === "PKL" || role.startsWith("PKL_");
+}
+
+// ─── Role "Solit Jogja": Cashflow & Riwayat Transaksi DIKUNCI cabang Jogja ────
+// SATU-SATUNYA sumber "role mana yang dikunci Jogja". Dipakai di backend
+// (api/cashflow, api/transaction, api/transaction/create) untuk MEMAKSA
+// branch=JOGJA (tidak bisa di-bypass dari client) & di UI untuk mengunci dropdown.
+export const JOGJA_BRANCH_LOCKED_ROLES: UserRole[] = ["SOLIT_JOGJA"];
+export function isJogjaBranchLockedRole(userRoles: string[]): boolean {
+  return userRoles.some((r) => (JOGJA_BRANCH_LOCKED_ROLES as string[]).includes(r));
 }
 
 export function isFullAccess(role: string): boolean {

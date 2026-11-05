@@ -861,6 +861,32 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_CUSTOMER_SERVICE: [...PKL_MENU],
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
   PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
+
+  // ── Solit Jogja: operasional cabang Jogja. Cashflow & Riwayat Transaksi
+  // datanya DIKUNCI cabang Jogja di backend. "Minus Siap Jual" otomatis nempel
+  // ke grup Inventaris lewat blok LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES di bawah.
+  SOLIT_JOGJA: [
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Keuangan", items: [ITEM_CASHFLOW] },
+    {
+      label: "Inventaris",
+      items: [
+        ITEM_LAPTOP_SIAP_JUAL,
+        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+      ],
+    },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+        { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Scanner", href: "/scan", icon: Icons.scanner },
+      ],
+    },
+    PREPARATION_PENYEDIA_MENU,
+  ],
 };
 
 // ── Laporan Sales: grup sidebar tersendiri (WA/FB/OLX/Carousell/Mitra/
@@ -1339,6 +1365,7 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_ACCOUNTING: { label: "PKL Accounting", className: "bg-amber-50 text-amber-700" },
   KEPALA_ZENITH: { label: "Kepala Zenith", className: "bg-purple-50 text-purple-700" },
   KEPALA_CC: { label: "Kepala CC", className: "bg-fuchsia-50 text-fuchsia-800" },
+  SOLIT_JOGJA: { label: "Solit Jogja", className: "bg-violet-50 text-violet-700" },
 };
 
 function getInitials(name: string): string {

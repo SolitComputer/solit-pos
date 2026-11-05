@@ -1,7 +1,7 @@
 // src/app/api/cashflow/route.ts
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
-import { CASHFLOW_ROLES } from "@/lib/permissions";
+import { CASHFLOW_ROLES, isJogjaBranchLockedRole } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
     CASHFLOW_START_DATE,
@@ -826,7 +826,7 @@ async function runSyncThrottled(supabase: SupabaseClient, force = false): Promis
 }
 
 // ── GET /api/cashflow ──────────────────────────────────────────────────────
-export const GET = withAuth(async (req) => {
+export const GET = withAuth(async (req, _ctx, user: any) => {
     const supabase = getAdmin();
 
     // ⬅️ FIX: ?skipSync=1 melewati sinkronisasi berat (scan transactions/
@@ -839,8 +839,10 @@ export const GET = withAuth(async (req) => {
     // Filter cabang: "JOGJA" → eksklusif cabang Jogja. Selain itu (UTAMA/kosong)
     // → konsolidasi: tampilkan SEMUA cabang. Jadi filter DB HANYA dipasang untuk
     // Jogja; Utama sengaja tidak difilter supaya tetap jadi laporan gabungan.
+    const roles = user?.roles ?? [user?.role];
+    const forceJogja = isJogjaBranchLockedRole(roles);
     const branchParam = url.searchParams.get("branch");
-    const branchFilter = branchParam === "JOGJA" ? "JOGJA" : null;
+    const branchFilter = forceJogja ? "JOGJA" : (branchParam === "JOGJA" ? "JOGJA" : null);
 
     if (!skipSync) {
         await runSyncThrottled(supabase, forceSync);
@@ -1026,8 +1028,11 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
 
     // ⬅️ BARU: Kasbon & Cicilan wajib menunjuk karyawan pemilik (berlaku utk IN & OUT)
     const targetUserId = (body.target_user_id as string | undefined) || null;
-    // Cabang entry manual — fail-safe ke UTAMA
-    const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
+    // Cabang entry manual — fail-safe ke UTAMA. Role Solit Jogja dipaksa JOGJA.
+    const roles = user?.roles ?? [user?.role];
+    const branch = isJogjaBranchLockedRole(roles)
+        ? "JOGJA"
+        : (body.branch === "JOGJA" ? "JOGJA" : "UTAMA");
     // ⬅️ BARU: akun kas fisik (wallet). Dipakai saat CASH -> 120/121; SALDO -> null (110).
     const cashLocation = body.cash_location === "JOGJA" ? "JOGJA" : "UTAMA";
     if (isKasbonCicilanCategory(category) && !targetUserId)

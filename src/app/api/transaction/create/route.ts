@@ -5,7 +5,7 @@ import { generateInvoice } from "@/lib/invoice";
 import { sendWhatsapp, buildPaymentMessage } from "@/service/whatsapp";
 import { logActivity } from "@/lib/activityLogger";
 import { recordOutflow } from "@/lib/accessoryOutflow";
-import { ACCESSORY_ONLY_SALES_ROLES, UserRole } from "@/lib/permissions";
+import { ACCESSORY_ONLY_SALES_ROLES, UserRole, isJogjaBranchLockedRole } from "@/lib/permissions";
 import { buildLineItemsFromTxItems } from "@/lib/receiptItems";
 import { markLoansSoldOnSale } from "@/lib/itemLoanSync";
 
@@ -260,8 +260,12 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const accessoryUnitInventory = accessoryUnits.reduce((s, u) => s + (u.cost_price ?? 0), 0);
         const inventory_price = laptopInventory + accessoryInventory + accessoryUnitInventory;
 
-              // Cabang transaksi — hanya terima nilai valid, selain itu jatuh ke UTAMA
-        const branch = body.branch === "JOGJA" ? "JOGJA" : "UTAMA";
+        // Cabang transaksi — hanya terima nilai valid, selain itu jatuh ke UTAMA.
+        // Role Solit Jogja DIPAKSA JOGJA (tidak bisa di-bypass dari client).
+        const txRoles = user.roles ?? [user.role];
+        const branch = isJogjaBranchLockedRole(txRoles)
+            ? "JOGJA"
+            : (body.branch === "JOGJA" ? "JOGJA" : "UTAMA");
 
         const payment_method = body.payment_method || "CASH";
         const is_trade_in = Boolean(body.is_trade_in);
