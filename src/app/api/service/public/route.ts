@@ -46,12 +46,13 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Sensor nama customer: nama depan + inisial belakang. cth: "Budi Santoso" → "Budi S."
+  // Tampilkan nama lengkap tanpa sensor
   const sanitized = (data ?? []).map((o: any) => ({
     no_urut: o.no_urut,
     nama: o.nama,
     type_laptop: o.type_laptop,
-    teknisi: o.teknisi?.name ?? null, // ratakan object { name } → string utk frontend
+    keluhan: o.keluhan ?? null,
+    teknisi: o.teknisi?.name ?? null,
     status: o.status,
     tanggal_masuk: o.tanggal_masuk,
     tanggal_selesai: o.tanggal_selesai ?? null,
@@ -82,12 +83,4 @@ export async function OPTIONS(req: NextRequest) {
       "Access-Control-Allow-Headers": "Content-Type",
     },
   });
-}
-
-// Sensor nama: "Budi Santoso Wijaya" → "Budi S. W."
-function sensorNama(nama: string): string {
-  const parts = nama.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0]; // nama tunggal, tampilkan utuh
-  const [first, ...rest] = parts;
-  return `${first} ${rest.map(p => p[0].toUpperCase() + ".").join(" ")}`;
 }
