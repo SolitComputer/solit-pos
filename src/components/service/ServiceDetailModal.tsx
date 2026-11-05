@@ -6,6 +6,8 @@ import type { ServiceOrder, ServiceOrderLog } from "@/types/service";
 import { useRegisterOverlay } from "@/contexts/OverlayContext";
 import { STATUS_LABEL, STATUS_COLOR } from "@/types/service";
 import ServiceStatusBadge from "./ServiceStatusBadge";
+import { useAuthUser } from "@/hooks/useAuthUser"; //  NEW
+import { SERVICE_TEKNISI_ROLES } from "@/lib/permissions"; //  NEW
 
 interface Props {
   orderId: string | null;
@@ -42,18 +44,62 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
 };
 
 export default function ServiceDetailModal({ orderId, onClose }: Props) {
+  const { user } = useAuthUser(); //  NEW
   const [data, setData] = useState<(ServiceOrder & { logs: ServiceOrderLog[] }) | null>(null);
   const [loading, setLoading] = useState(false);
   useRegisterOverlay(!!orderId);
 
-  useEffect(() => {
+  //  NEW — state catatan pengerjaan teknisi
+  const [catatan, setCatatan] = useState("");
+  const [savingCatatan, setSavingCatatan] = useState(false);
+  const [catatanMsg, setCatatanMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  //  CHANGED — fetch dipisah ke fungsi supaya bisa dipanggil ulang setelah simpan catatan
+  const loadData = async () => {
     if (!orderId) { setData(null); return; }
     setLoading(true);
-    fetch(`/api/service/${orderId}`)
-      .then(r => r.json())
-      .then(j => { if (j.success) setData(j.data); })
-      .finally(() => setLoading(false));
+    try {
+      const res = await fetch(`/api/service/${orderId}`);
+      const j = await res.json();
+      if (j.success) {
+        setData(j.data);
+        setCatatan(j.data.catatan_pengerjaan ?? ""); //  NEW — prefill textarea
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setCatatanMsg(null); //  NEW — reset pesan tiap ganti order
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
+
+  //  NEW — simpan catatan (menimpa nilai lama, bukan nambah baris)
+  const handleSaveCatatan = async () => {
+    if (!orderId) return;
+    setSavingCatatan(true);
+    setCatatanMsg(null);
+    try {
+      const res = await fetch(`/api/service/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_catatan", catatan_pengerjaan: catatan }),
+      });
+      const j = await res.json();
+      if (!j.success) throw new Error(j.message || "Gagal menyimpan catatan");
+      setCatatanMsg({ ok: true, text: "Catatan tersimpan" });
+      await loadData(); //  refresh data + timeline
+    } catch (e) {
+      setCatatanMsg({ ok: false, text: e instanceof Error ? e.message : "Gagal menyimpan catatan" });
+    } finally {
+      setSavingCatatan(false);
+    }
+  };
+
+  const userRoles = user?.roles ?? (user?.role ? [user.role] : []); //  NEW
+  const canEditCatatan = userRoles.some(r => (SERVICE_TEKNISI_ROLES as string[]).includes(r)); //  NEW
 
   if (!orderId) return null;
 
@@ -118,6 +164,42 @@ export default function ServiceDetailModal({ orderId, onClose }: Props) {
                   <Row label="Alasan" value={data.alasan_tidak_jadi} multiline highlight="red" />
                 )}
               </Section>
+
+              {/*  NEW — Catatan Pengerjaan (hanya saat status SEDANG_DIKERJAKAN) */}
+              {data.status === "SEDANG_DIKERJAKAN" && (
+                <Section title="Catatan Pengerjaan">
+                  <div className="px-4 py-3 space-y-2">
+                    {canEditCatatan ? (
+                      <>
+                        <textarea
+                          value={catatan}
+                          onChange={e => setCatatan(e.target.value)}
+                          rows={3}
+                          placeholder="Contoh: Sudah bongkar casing, kerusakan di IC charging. Nunggu konfirmasi ganti IC."
+                          className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-gray-300 focus:border-[#1a1a2e]/30 focus:ring-2 focus:ring-[#1a1a2e]/10"
+                        />
+                        <div className="flex items-center justify-between gap-3">
+                          <span className={`text-xs font-medium ${catatanMsg?.ok ? "text-emerald-600" : "text-rose-600"}`}>
+                            {catatanMsg?.text ?? ""}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleSaveCatatan}
+                            disabled={savingCatatan}
+                            className="inline-flex h-9 items-center justify-center rounded-lg bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] px-4 text-xs font-bold text-white shadow-sm transition-all hover:shadow-md disabled:opacity-60 active:scale-95"
+                          >
+                            {savingCatatan ? "Menyimpan..." : "Simpan Catatan"}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words text-sm text-gray-700">
+                        {data.catatan_pengerjaan?.trim() || "Belum ada catatan pengerjaan."}
+                      </p>
+                    )}
+                  </div>
+                </Section>
+              )}
 
               {/* Timeline */}
               <Section title="Timeline">

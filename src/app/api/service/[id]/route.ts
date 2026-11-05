@@ -212,6 +212,7 @@ export async function PATCH(
     sparepart_mode,    //  NEW — "stock" | "manual"
     sparepart_modal,   //  NEW — modal input manual
     sparepart_entry,   //  NEW — baris siap-tampil "label§harga" utk kolom Sparepart
+    catatan_pengerjaan, //  NEW — catatan progres pengerjaan teknisi
   } = body as {
     action: string;
     alasan?: string;
@@ -228,6 +229,7 @@ export async function PATCH(
     sparepart_mode?: "stock" | "manual"; //  NEW
     sparepart_modal?: number; //  NEW
     sparepart_entry?: string; //  NEW
+    catatan_pengerjaan?: string; //  NEW
   };
 
   const supabase = getAdmin();
@@ -265,6 +267,19 @@ export async function PATCH(
         ? `Mulai dikerjakan · Estimasi: Rp ${Number(estimasi_harga).toLocaleString("id-ID")}`
         : "Mulai dikerjakan";
       break;
+
+    //  NEW — simpan catatan progres. HANYA saat SEDANG_DIKERJAKAN, ditimpa tiap simpan.
+    case "update_catatan": {
+      if (!hasAnyRole(getEffectiveRoles(user), SERVICE_TEKNISI_ROLES))
+        return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+      if (oldStatus !== "SEDANG_DIKERJAKAN")
+        return NextResponse.json({ success: false, message: "Catatan hanya bisa diisi saat status Sedang Dikerjakan" }, { status: 400 });
+      newStatus = oldStatus; // status tidak berubah
+      const catatanClean = (catatan_pengerjaan ?? "").toString().trim();
+      updatePayload = { catatan_pengerjaan: catatanClean || null };
+      logCatatan = catatanClean ? "Catatan pengerjaan diperbarui" : "Catatan pengerjaan dikosongkan";
+      break;
+    }
 
     case "sparepart": {
       //  CHANGED — dicatat dari Data Services (CS + teknisi + full access), bukan aksi khusus teknisi

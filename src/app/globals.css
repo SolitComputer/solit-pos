@@ -363,6 +363,7 @@ html.dark .ring-slate-200, html.dark .ring-gray-200 { --tw-ring-color: #1e293b; 
 /* Netral (gray/slate) → overlay putih super tipis = lift seragam */
 html.dark .bg-gray-50\/40,
 html.dark .bg-gray-50\/30,
+html.dark .bg-gray-50\/50,
 html.dark .bg-slate-50\/50,
 html.dark .bg-slate-50\/30        { background-color: rgba(255,255,255,.02); }
 html.dark .bg-slate-100\/80       { background-color: rgba(255,255,255,.04); }
