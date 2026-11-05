@@ -6203,8 +6203,32 @@ export default function AttendanceDashboardPage() {
                                             const pc = dd.filter(a => a.displayStatus === "PRESENT" && !isDayOffForUser(a.user_name, dk)).length;
                                             const lc = dd.filter(a => a.displayStatus === "LATE" && !isDayOffForUser(a.user_name, dk)).length;
                                             const sc = dd.filter(a => a.displayStatus === "SKIP" && !isDayOffForUser(a.user_name, dk)).length;
-                                            const mc = dd.filter(a => a.source === "MANUAL" && !isDayOffForUser(a.user_name, dk)).length;
+                                                                                       const mc = dd.filter(a => a.source === "MANUAL" && !isDayOffForUser(a.user_name, dk)).length;
                                             const tot = pc + lc + sc;
+                                            // ✅ NEW — label kalender ikut status manual spesifik.
+                                            // Absen manual Izin/Sakit/Cuti/Tidak Hadir ditampilkan sesuai
+                                            // statusnya (bukan "hadir · manual"). Record ini displayStatus-nya
+                                            // "SKIP" (lihat mergedAttendances), jadi sudah ikut di `tot` → tinggal
+                                            // dikurangi supaya tidak dobel dihitung sebagai "hadir".
+                                            const specialManual = dd.filter(a =>
+                                                a.source === "MANUAL" &&
+                                                !isDayOffForUser(a.user_name, dk) &&
+                                                (a.status === "PERMIT" || a.status === "SICK" || a.status === "LEAVE" || a.status === "ABSENT")
+                                            );
+                                            const izinC = specialManual.filter(a => a.status === "PERMIT").length;
+                                            const sakitC = specialManual.filter(a => a.status === "SICK").length;
+                                            const cutiC = specialManual.filter(a => a.status === "LEAVE").length;
+                                            const absenC = specialManual.filter(a => a.status === "ABSENT").length;
+                                            const hadirLabelC = tot - specialManual.length;  // sisa yang benar-benar hadir
+                                            const manualLabelC = mc - specialManual.length;  // manual Hadir/Terlambat biasa
+                                            const cellLabelParts: string[] = [];
+                                            if (hadirLabelC > 0) cellLabelParts.push(`${hadirLabelC} hadir`);
+                                            if (izinC > 0) cellLabelParts.push(`${izinC} izin`);
+                                            if (sakitC > 0) cellLabelParts.push(`${sakitC} sakit`);
+                                            if (cutiC > 0) cellLabelParts.push(`${cutiC} cuti`);
+                                            if (absenC > 0) cellLabelParts.push(`${absenC} tdk hadir`);
+                                            if (manualLabelC > 0) cellLabelParts.push(`${manualLabelC} manual`);
+                                            const cellLabel = cellLabelParts.join(" · ");
                                             const isTod = dk === todayKey, isSel = dk === selectedDate;
                                             const effectiveFilterUser = !canManage && currentUser?.name ? currentUser.name : filterUser;
                                             const filteredUserInfo = allUsers.find(u => u.name === effectiveFilterUser);
@@ -6253,7 +6277,7 @@ export default function AttendanceDashboardPage() {
                                                                     </span>
                                                                 </div>
                                                                 <span className={`text-[9px] sm:text-[10px] font-bold leading-tight ${isSel ? "text-white/70" : "text-gray-400"}`}>
-                                                                    <span className="hidden sm:inline">{tot} hadir{mc > 0 ? ` · ${mc} manual` : ""}</span>
+                                                                                                                                        <span className="hidden sm:inline">{cellLabel}</span>
                                                                     <span className="sm:hidden">{tot}{mc > 0 ? " (m)" : ""}</span>
                                                                 </span>
                                                             </div>
