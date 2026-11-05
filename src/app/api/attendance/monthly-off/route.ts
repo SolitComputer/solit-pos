@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const MAX_OFF_PER_MONTH = 6;
+const MAX_OFF_PER_MONTH = 10;
 
 // ── Multi-role helpers ────────────────────────────────────────────────────────
 // Ambil semua role user. Dukung akun multi-role (roles[]) & fallback single (role).

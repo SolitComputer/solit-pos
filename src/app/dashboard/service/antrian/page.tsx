@@ -6,6 +6,7 @@ import ServiceFormModal from "@/components/service/ServiceFormModal";
 import ServiceConfirmDialog from "@/components/service/ServiceConfirmDialog";
 import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import ServiceDetailModal from "@/components/service/ServiceDetailModal";
+import ServiceCatatanModal from "@/components/service/ServiceCatatanModal"; //  NEW
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { SERVICE_CREATE_ROLES, SERVICE_TEKNISI_ROLES, hasPermission } from "@/lib/permissions";
@@ -329,6 +330,7 @@ export default function AntrianPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [catatanOrder, setCatatanOrder] = useState<ServiceOrder | null>(null); //  NEW
   const [search, setSearch] = useState(""); //  NEW
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
@@ -398,6 +400,10 @@ export default function AntrianPage() {
         break;
       case "SEDANG_DIKERJAKAN":
       case "MENUNGGU_SPAREPART": // order lama yg terlanjur menunggu sparepart tetap bisa diselesaikan
+        //  NEW — tombol Catatan hanya untuk SEDANG_DIKERJAKAN (sesuai aturan backend)
+        if (o.status === "SEDANG_DIKERJAKAN") {
+          actions.push({ label: "Catatan", color: "purple", onClick: () => setCatatanOrder(o) });
+        }
         actions.push(
           { label: "Selesai", color: "green", onClick: () => openDialog(o, "done") },
           { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
@@ -838,6 +844,13 @@ export default function AntrianPage() {
 
 
         <ServiceDetailModal orderId={detailId} onClose={() => setDetailId(null)} />
+
+        {/*  NEW — popup catatan pengerjaan teknisi */}
+        <ServiceCatatanModal
+          order={catatanOrder}
+          onClose={() => setCatatanOrder(null)}
+          onSaved={() => { showToast("Catatan pengerjaan tersimpan!"); refresh(); }}
+        />
 
         {/* ── Toast ───────────────────────────────────────────────────────── */}
         {toast && (

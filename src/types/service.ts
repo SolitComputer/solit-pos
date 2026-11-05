@@ -30,6 +30,9 @@ export interface ServiceOrder {
   keluhan: string;
   hasil_analisa?: string;
 
+  //  NEW — catatan progres pengerjaan teknisi (status SEDANG_DIKERJAKAN), ditimpa tiap update
+  catatan_pengerjaan?: string | null;
+
   // Status
   status: ServiceStatus;
 

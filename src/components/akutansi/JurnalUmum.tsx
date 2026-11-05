@@ -2865,7 +2865,7 @@ function EntryFormModal({
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
-                <div className="h-1 bg-gradient-to-r from-[#0f0c29] to-[#1a1545] shrink-0" />
+                <div className="h-1 bg-gradient-to-r from-[#0f0c29] to-[#1a1545] dark:from-indigo-600 dark:to-violet-600shrink-0" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
                     <div>
                         <h3 className="font-bold text-gray-900 text-sm">{isEdit ? "Edit Jurnal" : "Jurnal Manual"}</h3>
@@ -3640,7 +3640,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                         <td className="px-2 py-3 align-top">
                             <div className="flex flex-col items-start gap-1">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${badge.color}`}>
-                                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{badge.label}
+                                    {badge.label}
                                 </span>
                                 {branchBadge && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${branchBadge.color}`}>{branchBadge.label}</span>}
                             </div>
@@ -3665,7 +3665,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                         {/* Status */}
                         <td className="px-2 py-3 align-top">
                             <div className="flex flex-col items-start gap-1">
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 inline-flex items-center gap-1">
+                                <span className="text-[10px] font-semibold text-slate-500 inline-flex items-center gap-1.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Approved
                                 </span>
                                 {entry.has_warning && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-red-600" />Penanda</span>}
@@ -3854,7 +3854,7 @@ function JournalDraftRow({
                 <td className="px-2 py-3 align-top">
                     <div className="flex flex-col items-start gap-1">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${badge.color}`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{badge.label}
+                            {badge.label}
                         </span>
                         {branchBadge && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${branchBadge.color}`}>{branchBadge.label}</span>}
                     </div>
@@ -3868,8 +3868,8 @@ function JournalDraftRow({
                 </td>
                 <td className="px-2 py-3 align-top">
                     <div className="flex flex-col items-start gap-1">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />Draft
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center">
+                            Draft
                         </span>
                         {modalMissing && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-amber-600" />Modal Rp0</span>}
                     </div>
