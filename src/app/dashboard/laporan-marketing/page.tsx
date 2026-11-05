@@ -73,7 +73,7 @@ function qtyCellClass(value: number, max: number): string {
   if (value <= 0) return "text-transparent";
   const ratio = max > 0 ? value / max : 0;
   if (ratio >= 0.6) return "bg-violet-600 text-white font-bold";
-  if (ratio >= 0.3) return "bg-violet-200 text-violet-900 font-semibold";
+  if (ratio >= 0.3) return "bg-violet-200 dark:bg-violet-500/30 text-violet-900 dark:text-violet-50 font-semibold";
   return "bg-violet-50 text-gray-800";
 }
 
@@ -512,9 +512,9 @@ export default function LaporanMarketingPage() {
                         </tr>
                       ) : (
                         filteredRows.map((row) => (
-                          <tr key={row.key} className="group hover:bg-violet-50/40">
+                          <tr key={row.key} className="group hover:bg-violet-50/40 dark:hover:bg-white/[0.04]">
                             <td
-                              className="sticky left-0 z-[1] bg-white group-hover:bg-violet-50 border border-gray-200 px-3 py-1.5 text-gray-800 max-w-[260px] truncate"
+                              className="sticky left-0 z-[1] bg-white group-hover:bg-violet-50 dark:group-hover:bg-white/[0.06] border border-gray-200 px-3 py-1.5 text-gray-800 max-w-[260px] truncate"
                               title={row.keyword}
                             >
                               {row.keyword}
@@ -541,11 +541,11 @@ export default function LaporanMarketingPage() {
                     {filteredRows.length > 0 && (
                       <tfoot>
                         <tr className="bg-violet-50">
-                          <td className="sticky left-0 z-[1] bg-violet-100 border border-violet-200 px-3 py-2 font-bold text-violet-800">
+                          <td className="sticky left-0 z-[1] bg-violet-100 border border-violet-200 px-3 py-2 font-bold text-violet-800 dark:text-violet-200">
                             TOTAL
                           </td>
                           {visibleChannels.map((ch) => (
-                            <td key={ch} className="border border-violet-200 px-2 py-2 text-center font-bold tabular-nums text-violet-800">
+                            <td key={ch} className="border border-violet-200 px-2 py-2 text-center font-bold tabular-nums text-violet-800 dark:text-violet-200">
                               {footer.perChannel[ch] ?? 0}
                             </td>
                           ))}
