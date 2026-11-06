@@ -20,13 +20,6 @@ function getCorsOrigin(req: NextRequest) {
   return ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
 }
 
-function sensorNama(nama: string): string {
-  const parts = nama.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0];
-  const [first, ...rest] = parts;
-  return `${first} ${rest.map(p => `${p[0].toUpperCase()}.`).join(" ")}`;
-}
-
 // Kolom select dipakai di 2 query (aktif & done) — teknisi via FK dikerjakan_by
 const SELECT_COLS =
   "no_urut, nama, type_laptop, keluhan, status, tanggal_masuk, tanggal_mulai, tanggal_selesai, teknisi:users!service_orders_dikerjakan_by_fkey(name)";
@@ -46,9 +39,10 @@ async function fetchPublicOrders() {
     .in("status", ["ANTRIAN", "SEDANG_DIKERJAKAN", "MENUNGGU_SPAREPART", "DONE"])
     .order("no_urut", { ascending: true });
 
+  // Tampilkan nama lengkap tanpa sensor
   return (data ?? []).map((o: any) => ({
     no_urut: o.no_urut,
-    nama: sensorNama(o.nama),
+    nama: o.nama,
     type_laptop: o.type_laptop,
     keluhan: o.keluhan ?? null,
     teknisi: o.teknisi?.name ?? null, // ratakan object { name } → string utk frontend
