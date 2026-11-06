@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import CashflowPribadiClient from "./CashflowPribadiClient";
 
 export const metadata: Metadata = {
@@ -9,5 +10,9 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default function Page() {
-  return <CashflowPribadiClient />;
+  return (
+    <DashboardLayout>
+      <CashflowPribadiClient />
+    </DashboardLayout>
+  );
 }

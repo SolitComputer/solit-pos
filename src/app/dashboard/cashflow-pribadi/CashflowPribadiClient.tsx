@@ -103,8 +103,8 @@ export default function CashflowPribadiClient() {
   const income = summary?.total_income ?? 0;
   const expense = summary?.total_expense ?? 0;
 
-  return (
-    <div className="min-h-screen bg-slate-50 pb-20 lg:pb-8">
+    return (
+    <div className="bg-slate-50 pb-20 lg:pb-8">
       <div className="max-w-6xl mx-auto px-4 py-6 lg:py-8 space-y-6">
 
         {/* ── Header ──────────────────────────────────────────────────── */}
