@@ -35,6 +35,7 @@ interface LaptopUnitLite {
     msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
     so_at?: string | null; so_by?: string | null;       // SO per-unit (progress X/Y)
     audited_at?: string | null; audited_by?: string | null; // Audit per-unit (progress X/Y)
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU: cabang per unit
 }
 interface LaptopRaw {
     id: string; laptop_name: string; category_id?: string | null; category_name?: string | null;
@@ -52,6 +53,7 @@ interface AccessoryUnitLite {
     msj_group_id?: string | null; // terisi = unit sudah masuk Kelompok MSJ
     so_at?: string | null; so_by?: string | null; // SO per-unit (progress X/Y)
     audited_at?: string | null; audited_by?: string | null; // Audit per-unit (progress X/Y)
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU: cabang per unit
 }
 interface AccessoryRaw {
     id: string; name: string; category: string; brand: string | null; spec: string | null;
@@ -82,6 +84,7 @@ interface UnifiedRow {
     pinjam_done: number;
     unit_id?: string; unit_count: number;
     is_pedagang_listed?: boolean; // laptop: true kalau ADA unit aktif yang masuk Pricelist Pedagang
+    branch: "UTAMA" | "JOGJA" | "CAMPURAN" | null; // ⬅️ BARU: ringkasan cabang dari unit aktif
     raw: LaptopRaw | AccessoryRaw;
 }
 
@@ -182,6 +185,33 @@ const statusUnitLabel = (s: string) => STATUS_UNIT_LABEL[s] ?? s;
 const isUnitAuditActiveAccessory = (auditedAt?: string | null) =>
     !!auditedAt && Date.now() - new Date(auditedAt).getTime() < ACCESSORY_AUDIT_TTL_MS;
 
+// ⬅️ BARU (unit-level): ringkas cabang dari unit AKTIF. 1 kardus bisa campur cabang.
+//  - belum ada yang di-tag          → null ("—")
+//  - semua yang di-tag cabang sama  → cabang itu (UTAMA/JOGJA)
+//  - ada >1 cabang berbeda          → "CAMPURAN"
+function deriveBranch(units: { branch?: "UTAMA" | "JOGJA" | null }[]): "UTAMA" | "JOGJA" | "CAMPURAN" | null {
+    const tagged = units
+        .map(u => u.branch)
+        .filter((b): b is "UTAMA" | "JOGJA" => b === "UTAMA" || b === "JOGJA");
+    if (tagged.length === 0) return null;
+    return new Set(tagged).size === 1 ? tagged[0] : "CAMPURAN";
+}
+
+// ⬅️ BARU: badge Cabang untuk tabel & kartu.
+function BranchBadge({ branch }: { branch: "UTAMA" | "JOGJA" | "CAMPURAN" | null }) {
+    if (branch === "JOGJA") return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 whitespace-nowrap">📍 Jogja</span>
+    );
+    if (branch === "UTAMA") return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-700 border border-slate-200 whitespace-nowrap">🏢 Utama</span>
+    );
+    if (branch === "CAMPURAN") return (
+        <span title="Unit di model ini tersebar di lebih dari satu cabang"
+            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">🔀 Campuran</span>
+    );
+    return <span className="text-[10px] text-gray-300 font-medium">—</span>;
+}
+
 function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const units = l.laptop_units ?? [];
     // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok,
@@ -226,6 +256,7 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
         pinjam_done: 0, // diisi setelah fetch active-units (lihat useEffect pinjaman)
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         is_pedagang_listed: aktif.some(u => u.is_pedagang_listed === true),
+        branch: deriveBranch(aktif), // ⬅️ BARU
         raw: l,
     };
 }
@@ -274,6 +305,7 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
         so_done: soDoneAcc, audit_done: auditDoneAcc,
         pinjam_done: 0, // diisi setelah fetch active-units (lihat useEffect pinjaman)
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
+        branch: deriveBranch(aktif), // ⬅️ BARU
         raw: a,
     };
 }
@@ -2146,6 +2178,7 @@ export default function UnifiedBarangContent() {
                                                         <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
                                                             {row.kategori || "Tanpa kategori"}{row.brand ? ` · ${row.brand}` : ""}
                                                         </p>
+                                                        <div className="mt-1"><BranchBadge branch={row.branch} /></div>
                                                     </div>
                                                     {!canOnlyViewBasic && (
                                                         <div className="text-right flex-shrink-0 max-w-[42%]">
@@ -2365,8 +2398,8 @@ export default function UnifiedBarangContent() {
                                             <thead>
                                                 <tr className="whitespace-nowrap">
                                                     {(canOnlyViewBasic
-                                                        ? ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek", "Tes Kondisi"]
-                                                        : ["No", "Kategori", "Nama Barang", "Merk", "CPU", "RAM", "Storage", "Spek",
+                                                        ? ["No", "Kategori", "Nama Barang", "Cabang", "Merk", "CPU", "RAM", "Storage", "Spek", "Tes Kondisi"]
+                                                        : ["No", "Kategori", "Nama Barang", "Cabang", "Merk", "CPU", "RAM", "Storage", "Spek",
                                                             "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
                                                             "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "MSJ", "M", "Stok", "DP", "SO", "Audit", "Aksi"]
                                                     ).map((h, hi) => (
@@ -2403,6 +2436,7 @@ export default function UnifiedBarangContent() {
                                                                 </span>
                                                             </td>
                                                             <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 ${rowBg}`} title={row.nama}>{row.nama}</td>
+                                                            <td className="px-3 py-3 whitespace-nowrap"><BranchBadge branch={row.branch} /></td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.brand || <Dash />}</td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.cpu || <Dash />}</td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.ram || <Dash />}</td>

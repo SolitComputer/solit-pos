@@ -29,9 +29,10 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         serial_number: string;
         grade: string;
         condition_note: string;
-        purchase_price: number;
+            purchase_price: number;
         selling_price: number;
         status: string;
+        branch?: string | null; // ⬅️ BARU
         notes: string;
         received_at?: string;
       }[];
@@ -72,8 +73,9 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       grade: u.grade || "B",
       condition_note: u.condition_note || "",
       purchase_price: Math.round(Number(u.purchase_price) || 0),
-      selling_price: Math.round(Number(u.selling_price) || 0),
+        selling_price: Math.round(Number(u.selling_price) || 0),
       status: u.status || "SIAP_JUAL",
+      branch: u.branch === "UTAMA" || u.branch === "JOGJA" ? u.branch : null, // ⬅️ BARU
       notes: u.notes || "",
       ...(u.received_at ? { created_at: u.received_at } : {}),
     }));

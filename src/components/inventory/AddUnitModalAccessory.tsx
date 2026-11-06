@@ -31,8 +31,9 @@ export default function AddUnitModalAccessory({
         serial_number: "",
         condition: "BARU",
         source: "",
-        buy_price: "",
+               buy_price: "",
         selling_price: String(defaultSellingPrice || ""),
+        branch: "", // ⬅️ BARU: cabang per unit (unit-level). "" = belum ditentukan → null
         notes: "",
     });
     const [loading, setLoading] = useState(false);
@@ -60,8 +61,9 @@ export default function AddUnitModalAccessory({
                     serial_number: form.serial_number.trim(),
                     condition: form.condition,
                     source: form.source.trim() || null,
-                    buy_price: Number(form.buy_price) || 0,
+                                       buy_price: Number(form.buy_price) || 0,
                     selling_price: Number(form.selling_price) || 0,
+                    branch: form.branch || null, // ⬅️ BARU: "" dikirim sebagai null
                     notes: form.notes,
                 }),
             });
@@ -107,9 +109,18 @@ export default function AddUnitModalAccessory({
                         </select>
                     </Field>
 
-                    <Field label="Sumber">
+                                       <Field label="Sumber">
                         <input name="source" value={form.source} onChange={handleChange}
                             placeholder="Contoh: Kosasih, Lelang, China" className={inputCls} />
+                    </Field>
+
+                    {/* ⬅️ BARU: Cabang per unit. Kardus boleh campur cabang, jadi diisi per SN. */}
+                    <Field label="Cabang">
+                        <select name="branch" value={form.branch} onChange={handleChange} className={inputCls}>
+                            <option value="">— Belum ditentukan —</option>
+                            <option value="UTAMA">🏢 Cabang Utama</option>
+                            <option value="JOGJA">📍 Cabang Jogja</option>
+                        </select>
                     </Field>
 
                     <div className="grid grid-cols-2 gap-3">

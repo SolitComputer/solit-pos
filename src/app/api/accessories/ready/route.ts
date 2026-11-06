@@ -14,7 +14,7 @@ async function handler(_req: NextRequest, _ctx: any, _user: AuthUser) {
         // sama sekali — halaman ini untuk sales, cukup harga jual + stok.
         const { data, error } = await supabaseAdmin
             .from("accessories")
-            .select("id, name, category, sell_price, stock, archived_at, accessory_units(status)")
+                      .select("id, name, category, sell_price, stock, archived_at, accessory_units(status, branch)")
             .order("name", { ascending: true });
 
         if (error) {
@@ -29,19 +29,27 @@ async function handler(_req: NextRequest, _ctx: any, _user: AuthUser) {
                 READY_ACCESSORY_CATEGORIES.includes(String(a.category ?? "").trim().toUpperCase())
             )
             .map((a: any) => {
-                const units = a.accessory_units ?? [];
+                             const units = a.accessory_units ?? [];
+                const tersedia = units.filter((u: any) => u.status === "TERSEDIA");
                 // Stok = jumlah unit berstatus TERSEDIA (Siap Jual). Kalau aksesoris
                 // lama belum punya unit ber-SN, fallback ke kolom stock manual —
                 // pola yang sama dipakai normalizeAccessory di Data Barang.
                 const stok = units.length > 0
-                    ? units.filter((u: any) => u.status === "TERSEDIA").length
+                    ? tersedia.length
                     : (a.stock ?? 0);
+                // ⬅️ BARU: breakdown stok per cabang (unit-level). Unit tanpa branch
+                // (termasuk stok manual lama) TIDAK masuk hitungan cabang → model itu
+                // hanya tampil di tab "Semua".
+                const stok_utama = tersedia.filter((u: any) => u.branch === "UTAMA").length;
+                const stok_jogja = tersedia.filter((u: any) => u.branch === "JOGJA").length;
                 return {
                     id: a.id,
                     name: a.name,
                     category: a.category,
                     sell_price: Math.round(Number(a.sell_price) || 0),
                     stok,
+                    stok_utama, // ⬅️ BARU
+                    stok_jogja, // ⬅️ BARU
                 };
             })
             // Hanya tampilkan yang stoknya > 0 — sama semangat dengan laptop (qty > 0).

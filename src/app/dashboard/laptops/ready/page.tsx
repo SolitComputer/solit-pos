@@ -28,8 +28,9 @@ interface LaptopUnit {
     created_at: string;
     reserved_by?: string;
     reserved_invoice?: string;
-    being_prepared?: boolean;
+      being_prepared?: boolean;
     preparing_order_number?: string | null;
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU: cabang per unit
     laptop?: {
         id: string;
         laptop_name: string;
@@ -50,6 +51,8 @@ interface ReadyAccessory {
     category: string;
     sell_price: number;
     stok: number;
+    stok_utama?: number; // ⬅️ BARU: stok unit cabang Utama
+    stok_jogja?: number; // ⬅️ BARU: stok unit cabang Jogja
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -522,8 +525,11 @@ function ReadyContent() {
     const [filterBrand, setFilterBrand] = useState("ALL");
     const [filterRam, setFilterRam] = useState("ALL");
     const [filterPriceRange, setFilterPriceRange] = useState("ALL");
-    const [filterPrepared, setFilterPrepared] = useState("ALL"); // ALL | YES | NO
+     const [filterPrepared, setFilterPrepared] = useState("ALL"); // ALL | YES | NO
     const [sortBy, setSortBy] = useState("DEFAULT");
+    // ⬅️ BARU: tab Cabang (unit-level). Nyaring laptop per-SN & aksesoris per stok cabang.
+    // Unit tanpa cabang hanya muncul di tab "Semua".
+    const [branchTab, setBranchTab] = useState<"ALL" | "UTAMA" | "JOGJA">("ALL");
 
     const [alertMsg, setAlertMsg] = useState<string | null>(null);
     const [confirmTarget, setConfirmTarget] = useState<LaptopUnit | null>(null);
@@ -617,8 +623,13 @@ function ReadyContent() {
         setSortBy(prev => (prev === asc ? desc : asc));
     };
 
-    const filtered = useMemo(() => {
+     const filtered = useMemo(() => {
         let list = [...units];
+        // ⬅️ BARU: filter tab Cabang per-SN (unit-level). 1 kardus campur cabang
+        // otomatis kebagi: SN Jogja muncul di tab Jogja, SN Utama di tab Utama.
+        if (branchTab !== "ALL") {
+            list = list.filter(u => u.branch === branchTab);
+        }
         if (search.trim()) {
             const t = search.toLowerCase();
             list = list.filter(u =>
@@ -716,7 +727,7 @@ function ReadyContent() {
             }
         }
         return list;
-    }, [units, search, filterSN, filterStatus, filterBrand, filterRam, filterPriceRange, filterPrepared, sortBy]);
+      }, [units, search, filterSN, filterStatus, filterBrand, filterRam, filterPriceRange, filterPrepared, sortBy, branchTab]);
     const counts = {
         all: units.length,
         siap: units.filter(u => u.status === "SIAP_JUAL").length,
@@ -904,7 +915,7 @@ function ReadyContent() {
 
     const accessoryRows: InventoryRow[] = laptopFilterActive
         ? [] // filter khusus laptop aktif → sembunyikan aksesoris biar hasil tidak campur
-        : accessories
+              : accessories
             .filter(a => {
                 if (search.trim()) {
                     const t = search.toLowerCase();
@@ -920,25 +931,34 @@ function ReadyContent() {
                     const [min, max] = ranges[filterPriceRange] ?? [0, Infinity];
                     if (!(a.sell_price >= min && a.sell_price < max)) return false;
                 }
+                // ⬅️ BARU: tab Cabang — buang model yang tidak punya stok di cabang itu.
+                if (branchTab === "UTAMA" && (a.stok_utama ?? 0) === 0) return false;
+                if (branchTab === "JOGJA" && (a.stok_jogja ?? 0) === 0) return false;
                 return true;
             })
-            .map(a => ({
-                id: a.id,
-                laptop_name: a.name,
-                category_name: a.category, // chip HDD/RAM di kolom Kategori
-                cpu: "",
-                ram: "",
-                storage: "",
-                harga_modal: null,
-                harga_jual: a.sell_price,
-                hide_official: true, // aksesoris tak punya konsep Harga Official
-                sumber: null,
-                tanggal_masuk: null,
-                sn: null,
-                stok_tersisa: a.stok,
-                siap_jual: a.stok, // kolom SJ = stok tersedia aksesoris
-                minus: 0,
-            }));
+            .map(a => {
+                // ⬅️ BARU: stok yang ditampilkan ikut cabang aktif.
+                const effStok = branchTab === "UTAMA" ? (a.stok_utama ?? 0)
+                    : branchTab === "JOGJA" ? (a.stok_jogja ?? 0)
+                        : a.stok;
+                return {
+                    id: a.id,
+                    laptop_name: a.name,
+                    category_name: a.category, // chip HDD/RAM di kolom Kategori
+                    cpu: "",
+                    ram: "",
+                    storage: "",
+                    harga_modal: null,
+                    harga_jual: a.sell_price,
+                    hide_official: true, // aksesoris tak punya konsep Harga Official
+                    sumber: null,
+                    tanggal_masuk: null,
+                    sn: null,
+                    stok_tersisa: effStok,
+                    siap_jual: effStok, // kolom SJ = stok tersedia aksesoris (cabang aktif)
+                    minus: 0,
+                };
+            });
 
     const tableRows: InventoryRow[] = [...laptopRows, ...accessoryRows];
 
@@ -1061,6 +1081,30 @@ function ReadyContent() {
                         <StatCard dark label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="text-white" bg={BRAND_GRADIENT} bar="bg-white/25" />
                         <StatCard label="Siap Jual" value={counts.siap} icon={<CheckCircle2 size={18} className="text-white" />} color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
                         <StatCard label="Dipesan" value={counts.reserved} icon={<Lock size={18} className="text-white" />} color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
+                    </div>
+
+                                       {/* ⬅️ BARU: Tab Cabang — Semua / Cabang Utama / Cabang Jogja.
+                        Per-SN untuk laptop, per stok cabang untuk aksesoris. Barang
+                        yang unit-nya belum di-tag cabang hanya tampil di tab "Semua". */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-black/[0.02] p-1.5">
+                        <div className="flex gap-1.5">
+                            {([
+                                { key: "ALL", label: "Semua", emoji: "" },
+                                { key: "UTAMA", label: "Cabang Utama", emoji: "🏢" },
+                                { key: "JOGJA", label: "Cabang Jogja", emoji: "📍" },
+                            ] as const).map((t) => {
+                                const active = branchTab === t.key;
+                                let activeCls = "bg-gradient-to-r from-[#1a1545] to-[#0f0c29] text-white shadow-sm";
+                                if (t.key === "UTAMA" && active) activeCls = "bg-slate-700 text-white shadow-sm";
+                                if (t.key === "JOGJA" && active) activeCls = "bg-violet-600 text-white shadow-sm";
+                                return (
+                                    <button key={t.key} onClick={() => setBranchTab(t.key)}
+                                        className={`flex-1 h-10 rounded-xl text-xs sm:text-sm font-semibold transition-all ${active ? activeCls : "text-gray-500 hover:bg-gray-50"}`}>
+                                        {t.emoji && <span className="mr-1">{t.emoji}</span>}{t.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {/* ── Filter — disamakan dengan Data Barang ───────────── */}

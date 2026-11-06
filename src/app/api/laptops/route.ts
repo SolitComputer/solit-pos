@@ -25,10 +25,11 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
           created_at,
           is_pedagang_listed,
           msj_group_id,
-          so_at,
+                 so_at,
           so_by,
           audited_at,
-          audited_by
+          audited_by,
+          branch
         )
       `)
       .order("laptop_name", { ascending: true });
@@ -70,10 +71,11 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
             msj_group_id: u.msj_group_id, // penanda sudah masuk Kelompok MSJ — dipakai filter Data Barang
             // SO & Audit per-unit ikut dikirim ke SEMUA role (bukan data sensitif
             // seperti harga) supaya tabel Data Barang bisa hitung progress X/Y.
-            so_at: u.so_at ?? null,
+                      so_at: u.so_at ?? null,
             so_by: u.so_by ?? null,
             audited_at: u.audited_at ?? null,
             audited_by: u.audited_by ?? null,
+            branch: u.branch ?? null, // ⬅️ BARU: cabang per unit (bukan sensitif)
           })),
       }));
 

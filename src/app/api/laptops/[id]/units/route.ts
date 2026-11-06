@@ -80,7 +80,8 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       selling_price,
       sparepart_cost,
       official_price, // ← kolom baru
-      status,
+           status,
+      branch, // ⬅️ BARU: cabang per unit (UTAMA/JOGJA/null)
       notes,
       received_at,
       condition_checks, // ← tes kondisi per unit (per SN)
@@ -122,7 +123,8 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         selling_price: selling_price != null ? Math.round(Number(selling_price)) : 0,
         sparepart_cost: sparepart_cost != null ? Math.round(Number(sparepart_cost)) : 0,
         official_price: selling_price != null ? Math.round(Number(selling_price)) + OFFICIAL_PRICE_MARKUP : 0, // ← auto: Harga Setor + markup
-        status,
+               status,
+        branch: branch === "UTAMA" || branch === "JOGJA" ? branch : null, // ⬅️ BARU
         notes,
         condition_checks: condition_checks ?? {},
         kelengkapan: kelengkapan ?? null,

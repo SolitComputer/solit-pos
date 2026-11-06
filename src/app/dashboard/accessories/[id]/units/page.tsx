@@ -30,6 +30,7 @@ interface AccessoryUnit {
     so_by?: string | null;
     audited_at?: string | null;
     audited_by?: string | null;
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU
     notes: string | null;
     created_at: string;
 }
@@ -97,6 +98,7 @@ const EMPTY_UNIT_FORM = {
     serial_number: "",
     condition: "BARU" as "BARU" | "BEKAS",
     status: "TERSEDIA" as "TERSEDIA" | "BELUM_SIAP" | "MINUS_SIAP_JUAL" | "TERJUAL" | "RESERVED",
+    branch: "" as "" | "UTAMA" | "JOGJA", // ⬅️ BARU
     buy_price: "",
     selling_price: "",
     notes: "",
@@ -257,8 +259,9 @@ function BulkAddModal({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    const [condition, setCondition] = useState<"BARU" | "BEKAS">("BARU");
+       const [condition, setCondition] = useState<"BARU" | "BEKAS">("BARU");
     const [status, setStatus] = useState<"TERSEDIA" | "RESERVED">("TERSEDIA");
+    const [branch, setBranch] = useState<"" | "UTAMA" | "JOGJA">(""); // ⬅️ BARU: cabang default semua unit batch
     const [buyPrice, setBuyPrice] = useState("");
     const [sellPrice, setSellPrice] = useState(fmtInput(defaultSellingPrice || 0));
     const [notes, setNotes] = useState("");
@@ -336,9 +339,10 @@ function BulkAddModal({
     };
 
     function buildUnits() {
-        const defaults = {
+              const defaults = {
             condition,
             status,
+            branch: branch || null, // ⬅️ BARU: "" → null
             buy_price: parseRupiah(buyPrice) || 0,
             selling_price: parseRupiah(sellPrice) || 0,
             notes: notes || "",
@@ -352,10 +356,11 @@ function BulkAddModal({
             return sns.map(sn => ({ serial_number: sn, ...defaults }));
         }
         if (tab === "excel") {
-            return excelRows.map(r => ({
+                     return excelRows.map(r => ({
                 serial_number: r.serial_number,
                 condition: r.condition || defaults.condition,
                 status: defaults.status,
+                branch: defaults.branch, // ⬅️ BARU
                 buy_price: r.buy_price || defaults.buy_price,
                 selling_price: r.selling_price || defaults.selling_price,
                 notes: r.notes || "",
@@ -592,7 +597,29 @@ function BulkAddModal({
                                                 : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                                 }`}
                                         >
-                                            {s === "TERSEDIA" ? <><CheckCircle2 size={13} /> Tersedia</> : <><Lock size={13} /> Reserved</>}
+                                                                                  {s === "TERSEDIA" ? <><CheckCircle2 size={13} /> Tersedia</> : <><Lock size={13} /> Reserved</>}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ⬅️ BARU: Cabang — 1 pilihan berlaku untuk SEMUA unit di batch ini.
+                                Kalau satu kiriman campur cabang, set salah satu lalu ubah per-SN lewat Edit. */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Cabang <span className="text-gray-400 font-normal">(semua unit)</span></label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {([
+                                        { v: "", label: "Belum" },
+                                        { v: "UTAMA", label: "🏢 Utama" },
+                                        { v: "JOGJA", label: "📍 Jogja" },
+                                    ] as const).map(o => (
+                                        <button key={o.v || "none"} type="button" onClick={() => setBranch(o.v)}
+                                            className={`inline-flex items-center justify-center gap-1 h-9 rounded-lg text-xs font-bold border transition ${branch === o.v
+                                                ? o.v === "JOGJA" ? "bg-violet-600 text-white border-violet-600"
+                                                    : o.v === "UTAMA" ? "bg-slate-700 text-white border-slate-700"
+                                                        : "bg-gray-700 text-white border-gray-700"
+                                                : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                                            {o.label}
                                         </button>
                                     ))}
                                 </div>
@@ -1746,9 +1773,10 @@ export default function AccessoryUnitsPage() {
                     unit.status === "MINUS_SIAP_JUAL" ? "MINUS_SIAP_JUAL" :
                         "TERSEDIA";
         setFormData({
-            serial_number: unit.serial_number,
+                     serial_number: unit.serial_number,
             condition: unit.condition,
             status: formStatus,
+            branch: unit.branch ?? "", // ⬅️ BARU
             buy_price: fmtInput(unit.buy_price),
             selling_price: fmtInput(unit.selling_price),
             notes: unit.notes ?? "",
@@ -1768,8 +1796,9 @@ export default function AccessoryUnitsPage() {
         try {
             const payload = {
                 serial_number: formData.serial_number.trim().toUpperCase(),
-                condition: formData.condition,
+                             condition: formData.condition,
                 status: formData.status,
+                branch: formData.branch || null, // ⬅️ BARU
                 buy_price: parseRupiah(buyInput),
                 selling_price: parseRupiah(sellInput),
                 notes: formData.notes || null,
@@ -2483,7 +2512,20 @@ export default function AccessoryUnitsPage() {
                                     {canSeePrivate && (
                                         <PriceInput label="Harga Modal" value={buyInput} onChange={setBuyInput} />
                                     )}
-                                    <PriceInput label="Harga Jual" value={sellInput} onChange={setSellInput} required />
+                                                                   <PriceInput label="Harga Jual" value={sellInput} onChange={setSellInput} required />
+                                </div>
+
+                                {/* ⬅️ BARU: Cabang per unit */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Cabang</label>
+                                    <select
+                                        value={formData.branch}
+                                        onChange={e => setFormData(p => ({ ...p, branch: e.target.value as "" | "UTAMA" | "JOGJA" }))}
+                                        className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition">
+                                        <option value="">— Belum ditentukan —</option>
+                                        <option value="UTAMA">🏢 Cabang Utama</option>
+                                        <option value="JOGJA">📍 Cabang Jogja</option>
+                                    </select>
                                 </div>
 
                                 {canSeePrivate && buyVal > 0 && sellVal > 0 && (

@@ -13,6 +13,7 @@ export interface AccessoryUnitDetailData {
     buy_price: number;
     selling_price: number;
     status: string;
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU: cabang per unit
     notes: string;
     created_at: string;
 }
@@ -70,6 +71,7 @@ export default function AccessoryUnitDetailModal({
         buy_price: String(unit.buy_price ?? 0),
         selling_price: String(unit.selling_price ?? 0),
         status: unit.status ?? "TERSEDIA",
+        branch: unit.branch ?? "", // ⬅️ BARU ("" = belum ditentukan)
         notes: unit.notes ?? "",
     });
 
@@ -112,7 +114,8 @@ export default function AccessoryUnitDetailModal({
                     condition: form.condition,
                     buy_price: Number(form.buy_price) || 0,
                     selling_price: Number(form.selling_price) || 0,
-                    status: form.status,
+                                       status: form.status,
+                    branch: form.branch || null, // ⬅️ BARU
                     notes: form.notes,
                 }),
             });
@@ -261,10 +264,20 @@ export default function AccessoryUnitDetailModal({
                                                 {EDITABLE_STATUS.map(s => <option key={s} value={s}>{STATUS_STYLE[s].label}</option>)}
                                             </select>
                                         </Field>
-                                        <Field label="Kondisi">
+                                                                              <Field label="Kondisi">
                                             <select value={form.condition} onChange={e => set("condition", e.target.value)} className={inputCls}>
                                                 <option value="BARU">Baru</option>
                                                 <option value="BEKAS">Bekas</option>
+                                            </select>
+                                        </Field>
+                                    </div>
+                                    {/* ⬅️ BARU: Cabang per unit */}
+                                    <div className="mt-3">
+                                        <Field label="Cabang">
+                                            <select value={form.branch} onChange={e => set("branch", e.target.value)} className={inputCls}>
+                                                <option value="">— Belum ditentukan —</option>
+                                                <option value="UTAMA">🏢 Cabang Utama</option>
+                                                <option value="JOGJA">📍 Cabang Jogja</option>
                                             </select>
                                         </Field>
                                     </div>

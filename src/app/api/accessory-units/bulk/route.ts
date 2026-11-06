@@ -24,11 +24,12 @@ export const POST = withAuth(async (req: NextRequest) => {
 
     const { accessory_id, units } = body as {
         accessory_id?: string;
-        units?: Array<{
+             units?: Array<{
             serial_number: string;
             condition?: string;
             status?: string;
             source?: string;
+            branch?: string | null; // ⬅️ BARU
             buy_price?: number;
             selling_price?: number;
             notes?: string;
@@ -111,7 +112,8 @@ export const POST = withAuth(async (req: NextRequest) => {
         status: VALID_STATUSES.includes(u.status ?? "")
             ? u.status!
             : "TERSEDIA",
-        source: u.source?.trim() || null,
+              source: u.source?.trim() || null,
+        branch: u.branch === "UTAMA" || u.branch === "JOGJA" ? u.branch : null, // ⬅️ BARU
         buy_price: Math.max(0, Math.round(Number(u.buy_price) || 0)),
         selling_price: Math.max(0, Math.round(Number(u.selling_price) || 0)),
         notes: u.notes?.trim() || null,

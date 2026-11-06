@@ -36,9 +36,10 @@ interface LaptopUnit {
     created_at: string;
     audited_at?: string | null;
     audited_by?: string | null;
-    so_at?: string | null;
+     so_at?: string | null;
     so_by?: string | null;
     is_pedagang_listed?: boolean;
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU
 }
 
 interface Laptop {

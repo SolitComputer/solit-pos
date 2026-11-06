@@ -26,7 +26,8 @@ export interface UnitDetailData {
     sparepart_cost?: number;
     selling_price: number;
     official_price?: number;
-    status: string;
+       status: string;
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU
     notes: string;
     condition_checks?: ConditionChecks | null;
     kelengkapan?: string | null;
@@ -125,7 +126,8 @@ export default function UnitDetailModal({
         sparepart_cost: String(unit.sparepart_cost ?? 0),
         selling_price: String(unit.selling_price ?? 0),
         official_price: String(unit.official_price ?? 0),
-        status: unit.status ?? "SIAP_JUAL",
+              status: unit.status ?? "SIAP_JUAL",
+        branch: unit.branch ?? "", // ⬅️ BARU
         notes: unit.notes ?? "",
         kelengkapan: unit.kelengkapan ?? "",
         received_at: toDateInput(unit.created_at),
@@ -193,7 +195,8 @@ export default function UnitDetailModal({
                     sparepart_cost: Number(form.sparepart_cost) || 0,
                     selling_price: Number(form.selling_price) || 0,
                     official_price: (Number(form.selling_price) || 0) + OFFICIAL_PRICE_MARKUP,
-                    status: form.status,
+                                      status: form.status,
+                    branch: form.branch || null, // ⬅️ BARU
                     notes: form.notes,
                     kelengkapan: form.kelengkapan,
                     ...(canEditChecklist ? { condition_checks: conditionChecks } : {}),
@@ -435,7 +438,7 @@ export default function UnitDetailModal({
                                                 )}
                                             </select>
                                         </Field>
-                                        {canSeePrivate && (
+                                                                             {canSeePrivate && (
                                             <Field label="Grade">
                                                 <select value={form.grade} onChange={e => set("grade", e.target.value)} className={inputCls}>
                                                     <option value="A">Grade A — Sempurna</option>
@@ -444,6 +447,16 @@ export default function UnitDetailModal({
                                                 </select>
                                             </Field>
                                         )}
+                                    </div>
+                                    {/* ⬅️ BARU: Cabang per unit */}
+                                    <div className="mt-3">
+                                        <Field label="Cabang">
+                                            <select value={form.branch} onChange={e => set("branch", e.target.value)} className={inputCls}>
+                                                <option value="">— Belum ditentukan —</option>
+                                                <option value="UTAMA">🏢 Cabang Utama</option>
+                                                <option value="JOGJA">📍 Cabang Jogja</option>
+                                            </select>
+                                        </Field>
                                     </div>
                                 </Section>
                             )}

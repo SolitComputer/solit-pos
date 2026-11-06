@@ -13,7 +13,8 @@ export interface LaptopUnit {
     condition_note: string;
     purchase_price: number;
     selling_price: number;
-    status: string;
+     status: string;
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU
     notes: string;
     condition_checks?: ConditionChecks | null;
     kelengkapan?: string | null;
@@ -40,7 +41,8 @@ const EMPTY_FORM = {
     condition_note: "",
     purchase_price: "",
     selling_price: "",
-    status: "SIAP_JUAL",
+       status: "SIAP_JUAL",
+    branch: "", // ⬅️ BARU
     notes: "",
     kelengkapan: "",
     received_at: "",
@@ -68,7 +70,8 @@ function buildInitialFormData(editingUnit: LaptopUnit | null, defaultSellingPric
         condition_note: editingUnit.condition_note || "",
         purchase_price: String(editingUnit.purchase_price || ""),
         selling_price: String(editingUnit.selling_price || ""),
-        status: editableStatus,
+              status: editableStatus,
+        branch: editingUnit.branch ?? "", // ⬅️ BARU
         notes: editingUnit.notes || "",
         kelengkapan: editingUnit.kelengkapan || "",
         received_at: editingUnit.created_at ? new Date(editingUnit.created_at).toISOString().split("T")[0] : "",
@@ -107,10 +110,11 @@ export default function UnitFormModal({
         e.preventDefault();
         setFormLoading(true);
         try {
-            const payload = {
+                   const payload = {
                 ...formData,
                 purchase_price: Number(formData.purchase_price),
                 selling_price: Number(formData.selling_price),
+                branch: formData.branch || null, // ⬅️ BARU ("" → null)
                 ...(canEditChecklist ? { condition_checks: conditionChecks } : {}),
                 ...(formData.received_at
                     ? { received_at: new Date(formData.received_at).toISOString() }
@@ -352,6 +356,17 @@ export default function UnitFormModal({
                             {formData.received_at && (
                                 <p className="text-[10px] text-gray-400 mt-1">Barang masuk: {fmtDate(formData.received_at)}</p>
                             )}
+                        </div>
+
+                                              {/* ⬅️ BARU: Cabang per unit */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Cabang</label>
+                            <select name="branch" value={formData.branch} onChange={handleChange}
+                                className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition">
+                                <option value="">— Belum ditentukan —</option>
+                                <option value="UTAMA">🏢 Cabang Utama</option>
+                                <option value="JOGJA">📍 Cabang Jogja</option>
+                            </select>
                         </div>
 
                         {/* Kelengkapan — teks bebas, mis. "Dus, charger, tas" */}

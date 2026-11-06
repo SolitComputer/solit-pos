@@ -23,7 +23,7 @@ export const PATCH = withAuth(async (
     try { body = await req.json(); }
     catch { return NextResponse.json({ success: false, error: "Body tidak valid" }, { status: 400 }); }
 
-    const { serial_number, condition, status, source, selling_price, buy_price, notes } = body as Record<string, unknown>;
+        const { serial_number, condition, status, source, selling_price, buy_price, notes, branch } = body as Record<string, unknown>;
     // source di-handle di bawah — kolom `source` sudah ada di accessory_units
     // (via migration ADD COLUMN source).
 
@@ -52,9 +52,11 @@ export const PATCH = withAuth(async (
     // sudah benar. Unit tetap kehitung stok (status !== TERJUAL), jadi tetap
     // tampil di Data Barang sampai dimasukkan ke Kelompok MSJ.
     if (typeof status === "string" && ["TERSEDIA", "BELUM_SIAP", "MINUS_SIAP_JUAL", "TERJUAL", "RESERVED"].includes(status)) updates.status = status;
-        if (typeof buy_price === "number") updates.buy_price = Math.max(0, buy_price);
+          if (typeof buy_price === "number") updates.buy_price = Math.max(0, buy_price);
     if (typeof selling_price === "number") updates.selling_price = Math.max(0, selling_price);
     if (typeof notes === "string") updates.notes = notes.trim() || null;
+    // ⬅️ BARU: Cabang — diproses hanya kalau dikirim; UTAMA/JOGJA saja, lainnya null.
+    if (branch !== undefined) updates.branch = branch === "UTAMA" || branch === "JOGJA" ? branch : null;
 
     if (Object.keys(updates).length === 0) {
         return NextResponse.json({ success: false, error: "Tidak ada data yang diubah" }, { status: 400 });

@@ -38,6 +38,7 @@ export default function AddUnitModal({
         sparepart_cost: "",
         selling_price: String(defaultSellingPrice || ""),
         status: "SIAP_JUAL",
+        branch: "", // ⬅️ BARU: cabang per unit (unit-level). "" = belum ditentukan → null
         notes: "",
     });
     const [loading, setLoading] = useState(false);
@@ -67,7 +68,8 @@ export default function AddUnitModal({
                     purchase_price: Number(form.purchase_price) || 0,
                     selling_price: Number(form.selling_price) || 0,
                     sparepart_cost: Number(form.sparepart_cost) || 0,
-                    status: form.status,
+                                       status: form.status,
+                    branch: form.branch || null, // ⬅️ BARU: "" dikirim sebagai null
                     notes: form.notes,
                 }),
             });
@@ -120,9 +122,18 @@ export default function AddUnitModal({
                         </Field>
                     </div>
 
-                    <Field label="Sumber">
+                                        <Field label="Sumber">
                         <input name="source" value={form.source} onChange={handleChange}
                             placeholder="Supplier Jakarta, Tukar Tambah, Lelang..." className={inputCls} />
+                    </Field>
+
+                    {/* ⬅️ BARU: Cabang per unit. Kardus boleh campur cabang, jadi diisi per SN. */}
+                    <Field label="Cabang">
+                        <select name="branch" value={form.branch} onChange={handleChange} className={inputCls}>
+                            <option value="">— Belum ditentukan —</option>
+                            <option value="UTAMA">🏢 Cabang Utama</option>
+                            <option value="JOGJA">📍 Cabang Jogja</option>
+                        </select>
                     </Field>
 
                     <div className="grid grid-cols-2 gap-3">

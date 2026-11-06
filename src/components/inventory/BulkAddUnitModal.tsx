@@ -25,8 +25,9 @@ export default function BulkAddUnitModal({
     // ── CHANGED: default status hanya 2 pilihan ──
     const [status, setStatus] = useState("SIAP_JUAL");
     const [purchasePrice, setPurchasePrice] = useState("");
-    const [sellingPrice, setSellingPrice] = useState(String(defaultSellingPrice || ""));
+       const [sellingPrice, setSellingPrice] = useState(String(defaultSellingPrice || ""));
     const [conditionNote, setConditionNote] = useState("");
+    const [branch, setBranch] = useState<"" | "UTAMA" | "JOGJA">(""); // ⬅️ BARU: cabang default semua unit batch ini
 
     const [snFrom, setSnFrom] = useState("");
     const [snTo, setSnTo] = useState("");
@@ -125,12 +126,13 @@ export default function BulkAddUnitModal({
     };
 
     function buildUnits() {
-        const defaults = {
+            const defaults = {
             grade,
             status,
             purchase_price: Number(purchasePrice) || 0,
             selling_price: Number(sellingPrice) || 0,
             condition_note: conditionNote,
+            branch: branch || null, // ⬅️ BARU: "" → null
             notes: "",
             received_at: receivedAt ? new Date(receivedAt).toISOString() : undefined,
         };
@@ -144,13 +146,14 @@ export default function BulkAddUnitModal({
             return sns.map(sn => ({ serial_number: sn, ...defaults }));
         }
         if (tab === "excel") {
-            return excelRows.map(r => ({
+                    return excelRows.map(r => ({
                 serial_number: r.serial_number,
                 grade: r.grade || defaults.grade,
                 status: r.status || defaults.status,
                 purchase_price: r.purchase_price || defaults.purchase_price,
                 selling_price: r.selling_price || defaults.selling_price,
                 condition_note: r.condition_note || defaults.condition_note,
+                branch: defaults.branch, // ⬅️ BARU: cabang dari pilihan default (Excel belum punya kolom cabang)
                 notes: r.notes || "",
             }));
         }
@@ -425,6 +428,28 @@ export default function BulkAddUnitModal({
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Jual</label>
                                     <CurrencyInput value={Number(sellingPrice) || 0} onChange={(v) => setSellingPrice(String(v))}
                                         className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition" />
+                                </div>
+                            </div>
+
+                                                      {/* ⬅️ BARU: Cabang — 1 pilihan berlaku untuk SEMUA unit di batch ini.
+                                Kalau satu kiriman campur cabang, set salah satu lalu ubah per-SN lewat Edit. */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Cabang <span className="text-gray-400 font-normal">(semua unit)</span></label>
+                                <div className="flex gap-1.5">
+                                    {([
+                                        { v: "", label: "Belum" },
+                                        { v: "UTAMA", label: "🏢 Utama" },
+                                        { v: "JOGJA", label: "📍 Jogja" },
+                                    ] as const).map(o => (
+                                        <button key={o.v || "none"} type="button" onClick={() => setBranch(o.v)}
+                                            className={`flex-1 h-9 rounded-lg text-xs font-semibold border transition ${branch === o.v
+                                                ? o.v === "JOGJA" ? "bg-violet-600 text-white border-violet-600"
+                                                    : o.v === "UTAMA" ? "bg-slate-700 text-white border-slate-700"
+                                                        : "bg-gray-700 text-white border-gray-700"
+                                                : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                                            {o.label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 

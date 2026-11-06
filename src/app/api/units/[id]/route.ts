@@ -27,9 +27,9 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { id } = await props.params;
     const body = await req.json();
 
-    const {
+       const {
       serial_number, grade, condition_note, source,
-      purchase_price, selling_price, status, notes,
+      purchase_price, selling_price, status, notes, branch,
       condition_checks, // ← tes kondisi per unit (per SN)
       kelengkapan,      // ← keterangan kelengkapan unit (teks bebas)
     } = body;
@@ -101,7 +101,10 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         ...(selling_price !== undefined && { selling_price: Math.round(Number(selling_price)) }),
         ...(body.sparepart_cost !== undefined && { sparepart_cost: Math.round(Number(body.sparepart_cost)) }),
         ...(body.official_price !== undefined && { official_price: Math.round(Number(body.official_price)) }),
-        ...(status !== undefined && { status }),
+              ...(status !== undefined && { status }),
+        // ⬅️ BARU: Cabang per unit — UTAMA/JOGJA saja, lainnya null. Tidak di-gate
+        // full-access (bukan sensitif seperti SN/sumber), cukup izin edit unit.
+        ...(branch !== undefined && { branch: branch === "UTAMA" || branch === "JOGJA" ? branch : null }),
         ...(notes !== undefined && { notes }),
         //  Tes kondisi per unit — hanya ikut ter-update kalau pengirim memang
         //  berhak isi checklist (Rafi Salim, Fikri Aryansyah & Admin). Kalau
