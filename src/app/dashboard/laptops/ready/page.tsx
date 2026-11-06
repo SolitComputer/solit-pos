@@ -895,11 +895,12 @@ function ReadyContent() {
         sumber: null,
         tanggal_masuk: null,
         sn: u.serial_number,
+        branch: u.branch ?? null, // ⬅️ BARU (per-SN)
         stok_tersisa: 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
         minus: 0,
         is_new: isNewArrival(u.created_at),
-    }));
+    }));    
 
     // ── Baris aksesoris (HDD & RAM) — per-MODEL, digabung ke tabel yang sama ──
     // Sales cuma lihat Nama + Harga Jual + Stok (lewat kolom SJ). Tanpa SN/CPU/
@@ -953,7 +954,10 @@ function ReadyContent() {
                     hide_official: true, // aksesoris tak punya konsep Harga Official
                     sumber: null,
                     tanggal_masuk: null,
-                    sn: null,
+                                      sn: null,
+                    // ⬅️ BARU: aksesoris per-model → tunjukkan cabang yang sedang
+                    // aktif di tab (kalau tab ALL, kosongkan biar nggak menyesatkan).
+                    branch: branchTab === "UTAMA" ? "UTAMA" : branchTab === "JOGJA" ? "JOGJA" : null,
                     stok_tersisa: effStok,
                     siap_jual: effStok, // kolom SJ = stok tersedia aksesoris (cabang aktif)
                     minus: 0,
@@ -1239,10 +1243,11 @@ function ReadyContent() {
                             {/* RESPONSIVE: bungkus InventoryTable dengan overflow-x-auto sendiri,
                                 supaya tabel bisa discroll horizontal di HP tanpa merusak rounded corner card */}
                             <div className="overflow-x-auto table-scroll">
-                                <InventoryTable
+                                                         <InventoryTable
                                     rows={tableRows}
                                     canSeePrivate={false}
                                     canSeeStock={false}
+                                    showBranch
                                     sortBy={sortBy}
                                     onSort={handleSort}
                                     onRowClick={(row) => {

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import BarcodeModal from "@/components/ui/BarcodeModal";
+import { BranchBadge } from "@/components/inventory/InventoryTable"; // ⬅️ BARU: badge cabang reusable
 import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, ACCESSORY_UNIT_AUDIT_ROLES } from "@/lib/permissions";
 import {
     HardDrive, MemoryStick, Plug, BatteryFull, Keyboard, Monitor,
@@ -259,7 +260,7 @@ function BulkAddModal({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-       const [condition, setCondition] = useState<"BARU" | "BEKAS">("BARU");
+    const [condition, setCondition] = useState<"BARU" | "BEKAS">("BARU");
     const [status, setStatus] = useState<"TERSEDIA" | "RESERVED">("TERSEDIA");
     const [branch, setBranch] = useState<"" | "UTAMA" | "JOGJA">(""); // ⬅️ BARU: cabang default semua unit batch
     const [buyPrice, setBuyPrice] = useState("");
@@ -339,7 +340,7 @@ function BulkAddModal({
     };
 
     function buildUnits() {
-              const defaults = {
+        const defaults = {
             condition,
             status,
             branch: branch || null, // ⬅️ BARU: "" → null
@@ -356,7 +357,7 @@ function BulkAddModal({
             return sns.map(sn => ({ serial_number: sn, ...defaults }));
         }
         if (tab === "excel") {
-                     return excelRows.map(r => ({
+            return excelRows.map(r => ({
                 serial_number: r.serial_number,
                 condition: r.condition || defaults.condition,
                 status: defaults.status,
@@ -597,7 +598,7 @@ function BulkAddModal({
                                                 : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                                 }`}
                                         >
-                                                                                  {s === "TERSEDIA" ? <><CheckCircle2 size={13} /> Tersedia</> : <><Lock size={13} /> Reserved</>}
+                                            {s === "TERSEDIA" ? <><CheckCircle2 size={13} /> Tersedia</> : <><Lock size={13} /> Reserved</>}
                                         </button>
                                     ))}
                                 </div>
@@ -1773,7 +1774,7 @@ export default function AccessoryUnitsPage() {
                     unit.status === "MINUS_SIAP_JUAL" ? "MINUS_SIAP_JUAL" :
                         "TERSEDIA";
         setFormData({
-                     serial_number: unit.serial_number,
+            serial_number: unit.serial_number,
             condition: unit.condition,
             status: formStatus,
             branch: unit.branch ?? "", // ⬅️ BARU
@@ -1796,7 +1797,7 @@ export default function AccessoryUnitsPage() {
         try {
             const payload = {
                 serial_number: formData.serial_number.trim().toUpperCase(),
-                             condition: formData.condition,
+                condition: formData.condition,
                 status: formData.status,
                 branch: formData.branch || null, // ⬅️ BARU
                 buy_price: parseRupiah(buyInput),
@@ -2200,15 +2201,15 @@ export default function AccessoryUnitsPage() {
                                     </button>
                                 )}
                                 {canDelete && (
-                                <button onClick={handleBulkDelete} disabled={bulkDeleting}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50">
-                                    {bulkDeleting
-                                        ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menghapus...</>
-                                        : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>Hapus {selectedIds.size} Unit</>
-                                    }
-                                </button>
+                                    <button onClick={handleBulkDelete} disabled={bulkDeleting}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50">
+                                        {bulkDeleting
+                                            ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menghapus...</>
+                                            : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>Hapus {selectedIds.size} Unit</>
+                                        }
+                                    </button>
                                 )}
                             </div>
                         </div>
@@ -2267,6 +2268,7 @@ export default function AccessoryUnitsPage() {
                                                 </button>
                                             </th>
                                             <Th>Serial Number</Th>
+                                            <Th center>Cabang</Th>
                                             <Th>Kondisi</Th>
                                             <Th>Tgl Masuk</Th>
                                             {canSeePrivate && <Th right>Harga Modal</Th>}
@@ -2306,6 +2308,9 @@ export default function AccessoryUnitsPage() {
                                                                 <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded" title="Unit ini sedang dipinjam">Di Pinjam</span>
                                                             )}
                                                         </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                        <BranchBadge branch={unit.branch ?? null} />
                                                     </td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         {c && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${c.badge}`}>{c.label}</span>}
@@ -2402,7 +2407,7 @@ export default function AccessoryUnitsPage() {
                                                                 </button>
                                                             )}
                                                             {unit.status !== "TERJUAL" && canDelete && (
-                                                                <button onClick={() => handleDelete(unit)}                                                                    className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
+                                                                <button onClick={() => handleDelete(unit)} className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                                     </svg>
@@ -2512,7 +2517,7 @@ export default function AccessoryUnitsPage() {
                                     {canSeePrivate && (
                                         <PriceInput label="Harga Modal" value={buyInput} onChange={setBuyInput} />
                                     )}
-                                                                   <PriceInput label="Harga Jual" value={sellInput} onChange={setSellInput} required />
+                                    <PriceInput label="Harga Jual" value={sellInput} onChange={setSellInput} required />
                                 </div>
 
                                 {/* ⬅️ BARU: Cabang per unit */}

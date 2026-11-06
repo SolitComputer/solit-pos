@@ -753,7 +753,8 @@ export default function UnitsPage() {
         gross_profit: (u.selling_price ?? 0) - (u.sparepart_cost ?? 0) - (u.purchase_price ?? 0),
         sumber: u.source ?? null,
         tanggal_masuk: u.created_at ?? null,
-        sn: u.serial_number,
+              sn: u.serial_number,
+        branch: u.branch ?? null, // ⬅️ BARU
         kelengkapan: u.kelengkapan ?? null,
         stok_tersisa: u.status !== "SOLD" ? 1 : 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
@@ -1293,9 +1294,10 @@ export default function UnitsPage() {
                                 canSeePrivate={canSeePriceInfo}
                                 canSeeStock={canSeePriceInfo}
                                 showSparepart
-                                showMinusSiapJual
+                                                               showMinusSiapJual
                                 showTotalJual
                                 showKelengkapan
+                                showBranch
                                 sortBy={sortBy}
                                 onSort={handleSort}
                                 selectedIds={selectedIds}

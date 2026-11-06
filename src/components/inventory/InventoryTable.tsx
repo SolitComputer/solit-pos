@@ -53,6 +53,10 @@ export interface InventoryRow {
     sn: string | null;
     sn_note?: string;
 
+    /** Cabang unit (unit-level). Laptop/aksesoris per-SN; "CAMPURAN" dipakai
+     *  di Data Barang level model. Kolom opt-in via showBranch. */
+    branch?: "UTAMA" | "JOGJA" | "CAMPURAN" | null;
+
     /** Kelengkapan unit (teks bebas, mis. "Dus, charger, tas") — opt-in via showKelengkapan */
     kelengkapan?: string | null;
 
@@ -97,8 +101,10 @@ interface Props {
     showSparepart?: boolean;
     /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
     showTotalJual?: boolean;
-    /** Tampilkan kolom Kelengkapan unit (opt-in — halaman Units) */
+       /** Tampilkan kolom Kelengkapan unit (opt-in — halaman Units) */
     showKelengkapan?: boolean;
+    /** Tampilkan kolom Cabang (opt-in — Kelola Unit & Barang Siap Jual) */
+    showBranch?: boolean;
     /** Label kolom tanggal — default "Tanggal Masuk", dipakai "Tanggal Terjual" di tab Terjual */
     dateColumnLabel?: string;
     onRowClick?: (row: InventoryRow) => void;
@@ -166,10 +172,26 @@ const BelumLunasBadge = ({ label }: { label?: string }) => (
 
 
 
+// ⬅️ BARU: badge Cabang reusable. Di-export supaya tabel lain yang BUKAN
+// InventoryTable (mis. Kelola Unit Aksesoris) bisa pakai badge yang sama.
+export function BranchBadge({ branch }: { branch?: "UTAMA" | "JOGJA" | "CAMPURAN" | null }) {
+    if (branch === "JOGJA") return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 whitespace-nowrap">📍 Jogja</span>
+    );
+    if (branch === "UTAMA") return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-700 border border-slate-200 whitespace-nowrap">🏢 Utama</span>
+    );
+    if (branch === "CAMPURAN") return (
+        <span title="Unit model ini tersebar di lebih dari satu cabang"
+            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">🔀 Campuran</span>
+    );
+    return <span className="text-[10px] text-gray-300 font-medium">—</span>;
+}
+
 export default function InventoryTable({
     rows, canSeePrivate, canSeeStock, showSparepart, showMinusSiapJual, showTotalJual, showKelengkapan, dateColumnLabel,
     onRowClick, renderActions, renderAudit, renderSo, renderPedagang, sortBy, onSort,
-    selectedIds, onToggleSelect, onToggleSelectAll, allSelected, someSelected,
+    selectedIds, onToggleSelect, onToggleSelectAll, allSelected, someSelected, showBranch,
 }: Props) {
     // Checkbox aktif hanya kalau handler toggle dikirim oleh pemanggil.
     const selectable = !!onToggleSelect;
@@ -261,7 +283,8 @@ export default function InventoryTable({
                         {showTotalJual && canSeeStock && <Th right sortKey="TOTAL_JUAL" activeSort={sortBy} onSort={onSort}>Total Jual</Th>}
                         {canSeePrivate && <Th sortKey="SUMBER" activeSort={sortBy} onSort={onSort}>Sumber</Th>}
                         {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>{dateColumnLabel ?? "Tanggal Masuk"}</Th>}
-                        <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
+                                             <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
+                        {showBranch && <Th center>Cabang</Th>}
                         {showKelengkapan && <Th>Kelengkapan</Th>}
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                                                 <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
@@ -420,11 +443,17 @@ export default function InventoryTable({
                                 </td>
                             )}
 
-                            <td className="px-3 py-3.5 whitespace-nowrap">
+                                                       <td className="px-3 py-3.5 whitespace-nowrap">
                                 {row.sn ? (
                                     <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{row.sn}</code>
                                 ) : row.sn_note ? <Note>{row.sn_note}</Note> : <Dash />}
                             </td>
+
+                            {showBranch && (
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                                    <BranchBadge branch={row.branch} />
+                                </td>
+                            )}
 
                             {showKelengkapan && (
                                 <td className="px-3.5 py-3.5 max-w-[160px]">
