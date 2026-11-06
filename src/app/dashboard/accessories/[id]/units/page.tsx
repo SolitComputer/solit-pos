@@ -1069,6 +1069,7 @@ function BulkEditUnitsModal({
 }) {
     const [condition, setCondition] = useState<"" | "BARU" | "BEKAS">("");
     const [status, setStatus] = useState<"" | "TERSEDIA" | "BELUM_SIAP" | "MINUS_SIAP_JUAL">("");
+    const [branch, setBranch] = useState<"" | "UTAMA" | "JOGJA">(""); // ⬅️ BARU: "" = tidak diubah
     const [buyInput, setBuyInput] = useState("");
     const [sellInput, setSellInput] = useState("");
     const [notes, setNotes] = useState("");
@@ -1090,6 +1091,7 @@ function BulkEditUnitsModal({
         const patch: Record<string, unknown> = {};
         if (condition) patch.condition = condition;
         if (status) patch.status = status;
+        if (branch) patch.branch = branch; // ⬅️ BARU: hanya dikirim kalau dipilih
         if (buyInput.trim() !== "") patch.buy_price = parseRupiah(buyInput);
         if (sellInput.trim() !== "") patch.selling_price = parseRupiah(sellInput);
         if (notes.trim() !== "") patch.notes = notes.trim();
@@ -1172,6 +1174,25 @@ function BulkEditUnitsModal({
                                 </button>
                             ))}
                         </div>
+                    </div>
+
+                    {/* ⬅️ BARU: Cabang — klik untuk pilih, klik lagi batal (biarkan). */}
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Cabang</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {([
+                                { v: "UTAMA", l: "🏢 Utama" },
+                                { v: "JOGJA", l: "📍 Jogja" },
+                            ] as const).map(o => (
+                                <button key={o.v} type="button" onClick={() => setBranch(prev => prev === o.v ? "" : o.v)}
+                                    className={`h-10 rounded-xl text-xs font-bold border transition ${branch === o.v
+                                        ? o.v === "JOGJA" ? "bg-violet-600 text-white border-violet-600" : "bg-slate-700 text-white border-slate-700"
+                                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                    {o.l}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">Kosongkan = cabang tiap unit tidak diubah.</p>
                     </div>
 
                     <div className={canSeePrivate ? "grid grid-cols-2 gap-3" : ""}>

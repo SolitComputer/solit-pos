@@ -72,8 +72,14 @@ export async function GET(request: Request) {
         .in("role", subordinateRoles as string[]);
 
       const subordinateIds = (subordinateUsers ?? []).map((u: any) => u.id);
+      // ✅ FIX: kepala divisi ikut lihat libur bulanan DIRINYA sendiri, bukan
+      // cuma bawahannya — selaras dengan day-off & date-work. Tanpa ini libur
+      // bulanan kepala divisi tidak ter-load di akunnya → bisa muncul sebagai
+      // hari kerja / "Tidak Hadir" palsu di Ringkasan.
+      if (!subordinateIds.includes(user.id)) subordinateIds.push(user.id);
 
-      if (targetUserId && !subordinateIds.includes(targetUserId)) {
+      // targetUserId diri sendiri selalu boleh (lihat libur bulanan sendiri)
+      if (targetUserId && targetUserId !== user.id && !subordinateIds.includes(targetUserId)) {
         return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
       }
 

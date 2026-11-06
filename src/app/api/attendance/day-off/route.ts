@@ -27,7 +27,12 @@ export async function GET(request: Request) {
       }
       const { data: subs } = await supabase
         .from("users").select("id").in("role", subRoles);
-      const subIds = (subs ?? []).map((s: any) => s.id);
+          const subIds = (subs ?? []).map((s: any) => s.id);
+      // ✅ FIX: kepala divisi (mis. CUSTOMER_SERVICE) harus bisa lihat libur
+      // DIRINYA sendiri, bukan cuma bawahannya. Tanpa ini libur mingguannya
+      // tidak ter-load di akunnya → hari libur dihitung hari kerja → muncul
+      // "Tidak Hadir" palsu di Ringkasan.
+      if (!subIds.includes(user.id)) subIds.push(user.id);
       q = q.in("user_id", subIds.length ? subIds : ["00000000-0000-0000-0000-000000000000"]);
     } else {
       q = q.eq("user_id", user.id);

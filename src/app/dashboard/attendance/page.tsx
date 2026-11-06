@@ -6203,7 +6203,7 @@ export default function AttendanceDashboardPage() {
                                             const pc = dd.filter(a => a.displayStatus === "PRESENT" && !isDayOffForUser(a.user_name, dk)).length;
                                             const lc = dd.filter(a => a.displayStatus === "LATE" && !isDayOffForUser(a.user_name, dk)).length;
                                             const sc = dd.filter(a => a.displayStatus === "SKIP" && !isDayOffForUser(a.user_name, dk)).length;
-                                                                                       const mc = dd.filter(a => a.source === "MANUAL" && !isDayOffForUser(a.user_name, dk)).length;
+                                            const mc = dd.filter(a => a.source === "MANUAL" && !isDayOffForUser(a.user_name, dk)).length;
                                             const tot = pc + lc + sc;
                                             // ✅ NEW — label kalender ikut status manual spesifik.
                                             // Absen manual Izin/Sakit/Cuti/Tidak Hadir ditampilkan sesuai
@@ -6277,7 +6277,7 @@ export default function AttendanceDashboardPage() {
                                                                     </span>
                                                                 </div>
                                                                 <span className={`text-[9px] sm:text-[10px] font-bold leading-tight ${isSel ? "text-white/70" : "text-gray-400"}`}>
-                                                                                                                                        <span className="hidden sm:inline">{cellLabel}</span>
+                                                                    <span className="hidden sm:inline">{cellLabel}</span>
                                                                     <span className="sm:hidden">{tot}{mc > 0 ? " (m)" : ""}</span>
                                                                 </span>
                                                             </div>
@@ -6542,7 +6542,7 @@ export default function AttendanceDashboardPage() {
                                                                     {a.source === "MANUAL" ? "Manual" : a.method === "FACE" ? "Wajah" : a.method === "BIOMETRIC" ? "Sidik Jari" : "Skip"}
                                                                 </span>
                                                             </td>
-                                                                                                                   <td className="px-4 py-4">
+                                                            <td className="px-4 py-4">
                                                                 {a.latitude && a.longitude ? (() => {
                                                                     // ✅ NEW — ukur ke cabang TERDEKAT (Depok/UTAMA atau Jogja),
                                                                     // bukan lagi cuma ke titik Depok. Hijau = dalam radius cabang,
