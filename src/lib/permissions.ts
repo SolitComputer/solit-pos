@@ -843,6 +843,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // Halaman + API ADMIN (lihat semua + hapus): FULL_ACCESS saja.
   "/dashboard/kotak-surat/admin": [...FULL_ACCESS],
   "/api/kotak-surat/admin": [...FULL_ACCESS],
+
+  // ── Cashflow Pribadi (private per user, semua role boleh) ────────────────
+  // Data 100% isolated per user_id di layer API. Semua role (termasuk PKL)
+  // boleh kelola keuangan pribadi mereka sendiri. ADMIN TIDAK bisa lihat data
+  // user lain — enforcement di API route pakai header x-user-id dari JWT.
+  "/dashboard/cashflow-pribadi": [...ALL_ROLES],
+  "/api/cashflow-pribadi": [...ALL_ROLES],
 };
 
 export const PERMISSIONS = {

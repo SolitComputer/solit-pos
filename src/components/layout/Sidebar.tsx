@@ -174,7 +174,8 @@ const Icons = {
   barang: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" /><path d="M4 7.5l8 4.5 8-4.5" /><path d="M12 12v9" /></svg>),
   allUnits: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></svg>),
   monitorChat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" /><circle cx="12" cy="12" r="3" /></svg>),
-  cashflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h13" /><path d="M13 3l4 4-4 4" /><path d="M20 17H7" /><path d="M11 21l-4-4 4-4" /></svg>),
+    cashflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h13" /><path d="M13 3l4 4-4 4" /><path d="M20 17H7" /><path d="M11 21l-4-4 4-4" /></svg>),
+  cashflowPribadi: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4" /><path d="M21 12h-5a2 2 0 0 0 0 4h5" /><circle cx="16" cy="14" r="0.8" fill="currentColor" stroke="none" /></svg>),
   managementSeller: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2" /><path d="M3 20a6 6 0 0112 0" /><circle cx="17.5" cy="9.5" r="2.3" /><path d="M15.5 20a5 5 0 016.5-3.8" /></svg>),
   deliveryRoute: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="19" r="2.2" /><circle cx="18" cy="5" r="2.2" /><path d="M8 19h6a3 3 0 003-3V9M16 5H10a3 3 0 00-3 3v3" /></svg>),
   buatPengantaran: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>), notifSound: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15V9h4l5-4v14l-5-4H4z" /><path d="M17 8.5a5 5 0 010 7" /><path d="M19.5 6a8 8 0 010 12" /></svg>),
@@ -217,6 +218,7 @@ const ITEM_ALL_UNITS: MenuItem = { name: "Barang Terjual", href: "/dashboard/uni
 const ITEM_MANAGEMENT_SELLER: MenuItem = { name: "Management Seller", href: "/dashboard/management-seller", icon: Icons.managementSeller };
 const ITEM_MISSIONS: MenuItem = { name: "Misi Pekerjaan", href: "/dashboard/missions", icon: Icons.missions };
 const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow };
+const ITEM_CASHFLOW_PRIBADI: MenuItem = { name: "Cashflow Pribadi", href: "/dashboard/cashflow-pribadi", icon: Icons.cashflowPribadi };
 const ITEM_CC_REPORT: MenuItem = { name: "Laporan Konten (CC)", href: "/dashboard/cc-reports", icon: Icons.ccReport };
 const ITEM_CUSTOMER_BIRTHDAY: MenuItem = { name: "Ultah Customer", href: "/dashboard/customer-birthdays", icon: Icons.customerBirthday };
 const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", icon: Icons.todo };
@@ -991,6 +993,7 @@ const DATA_BARANG_LEGACY_HREFS = new Set<string>(["/dashboard/laptops", "/dashbo
 
 const GROUP_ORDER: string[] = [
   "Utama",
+  "Keuangan Pribadi",
   "Keuangan",
   "Inventaris",
   "Transaksi",
@@ -1203,6 +1206,21 @@ function withKendaraanGroup(groups: MenuGroup[]): MenuGroup[] {
   const utamaIdx = rest.findIndex((g) => g.label === "Utama");
   const at = utamaIdx >= 0 ? utamaIdx + 1 : 0;
   return [...rest.slice(0, at), KENDARAAN_GROUP, ...rest.slice(at)];
+}
+
+// Cashflow Pribadi: grup sidebar sendiri (collapsible), item "Cashflow Pribadi".
+// Disuntik di level groups final (pola identik withKendaraanGroup) supaya role
+// dinamis (menu dari DB) pun kebagian. Data 100% private per user_id di API.
+const CASHFLOW_PRIBADI_GROUP: MenuGroup = {
+  label: "Keuangan Pribadi",
+  items: [ITEM_CASHFLOW_PRIBADI],
+};
+
+function withCashflowPribadiGroup(groups: MenuGroup[]): MenuGroup[] {
+  const rest = groups.filter((g) => g.label !== "Keuangan Pribadi");
+  const utamaIdx = rest.findIndex((g) => g.label === "Utama");
+  const at = utamaIdx >= 0 ? utamaIdx + 1 : 0;
+  return [...rest.slice(0, at), CASHFLOW_PRIBADI_GROUP, ...rest.slice(at)];
 }
 
 // Peminjaman Barang: SEMUA role boleh pinjam. Disuntik di level groups final
@@ -1949,7 +1967,7 @@ export default function Sidebar() {
       .map((g) => ({ ...g, items: g.items.filter((it) => it.href !== ITEM_PKL_REPORT.href) }))
       .filter((g) => g.items.length > 0);
 
-    const groups = useMemo<MenuGroup[]>(() => stripPklReports(withPelanggaranInAbsensi(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKotakSuratGroup(withKendaraanGroup(
+       const groups = useMemo<MenuGroup[]>(() => stripPklReports(withPelanggaranInAbsensi(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKotakSuratGroup(withCashflowPribadiGroup(withKendaraanGroup(
     dedupeGroups([
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
@@ -1961,7 +1979,7 @@ export default function Sidebar() {
         items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
       })),
     ])
-  ), effectiveRoles), effectiveRoles)), {
+   )), effectiveRoles), effectiveRoles)), {
     showPerjanjian: !!(contractStatus && contractStatus !== "APPROVED"),
     showSign: isContractSigner,
     showExpiring: isContractExpiringAdmin,

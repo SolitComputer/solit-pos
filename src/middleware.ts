@@ -753,5 +753,7 @@ export const config = {
     "/api/sop/:path*",
     "/dashboard/kotak-surat/:path*",
     "/api/kotak-surat/:path*",
+    "/api/cashflow-pribadi/:path*",
+    "/dashboard/cashflow-pribadi/:path*",
   ],
 };
