@@ -214,11 +214,12 @@ function BranchBadge({ branch }: { branch: "UTAMA" | "JOGJA" | "CAMPURAN" | null
 
 function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const units = l.laptop_units ?? [];
-    // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok,
-    // sama seperti SOLD, tapi tetap dibedakan dari penjualan di laporan.
-    // msj_group_id terisi = unit sudah masuk Kelompok Minus Siap Jual → disembunyikan
-    // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
-    const aktif = units.filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && u.status !== "RETURNED" && !u.msj_group_id);
+    // Unit "keluar" dari stok memakai OUT_STATUSES (lihat atas) supaya
+    // SAMA dengan logika di Kelola Unit & export per-SN. Selain SOLD/KELUAR/
+    // RETURNED, status RESERVED/HELD/PACKING/PENDING (sedang transaksi berjalan,
+    // barang fisik sudah tidak available) juga di-exclude dari stok.
+    // msj_group_id terisi = unit sudah masuk Kelompok MSJ → disembunyikan.
+    const aktif = units.filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
     const siapJual = aktif.filter(u => u.status === "SIAP_JUAL").length;
     // "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual (bisa dibikin
     // payment). Dihitung terpisah dari minus biasa (SERVICE/BELUM_SIAP) yang
@@ -263,10 +264,11 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
 
 function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     const units = a.accessory_units ?? [];
-    // "KELUAR" = diambil utk service/kebutuhan internal → tidak dihitung stok.
-    // msj_group_id terisi = unit sudah masuk Kelompok Minus Siap Jual → disembunyikan
-    // dari Data Barang (requirement #4). Barang tidak dihapus, hanya pindah "rumah".
-    const aktif = units.filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && u.status !== "RETURNED" && !u.msj_group_id);
+    // Unit "keluar" dari stok memakai OUT_STATUSES (lihat atas) supaya SAMA
+    // dengan Kelola Unit & export per-SN — termasuk status RESERVED/HELD/
+    // PACKING/PENDING (sedang transaksi berjalan, fisik sudah tidak available).
+    // msj_group_id terisi = sudah masuk Kelompok MSJ → disembunyikan.
+    const aktif = units.filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
     const one = aktif.length === 1 ? aktif[0] : null;
     // Progress SO & Audit per-unit aksesoris (audit kolomnya sudah ada — R3 selesai).
     const soDoneAcc = aktif.filter(u => isUnitSoActive(u.so_at)).length;
@@ -401,7 +403,7 @@ function DeleteConfirm({ row, onClose, onConfirm, loading }: {
 // muncul instan dari data terakhir, tanpa nunggu network. Data lalu di-refresh
 // diam-diam (silent) di belakang layar supaya tetap akurat.
 // ═══════════════════════════════════════════════════════════════════════════
-const BARANG_CACHE_KEY = "unified-barang-cache-v1";
+const BARANG_CACHE_KEY = "unified-barang-cache-v2";
 const BARANG_CACHE_TTL_MS = 5 * 60 * 1000; // cache dianggap basi setelah 5 menit
 
 interface BarangCachePayload {
@@ -1150,11 +1152,13 @@ export default function UnifiedBarangContent() {
         // ini yang unit_id-nya ada di set pinjaman aktif. Dikerjakan di sini
         // (bukan di normalizer) karena data pinjaman datang terpisah/asinkron.
         let list = rows.map(r => {
+            // Samakan basis "unit aktif" dengan normalizer (OUT_STATUSES) supaya
+            // X/Y pinjam konsisten dengan angka stok yang ditampilkan di tabel.
             const rawUnits = r.tipe === "LAPTOP"
                 ? ((r.raw as LaptopRaw).laptop_units ?? [])
-                    .filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id)
+                    .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id)
                 : ((r.raw as AccessoryRaw).accessory_units ?? [])
-                    .filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR" && !u.msj_group_id);
+                    .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
             const pinjamDone = rawUnits.filter(u => borrowedUnitIds.has(u.id)).length;
             return pinjamDone === r.pinjam_done ? r : { ...r, pinjam_done: pinjamDone };
         });
@@ -1292,10 +1296,12 @@ export default function UnifiedBarangContent() {
                 const soLabel = isSoActive(row.so_at) ? "Sudah" : "Belum";
 
                 if (row.tipe === "LAPTOP") {
-                    // Total Modal = jumlah modal SEMUA unit aktif (bukan SOLD/KELUAR/MSJ)
-                    // supaya konsisten dengan angka Stok Tersedia di tabel layar.
+                    // Total Modal = jumlah modal unit aktif (basis OUT_STATUSES, sama
+                    // dengan normalizer & Kelola Unit) supaya kolom Stok di export
+                    // konsisten dengan Total Modal — unit RESERVED/HELD/PACKING/PENDING
+                    // sudah tidak dihitung stok, jadi modalnya juga tidak dihitung.
                     const aktif = ((row.raw as LaptopRaw).laptop_units ?? [])
-                        .filter(u => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id);
+                        .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
                     const totalModal = aktif.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
                     exportRows.push({
                         No: no++, Tipe: "LAPTOP", "Nama Barang": row.nama,
@@ -1309,8 +1315,10 @@ export default function UnifiedBarangContent() {
                     });
                 } else {
                     const acc = row.raw as AccessoryRaw;
+                    // Basis sama dengan normalizer — unit RESERVED/HELD/PACKING/PENDING
+                    // tidak dihitung stok, jadi modalnya juga tidak masuk Total Modal.
                     const accAktif = (acc.accessory_units ?? [])
-                        .filter(u => u.status !== "TERJUAL" && u.status !== "KELUAR");
+                        .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
                     // Punya unit ber-SN → jumlahkan modal tiap unit. Belum pakai SN →
                     // buy_price model × stok manual.
                     const totalModal = accAktif.length > 0
