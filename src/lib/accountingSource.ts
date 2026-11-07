@@ -910,7 +910,12 @@ async function buildTransactionDrafts(
     const specs = resolvedLaptopId ? laptopSpecMap.get(resolvedLaptopId) : undefined;
 
     const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
-    const keterangan = `${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}`;
+    // ⬅️ FIX: Suffix SN aksesoris disamakan dengan getTransactionSyncDraftsByInvoices (line 395-398)
+    // supaya keterangan konsisten antara posting awal vs sync re-check — mencegah entry mixed
+    // laptop+aksesoris ter-flag "Nominal Berubah" palsu padahal nominal sama persis.
+    const accSns = accMap.get(t.invoice_number as string)?.sns ?? [];
+    const accSuffix = accSns.length > 0 ? ` · Aksesoris: ${accSns.join(", ")}` : "";
+    const keterangan = `${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}${accSuffix}`;
 
     if (existingAccrualInvoices.has(t.invoice_number as string)) {
       continue;
@@ -1028,6 +1033,13 @@ async function buildTransactionAccrualDrafts(
     .filter((t) => t.item_kind === "mixed")
     .map((t) => t.invoice_number as string);
 
+  // ⬅️ FIX: Batch-fetch SN aksesoris SEKALIGUS deal_price (pakai helper yang sudah ada)
+  // supaya keterangan accrual bisa tambah suffix aksesoris tanpa N+1 query di loop.
+  const accInvoiceNumbersAccrual = (trxs as any[])
+    .filter((t) => t.item_kind === "mixed" || t.item_kind === "accessory")
+    .map((t) => t.invoice_number as string);
+  const accMapAccrual = await getAccessoryDealModalByInvoices(supabase, accInvoiceNumbersAccrual);
+
   const accessoryDealByInvoice = new Map<string, number>();
   if (mixedInvoiceNumbers.length > 0) {
     for (const batch of chunkArray(mixedInvoiceNumbers, 150)) {
@@ -1123,7 +1135,12 @@ async function buildTransactionAccrualDrafts(
 
     const specs = resolvedLaptopId ? laptopSpecMap.get(resolvedLaptopId) : undefined;
     const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
-    const keterangan = `DP/Reservasi · ${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}`;
+    // ⬅️ FIX: Pakai accMapAccrual yang sudah di-batch-fetch di atas (line 1009) —
+    // jangan fetch ulang per-invoice di loop (N+1 query). Konsisten dengan
+    // buildTransactionDrafts & getTransactionSyncDraftsByInvoices.
+    const accSnsAccrual = accMapAccrual.get(t.invoice_number as string)?.sns ?? [];
+    const accSuffixAccrual = accSnsAccrual.length > 0 ? ` · Aksesoris: ${accSnsAccrual.join(", ")}` : "";
+    const keterangan = `DP/Reservasi · ${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}${accSuffixAccrual}`;
 
     const lines: DraftLine[] = [{ account_code: AKUN.PIUTANG, side: "DEBIT", nominal: deal }];
 
