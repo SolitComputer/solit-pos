@@ -789,9 +789,9 @@ export default function FixedAssetsContent() {
             ) : null}
           </div>
         ) : (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+          <ul className="flex flex-col gap-2.5">
             {visibleAssets.map((asset) => (
-              <AssetTagCard
+              <AssetTagRow
                 key={asset.id}
                 asset={asset}
                 onEdit={() => openEditModal(asset)}
@@ -1202,9 +1202,10 @@ export default function FixedAssetsContent() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Sub-component: Kartu tag inventaris
+// Sub-component: Row tag inventaris — layout memanjang full width
+// (meniru EntryRow Modal Service, diperluas untuk badge jenis + audit)
 // ═════════════════════════════════════════════════════════════════════════════
-function AssetTagCard({
+function AssetTagRow({
   asset,
   onEdit,
   onDelete,
@@ -1220,33 +1221,88 @@ function AssetTagCard({
   const type = detectAssetType(asset.nama_aset);
   const TypeIcon = type.Icon;
   const nominal = Number(asset.nominal) || 0;
-
+  const canAudit = canAuditNow(asset.last_audited_at);
 
   return (
-    <li className="group relative flex flex-col rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition">
-      {/* Bagian atas: identitas aset */}
-      <div className="flex items-start gap-3 p-4 pb-3">
+    <li className="group relative rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition">
+      <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4">
+        {/* Ikon jenis aset */}
         <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${type.tile}`}>
           <TypeIcon size={20} />
         </div>
+
+        {/* Identitas: jenis + kategori + tanggal beli + nama + keterangan + meta + audit */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] font-semibold text-gray-500">{type.label}</span>
             {asset.kategori && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 flex-shrink-0">
                 {asset.kategori}
               </span>
             )}
+            {asset.tanggal_beli && (
+              <span className="text-[11px] text-gray-500 tabular-nums flex-shrink-0">
+                · Dibeli {formatDate(asset.tanggal_beli)}
+              </span>
+            )}
           </div>
-          <p className="text-sm font-bold text-gray-900 leading-snug break-words line-clamp-2">
+          <p className="text-sm font-bold text-gray-900 leading-snug break-words line-clamp-1 mt-0.5">
             {asset.nama_aset}
           </p>
+          {asset.keterangan && (
+            <p className="text-xs text-gray-500 leading-relaxed line-clamp-1 break-words mt-0.5">
+              {asset.keterangan}
+            </p>
+          )}
+          <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+            {asset.created_by_name ? `Dicatat ${asset.created_by_name}` : "Dicatat"} · {formatDate(asset.created_at)}
+          </p>
+          {asset.last_audited_at ? (
+            <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-1">
+              <CheckIcon size={11} />
+              Diaudit {formatDate(asset.last_audited_at)}
+              {asset.last_audited_by_name ? ` · ${asset.last_audited_by_name}` : ""}
+            </p>
+          ) : (
+            <p className="text-[11px] text-gray-400 mt-1">Belum pernah diaudit</p>
+          )}
         </div>
-        <div className="flex items-center -mr-1.5 -mt-1 flex-shrink-0">
+
+        {/* Nominal + tombol Audit — kolom kanan, rata kanan */}
+        <div className="flex flex-col items-end flex-shrink-0 min-w-[110px] sm:min-w-[140px] gap-1.5">
+          <p className="text-base sm:text-lg font-black text-[#1a1a2e] tabular-nums tracking-tight whitespace-nowrap">
+            {formatIDR(nominal)}
+          </p>
+          {canAudit ? (
+            <button
+              onClick={onAudit}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 hover:bg-emerald-100 transition"
+            >
+              <CheckIcon size={12} />
+              Audit
+            </button>
+          ) : (
+            <span className="text-[10px] text-gray-400 text-right leading-tight">
+              {auditCooldownLabel(asset.last_audited_at)}
+            </span>
+          )}
+        </div>
+
+        {/* Tombol aksi — kanan jauh, dipisah border */}
+        <div className="flex items-center gap-0.5 flex-shrink-0 border-l border-gray-100 pl-2 sm:pl-3 ml-1">
+          <button
+            onClick={onHistory}
+            className="p-2 rounded-lg text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition"
+            aria-label={`Riwayat ${asset.nama_aset}`}
+            title="Riwayat"
+          >
+            <HistoryIcon size={15} />
+          </button>
           <button
             onClick={onEdit}
             className="p-2 rounded-lg text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/20 transition"
             aria-label={`Edit ${asset.nama_aset}`}
+            title="Edit"
           >
             <EditIcon />
           </button>
@@ -1254,71 +1310,10 @@ function AssetTagCard({
             onClick={onDelete}
             className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 transition"
             aria-label={`Hapus ${asset.nama_aset}`}
+            title="Hapus"
           >
             <TrashIcon />
           </button>
-        </div>
-      </div>
-
-      {asset.keterangan && (
-        <p className="px-4 -mt-1 mb-3 text-xs text-gray-500 leading-relaxed line-clamp-2 break-words">
-          {asset.keterangan}
-        </p>
-      )}
-
-      {/* Garis sobek ala label inventaris */}
-      <div className="mt-auto mx-4 border-t border-dashed border-gray-200" aria-hidden="true" />
-
-      {/* Bagian bawah: nilai */}
-      <div className="px-4 pt-3 pb-4">
-        <div className="flex items-end justify-between gap-3">
-          <p className="text-lg font-black text-[#1a1a2e] tabular-nums tracking-tight">
-            {formatIDR(nominal)}
-          </p>
-        </div>
-        {asset.tanggal_beli && (
-          <p className="mt-3 text-[11px] text-gray-500 tabular-nums">
-            Dibeli {formatDate(asset.tanggal_beli)}
-          </p>
-        )}
-        <div className="flex items-center justify-between gap-2 mt-3 text-[11px] text-gray-400">
-          <span className="truncate">
-            {asset.created_by_name ? `Dicatat ${asset.created_by_name}` : "Dicatat"}
-          </span>
-          <span className="flex-shrink-0 tabular-nums">{formatDate(asset.created_at)}</span>
-        </div>
-
-        {/* Audit lokasi barang */}
-        <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
-          {asset.last_audited_at ? (
-            <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mb-2">
-              <CheckIcon size={12} />
-              Diaudit {formatDate(asset.last_audited_at)}
-              {asset.last_audited_by_name ? ` · ${asset.last_audited_by_name}` : ""}
-            </p>
-          ) : (
-            <p className="text-[11px] text-gray-400 mb-2">Belum pernah diaudit</p>
-          )}
-          <div className="flex items-center gap-2">
-            {canAuditNow(asset.last_audited_at) ? (
-              <button
-                onClick={onAudit}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold px-3 py-1.5 hover:bg-emerald-100 transition"
-              >
-                <CheckIcon size={13} />
-                Audit
-              </button>
-            ) : (
-              <span className="text-[11px] text-gray-400">{auditCooldownLabel(asset.last_audited_at)}</span>
-            )}
-            <button
-              onClick={onHistory}
-              className="inline-flex items-center gap-1.5 rounded-lg text-gray-500 text-xs font-semibold px-2.5 py-1.5 hover:bg-gray-100 transition ml-auto"
-            >
-              <HistoryIcon size={13} />
-              Riwayat
-            </button>
-          </div>
         </div>
       </div>
     </li>
