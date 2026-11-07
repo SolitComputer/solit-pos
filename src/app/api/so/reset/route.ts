@@ -31,20 +31,27 @@ async function handler(_req: NextRequest, _ctx: unknown, user: AuthUser) {
       );
     }
 
-    // Filter `.not("so_at", "is", null)` dipakai supaya UPDATE cuma menyentuh
-    // baris yang memang punya so_at — mengurangi beban write di tabel besar.
+    // Sentinel timestamp — tanggal "penanda" bahwa unit sudah di-reset manual.
+    // Dipilih 2000-01-01 karena: (1) jauh di masa lalu (sebelum Solit POS ada),
+    // (2) tidak akan pernah bentrok dengan timestamp SO asli, (3) mudah dikenali.
+    // UI render so_at = sentinel sebagai "SO Ulang" (dihitung BELUM SO) TANPA
+    // bergantung waktu sekarang — jadi tidak ada auto-reset harian/periodik.
+    // Unit yang belum pernah SO (so_at NULL) TIDAK disentuh — tetap "SO" merah.
+    // Kolom `so_by` SENGAJA dipertahankan — info siapa terakhir SO tetap ada.
+    const SO_RESET_SENTINEL_ISO = "2000-01-01T00:00:00.000Z";
+
     const [lapRes, lapUnitRes, accRes, accUnitRes] = await Promise.all([
       supabase.from("laptops")
-        .update({ so_at: null, so_by: null })
+        .update({ so_at: SO_RESET_SENTINEL_ISO })
         .not("so_at", "is", null),
       supabase.from("laptop_units")
-        .update({ so_at: null, so_by: null })
+        .update({ so_at: SO_RESET_SENTINEL_ISO })
         .not("so_at", "is", null),
       supabase.from("accessories")
-        .update({ so_at: null, so_by: null })
+        .update({ so_at: SO_RESET_SENTINEL_ISO })
         .not("so_at", "is", null),
       supabase.from("accessory_units")
-        .update({ so_at: null, so_by: null })
+        .update({ so_at: SO_RESET_SENTINEL_ISO })
         .not("so_at", "is", null),
     ]);
 
@@ -65,16 +72,16 @@ async function handler(_req: NextRequest, _ctx: unknown, user: AuthUser) {
       userName: user.name,
       userRole: user.role,
       action: "RESET_SO",
-      entity: "data_barang", // ganti dash → underscore biar konsisten dengan konvensi LogEntity lain
+      entity: "data_barang",
       entityId: "all",
-      entityLabel: "Reset SO Manual — semua laptop, aksesori & unit",
-      reason: "Reset manual dari halaman Data Barang",
+      entityLabel: "Reset SO — semua unit 'Sudah SO' dipaksa jadi 'SO Ulang'",
+      reason: "Reset manual dari halaman Data Barang (paksa SO Ulang)",
     });
 
     return NextResponse.json({
       success: true,
-      message: "Semua data SO berhasil direset",
-    });
+      message: "Semua barang 'Sudah SO' berhasil dipaksa jadi 'SO Ulang'",
+    }); 
   } catch (err: any) {
     console.error("[POST /api/so/reset]", err);
     return NextResponse.json(
