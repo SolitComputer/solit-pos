@@ -18,10 +18,13 @@ import { BarRankingChart } from "@/components/ui/BarRankingChart";
 import { makeLocalId, type InsightRow, type InsightSheet } from "@/lib/marketing-insight";
 
 // Deteksi sheet IG/TikTok dari NAMA tabel (case-insensitive). Sheet lain → null (grid Excel).
-export function detectSocialPlatform(name: string): "tiktok" | "instagram" | null {
+export function detectSocialPlatform(name: string): "tiktok" | "instagram" | "facebook" | "threads" | "youtube" | null {
   const n = (name || "").toLowerCase();
   if (n.includes("tiktok")) return "tiktok";
   if (n.includes("instagram")) return "instagram";
+  if (n.includes("facebook")) return "facebook";
+  if (n.includes("threads")) return "threads";
+  if (n.includes("youtube")) return "youtube";
   return null;
 }
 
@@ -33,8 +36,8 @@ interface BreakdownField { key: string; label: string; color: string; }
 interface BreakdownDef { key: string; title: string; mode: "percent" | "count"; fields: BreakdownField[]; }
 interface PlatformConfig { label: string; metrics: MetricDef[]; breakdowns: BreakdownDef[]; }
 
-const CONFIG: Record<"tiktok" | "instagram", PlatformConfig> = {
-  tiktok: {
+const CONFIG: Record<"tiktok" | "instagram" | "facebook" | "threads" | "youtube", PlatformConfig> = {
+    tiktok: {
     label: "TikTok Studio",
     metrics: [
       { key: "views", label: "Video Views", type: "sum", color: "#2563EB" },
@@ -97,6 +100,188 @@ const CONFIG: Record<"tiktok" | "instagram", PlatformConfig> = {
           { key: "ic_reels", label: "Reels", color: "#7C3AED" },
           { key: "ic_stories", label: "Stories", color: "#C026D3" },
           { key: "ic_posts", label: "Posts", color: "#DB2777" },
+        ],
+      },
+    ],
+  },
+  facebook: {
+    label: "Facebook Dasbor Bisnis",
+    metrics: [
+      { key: "views", label: "Tayangan", type: "sum", color: "#2563EB" },
+      { key: "views_3s", label: "Tayangan 3 Detik", type: "sum", color: "#0891B2" },
+      { key: "views_1m", label: "Tayangan 1 Menit", type: "sum", color: "#7C3AED" },
+      { key: "watch_hours", label: "Waktu Tonton (jam)", type: "sum", color: "#D97706" },
+      { key: "interactions", label: "Interaksi", type: "sum", color: "#DB2777" },
+      { key: "reactions", label: "Tanggapan", type: "sum", color: "#059669" },
+      { key: "comments", label: "Komentar", type: "sum", color: "#C026D3" },
+      { key: "shares", label: "Berbagi", type: "sum", color: "#E11D48" },
+    ],
+    breakdowns: [
+      {
+        key: "views_content",
+        title: "Tayangan · Jenis Konten",
+        mode: "percent",
+        fields: [
+          { key: "vc_reel", label: "Reel", color: "#2563EB" },
+          { key: "vc_multifoto", label: "Beberapa Foto", color: "#0891B2" },
+          { key: "vc_foto", label: "Foto", color: "#7C3AED" },
+          { key: "vc_teks", label: "Teks", color: "#D97706" },
+        ],
+      },
+      {
+        key: "views_audience",
+        title: "Tayangan · Pengikut vs Non-pengikut",
+        mode: "percent",
+        fields: [
+          { key: "va_pengikut", label: "Pengikut", color: "#2563EB" },
+          { key: "va_nonpengikut", label: "Non-pengikut", color: "#C026D3" },
+        ],
+      },
+      {
+        key: "int_content",
+        title: "Interaksi · Jenis Konten",
+        mode: "percent",
+        fields: [
+          { key: "icf_reel", label: "Reel", color: "#2563EB" },
+          { key: "icf_lainnya", label: "Lainnya", color: "#0891B2" },
+          { key: "icf_foto", label: "Foto", color: "#7C3AED" },
+          { key: "icf_teks", label: "Teks", color: "#D97706" },
+          { key: "icf_tautan", label: "Tautan", color: "#E11D48" },
+        ],
+      },
+      {
+        key: "int_type",
+        title: "Interaksi · Jenis Interaksi",
+        mode: "percent",
+        fields: [
+          { key: "it_tanggapan", label: "Tanggapan", color: "#2563EB" },
+          { key: "it_dibagikan", label: "Frekuensi Dibagikan", color: "#0891B2" },
+          { key: "it_komentar", label: "Komentar", color: "#7C3AED" },
+        ],
+      },
+      {
+        key: "int_audience",
+        title: "Interaksi · Pengikut vs Non-pengikut",
+        mode: "percent",
+        fields: [
+          { key: "ia_pengikut", label: "Pengikut", color: "#2563EB" },
+          { key: "ia_nonpengikut", label: "Non-pengikut", color: "#C026D3" },
+        ],
+      },
+    ],
+  },
+  threads: {
+    label: "Threads Overview",
+    metrics: [
+      { key: "views", label: "Views", type: "sum", color: "#171717" },
+      { key: "viewers", label: "Viewers", type: "sum", color: "#2563EB" },
+      { key: "net_followers", label: "Net Followers", type: "sum", color: "#059669" },
+      { key: "interactions", label: "Interactions", type: "sum", color: "#DB2777" },
+    ],
+    breakdowns: [
+      {
+        key: "viewer_types",
+        title: "Viewer Types",
+        mode: "count",
+        fields: [
+          { key: "vt_followers", label: "Followers", color: "#2563EB" },
+          { key: "vt_nonfollowers", label: "Non-followers", color: "#171717" },
+        ],
+      },
+      {
+        key: "countries",
+        title: "Negara (Demographics)",
+        mode: "percent",
+        fields: [
+          { key: "ct_id", label: "Indonesia", color: "#2563EB" },
+          { key: "ct_my", label: "Malaysia", color: "#0891B2" },
+          { key: "ct_tw", label: "Taiwan", color: "#D97706" },
+          { key: "ct_vn", label: "Vietnam", color: "#059669" },
+          { key: "ct_in", label: "India", color: "#DB2777" },
+        ],
+      },
+      {
+        key: "gender",
+        title: "Gender (Demographics)",
+        mode: "percent",
+        fields: [
+          { key: "gd_pria", label: "Pria", color: "#2563EB" },
+          { key: "gd_wanita", label: "Wanita", color: "#DB2777" },
+        ],
+      },
+      {
+        key: "age",
+        title: "Umur (Demographics)",
+        mode: "percent",
+        fields: [
+          { key: "ag_1824", label: "18-24", color: "#7C3AED" },
+          { key: "ag_2534", label: "25-34", color: "#2563EB" },
+          { key: "ag_3544", label: "35-44", color: "#0891B2" },
+          { key: "ag_4554", label: "45-54", color: "#D97706" },
+          { key: "ag_55", label: "55+", color: "#059669" },
+        ],
+      },
+      {
+        key: "interests",
+        title: "Top Interests & Communities",
+        mode: "count",
+        fields: [
+          { key: "in_1", label: "AI Threads", color: "#7C3AED" },
+          { key: "in_2", label: "Running Threads", color: "#2563EB" },
+          { key: "in_3", label: "PC Gaming", color: "#0891B2" },
+          { key: "in_4", label: "Gaming Threads", color: "#D97706" },
+          { key: "in_5", label: "Tech Threads", color: "#059669" },
+        ],
+      },
+    ],
+  },
+  youtube: {
+    label: "YouTube Studio",
+    metrics: [
+      { key: "views", label: "Penayangan", type: "sum", color: "#DC2626" },
+      { key: "new_viewers", label: "Penonton Baru", type: "sum", color: "#2563EB" },
+      { key: "returning_viewers", label: "Penonton Rutin", type: "sum", color: "#059669" },
+      { key: "subscribers", label: "Subscriber", type: "sum", color: "#7C3AED" },
+    ],
+    breakdowns: [
+      {
+        key: "views_type",
+        title: "Penayangan · Jenis Konten",
+        mode: "count",
+        fields: [
+          { key: "vt_video", label: "Video", color: "#7C3AED" },
+          { key: "vt_shorts", label: "Shorts", color: "#2563EB" },
+          { key: "vt_live", label: "Live", color: "#DB2777" },
+        ],
+      },
+      {
+        key: "newv_type",
+        title: "Penonton Baru · Jenis Konten",
+        mode: "count",
+        fields: [
+          { key: "nv_video", label: "Video", color: "#7C3AED" },
+          { key: "nv_shorts", label: "Shorts", color: "#2563EB" },
+          { key: "nv_live", label: "Live", color: "#DB2777" },
+        ],
+      },
+      {
+        key: "retv_type",
+        title: "Penonton Rutin · Jenis Konten",
+        mode: "count",
+        fields: [
+          { key: "rv_video", label: "Video", color: "#7C3AED" },
+          { key: "rv_shorts", label: "Shorts", color: "#2563EB" },
+          { key: "rv_live", label: "Live", color: "#DB2777" },
+        ],
+      },
+      {
+        key: "sub_type",
+        title: "Subscriber · Jenis Konten",
+        mode: "count",
+        fields: [
+          { key: "sb_video", label: "Video", color: "#7C3AED" },
+          { key: "sb_shorts", label: "Shorts", color: "#2563EB" },
+          { key: "sb_live", label: "Live", color: "#DB2777" },
         ],
       },
     ],
@@ -208,7 +393,7 @@ export default function MarketingSocialInsight({
   saveState,
 }: {
   sheet: InsightSheet;
-  platform: "tiktok" | "instagram";
+  platform: "tiktok" | "instagram" | "facebook" | "threads" | "youtube";
   onMutate: (updater: (s: InsightSheet) => InsightSheet) => void;
   saveState: "idle" | "saving" | "saved" | "error";
 }) {
