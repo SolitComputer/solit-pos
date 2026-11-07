@@ -6,11 +6,14 @@ const supabaseAdmin = createClient(
 );
 
 // ✅ ADD: "AUDIT" & "UNAUDIT" untuk aksi verifikasi audit di cashflow
-export type LogAction = "CREATE" | "EDIT" | "DELETE" | "RESTORE" | "ARCHIVE" | "UNARCHIVE" | "AUDIT" | "UNAUDIT" | "SO" | "UNSO" | "MINUS_FIXED" | "PARTIAL_CANCEL";
+// ✅ ADD: "RESET_SO" untuk tombol Reset SO manual di halaman Data Barang
+// (mereset so_at/so_by di laptops, laptop_units, accessories, accessory_units sekaligus).
+export type LogAction = "CREATE" | "EDIT" | "DELETE" | "RESTORE" | "ARCHIVE" | "UNARCHIVE" | "AUDIT" | "UNAUDIT" | "SO" | "UNSO" | "RESET_SO" | "MINUS_FIXED" | "PARTIAL_CANCEL";
 
 export type LogEntity =
   | "laptop"
   | "laptop_category" // ✅ ADD: log CRUD kategori laptop (laptop_categories) di tab Kategori — Data Barang
+  | "data_barang" // ✅ ADD: log aksi lintas-tabel di halaman Data Barang — mis. Reset SO manual (laptops + laptop_units + accessories + accessory_units sekaligus)
   | "unit"
   | "transaction"
   | "warranty"

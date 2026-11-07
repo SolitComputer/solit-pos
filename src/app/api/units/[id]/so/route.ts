@@ -8,12 +8,8 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-//  SO unit direset otomatis begitu ganti TANGGAL KALENDER WIB (00:00), BUKAN
-//  rolling 24 jam — harus konsisten dengan toWibDateStr() di
-//  /api/laptops/[id]/so/route.ts dan isUnitSOActive() di
-//  src/app/dashboard/laptops/[id]/units/page.tsx.
-const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7, Indonesia tidak pakai DST
-const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+// Reset SO unit sekarang MANUAL — dilakukan lewat tombol Reset SO di halaman
+// Data Barang (POST /api/so/reset). Tidak ada TTL harian lagi.
 
 // Sama polanya dgn canSoLaptop() di /api/laptops/[id]/so — bedanya di sini
 // cek status unit itu SENDIRI (bukan agregat), karena 1 unit = 1 baris.
@@ -48,9 +44,8 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    const isActive =
-      current.so_at != null &&
-      toWibDateStr(new Date(current.so_at)) === toWibDateStr(new Date());
+    // SO unit aktif = so_at terisi (tidak ada TTL harian).
+    const isActive = current.so_at != null;
 
     const payload = isActive
       ? { so_at: null, so_by: null }
@@ -98,15 +93,12 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         .select("status, so_at, msj_group_id")
         .eq("laptop_id", current.laptop_id);
 
-      const today = toWibDateStr(new Date());
       const aktif = (siblings ?? []).filter(
         (u) => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id
       );
-      const allSo =
-        aktif.length > 0 &&
-        aktif.every(
-          (u) => u.so_at != null && toWibDateStr(new Date(u.so_at)) === today
-        );
+      // Semua unit aktif sudah di-SO (so_at terisi) → naikkan status ke parent.
+      // Tanpa cek tanggal karena reset sekarang manual, bukan periodik.
+      const allSo = aktif.length > 0 && aktif.every((u) => u.so_at != null);
 
       await supabase
         .from("laptops")

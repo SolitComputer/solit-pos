@@ -122,15 +122,10 @@ function isAuditActive(row: Pick<UnifiedRow, "tipe" | "audited_at">): boolean {
     return Date.now() - new Date(row.audited_at).getTime() < ttl;
 }
 
-const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
-// ⏰ SO di-reset tiap jam 22:00 WIB (bukan tengah malam). Caranya: geser waktu
-// WIB mundur SO_RESET_HOUR jam lalu ambil tanggalnya sebagai "kunci periode".
-// Semua waktu 22:00 hari ini s/d 21:59 WIB besok jatuh ke kunci yang SAMA,
-// jadi dihitung satu sesi SO; begitu lewat 22:00 kuncinya berganti = reset.
-const SO_RESET_HOUR = 22;
-const soPeriodKey = (d: Date) =>
-    new Date(d.getTime() + WIB_OFFSET_MS - SO_RESET_HOUR * 60 * 60 * 1000).toISOString().slice(0, 10);
-const isSoActive = (soAt?: string | null) => !!soAt && soPeriodKey(new Date(soAt)) === soPeriodKey(new Date());
+// Reset SO sekarang MANUAL (tombol Reset SO di halaman Data Barang).
+// Status SO aktif = kolom so_at terisi, tanpa TTL/periode. WIB_OFFSET_MS tetap
+// dibiarkan karena masih dipakai LAPTOP_AUDIT_TTL_MS & isAuditActive di atas.
+const isSoActive = (soAt?: string | null) => !!soAt;
 
 // ── Helper per-unit untuk progress X/Y ─────────────────────────────────────
 // Logika reset DISAMAKAN dengan halaman Kelola Unit:
@@ -141,7 +136,8 @@ function isUnitAuditActiveLaptop(u: LaptopUnitLite): boolean {
     return !!u.audited_at && Date.now() - new Date(u.audited_at).getTime() < LAPTOP_AUDIT_TTL_MS;
 }
 function isUnitSoActive(soAt?: string | null): boolean {
-    return !!soAt && soPeriodKey(new Date(soAt)) === soPeriodKey(new Date());
+    // Sejalan dgn isSoActive di atas — reset hanya terjadi manual.
+    return !!soAt;
 }
 // Arsip MANUAL hanya boleh muncul saat stok BENAR-BENAR habis (0 semua).
 function isStockEmpty(row: UnifiedRow): boolean {
@@ -925,6 +921,9 @@ export default function UnifiedBarangContent() {
     const [convertTarget, setConvertTarget] = useState<UnifiedRow | null>(null);
     const [converting, setConverting] = useState(false);
     const [archivingId, setArchivingId] = useState<string | null>(null);
+    // ── State untuk tombol Reset SO manual (menggantikan auto-reset per periode)
+    const [resetSoConfirm, setResetSoConfirm] = useState(false);
+    const [resettingSo, setResettingSo] = useState(false);
     // Target row untuk modal "Tes Kondisi" — edit checklist kondisi laptop
     // (level model) TANPA harus buka form Edit penuh.
     const [conditionChecksTarget, setConditionChecksTarget] = useState<UnifiedRow | null>(null);
@@ -1592,6 +1591,24 @@ export default function UnifiedBarangContent() {
         }
     };
 
+    // ── Reset SO MANUAL — meng-NULL-kan so_at/so_by di semua tabel sekaligus.
+    //    Master data (nama/harga/stok) & riwayat SO TIDAK terhapus.
+    const handleResetSo = async () => {
+        setResettingSo(true);
+        try {
+            const res = await fetch("/api/so/reset", { method: "POST" });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal reset SO");
+            toast.success("Semua data SO berhasil direset");
+            setResetSoConfirm(false);
+            fetchAll(); // refresh biar badge "Sudah SO" langsung hilang di UI
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal reset SO");
+        } finally {
+            setResettingSo(false);
+        }
+    };
+
     const convertToAccessory = async (categoryName: string) => {
         if (!convertTarget) return;
         const targetCategory = categories.find(c => c.name === categoryName);
@@ -1901,6 +1918,16 @@ export default function UnifiedBarangContent() {
                                 >
                                     {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
+                                {!canOnlyViewBasic && !isPklPengelolaViewOnly && canFullAccessBarang && (
+                                    <button
+                                        onClick={() => setResetSoConfirm(true)}
+                                        title="Reset semua data SO (laptop + aksesoris + unit) secara manual"
+                                        className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 transition whitespace-nowrap inline-flex items-center justify-center gap-1.5"
+                                    >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        Reset SO
+                                    </button>
+                                )}
                                 {!canOnlyViewBasic && !isPklPengelolaViewOnly && (
                                     <button onClick={handleExportRingkas} disabled={filteredRows.length === 0}
                                         className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition whitespace-nowrap">
@@ -2710,6 +2737,14 @@ export default function UnifiedBarangContent() {
 
             <DeleteConfirm row={deleteRow} onClose={() => setDeleteRow(null)} onConfirm={confirmDelete} loading={deleting} />
 
+            {resetSoConfirm && (
+                <ResetSoConfirmModal
+                    loading={resettingSo}
+                    onCancel={() => { if (!resettingSo) setResetSoConfirm(false); }}
+                    onConfirm={handleResetSo}
+                />
+            )}
+
             {historyTarget && (
                 <HistoryModal
                     title={historyTarget.kind === "so" ? "Riwayat SO" : "Riwayat Audit"}
@@ -2934,6 +2969,61 @@ function writeStyledExcel(
 const inputCls = "w-full h-10 border border-zinc-200 rounded-xl px-3 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400";
 
 const cardActionCls = "h-8 w-full inline-flex items-center justify-center px-2 rounded-lg text-[11px] font-semibold truncate transition disabled:opacity-40";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Konfirmasi Reset SO — dipanggil dari tombol "Reset SO" di header
+// halaman Data Barang. Hanya menghapus status SO (so_at/so_by), tidak data
+// master barang maupun riwayat SO. Pola styling kembar dengan DeleteConfirm.
+// ═══════════════════════════════════════════════════════════════════════════
+function ResetSoConfirmModal({
+    loading, onCancel, onConfirm,
+}: {
+    loading: boolean; onCancel: () => void; onConfirm: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel, loading]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !loading && onCancel()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-red-400 via-red-600 to-red-800" />
+                <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-5">
+                    <p className="font-bold text-white text-sm">Reset Data SO</p>
+                    <p className="text-xs text-white/60 mt-0.5">Tindakan ini akan mereset semua status SO</p>
+                </div>
+                <div className="p-6">
+                    <p className="text-sm text-zinc-600 text-center mb-2">
+                        Semua status SO (laptop, aksesori, dan unit) akan dikembalikan ke <span className="font-bold text-zinc-800">"Belum SO"</span>.
+                    </p>
+                    <p className="text-xs text-emerald-700 text-center mt-3 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                        ✓ Data master barang & riwayat SO <b>tetap aman</b>, tidak ikut terhapus.
+                    </p>
+                    <div className="flex gap-3 mt-5">
+                        <button
+                            onClick={onCancel}
+                            disabled={loading}
+                            className="flex-1 h-11 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 transition disabled:opacity-50"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            disabled={loading}
+                            className="flex-1 h-11 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Ya, Reset SO
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
     return (

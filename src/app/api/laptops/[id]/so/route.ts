@@ -33,10 +33,9 @@ async function canSoLaptop(user: AuthUser, laptopId: string): Promise<boolean> {
   return false;
 }
 
-//  Harus sama logikanya dengan isSoActive di LaptopsContent — reset otomatis
-//  tiap jam 00:00 WIB (perbandingan tanggal kalender), BUKAN rolling 24 jam.
-const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7, Indonesia tidak pakai DST
-const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+// Reset SO sekarang MANUAL via endpoint POST /api/so/reset — tidak ada lagi
+// TTL harian otomatis. Status SO aktif = kolom so_at TIDAK NULL. Konstanta
+// WIB_OFFSET_MS / toWibDateStr sengaja dihapus karena sudah tidak dipakai.
 
 async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
@@ -70,12 +69,9 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    // SO dianggap aktif hanya jika masih di tanggal WIB yang sama dengan hari
-    // ini — begitu lewat jam 00:00 WIB, otomatis dianggap tidak aktif walau
-    // belum genap 24 jam sejak ditandai.
-    const isActive =
-      current.so_at != null &&
-      toWibDateStr(new Date(current.so_at)) === toWibDateStr(new Date());
+    // SO aktif = so_at terisi. Tidak ada TTL harian — reset hanya terjadi
+    // lewat tombol Reset SO manual (POST /api/so/reset).
+    const isActive = current.so_at != null;
 
     // Aktif → batalkan (undo). Belum/expired → tandai SO sekarang.
     const payload = isActive
