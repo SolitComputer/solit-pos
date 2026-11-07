@@ -19,12 +19,19 @@ interface FixedAsset {
 
 interface ChangeLog {
   id: string;
-  action: string; // 'create' | 'update' | 'audit'
+  action: string; // 'create' | 'update' | 'audit' | 'audit_edit'
   field: string | null;
   field_label: string | null;
   old_value: string | null;
   new_value: string | null;
   changed_by_name: string | null;
+  created_at: string;
+}
+
+interface AuditItem {
+  id: string;
+  catatan: string | null;
+  audited_by_name: string | null;
   created_at: string;
 }
 
@@ -341,11 +348,20 @@ export default function FixedAssetsContent() {
   const [auditTarget, setAuditTarget] = useState<FixedAsset | null>(null);
   const [auditNote, setAuditNote] = useState("");
   const [auditing, setAuditing] = useState(false);
-
-  // Riwayat audit
+  // Riwayat audit (dari fixed_asset_change_logs — semua perubahan field aset)
   const [historyTarget, setHistoryTarget] = useState<FixedAsset | null>(null);
   const [historyItems, setHistoryItems] = useState<ChangeLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Riwayat audit stempel (dari fixed_asset_audits — khusus log audit)
+  const [auditHistoryTarget, setAuditHistoryTarget] = useState<FixedAsset | null>(null);
+  const [auditHistoryItems, setAuditHistoryItems] = useState<AuditItem[]>([]);
+  const [auditHistoryLoading, setAuditHistoryLoading] = useState(false);
+
+  // Edit audit (sub-modal di atas Riwayat Audit)
+  const [editAuditTarget, setEditAuditTarget] = useState<AuditItem | null>(null);
+  const [editAuditNote, setEditAuditNote] = useState("");
+  const [editAuditSaving, setEditAuditSaving] = useState(false);
 
 
   const fetchAssets = useCallback(async () => {
@@ -550,6 +566,62 @@ export default function FixedAssetsContent() {
       // abaikan; modal tetap tampil kosong
     } finally {
       setHistoryLoading(false);
+    }
+  }
+
+  // Buka modal "Riwayat Audit" — ambil list dari /audit (bukan /change-logs)
+  async function openAuditHistory(asset: FixedAsset) {
+    setAuditHistoryTarget(asset);
+    setAuditHistoryItems([]);
+    setAuditHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/fixed-assets/${asset.id}/audit`, { cache: "no-store" });
+      const d = await res.json();
+      if (d.success) setAuditHistoryItems(d.data || []);
+    } catch {
+      // abaikan; modal tetap tampil kosong
+    } finally {
+      setAuditHistoryLoading(false);
+    }
+  }
+
+  function openEditAudit(item: AuditItem) {
+    setEditAuditTarget(item);
+    setEditAuditNote(item.catatan || "");
+    setError(null);
+  }
+
+  async function handleEditAuditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editAuditTarget || !auditHistoryTarget) return;
+    setEditAuditSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/fixed-assets/${auditHistoryTarget.id}/audit/${editAuditTarget.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ catatan: editAuditNote.trim() || null }),
+        }
+      );
+      const d = await res.json();
+      if (!d.success) throw new Error(d.message || "Gagal memperbarui audit");
+
+      // Refresh list audit (tanpa menutup modal Riwayat Audit)
+      setAuditHistoryItems((prev) =>
+        prev.map((it) =>
+          it.id === editAuditTarget.id
+            ? { ...it, catatan: editAuditNote.trim() || null }
+            : it
+        )
+      );
+      setEditAuditTarget(null);
+      setEditAuditNote("");
+    } catch (err: any) {
+      setError(err.message || "Gagal memperbarui audit");
+    } finally {
+      setEditAuditSaving(false);
     }
   }
 
@@ -798,6 +870,7 @@ export default function FixedAssetsContent() {
                 onDelete={() => setDeleteTarget(asset)}
                 onAudit={() => openAudit(asset)}
                 onHistory={() => openHistory(asset)}
+                onAuditHistory={() => openAuditHistory(asset)}
               />
             ))}
           </ul>
@@ -1196,6 +1269,179 @@ export default function FixedAssetsContent() {
             </div>
           </div>
         )}
+
+        {/* ── Riwayat Audit modal (list fixed_asset_audits + tombol Edit per entry) ── */}
+        {auditHistoryTarget && (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+            onClick={() => setAuditHistoryTarget(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="asset-audit-history-title"
+              className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md max-h-[85dvh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-[#1a1a2e] px-5 sm:px-6 pt-4 pb-5 rounded-t-3xl flex-shrink-0">
+                <div className="sm:hidden mx-auto w-10 h-1.5 rounded-full bg-white/20 mb-4" />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-400/15 text-emerald-300 flex items-center justify-center flex-shrink-0">
+                      <CheckIcon size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 id="asset-audit-history-title" className="text-base font-bold text-white">Riwayat Audit</h2>
+                      <p className="text-xs text-white/50 truncate">{auditHistoryTarget.nama_aset}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAuditHistoryTarget(null)}
+                    aria-label="Tutup"
+                    className="p-2 -m-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-5 sm:p-6 overflow-y-auto">
+                {auditHistoryLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
+                    ))}
+                  </div>
+                ) : auditHistoryItems.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <p className="text-sm font-semibold text-gray-600">Belum ada audit tercatat</p>
+                    <p className="text-xs text-gray-400 mt-1">Audit pertama akan muncul di sini.</p>
+                  </div>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {auditHistoryItems.map((item) => (
+                      <li
+                        key={item.id}
+                        className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 flex items-start gap-3"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <CheckIcon size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] text-gray-400 tabular-nums">
+                            {formatDateTime(item.created_at)}
+                            {item.audited_by_name ? ` · ${item.audited_by_name}` : ""}
+                          </p>
+                          <p className="text-sm text-gray-800 leading-relaxed mt-0.5 break-words whitespace-pre-wrap">
+                            {item.catatan || <span className="italic text-gray-400">(tanpa catatan)</span>}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openEditAudit(item)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-[#1a1a2e] hover:bg-white transition flex-shrink-0"
+                          aria-label="Edit audit"
+                          title="Edit catatan audit"
+                        >
+                          <EditIcon />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Edit Audit modal (sub-modal di atas Riwayat Audit) ───────────── */}
+        {editAuditTarget && (
+          <div
+            className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+            onClick={() => !editAuditSaving && setEditAuditTarget(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="asset-edit-audit-title"
+              className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-[#1a1a2e] px-5 sm:px-6 pt-4 pb-5 rounded-t-3xl">
+                <div className="sm:hidden mx-auto w-10 h-1.5 rounded-full bg-white/20 mb-4" />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-xl bg-amber-400/15 text-amber-300 flex items-center justify-center flex-shrink-0">
+                      <EditIcon />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 id="asset-edit-audit-title" className="text-base font-bold text-white">Edit Audit</h2>
+                      <p className="text-xs text-white/50 truncate">
+                        {formatDateTime(editAuditTarget.created_at)}
+                        {editAuditTarget.audited_by_name ? ` · ${editAuditTarget.audited_by_name}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditAuditTarget(null)}
+                    disabled={editAuditSaving}
+                    aria-label="Tutup"
+                    className="p-2 -m-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition disabled:opacity-50"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleEditAuditSubmit} className="p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6 space-y-4">
+                <div>
+                  <label htmlFor="edit-audit-note" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Catatan Audit <span className="font-normal text-gray-400">(opsional)</span>
+                  </label>
+                  <textarea
+                    id="edit-audit-note"
+                    value={editAuditNote}
+                    onChange={(e) => setEditAuditNote(e.target.value)}
+                    placeholder="Contoh: Ada di ruang sales, dipakai David"
+                    rows={4}
+                    autoFocus
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3.5 py-2.5 text-sm outline-none focus:bg-white focus:ring-4 focus:ring-amber-500/10 focus:border-amber-400/40 transition resize-none"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Hanya catatan audit yang diubah. Stempel waktu, keterangan aset, dan data aset lain tidak ikut berubah.
+                  </p>
+                </div>
+
+                {error && (
+                  <div role="alert" className="rounded-xl bg-red-50 text-red-600 text-sm px-3.5 py-2.5 border border-red-100">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditAuditTarget(null)}
+                    disabled={editAuditSaving}
+                    className="flex-1 px-4 py-3 sm:py-2.5 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editAuditSaving}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 rounded-xl text-sm font-semibold text-white bg-[#1a1a2e] hover:bg-[#2d2d4a] transition disabled:opacity-50"
+                  >
+                    {editAuditSaving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                    {editAuditSaving ? "Menyimpan..." : "Simpan Perubahan"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
@@ -1211,12 +1457,14 @@ function AssetTagRow({
   onDelete,
   onAudit,
   onHistory,
+  onAuditHistory,
 }: {
   asset: FixedAsset;
   onEdit: () => void;
   onDelete: () => void;
   onAudit: () => void;
   onHistory: () => void;
+  onAuditHistory: () => void;
 }) {
   const type = detectAssetType(asset.nama_aset);
   const TypeIcon = type.Icon;
@@ -1291,10 +1539,18 @@ function AssetTagRow({
         {/* Tombol aksi — kanan jauh, dipisah border */}
         <div className="flex items-center gap-0.5 flex-shrink-0 border-l border-gray-100 pl-2 sm:pl-3 ml-1">
           <button
+            onClick={onAuditHistory}
+            className="p-2 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
+            aria-label={`Riwayat audit ${asset.nama_aset}`}
+            title="Riwayat Audit"
+          >
+            <ClipboardCheckIcon size={15} />
+          </button>
+          <button
             onClick={onHistory}
             className="p-2 rounded-lg text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition"
             aria-label={`Riwayat ${asset.nama_aset}`}
-            title="Riwayat"
+            title="Riwayat Perubahan"
           >
             <HistoryIcon size={15} />
           </button>
@@ -1371,6 +1627,16 @@ function HistoryIcon({ className, size = 15 }: { className?: string; size?: numb
       <path d="M3 3v5h5" />
       <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
       <path d="M12 7v5l4 2" />
+    </svg>
+  );
+}
+
+function ClipboardCheckIcon({ className, size = 15 }: { className?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="m9 14 2 2 4-4" />
     </svg>
   );
 }
