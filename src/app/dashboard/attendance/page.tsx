@@ -147,6 +147,7 @@ type AttendanceDetailItem = {
     method: string;
     notes?: string | null;
     manualCreatedBy?: string | null;
+    isHalfDay?: boolean; // ✅ NEW — hari ini dihitung setengah (pulang kecepetan > ambang)
 };
 
 type AttendanceSummaryDetail = {
@@ -2462,12 +2463,19 @@ function AttendanceSummaryDetailModal({ detail, onClose }: {
                                         )}
                                     </div>
                                 </div>
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0 ${isPresent
-                                    ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                                    : "bg-amber-100 text-amber-700 border-amber-200"
-                                    }`}>
-                                    {isPresent ? "Tepat" : "Terlambat"}
-                                </span>
+                                                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    {item.isHalfDay && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-rose-100 text-rose-700 border-rose-200">
+                                            ½ Hari
+                                        </span>
+                                    )}
+                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${isPresent
+                                        ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                        : "bg-amber-100 text-amber-700 border-amber-200"
+                                        }`}>
+                                        {isPresent ? "Tepat" : "Terlambat"}
+                                    </span>
+                                </div>
                             </div>
                         ))
                     )}
@@ -2618,6 +2626,58 @@ function PendingAttendanceDetailModal({ name, dates, monthLabel, onClose }: {
                                 <p className="text-sm font-bold text-gray-800">{fmt(d)}</p>
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-orange-100 text-orange-700 border-orange-200 flex-shrink-0">
                                     Pending
+                                </span>
+                            </div>
+                        ))
+                    )}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ✅ NEW — detail tanggal "Setengah Hari" (klik badge rose di tab Ringkasan)
+function HalfDayDetailModal({ name, dates, monthLabel, onClose }: {
+    name: string; dates: string[]; monthLabel: string; onClose: () => void;
+}) {
+    const fmt = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
+    const sorted = [...dates].sort();
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-rose-500 to-pink-600 px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">Detail Setengah Hari</p>
+                        <p className="text-xs text-white/70 mt-1">{name} · {monthLabel}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="px-6 pt-4 flex-shrink-0">
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-[11px] text-rose-700 leading-relaxed">
+                        Di tanggal-tanggal ini {name} absen <strong>pulang lebih dari 3 jam lebih awal</strong> dari jadwal pulangnya, jadi hari itu cuma dihitung <strong>setengah hari (skor 0.5)</strong> — gaji hari itu ikut terpotong setengah.
+                    </div>
+                </div>
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-3">
+                        Tanggal setengah hari ({sorted.length})
+                    </p>
+                    {sorted.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Tidak ada data</p>
+                    ) : (
+                        sorted.map(d => (
+                            <div key={d} className="flex items-center justify-between gap-3 bg-rose-50/60 border border-rose-100 rounded-xl px-3.5 py-3">
+                                <p className="text-sm font-bold text-gray-800">{fmt(d)}</p>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-rose-100 text-rose-700 border-rose-200 flex-shrink-0">
+                                    ½ Hari
                                 </span>
                             </div>
                         ))
@@ -4144,7 +4204,8 @@ export default function AttendanceDashboardPage() {
     const [attendanceSummaryDetail, setAttendanceSummaryDetail] = useState<AttendanceSummaryDetail | null>(null);
     const [leaveDetail, setLeaveDetail] = useState<{ name: string; dates: string[] } | null>(null);
     const [holidayWorkDetail, setHolidayWorkDetail] = useState<{ name: string; dates: string[] } | null>(null);
-    const [pendingDetail, setPendingDetail] = useState<{ name: string; dates: string[] } | null>(null); // ✅ NEW
+       const [pendingDetail, setPendingDetail] = useState<{ name: string; dates: string[] } | null>(null); // ✅ NEW
+    const [halfDayDetail, setHalfDayDetail] = useState<{ name: string; dates: string[] } | null>(null); // ✅ NEW — setengah hari
     const [absentPopupMode, setAbsentPopupMode] = useState<"karyawan" | "pkl" | null>(null);
     const [pklFilterMode, setPklFilterMode] = useState(false);
     const [calendarPklFilter, setCalendarPklFilter] = useState<"all" | "karyawan" | "pkl">("karyawan");
@@ -5917,7 +5978,16 @@ export default function AttendanceDashboardPage() {
             if (isDayOffForUser(userName, dk)) continue;
 
             if (dayStatus === targetStatus) {
-                items.push({ date: dk, type: dayStatus, checkInTime, method, manualCreatedBy });
+                // ✅ NEW — tandai hari setengah: sudah absen pulang DAN pulangnya
+                // > HALF_DAY_EARLY_LEAVE_MINUTES lebih awal dari jadwal pulang.
+                let isHalfDay = false;
+                const coIso = checkoutTimes[`${userId}_${dk}`];
+                if (coIso) {
+                    const effDay = effectiveShiftFor(userId, dk);
+                    const coMin = preciseMinutesOfDayWIB(coIso);
+                    if (effDay.checkout - coMin > HALF_DAY_EARLY_LEAVE_MINUTES) isHalfDay = true;
+                }
+                items.push({ date: dk, type: dayStatus, checkInTime, method, manualCreatedBy, isHalfDay });
             }
         }
 
@@ -5927,7 +5997,7 @@ export default function AttendanceDashboardPage() {
             items,
             monthLabel: `${MONTH_NAMES[calMonth]} ${calYear}`,
         };
-    }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser, checkoutTimes]);
+       }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser, checkoutTimes, effectiveShiftFor]);
 
     const lastRefreshRef = useRef<number>(Date.now());
 
@@ -6816,7 +6886,8 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Pending</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Cuti</th>
+                                                                                       <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Cuti</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">½ Hari</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Lembur Libur</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
@@ -6917,7 +6988,7 @@ export default function AttendanceDashboardPage() {
                                                             <span className="text-gray-200 text-sm font-black">—</span>
                                                         )}
                                                     </td>
-                                                    <td className="px-4 py-4 text-center">
+                                                                                                     <td className="px-4 py-4 text-center">
                                                         {u.leave > 0 ? (
                                                             <button
                                                                 onClick={() => setLeaveDetail({ name: u.name, dates: u.leaveDates })}
@@ -6925,6 +6996,19 @@ export default function AttendanceDashboardPage() {
                                                                 title={`Lihat detail cuti ${u.name}`}
                                                             >
                                                                 {u.leave}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-gray-200 text-sm font-black">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        {u.halfDays > 0 ? (
+                                                            <button
+                                                                onClick={() => setHalfDayDetail({ name: u.name, dates: u.halfDayDates })}
+                                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-rose-100 text-rose-700 text-sm font-black border border-rose-200 hover:bg-rose-200 hover:scale-105 transition-all cursor-pointer"
+                                                                title={`Lihat detail setengah hari ${u.name}`}
+                                                            >
+                                                                {u.halfDays}
                                                             </button>
                                                         ) : (
                                                             <span className="text-gray-200 text-sm font-black">—</span>
@@ -7059,7 +7143,7 @@ export default function AttendanceDashboardPage() {
                         )}
 
                         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
-                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"], ["bg-orange-400", "Pending Absensi = 0 poin sementara (belum absen pulang)"], ["bg-purple-400", "Lembur Libur = 0 poin (dibayar lembur, bukan kehadiran)"]].map(([c, l]) => (
+                                                      {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-rose-400", "Setengah Hari = 0.5 poin (pulang >3 jam lebih awal)"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"], ["bg-orange-400", "Pending Absensi = 0 poin sementara (belum absen pulang)"], ["bg-purple-400", "Lembur Libur = 0 poin (dibayar lembur, bukan kehadiran)"]].map(([c, l]) => (
                                 <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
                             ))}
                             <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
@@ -8687,12 +8771,21 @@ export default function AttendanceDashboardPage() {
                 />
             )}
 
-            {pendingDetail && (
+                     {pendingDetail && (
                 <PendingAttendanceDetailModal
                     name={pendingDetail.name}
                     dates={pendingDetail.dates}
                     monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
                     onClose={() => setPendingDetail(null)}
+                />
+            )}
+
+            {halfDayDetail && (
+                <HalfDayDetailModal
+                    name={halfDayDetail.name}
+                    dates={halfDayDetail.dates}
+                    monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
+                    onClose={() => setHalfDayDetail(null)}
                 />
             )}
 

@@ -39,7 +39,8 @@ interface LaptopUnit {
     so_at?: string | null;
     so_by?: string | null;
     is_pedagang_listed?: boolean;
-    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU
+        branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU
+    msj_group_id?: string | null;      // ⬅️ BARU: terisi = unit terkunci di Kelompok MSJ
 }
 
 interface Laptop {
@@ -754,7 +755,8 @@ export default function UnitsPage() {
         sumber: u.source ?? null,
         tanggal_masuk: u.created_at ?? null,
         sn: u.serial_number,
-        branch: u.branch ?? null, // ⬅️ BARU
+               branch: u.branch ?? null, // ⬅️ BARU
+        msj_group_id: u.msj_group_id ?? null, // ⬅️ BARU: dipakai badge 🔒 di sel SN
         kelengkapan: u.kelengkapan ?? null,
         stok_tersisa: u.status !== "SOLD" ? 1 : 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
@@ -1297,7 +1299,8 @@ export default function UnitsPage() {
                                 showMinusSiapJual
                                 showTotalJual
                                 showKelengkapan
-                                showBranch
+                                                              showBranch
+                                showMsj
                                 sortBy={sortBy}
                                 onSort={handleSort}
                                 selectedIds={selectedIds}

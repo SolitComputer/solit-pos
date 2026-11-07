@@ -82,7 +82,8 @@ interface UnifiedRow {
     // Jumlah unit aktif yang sedang dipinjam (APPROVED). Dihitung belakangan
     // setelah fetch /api/item-loans/active-units — penanda saja, bukan stok.
     pinjam_done: number;
-    unit_id?: string; unit_count: number;
+        unit_id?: string; unit_count: number;
+    msj_locked?: number; // ⬅️ BARU: jumlah unit terkunci Kelompok MSJ (penanda, BUKAN stok)
     is_pedagang_listed?: boolean; // laptop: true kalau ADA unit aktif yang masuk Pricelist Pedagang
     branch: "UTAMA" | "JOGJA" | "CAMPURAN" | null; // ⬅️ BARU: ringkasan cabang dari unit aktif
     raw: LaptopRaw | AccessoryRaw;
@@ -149,6 +150,11 @@ function isUnitSoActive(soAt?: string | null): boolean {
 }
 // Arsip MANUAL hanya boleh muncul saat stok BENAR-BENAR habis (0 semua).
 function isStockEmpty(row: UnifiedRow): boolean {
+    // ⬅️ FIX: unit yang terkunci Kelompok MSJ fisiknya MASIH ADA. Barang yang
+    //  masih punya unit di kelompok TIDAK boleh dianggap kosong — kalau tidak,
+    //  tombol "Arsip" muncul & barang bisa ter-arsip padahal unitnya masih hidup
+    //  di kelompok (lalu hilang total dari Data Barang + tak bisa dicari via SN).
+    if ((row.msj_locked ?? 0) > 0) return false;
     const stok = row.tipe === "LAPTOP" ? (row.stok_tersedia ?? 0) : (row.stok ?? 0);
     return stok === 0;
 }
@@ -213,7 +219,19 @@ function BranchBadge({ branch }: { branch: "UTAMA" | "JOGJA" | "CAMPURAN" | null
         <span title="Unit di model ini tersebar di lebih dari satu cabang"
             className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">🔀 Campuran</span>
     );
-    return <span className="text-[10px] text-gray-300 font-medium">—</span>;
+      return <span className="text-[10px] text-gray-300 font-medium">—</span>;
+}
+
+// ⬅️ BARU: chip jumlah unit yang terkunci Kelompok MSJ. Biar baris Data Barang
+//  tidak terlihat "stok sedikit" padahal ada unit fisik yang sedang dibundel.
+function MsjLockedBadge({ count }: { count?: number }) {
+    if (!count || count <= 0) return null;
+    return (
+        <span title={`${count} unit terkunci di Kelompok MSJ — tidak dihitung sebagai stok di sini. Lepas dari halaman Minus Siap Jual untuk mengembalikannya.`}
+            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 whitespace-nowrap">
+            🔒 {count} MSJ
+        </span>
+    );
 }
 
 function normalizeLaptop(l: LaptopRaw): UnifiedRow {
@@ -223,7 +241,10 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     // RETURNED, status RESERVED/HELD/PACKING/PENDING (sedang transaksi berjalan,
     // barang fisik sudah tidak available) juga di-exclude dari stok.
     // msj_group_id terisi = unit sudah masuk Kelompok MSJ → disembunyikan.
-    const aktif = units.filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+       const aktif = units.filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+    // ⬅️ BARU: unit fisik ada tapi terkunci Kelompok MSJ. Terpisah dari `aktif` —
+    //  TIDAK masuk stok, cuma buat penanda baris.
+    const msjLocked = units.filter(u => !!u.msj_group_id && !OUT_STATUSES.has(u.status)).length;
     const siapJual = aktif.filter(u => u.status === "SIAP_JUAL").length;
     // "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual (bisa dibikin
     // payment). Dihitung terpisah dari minus biasa (SERVICE/BELUM_SIAP) yang
@@ -261,7 +282,8 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
         pinjam_done: 0, // diisi setelah fetch active-units (lihat useEffect pinjaman)
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         is_pedagang_listed: aktif.some(u => u.is_pedagang_listed === true),
-        branch: deriveBranch(aktif), // ⬅️ BARU
+             branch: deriveBranch(aktif), // ⬅️ BARU
+        msj_locked: msjLocked, // ⬅️ BARU
         raw: l,
     };
 }
@@ -272,7 +294,9 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     // dengan Kelola Unit & export per-SN — termasuk status RESERVED/HELD/
     // PACKING/PENDING (sedang transaksi berjalan, fisik sudah tidak available).
     // msj_group_id terisi = sudah masuk Kelompok MSJ → disembunyikan.
-    const aktif = units.filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+      const aktif = units.filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+    // ⬅️ BARU: unit fisik ada tapi terkunci Kelompok MSJ (sama logika dgn laptop).
+    const msjLocked = units.filter(u => !!u.msj_group_id && !OUT_STATUSES.has(u.status)).length;
     const one = aktif.length === 1 ? aktif[0] : null;
     // Progress SO & Audit per-unit aksesoris (audit kolomnya sudah ada — R3 selesai).
     const soDoneAcc = aktif.filter(u => isUnitSoActive(u.so_at)).length;
@@ -311,7 +335,8 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
         so_done: soDoneAcc, audit_done: auditDoneAcc,
         pinjam_done: 0, // diisi setelah fetch active-units (lihat useEffect pinjaman)
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
-        branch: deriveBranch(aktif), // ⬅️ BARU
+               branch: deriveBranch(aktif), // ⬅️ BARU
+        msj_locked: msjLocked, // ⬅️ BARU
         raw: a,
     };
 }
@@ -2225,7 +2250,7 @@ export default function UnifiedBarangContent() {
                                                         <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
                                                             {row.kategori || "Tanpa kategori"}{row.brand ? ` · ${row.brand}` : ""}
                                                         </p>
-                                                        <div className="mt-1"><BranchBadge branch={row.branch} /></div>
+                                                                                                               <div className="mt-1 flex items-center gap-1.5"><BranchBadge branch={row.branch} /><MsjLockedBadge count={row.msj_locked} /></div>
                                                     </div>
                                                     {!canOnlyViewBasic && (
                                                         <div className="text-right flex-shrink-0 max-w-[42%]">
@@ -2363,7 +2388,7 @@ export default function UnifiedBarangContent() {
                                                             {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
                                                                 <Link href={`/dashboard/laptops/${row.id}/units`}
                                                                     className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
-                                                                    Kelola Unit ({row.unit_count})
+                                                                   Kelola Unit ({row.unit_count + (row.msj_locked ?? 0)})
                                                                 </Link>
                                                             )}
                                                             {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
@@ -2375,7 +2400,7 @@ export default function UnifiedBarangContent() {
                                                             {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
                                                                 <Link href={`/dashboard/accessories/${row.id}/units`}
                                                                     className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
-                                                                    Kelola Unit ({row.stok ?? 0})
+                                                                   Kelola Unit ({(row.stok ?? 0) + (row.msj_locked ?? 0)})
                                                                 </Link>
                                                             )}
                                                             {row.tipe === "LAPTOP" && canViewBarcode && (
@@ -2512,7 +2537,12 @@ export default function UnifiedBarangContent() {
                                                                 </td>
                                                                 <td className="px-3 py-3 text-xs text-zinc-500">{row.sumber || <Dash />}</td>
                                                                 <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : <Dash />}</td>
-                                                                <td className="px-3 py-3 text-xs text-zinc-500">{row.sn || (row.sn_note ? <span className="text-zinc-400">{row.sn_note}</span> : <Dash />)}</td>
+                                                                                                                               <td className="px-3 py-3 text-xs text-zinc-500">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span>{row.sn || (row.sn_note ? <span className="text-zinc-400">{row.sn_note}</span> : <Dash />)}</span>
+                                                                        <MsjLockedBadge count={row.msj_locked} />
+                                                                    </div>
+                                                                </td>
                                                                 <td className="px-3 py-3 text-xs text-center tabular-nums">
                                                                     <span className={(row.stok_tersedia ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok_tersedia ?? <Dash />}</span>
                                                                 </td>
@@ -2584,7 +2614,7 @@ export default function UnifiedBarangContent() {
                                                                         )}
                                                                         {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
                                                                             <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                                                Kelola Unit ({row.unit_count})
+                                                                              Kelola Unit ({row.unit_count + (row.msj_locked ?? 0)})
                                                                             </Link>
                                                                         )}
                                                                         {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
@@ -2595,7 +2625,7 @@ export default function UnifiedBarangContent() {
                                                                         )}
                                                                         {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
                                                                             <Link href={`/dashboard/accessories/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                                                Kelola Unit ({row.stok ?? 0})
+                                                                               Kelola Unit ({(row.stok ?? 0) + (row.msj_locked ?? 0)})
                                                                             </Link>
                                                                         )}
                                                                         {row.tipe === "LAPTOP" && canViewBarcode && (

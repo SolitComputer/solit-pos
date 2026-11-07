@@ -53,6 +53,9 @@ export interface InventoryRow {
     sn: string | null;
     sn_note?: string;
 
+    /** FK ke msj_groups — terisi = unit terkunci di Kelompok MSJ (opt-in via showMsj) */
+    msj_group_id?: string | null;
+
     /** Cabang unit (unit-level). Laptop/aksesoris per-SN; "CAMPURAN" dipakai
      *  di Data Barang level model. Kolom opt-in via showBranch. */
     branch?: "UTAMA" | "JOGJA" | "CAMPURAN" | null;
@@ -101,8 +104,10 @@ interface Props {
     showSparepart?: boolean;
     /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
     showTotalJual?: boolean;
-       /** Tampilkan kolom Kelengkapan unit (opt-in — halaman Units) */
+    /** Tampilkan kolom Kelengkapan unit (opt-in — halaman Units) */
     showKelengkapan?: boolean;
+    /** Tampilkan badge 🔒 "Kelompok MSJ" di sel SN untuk unit yang terkunci kelompok */
+    showMsj?: boolean;
     /** Tampilkan kolom Cabang (opt-in — Kelola Unit & Barang Siap Jual) */
     showBranch?: boolean;
     /** Label kolom tanggal — default "Tanggal Masuk", dipakai "Tanggal Terjual" di tab Terjual */
@@ -189,7 +194,7 @@ export function BranchBadge({ branch }: { branch?: "UTAMA" | "JOGJA" | "CAMPURAN
 }
 
 export default function InventoryTable({
-    rows, canSeePrivate, canSeeStock, showSparepart, showMinusSiapJual, showTotalJual, showKelengkapan, dateColumnLabel,
+    rows, canSeePrivate, canSeeStock, showSparepart, showMinusSiapJual, showTotalJual, showKelengkapan, showMsj, dateColumnLabel,
     onRowClick, renderActions, renderAudit, renderSo, renderPedagang, sortBy, onSort,
     selectedIds, onToggleSelect, onToggleSelectAll, allSelected, someSelected, showBranch,
 }: Props) {
@@ -283,11 +288,11 @@ export default function InventoryTable({
                         {showTotalJual && canSeeStock && <Th right sortKey="TOTAL_JUAL" activeSort={sortBy} onSort={onSort}>Total Jual</Th>}
                         {canSeePrivate && <Th sortKey="SUMBER" activeSort={sortBy} onSort={onSort}>Sumber</Th>}
                         {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>{dateColumnLabel ?? "Tanggal Masuk"}</Th>}
-                                             <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
+                        <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
                         {showBranch && <Th center>Cabang</Th>}
                         {showKelengkapan && <Th>Kelengkapan</Th>}
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
-                                                <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
+                        <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {showMinusSiapJual && <Th center sortKey="MSJ" activeSort={sortBy} onSort={onSort} title="Minus Siap Jual">MSJ</Th>}
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
                         {renderSo && <Th center sortKey="SO" activeSort={sortBy} onSort={onSort}>SO</Th>}
@@ -443,9 +448,17 @@ export default function InventoryTable({
                                 </td>
                             )}
 
-                                                       <td className="px-3 py-3.5 whitespace-nowrap">
+                            <td className="px-3 py-3.5 whitespace-nowrap">
                                 {row.sn ? (
-                                    <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{row.sn}</code>
+                                    <div className="flex flex-col items-start gap-1">
+                                        <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{row.sn}</code>
+                                        {showMsj && row.msj_group_id && (
+                                            <span title="Unit ini terkunci di Kelompok MSJ — tidak dihitung sebagai stok di Data Barang. Lepaskan dari halaman Minus Siap Jual untuk mengembalikannya."
+                                                className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 whitespace-nowrap">
+                                                🔒 Kelompok MSJ
+                                            </span>
+                                        )}
+                                    </div>
                                 ) : row.sn_note ? <Note>{row.sn_note}</Note> : <Dash />}
                             </td>
 
