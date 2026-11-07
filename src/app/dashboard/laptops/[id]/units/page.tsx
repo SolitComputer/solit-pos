@@ -39,8 +39,8 @@ interface LaptopUnit {
     so_at?: string | null;
     so_by?: string | null;
     is_pedagang_listed?: boolean;
-        branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU
-    msj_group_id?: string | null;      // ⬅️ BARU: terisi = unit terkunci di Kelompok MSJ
+    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU
+    
 }
 
 interface Laptop {
@@ -755,8 +755,8 @@ export default function UnitsPage() {
         sumber: u.source ?? null,
         tanggal_masuk: u.created_at ?? null,
         sn: u.serial_number,
-               branch: u.branch ?? null, // ⬅️ BARU
-        msj_group_id: u.msj_group_id ?? null, // ⬅️ BARU: dipakai badge 🔒 di sel SN
+        branch: u.branch ?? null, // ⬅️ BARU
+      
         kelengkapan: u.kelengkapan ?? null,
         stok_tersisa: u.status !== "SOLD" ? 1 : 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
@@ -1299,8 +1299,8 @@ export default function UnitsPage() {
                                 showMinusSiapJual
                                 showTotalJual
                                 showKelengkapan
-                                                              showBranch
-                                showMsj
+                                showBranch
+                                
                                 sortBy={sortBy}
                                 onSort={handleSort}
                                 selectedIds={selectedIds}
@@ -1664,7 +1664,7 @@ function BulkEditUnitsModal({
         setError("");
         if (units.length === 0) { setError("Tidak ada unit yang bisa diedit (unit terjual dilewati)."); return; }
 
-              const patch: Record<string, unknown> = {};
+        const patch: Record<string, unknown> = {};
         if (grade) patch.grade = grade;
         if (status) patch.status = status;
         if (branch) patch.branch = branch; // ⬅️ BARU: hanya dikirim kalau dipilih
@@ -1747,7 +1747,7 @@ function BulkEditUnitsModal({
                                 { v: "MINUS_SIAP_JUAL", l: "Minus Siap Jual" },
                                 { v: "BELUM_SIAP", l: "Belum Siap Jual" },
                             ] as const).map(o => (
-                                                          <button key={o.v} type="button" onClick={() => setStatus(prev => prev === o.v ? "" : o.v)}
+                                <button key={o.v} type="button" onClick={() => setStatus(prev => prev === o.v ? "" : o.v)}
                                     className={`h-10 rounded-xl text-[11px] font-semibold border transition ${status === o.v ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
                                     {o.l}
                                 </button>
@@ -1771,7 +1771,7 @@ function BulkEditUnitsModal({
                                 </button>
                             ))}
                         </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Kosongkan (tidak dipilih) = cabang tiap unit tidak diubah.</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Kosongkan (tidak dipilih) = cabang tiap unit tidak diubah.</p>
                     </div>
 
                     <div className={canEditPurchasePrice ? "grid grid-cols-2 gap-3" : ""}>

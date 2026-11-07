@@ -53,9 +53,6 @@ export interface InventoryRow {
     sn: string | null;
     sn_note?: string;
 
-    /** FK ke msj_groups — terisi = unit terkunci di Kelompok MSJ (opt-in via showMsj) */
-    msj_group_id?: string | null;
-
     /** Cabang unit (unit-level). Laptop/aksesoris per-SN; "CAMPURAN" dipakai
      *  di Data Barang level model. Kolom opt-in via showBranch. */
     branch?: "UTAMA" | "JOGJA" | "CAMPURAN" | null;
@@ -106,8 +103,6 @@ interface Props {
     showTotalJual?: boolean;
     /** Tampilkan kolom Kelengkapan unit (opt-in — halaman Units) */
     showKelengkapan?: boolean;
-    /** Tampilkan badge 🔒 "Kelompok MSJ" di sel SN untuk unit yang terkunci kelompok */
-    showMsj?: boolean;
     /** Tampilkan kolom Cabang (opt-in — Kelola Unit & Barang Siap Jual) */
     showBranch?: boolean;
     /** Label kolom tanggal — default "Tanggal Masuk", dipakai "Tanggal Terjual" di tab Terjual */
@@ -194,7 +189,7 @@ export function BranchBadge({ branch }: { branch?: "UTAMA" | "JOGJA" | "CAMPURAN
 }
 
 export default function InventoryTable({
-    rows, canSeePrivate, canSeeStock, showSparepart, showMinusSiapJual, showTotalJual, showKelengkapan, showMsj, dateColumnLabel,
+    rows, canSeePrivate, canSeeStock, showSparepart, showMinusSiapJual, showTotalJual, showKelengkapan, dateColumnLabel,
     onRowClick, renderActions, renderAudit, renderSo, renderPedagang, sortBy, onSort,
     selectedIds, onToggleSelect, onToggleSelectAll, allSelected, someSelected, showBranch,
 }: Props) {
@@ -450,15 +445,7 @@ export default function InventoryTable({
 
                             <td className="px-3 py-3.5 whitespace-nowrap">
                                 {row.sn ? (
-                                    <div className="flex flex-col items-start gap-1">
-                                        <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{row.sn}</code>
-                                        {showMsj && row.msj_group_id && (
-                                            <span title="Unit ini terkunci di Kelompok MSJ — tidak dihitung sebagai stok di Data Barang. Lepaskan dari halaman Minus Siap Jual untuk mengembalikannya."
-                                                className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 whitespace-nowrap">
-                                                🔒 Kelompok MSJ
-                                            </span>
-                                        )}
-                                    </div>
+                                    <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{row.sn}</code>
                                 ) : row.sn_note ? <Note>{row.sn_note}</Note> : <Dash />}
                             </td>
 
