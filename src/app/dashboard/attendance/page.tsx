@@ -172,6 +172,11 @@ const PKL_LATE_RATE = 5000;
 
 const CHECKOUT_REQUIRED_FROM = "2026-08-13";
 
+// ✅ NEW — Setengah hari: kalau absen PULANG lebih dari X jam LEBIH AWAL dari
+// jadwal pulangnya, hari itu dihitung setengah hari (skor 0.5 = gaji ½),
+// apa pun status masuknya (Tepat/Terlambat). Berlaku kalau SUDAH absen pulang.
+const HALF_DAY_EARLY_LEAVE_MINUTES = 3 * 60; // 3 jam
+
 // ─── Constants ─────────────────────────────────────────────────────────────
 // Titik kantor per cabang ada di src/lib/attendanceLocations.ts (dipakai badge jarak).
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -4050,6 +4055,10 @@ export default function AttendanceDashboardPage() {
         return null;
     }); const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [checkoutTimes, setCheckoutTimes] = useState<Record<string, string>>({}); // ✅ NEW — key: `${user_id}_${dateKey}` → jam pulang (ISO), buat kolom Jam Pulang
+    // ✅ NEW — key sama (`${user_id}_${dateKey}`) → lokasi & metode absen PULANG (OUT).
+    // Dipisah dari checkoutTimes karena checkoutTimes cuma simpan jam (string),
+    // sedangkan ini butuh beberapa field. Dipakai di kolom "Lokasi Pulang" & "Metode Pulang".
+    const [checkoutMeta, setCheckoutMeta] = useState<Record<string, { latitude: number | null; longitude: number | null; method: string | null }>>({});
     const [afterOutOvertime, setAfterOutOvertime] = useState<Record<string, { minutes: number; status: string; auditStatus: string }>>({});
     // ✅ NEW — key: `${user_id}_${dateKey}`. Isi: lembur yang SUDAH otomatis
     // kedeteksi sistem dari absen OUT lewat jam pulang.
@@ -4193,7 +4202,7 @@ export default function AttendanceDashboardPage() {
     const fetchAttendance = useCallback(async () => {
         const r = await fetch("/api/attendance");
         const d = await r.json();
-        if (!d.success) return;
+        if (!d.success) { setCheckoutMeta({}); return; } // ✅ NEW — reset meta pulang kalau fetch gagal
         const rows: Attendance[] = d.data || [];
         // ✅ FIX: pisahkan absen PULANG (direction OUT) dari absen masuk — OUT
         // gak boleh ikut masuk ke `attendances`, karena seluruh logic status/
@@ -4204,11 +4213,15 @@ export default function AttendanceDashboardPage() {
         setAttendances(inRows.map((a) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" })));
 
         const co: Record<string, string> = {};
+        const coMeta: Record<string, { latitude: number | null; longitude: number | null; method: string | null }> = {};
         outRows.forEach(a => {
             const key = `${a.user_id}_${toWIBDateKey(a.check_in_time || a.created_at)}`;
             co[key] = a.check_in_time || a.created_at;
+            // ✅ NEW — simpan lokasi & metode absen pulang untuk kolom baru
+            coMeta[key] = { latitude: a.latitude, longitude: a.longitude, method: a.method };
         });
         setCheckoutTimes(co);
+        setCheckoutMeta(coMeta);
     }, []);
 
     const fetchAfterOutOvertime = useCallback(async (year: number, month: number) => {
@@ -4915,6 +4928,7 @@ export default function AttendanceDashboardPage() {
             pending: number; pendingDates: string[];
             manualDays: number; manualLateDays: number; perfectDays: number; violations: number;
             earlyDaysCount: number; avgEarlyMinutes: number;
+            halfDays: number; halfDayDates: string[]; // ✅ NEW — hari setengah (pulang kecepetan > 3 jam)
         };
 
         const todayWIB = getWIBToday();
@@ -5039,6 +5053,8 @@ export default function AttendanceDashboardPage() {
             const leaveDates: string[] = [];
             const holidayWorkDates: string[] = [];
             const pendingDates: string[] = []; // ✅ NEW
+            const halfDayDates: string[] = []; // ✅ NEW
+            let halfDays = 0; // ✅ NEW
             let totalWorkdays = 0;
             let pastWorkdays = 0;
 
@@ -5102,7 +5118,34 @@ export default function AttendanceDashboardPage() {
                 pastWorkdays++;
                 const isManualDay = !!manualByName[name]?.[dk];
                 if (eff === "PRESENT" || eff === "LATE") {
-                    if (eff === "PRESENT") { present++; score += 1; }
+                    // ✅ NEW — cek SETENGAH HARI: sudah absen pulang DAN pulangnya
+                    // > HALF_DAY_EARLY_LEAVE_MINUTES lebih awal dari jadwal pulang.
+                    // Kalau ya → hari ini cuma dihitung 0.5 (setengah gaji), apa pun
+                    // status masuknya. resolvedUserIdForDay dipakai karena userId
+                    // bisa kosong utk sumber manual-only.
+                    const resolvedUserIdForDay = userIdByName[name]
+                        ?? Object.values(manualByName[name] ?? {}).map(r => r.user_id).filter(Boolean)[0]
+                        ?? "";
+                    const checkoutIsoForDay = checkoutTimes[`${resolvedUserIdForDay}_${dk}`];
+                    let isHalfDay = false;
+                    if (checkoutIsoForDay) {
+                        const effDay = effectiveShiftFor(resolvedUserIdForDay, dk);
+                        const checkoutMinActual = preciseMinutesOfDayWIB(checkoutIsoForDay);
+                        // pulang lebih awal dari jadwal (eff.checkout) lebih dari ambang
+                        if (effDay.checkout - checkoutMinActual > HALF_DAY_EARLY_LEAVE_MINUTES) {
+                            isHalfDay = true;
+                        }
+                    }
+
+                    if (isHalfDay) {
+                        // Setengah hari: skor 0.5 apa pun status masuknya.
+                        // Tetap dihitung di present/late sesuai status masuk biar
+                        // kolom Tepat/Terlambat konsisten, tapi SKOR-nya 0.5.
+                        if (eff === "PRESENT") present++; else late++;
+                        score += 0.5;
+                        halfDays++;
+                        halfDayDates.push(dk);
+                    } else if (eff === "PRESENT") { present++; score += 1; }
                     else { late++; score += 0.5; }
 
                     if (isManualDay) {
@@ -5165,6 +5208,7 @@ export default function AttendanceDashboardPage() {
                 pending, pendingDates, // ✅ NEW
                 manualDays, manualLateDays, perfectDays, violations, // ✅ NEW — untuk leaderboard Kualitas Absensi
                 earlyDaysCount, avgEarlyMinutes, // ✅ NEW — rata-rata menit lebih cepat dari jadwal
+                halfDays, halfDayDates, // ✅ NEW — hari setengah
             });
         });
 
@@ -6435,8 +6479,10 @@ export default function AttendanceDashboardPage() {
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Jam Pulang</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Batas Absen</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Metode</th>
-                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Lokasi</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Metode Masuk</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Metode Pulang</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Lokasi Masuk</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Lokasi Pulang</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Catatan</th>
                                                     {isAdminRole(currentUser?.role)
                                                         && <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>}
@@ -6542,6 +6588,18 @@ export default function AttendanceDashboardPage() {
                                                                     {a.source === "MANUAL" ? "Manual" : a.method === "FACE" ? "Wajah" : a.method === "BIOMETRIC" ? "Sidik Jari" : "Skip"}
                                                                 </span>
                                                             </td>
+                                                            {/* ✅ NEW — Metode Pulang (dari record OUT). "—" kalau belum absen pulang. */}
+                                                            <td className="px-4 py-4">
+                                                                {(() => {
+                                                                    const meta = checkoutMeta[`${userId}_${dateKey}`];
+                                                                    if (!meta?.method) return <span className="text-[10px] text-gray-300 font-bold">—</span>;
+                                                                    return (
+                                                                        <span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border w-fit ${meta.method === "FACE" ? "bg-indigo-100 text-indigo-600 border-indigo-200" : meta.method === "BIOMETRIC" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-400 border-gray-200"}`}>
+                                                                            {meta.method === "FACE" ? "Wajah" : meta.method === "BIOMETRIC" ? "Sidik Jari" : meta.method}
+                                                                        </span>
+                                                                    );
+                                                                })()}
+                                                            </td>
                                                             <td className="px-4 py-4">
                                                                 {a.latitude && a.longitude ? (() => {
                                                                     // ✅ NEW — ukur ke cabang TERDEKAT (Depok/UTAMA atau Jogja),
@@ -6557,6 +6615,22 @@ export default function AttendanceDashboardPage() {
                                                                         </a>
                                                                     );
                                                                 })() : <span className="text-[10px] text-gray-200 font-bold">—</span>}
+                                                            </td>
+                                                            {/* ✅ NEW — Lokasi Pulang (dari record OUT). Jarak diukur ke cabang terdekat, sama seperti lokasi masuk. */}
+                                                            <td className="px-4 py-4">
+                                                                {(() => {
+                                                                    const meta = checkoutMeta[`${userId}_${dateKey}`];
+                                                                    if (!meta?.latitude || !meta?.longitude) return <span className="text-[10px] text-gray-200 font-bold">—</span>;
+                                                                    const geo = resolveBranchByLocation(meta.latitude, meta.longitude);
+                                                                    const inRange = geo.branch !== null;
+                                                                    return (
+                                                                        <a href={`https://maps.google.com/?q=${meta.latitude},${meta.longitude}`} target="_blank" rel="noopener noreferrer"
+                                                                            title={`${geo.nearest.label}${inRange ? "" : " — di luar radius"} (saat pulang)`}
+                                                                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-full border no-underline transition-all hover:shadow-md ${inRange ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>
+                                                                            {geo.nearestDistance}m
+                                                                        </a>
+                                                                    );
+                                                                })()}
                                                             </td>
                                                             <td className="px-4 py-4 hidden lg:table-cell">
                                                                 <div className="space-y-0.5">
