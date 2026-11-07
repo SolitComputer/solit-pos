@@ -18,7 +18,7 @@ import {
     UserRole, hasAnyRole, PERMISSIONS,
     LAPTOP_DELETE_ROLES, ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES, ACCESSORY_DELETE_ROLES,
     ACCESSORY_AUDIT_ROLES,
-    BARANG_PRIVATE_VIEW_ROLES, BARANG_FULL_ACCESS_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop,
+    BARANG_PRIVATE_VIEW_ROLES, BARANG_FULL_ACCESS_ROLES, SO_ROLES, SO_RESET_ROLES, SO_LIMITED_USER_IDS, canSoLaptop,
     canEditConditionChecks, isBarangBasicViewOnly,
 } from "@/lib/permissions";
 
@@ -964,6 +964,12 @@ export default function UnifiedBarangContent() {
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
     const canAddUnit = hasAnyRole(userRoles, PERMISSIONS.CREATE_UNITS);
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
+    // Guard khusus tombol Reset SO — dibatasi ketat ke Admin, Kepala Admin Barang,
+    // Admin Barang (lihat SO_RESET_ROLES di permissions.ts). Sengaja dipisah dari
+    // canFullAccessBarang yang scope-nya lebih luas (ikut Programmer, Pengelola
+    // Barang, dll) — supaya aksi destruktif reset so_at/so_by lintas 4 tabel ini
+    // tidak gampang kepencet role yang bukan domain-nya.
+    const canResetSo = hasAnyRole(userRoles, SO_RESET_ROLES);
     // PKL Pengelola Barang: mode lihat-saja — cuma daftar barang + filter
     // kategori. Tombol Export & Tambah Barang disembunyikan untuk role ini.
     // Kalau user juga punya role Full Access Barang (dobel role), privilege
@@ -1918,7 +1924,7 @@ export default function UnifiedBarangContent() {
                                 >
                                     {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
-                                {!canOnlyViewBasic && !isPklPengelolaViewOnly && canFullAccessBarang && (
+                                {canResetSo && (
                                     <button
                                         onClick={() => setResetSoConfirm(true)}
                                         title="Reset semua data SO (laptop + aksesoris + unit) secara manual"

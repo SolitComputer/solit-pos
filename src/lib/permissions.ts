@@ -1462,6 +1462,20 @@ export const SO_LIMITED_USER_IDS: string[] = [
   "203810b5-f9e0-4de4-9495-e1378451fa29",
 ];
 
+// ── Reset SO Manual (tombol "Reset SO" di halaman Data Barang) ───────────────
+// SENGAJA dipisah dari SO_ROLES (yang untuk SET SO per-item) & dari
+// BARANG_FULL_ACCESS_ROLES (scope terlalu luas untuk aksi destruktif). Reset
+// SO meng-NULL-kan kolom so_at/so_by di 4 tabel sekaligus (laptops, laptop_units,
+// accessories, accessory_units) — jadi harus dibatasi ketat. Keputusan 2026-11-07:
+// hanya ADMIN, KEPALA_ADMIN_BARANG, dan ADMIN_BARANG. Dipakai di UI
+// (UnifiedBarangContent) & di backend (/api/so/reset/route.ts) sebagai single
+// source of truth. Tambah/hapus role di sini kalau mau ubah akses.
+export const SO_RESET_ROLES: UserRole[] = [
+  "ADMIN",
+  "KEPALA_ADMIN_BARANG",
+  "ADMIN_BARANG",
+];
+
 // ── Riwayat Transaksi: akses per-AKUN (bukan per-role) ───────────────────────
 // Akun spesifik yang boleh buka /dashboard/transactions + /api/transaction
 // SETARA KEPALA_MARKETING, walau role-nya cuma MARKETING. Pakai UUID users.id
