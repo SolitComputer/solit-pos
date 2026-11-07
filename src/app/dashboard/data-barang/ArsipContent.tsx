@@ -15,6 +15,7 @@ interface ArchivedRow {
     kategori: string | null;
     brand: string | null;
     harga_jual: number;
+    sn: string | null;
     archived_at: string;
     archived_by: string | null;
     archive_reason: string | null;
@@ -74,6 +75,7 @@ export default function ArsipContent() {
                     id: l.id, tipe: "LAPTOP" as const, nama: l.laptop_name,
                     kategori: l.category_name ?? null, brand: l.brand || null,
                     harga_jual: l.selling_price || 0,
+                    sn: l.serial_number ?? l.sn ?? null,
                     archived_at: l.archived_at, archived_by: l.archived_by ?? null,
                     archive_reason: l.archive_reason ?? null,
                 }));
@@ -84,6 +86,7 @@ export default function ArsipContent() {
                     id: a.id, tipe: "AKSESORIS" as const, nama: a.name,
                     kategori: a.category ?? null, brand: a.brand || null,
                     harga_jual: a.sell_price || 0,
+                    sn: a.serial_number ?? a.sn ?? null,
                     archived_at: a.archived_at, archived_by: a.archived_by ?? null,
                     archive_reason: a.archive_reason ?? null,
                 }));
@@ -193,6 +196,7 @@ export default function ArsipContent() {
                                     <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Nama Barang</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Kategori</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Merk</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">SN</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-right font-semibold px-4 py-3">Harga Jual</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-center font-semibold px-4 py-3">Alasan</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Diarsipkan</th>
@@ -213,6 +217,9 @@ export default function ArsipContent() {
                                         </td>
                                         <td className="px-4 py-3 text-gray-600">{row.kategori || <span className="text-gray-300">—</span>}</td>
                                         <td className="px-4 py-3 text-gray-600">{row.brand || <span className="text-gray-300">—</span>}</td>
+                                        <td className="px-4 py-3 text-gray-700 font-mono text-[12px] tabular-nums whitespace-nowrap">
+                                            {row.sn || <span className="text-gray-300 font-sans">—</span>}
+                                        </td>
                                         <td className="px-4 py-3 text-right tabular-nums text-gray-800 font-medium">{fmt(row.harga_jual)}</td>
                                         <td className="px-4 py-3 text-center"><ReasonBadge reason={row.archive_reason} /></td>
                                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap tabular-nums">
