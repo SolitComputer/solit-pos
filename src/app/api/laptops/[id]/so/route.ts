@@ -69,14 +69,12 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    // SO aktif = so_at terisi. Tidak ada TTL harian — reset hanya terjadi
-    // lewat tombol Reset SO manual (POST /api/so/reset).
-    const isActive = current.so_at != null;
-
-    // Aktif → batalkan (undo). Belum/expired → tandai SO sekarang.
-    const payload = isActive
-      ? { so_at: null, so_by: null }
-      : { so_at: new Date().toISOString(), so_by: user.name };
+    // SELALU set/refresh so_at (bukan toggle off). Undo per-model sekarang
+    // hanya lewat tombol Reset SO manual (POST /api/so/reset). "SO Ulang"
+    // di UI = update timestamp, bukan clear.
+    const wasAlreadySo = current.so_at != null;
+    const nowIso = new Date().toISOString();
+    const payload = { so_at: nowIso, so_by: user.name };
 
     const { data, error } = await supabase
       .from("laptops")
@@ -89,26 +87,31 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
-    // History "siapa yang SO" tercatat permanen di activity log
+    // History "siapa yang SO" tercatat permanen di activity log — action
+    // selalu "SO", niat "SO Ulang" dicatat di reason kalau sebelumnya
+    // sudah pernah di-SO.
     await logActivity({
       userId: user.id,
       userName: user.name,
       userRole: user.role,
-      action: isActive ? "UNSO" : "SO",
+      action: "SO",
       entity: "laptop",
       entityId: id,
       entityLabel: current.laptop_name,
-      reason: notes || null,
+      reason: wasAlreadySo
+        ? (notes ? `${notes} (SO Ulang)` : "SO Ulang")
+        : (notes || null),
     });
 
-    // Catat juga ke laptop_so_logs — riwayat ini TIDAK ikut ter-reset
-    // walau status "aktif" di tabel laptops sudah lewat TTL 1 hari.
+    // Catat juga ke laptop_so_logs untuk kebutuhan tab Riwayat SO di modal.
     await supabase.from("laptop_so_logs").insert({
       laptop_id: id,
-      action: isActive ? "UNSO" : "SO",
+      action: "SO",
       so_by: user.name,
-      so_at: new Date().toISOString(),
-      notes: notes || null,
+      so_at: nowIso,
+      notes: wasAlreadySo
+        ? (notes ? `${notes} (SO Ulang)` : "SO Ulang")
+        : (notes || null),
     });
 
     return NextResponse.json({ success: true, data });

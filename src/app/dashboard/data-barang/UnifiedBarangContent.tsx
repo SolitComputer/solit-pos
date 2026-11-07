@@ -1725,13 +1725,27 @@ export default function UnifiedBarangContent() {
                 const res = await fetch(url);
                 const json = await res.json();
                 const raw = json.data?.history ?? [];
-                const mapped: HistoryEntry[] = raw.map((h: any) => ({
-                    id: h.id,
-                    action: kind === "so" ? (h.action === "SO" ? "Ditandai sudah SO" : "SO dibatalkan") : (h.action === "AUDIT" ? "Ditandai sudah diaudit" : "Audit dibatalkan"),
-                    by: kind === "so" ? h.so_by : h.audited_by,
-                    at: kind === "so" ? h.so_at : h.audited_at,
-                    notes: h.notes ?? null,
-                }));
+                const mapped: HistoryEntry[] = raw.map((h: any) => {
+                    let label: string;
+                    if (kind === "so") {
+                        // Entry baru selalu action "SO" — notes "SO Ulang" dipakai
+                        // untuk membedakan SO pertama kali vs SO ulang. Entry lama
+                        // dengan action "UNSO" dari sistem sebelum fix tetap tampil
+                        // sebagai "SO dibatalkan" untuk kejelasan riwayat.
+                        if (h.action === "UNSO") label = "SO dibatalkan";
+                        else if ((h.notes ?? "").toLowerCase().includes("so ulang")) label = "Ditandai ulang SO";
+                        else label = "Ditandai sudah SO";
+                    } else {
+                        label = h.action === "AUDIT" ? "Ditandai sudah diaudit" : "Audit dibatalkan";
+                    }
+                    return {
+                        id: h.id,
+                        action: label,
+                        by: kind === "so" ? h.so_by : h.audited_by,
+                        at: kind === "so" ? h.so_at : h.audited_at,
+                        notes: h.notes ?? null,
+                    };
+                });
                 setHistoryEntries(mapped);
             } catch {
                 setHistoryEntries([]);

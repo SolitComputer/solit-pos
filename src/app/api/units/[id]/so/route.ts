@@ -44,12 +44,16 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    // SO unit aktif = so_at terisi (tidak ada TTL harian).
-    const isActive = current.so_at != null;
+    // Setelah Reset SO jadi MANUAL, PATCH ini SELALU set/refresh so_at —
+    // TIDAK pernah toggle off ke null. Alasannya: tombol di UI sekarang
+    // bermakna "Tandai SO" (kalau belum) atau "SO Ulang" (kalau sudah),
+    // keduanya menghasilkan status "Sudah SO" dengan timestamp terbaru.
+    // Pengosongan so_at (undo per-unit) sekarang hanya dilakukan lewat
+    // tombol Reset SO manual di halaman Data Barang (POST /api/so/reset).
+    const wasAlreadySo = current.so_at != null;
 
-    const payload = isActive
-      ? { so_at: null, so_by: null }
-      : { so_at: new Date().toISOString(), so_by: user.name };
+    const nowIso = new Date().toISOString();
+    const payload = { so_at: nowIso, so_by: user.name };
 
     const { data, error } = await supabase
       .from("laptop_units")
@@ -62,23 +66,30 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
+    // Action label disamakan dengan niat user — "SO Ulang" kalau sebelumnya
+    // sudah SO, "SO" kalau baru pertama kali. Keduanya BUKAN "UNSO" karena
+    // operasinya selalu set, bukan clear.
     await logActivity({
       userId: user.id,
       userName: user.name,
       userRole: user.role,
-      action: isActive ? "UNSO" : "SO",
+      action: "SO",
       entity: "unit",
       entityId: id,
       entityLabel: `SN: ${current.serial_number}`,
-      reason: notes || null,
+      reason: wasAlreadySo
+        ? (notes ? `${notes} (SO Ulang)` : "SO Ulang")
+        : (notes || null),
     });
 
     await supabase.from("laptop_unit_so_logs").insert({
       unit_id: id,
-      action: isActive ? "UNSO" : "SO",
+      action: "SO",
       so_by: user.name,
-      so_at: new Date().toISOString(),
-      notes: notes || null,
+      so_at: nowIso,
+      notes: wasAlreadySo
+        ? (notes ? `${notes} (SO Ulang)` : "SO Ulang")
+        : (notes || null),
     });
 
     // ── ROLLUP ke parent laptops.so_at ──────────────────────────────────
@@ -97,17 +108,22 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         (u) => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id
       );
       // Semua unit aktif sudah di-SO (so_at terisi) → naikkan status ke parent.
-      // Tanpa cek tanggal karena reset sekarang manual, bukan periodik.
+      // Karena PATCH ini hanya SET (tidak pernah clear), kondisi allSo yang
+      // terpenuhi hanya PERLU update timestamp parent — JANGAN clear so_at
+      // parent walaupun allSo = false di sini (bisa saja kondisi "false"
+      // muncul karena ada unit baru masuk yang belum di-SO). Pembersihan
+      // so_at parent sekarang eksklusif lewat tombol Reset SO manual.
       const allSo = aktif.length > 0 && aktif.every((u) => u.so_at != null);
 
-      await supabase
-        .from("laptops")
-        .update(
-          allSo
-            ? { so_at: new Date().toISOString(), so_by: user.name }
-            : { so_at: null, so_by: null }
-        )
-        .eq("id", current.laptop_id);
+      if (allSo) {
+        await supabase
+          .from("laptops")
+          .update({ so_at: nowIso, so_by: user.name })
+          .eq("id", current.laptop_id);
+      }
+      // kalau TIDAK semua unit di-SO → jangan sentuh parent sama sekali.
+      // Status parent akan otomatis reflect "belum semua SO" via hitungan
+      // X/Y di UI, bukan via flag so_at parent.
     } catch {
       // Rollup gagal TIDAK membatalkan SO unit yang sudah sukses — unit tetap
       // tersimpan, cuma tanda di baris model yang mungkin telat ter-update.
