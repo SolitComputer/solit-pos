@@ -137,7 +137,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   // Laporan sales yang sedang ditolak (buka modal pilih alasan). null = tertutup.
   const [rejectTarget, setRejectTarget] = useState<LeadRow | null>(null);
   const [rejecting, setRejecting] = useState(false);
-  const [auditFilter, setAuditFilter] = useState<"all" | "audited" | "unaudited">("all");
+  const [auditFilter, setAuditFilter] = useState<"all" | "audited" | "unaudited" | "rejected">("all");
   // Filter rentang tanggal (format YYYY-MM-DD lokal). Kosong = tidak aktif.
   // Nilai awal sengaja "" (sama di server & client) supaya tidak ada hydration
   // mismatch — nilai sebenarnya (tersimpan / default hari ini) di-set di effect
@@ -252,7 +252,9 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   // difilter di server lewat fetchRows (?from=&to=), jadi tidak diulang di sini.
   const filteredRows = useMemo(() => {
     if (auditFilter === "audited") return rows.filter((r) => r.audited);
-    if (auditFilter === "unaudited") return rows.filter((r) => !r.audited);
+    // Belum diaudit = bukan audited DAN bukan rejected (ini fix bug sebelumnya)
+    if (auditFilter === "unaudited") return rows.filter((r) => !r.audited && !r.rejected);
+    if (auditFilter === "rejected") return rows.filter((r) => r.rejected);
     return rows;
   }, [rows, auditFilter]);
 
@@ -265,8 +267,11 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
     const total = rows.length;
     const transaksi = rows.filter((r) => r.transaksi).length;
     const audited = rows.filter((r) => r.audited).length;
+    const rejected = rows.filter((r) => r.rejected).length;
+    // Dipisah dari rejected — dulu "Belum Diaudit" ikut hitung yang ditolak
+    const unaudited = rows.filter((r) => !r.audited && !r.rejected).length;
     const convRate = total > 0 ? Math.round((transaksi / total) * 100) : 0;
-    return { total, transaksi, audited, convRate };
+    return { total, transaksi, audited, rejected, unaudited, convRate };
   }, [rows]);
 
   async function handleAudit(id: string, namaToko: string) {
@@ -439,7 +444,15 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                 auditFilter === "unaudited" ? "bg-white text-amber-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Belum Diaudit <span className="tabular-nums">({stats.total - stats.audited})</span>
+              Belum Diaudit <span className="tabular-nums">({stats.unaudited})</span>
+            </button>
+            <button
+              onClick={() => setAuditFilter("rejected")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                auditFilter === "rejected" ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <XCircle className="w-3 h-3" /> Ditolak <span className="tabular-nums">({stats.rejected})</span>
             </button>
             </div>
           </div>
