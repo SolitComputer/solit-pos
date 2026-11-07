@@ -37,7 +37,7 @@ interface BreakdownDef { key: string; title: string; mode: "percent" | "count"; 
 interface PlatformConfig { label: string; metrics: MetricDef[]; breakdowns: BreakdownDef[]; }
 
 const CONFIG: Record<"tiktok" | "instagram" | "facebook" | "threads" | "youtube", PlatformConfig> = {
-    tiktok: {
+  tiktok: {
     label: "TikTok Studio",
     metrics: [
       { key: "views", label: "Video Views", type: "sum", color: "#2563EB" },
@@ -303,6 +303,9 @@ const PERIODS = [
   { key: 30, label: "30 Hari", snaps: 4 },
 ] as const;
 
+// YouTube: field split Video/Shorts/Live untuk Penayangan (dipakai di layout khusus YT).
+const YT_SPLIT_KEYS = ["vt_video", "vt_shorts", "vt_live"] as const;
+
 const isSnapshotRow = (r: InsightRow) => Boolean(r.cells?.__store && r.cells?.__date);
 
 const num = (v: string | undefined): number => {
@@ -474,6 +477,29 @@ export default function MarketingSocialInsight({
     [sheet.rows, snapsCount, primaryDef]
   );
 
+  // ── YouTube: diturunkan dari split Video/Shorts/Live (bukan metrik total) ──
+  const ytViewRows = breakdownData.find((b) => b.key === "views_type")?.rows ?? [];
+  const ytViewsTotal = ytViewRows.reduce((s, r) => s + r.value, 0);
+  const ytTrend = useMemo(() => {
+    const last = snaps.slice(Math.max(0, snaps.length - 8));
+    return {
+      labels: last.map((r) => fmtDateShort(r.cells.__date ?? "")),
+      data: last.map((r) => YT_SPLIT_KEYS.reduce((s, k) => s + num(r.cells[k]), 0)),
+    };
+  }, [snaps]);
+  const ytStoreCompare = useMemo(
+    () =>
+      STORES.map((st) => {
+        const rows = (sheet.rows || [])
+          .filter(isSnapshotRow)
+          .filter((r) => r.cells.__store === st.key)
+          .sort((a, b) => ((a.cells.__date ?? "") < (b.cells.__date ?? "") ? -1 : 1));
+        const win = rows.slice(Math.max(0, rows.length - snapsCount));
+        return win.reduce((s, r) => s + YT_SPLIT_KEYS.reduce((a, k) => a + num(r.cells[k]), 0), 0);
+      }),
+    [sheet.rows, snapsCount]
+  );
+
   // ── Form Input ──
   const todayWib = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const [draftDate, setDraftDate] = useState(todayWib);
@@ -569,99 +595,134 @@ export default function MarketingSocialInsight({
 
       {/* ───────── DASHBOARD ───────── */}
       {view === "dashboard" && (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
-            {cards.map(({ m, cur, delta }) => {
-              const active = m.key === primaryDef.key;
-              return (
-                <button
-                  key={m.key}
-                  onClick={() => setPrimaryMetric(m.key)}
-                  title={`${m.label}: ${fmtFull(cur)} — klik untuk lihat tren`}
-                  className={`text-left bg-white rounded-2xl border px-3.5 py-3 shadow-sm transition-all ${active ? "border-violet-400 ring-2 ring-violet-500/20" : "border-gray-100 hover:border-gray-200"}`}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-[10px] font-semibold tracking-wide text-gray-500 uppercase truncate">{m.label}</span>
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
-                  </div>
-                  <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tabular-nums">{fmtCompact(cur)}</p>
-                  <div className="flex items-center gap-1 mt-1">
-                    <DeltaChip delta={delta} />
-                    <span className="text-[10px] text-gray-400">vs {period} hari sblm</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {!hasData ? (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-14 flex flex-col items-center text-center px-6">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 flex items-center justify-center mb-3 ring-1 ring-violet-100/60">
-                <BarChart3 className="w-6 h-6 text-violet-300" />
-              </div>
-              <p className="text-sm font-medium text-gray-700">Belum ada data untuk {storeLabel}</p>
-              <p className="text-xs text-gray-400 mt-1 max-w-[320px]">
-                Klik tombol <b>Input</b> untuk menyalin angka dari {config.label} ke sini.
-              </p>
-              <button
-                onClick={() => setView("input")}
-                className="mt-4 inline-flex items-center gap-1.5 h-10 px-4 rounded-full text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700"
-              >
-                <Plus className="w-4 h-4" /> Isi data
-              </button>
+        !hasData ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-14 flex flex-col items-center text-center px-6">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 flex items-center justify-center mb-3 ring-1 ring-violet-100/60">
+              <BarChart3 className="w-6 h-6 text-violet-300" />
             </div>
-          ) : (
-            <>
-              {/* Panel breakdown ala IG/TikTok */}
-              {breakdownData.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                  {breakdownData.map((bd) => (
-                    <BreakdownPanel key={bd.key} title={bd.title} mode={bd.mode} rows={bd.rows} />
+            <p className="text-sm font-medium text-gray-700">Belum ada data untuk {storeLabel}</p>
+            <p className="text-xs text-gray-400 mt-1 max-w-[320px]">
+              Klik tombol <b>Input</b> untuk menyalin angka dari {config.label} ke sini.
+            </p>
+            <button onClick={() => setView("input")} className="mt-4 inline-flex items-center gap-1.5 h-10 px-4 rounded-full text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700">
+              <Plus className="w-4 h-4" /> Isi data
+            </button>
+          </div>
+        ) : platform === "youtube" ? (
+          <>
+            {/* Penayangan — hero ala YouTube Studio */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 sm:px-5 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-bold text-gray-900">Penayangan</h3>
+                <p className="text-[11px] text-gray-400">{storeLabel} · periode {period} hari</p>
+              </div>
+              <div className="p-4 sm:p-5">
+                <div className="flex items-start gap-6 flex-wrap mb-4">
+                  {ytViewRows.map((r) => (
+                    <div key={r.label}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+                        <span className="text-lg sm:text-xl font-bold text-gray-900 tabular-nums">{fmtCompact(r.value)}</span>
+                        <span className="text-[11px] text-gray-400">({ytViewsTotal > 0 ? Math.round((r.value / ytViewsTotal) * 100) : 0}%)</span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 ml-3.5">{r.label}</p>
+                    </div>
                   ))}
                 </div>
-              )}
-
-              {/* Tren metrik utama */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-violet-500" />
-                  <h3 className="text-sm font-bold text-gray-900">Tren {primaryDef.label} · {storeLabel}</h3>
-                  <span className="ml-auto text-[11px] text-gray-400">per snapshot mingguan</span>
-                </div>
-                <div className="p-3 sm:p-4">
-                  <div className="max-w-3xl mx-auto">
-                    <LineTrendChart labels={trend.labels} data={trend.data} color={primaryDef.color} formatValue={fmtFull} />
-                  </div>
+                <div className="max-w-5xl">
+                  <LineTrendChart labels={ytTrend.labels} data={ytTrend.data} color="#DC2626" formatValue={fmtFull} />
                 </div>
               </div>
+            </div>
 
-              {/* Perbandingan antar toko */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-violet-500" />
-                  <h3 className="text-sm font-bold text-gray-900">Perbandingan Antar Toko · {primaryDef.label}</h3>
-                  <span className="ml-auto text-[11px] text-gray-400">periode {period} hari</span>
-                </div>
-                <div className="p-3 sm:p-4">
-                  <div className="max-w-3xl mx-auto">
-                    <BarRankingChart
-                      labels={STORES.map((s) => s.label)}
-                      series={[
-                        {
-                          key: primaryDef.key,
-                          label: primaryDef.label,
-                          color: primaryDef.color,
-                          data: storeCompare,
-                          formatValue: fmtFull,
-                        },
-                      ]}
-                    />
-                  </div>
+            {/* Penonton Baru / Rutin / Subscriber — kartu ala YouTube */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              {breakdownData.filter((b) => b.key !== "views_type").map((bd) => (
+                <BreakdownPanel key={bd.key} title={bd.title.replace(" · Jenis Konten", "")} mode={bd.mode} rows={bd.rows} />
+              ))}
+            </div>
+
+            {/* Perbandingan antar toko (Penayangan) */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-violet-500" />
+                <h3 className="text-sm font-bold text-gray-900">Perbandingan Antar Toko · Penayangan</h3>
+                <span className="ml-auto text-[11px] text-gray-400">periode {period} hari</span>
+              </div>
+              <div className="p-3 sm:p-4">
+                <div className="max-w-3xl mx-auto">
+                  <BarRankingChart
+                    labels={STORES.map((s) => s.label)}
+                    series={[{ key: "yt_views", label: "Penayangan", color: "#DC2626", data: ytStoreCompare, formatValue: fmtFull }]}
+                  />
                 </div>
               </div>
-            </>
-          )}
-        </>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
+              {cards.map(({ m, cur, delta }) => {
+                const active = m.key === primaryDef.key;
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => setPrimaryMetric(m.key)}
+                    title={`${m.label}: ${fmtFull(cur)} — klik untuk lihat tren`}
+                    className={`text-left bg-white rounded-2xl border px-3.5 py-3 shadow-sm transition-all ${active ? "border-violet-400 ring-2 ring-violet-500/20" : "border-gray-100 hover:border-gray-200"}`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[10px] font-semibold tracking-wide text-gray-500 uppercase truncate">{m.label}</span>
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                    </div>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tabular-nums">{fmtCompact(cur)}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <DeltaChip delta={delta} />
+                      <span className="text-[10px] text-gray-400">vs {period} hari sblm</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {breakdownData.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {breakdownData.map((bd) => (
+                  <BreakdownPanel key={bd.key} title={bd.title} mode={bd.mode} rows={bd.rows} />
+                ))}
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-violet-500" />
+                <h3 className="text-sm font-bold text-gray-900">Tren {primaryDef.label} · {storeLabel}</h3>
+                <span className="ml-auto text-[11px] text-gray-400">per snapshot mingguan</span>
+              </div>
+              <div className="p-3 sm:p-4">
+                <div className="max-w-3xl mx-auto">
+                  <LineTrendChart labels={trend.labels} data={trend.data} color={primaryDef.color} formatValue={fmtFull} />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-violet-500" />
+                <h3 className="text-sm font-bold text-gray-900">Perbandingan Antar Toko · {primaryDef.label}</h3>
+                <span className="ml-auto text-[11px] text-gray-400">periode {period} hari</span>
+              </div>
+              <div className="p-3 sm:p-4">
+                <div className="max-w-3xl mx-auto">
+                  <BarRankingChart
+                    labels={STORES.map((s) => s.label)}
+                    series={[{ key: primaryDef.key, label: primaryDef.label, color: primaryDef.color, data: storeCompare, formatValue: fmtFull }]}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
+        )
       )}
 
       {/* ───────── INPUT ───────── */}
@@ -687,27 +748,29 @@ export default function MarketingSocialInsight({
               </label>
             </div>
 
-            {/* Metrik utama */}
-            <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Metrik Utama</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {metrics.map((m) => (
-                  <label key={m.key} className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-gray-500 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: m.color }} />
-                      {m.label}
-                    </span>
-                    <input
-                                        inputMode="decimal"
-                      value={draft[m.key] ?? ""}
-                      onChange={(e) => setDraft((d) => ({ ...d, [m.key]: onlyNumeric(e.target.value) }))}
-                      placeholder="0"
-                      className="h-10 px-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-800 tabular-nums outline-none focus:border-violet-400 focus:bg-white"
-                    />
-                  </label>
-                ))}
+            {/* Metrik utama — YouTube diisi lewat breakdown Jenis Konten, jadi disembunyikan */}
+            {platform !== "youtube" && (
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Metrik Utama</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {metrics.map((m) => (
+                    <label key={m.key} className="flex flex-col gap-1">
+                      <span className="text-[11px] font-semibold text-gray-500 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: m.color }} />
+                        {m.label}
+                      </span>
+                      <input
+                        inputMode="decimal"
+                        value={draft[m.key] ?? ""}
+                        onChange={(e) => setDraft((d) => ({ ...d, [m.key]: onlyNumeric(e.target.value) }))}
+                        placeholder="0"
+                        className="h-10 px-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-800 tabular-nums outline-none focus:border-violet-400 focus:bg-white"
+                      />
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Breakdown */}
             {config.breakdowns.map((bd) => (
@@ -723,7 +786,7 @@ export default function MarketingSocialInsight({
                         {f.label}
                       </span>
                       <input
-                                               inputMode="decimal"
+                        inputMode="decimal"
                         value={draft[f.key] ?? ""}
                         onChange={(e) => setDraft((d) => ({ ...d, [f.key]: onlyNumeric(e.target.value) }))}
                         placeholder="0"
