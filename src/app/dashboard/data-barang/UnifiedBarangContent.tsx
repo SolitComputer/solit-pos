@@ -83,6 +83,7 @@ interface UnifiedRow {
     // setelah fetch /api/item-loans/active-units — penanda saja, bukan stok.
     pinjam_done: number;
     unit_id?: string; unit_count: number;
+
     is_pedagang_listed?: boolean; // laptop: true kalau ADA unit aktif yang masuk Pricelist Pedagang
     branch: "UTAMA" | "JOGJA" | "CAMPURAN" | null; // ⬅️ BARU: ringkasan cabang dari unit aktif
     raw: LaptopRaw | AccessoryRaw;
@@ -216,6 +217,8 @@ function BranchBadge({ branch }: { branch: "UTAMA" | "JOGJA" | "CAMPURAN" | null
     return <span className="text-[10px] text-gray-300 font-medium">—</span>;
 }
 
+
+
 function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const units = l.laptop_units ?? [];
     // Unit "keluar" dari stok memakai OUT_STATUSES (lihat atas) supaya
@@ -223,7 +226,8 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     // RETURNED, status RESERVED/HELD/PACKING/PENDING (sedang transaksi berjalan,
     // barang fisik sudah tidak available) juga di-exclude dari stok.
     // msj_group_id terisi = unit sudah masuk Kelompok MSJ → disembunyikan.
-    const aktif = units.filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+    const aktif = units.filter(u => !OUT_STATUSES.has(u.status));
+
     const siapJual = aktif.filter(u => u.status === "SIAP_JUAL").length;
     // "MINUS_SIAP_JUAL" = unit minus TAPI sudah boleh dijual (bisa dibikin
     // payment). Dihitung terpisah dari minus biasa (SERVICE/BELUM_SIAP) yang
@@ -272,7 +276,8 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     // dengan Kelola Unit & export per-SN — termasuk status RESERVED/HELD/
     // PACKING/PENDING (sedang transaksi berjalan, fisik sudah tidak available).
     // msj_group_id terisi = sudah masuk Kelompok MSJ → disembunyikan.
-    const aktif = units.filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+    const aktif = units.filter(u => !OUT_STATUSES.has(u.status));
+
     const one = aktif.length === 1 ? aktif[0] : null;
     // Progress SO & Audit per-unit aksesoris (audit kolomnya sudah ada — R3 selesai).
     const soDoneAcc = aktif.filter(u => isUnitSoActive(u.so_at)).length;
@@ -1165,9 +1170,9 @@ export default function UnifiedBarangContent() {
             // X/Y pinjam konsisten dengan angka stok yang ditampilkan di tabel.
             const rawUnits = r.tipe === "LAPTOP"
                 ? ((r.raw as LaptopRaw).laptop_units ?? [])
-                    .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id)
+                    .filter(u => !OUT_STATUSES.has(u.status))
                 : ((r.raw as AccessoryRaw).accessory_units ?? [])
-                    .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+                    .filter(u => !OUT_STATUSES.has(u.status));
             const pinjamDone = rawUnits.filter(u => borrowedUnitIds.has(u.id)).length;
             return pinjamDone === r.pinjam_done ? r : { ...r, pinjam_done: pinjamDone };
         });
@@ -1310,7 +1315,7 @@ export default function UnifiedBarangContent() {
                     // konsisten dengan Total Modal — unit RESERVED/HELD/PACKING/PENDING
                     // sudah tidak dihitung stok, jadi modalnya juga tidak dihitung.
                     const aktif = ((row.raw as LaptopRaw).laptop_units ?? [])
-                        .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+                        .filter(u => !OUT_STATUSES.has(u.status));
                     const totalModal = aktif.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
                     exportRows.push({
                         No: no++, Tipe: "LAPTOP", "Nama Barang": row.nama,
@@ -1327,7 +1332,7 @@ export default function UnifiedBarangContent() {
                     // Basis sama dengan normalizer — unit RESERVED/HELD/PACKING/PENDING
                     // tidak dihitung stok, jadi modalnya juga tidak masuk Total Modal.
                     const accAktif = (acc.accessory_units ?? [])
-                        .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+                        .filter(u => !OUT_STATUSES.has(u.status));
                     // Punya unit ber-SN → jumlahkan modal tiap unit. Belum pakai SN →
                     // buy_price model × stok manual.
                     const totalModal = accAktif.length > 0
@@ -1371,7 +1376,7 @@ export default function UnifiedBarangContent() {
                     // Hanya unit yang masih stok — buang semua yang sudah keluar
                     // (Terjual/Reserved/Held/Packing/Keluar). Barang keluar ≠ payment.
                     const units = ((row.raw as LaptopRaw).laptop_units ?? [])
-                        .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+                        .filter(u => !OUT_STATUSES.has(u.status));
 
                     if (units.length === 0) {
                         exportRows.push({
@@ -1404,7 +1409,7 @@ export default function UnifiedBarangContent() {
                 } else {
                     const acc = row.raw as AccessoryRaw;
                     const accUnits = (acc.accessory_units ?? [])
-                        .filter(u => !OUT_STATUSES.has(u.status) && !u.msj_group_id);
+                        .filter(u => !OUT_STATUSES.has(u.status));
 
                     if (accUnits.length === 0) {
                         // Aksesoris lama tanpa SN (stok manual) → tetap 1 baris ringkas.
@@ -1601,7 +1606,7 @@ export default function UnifiedBarangContent() {
         }
     };
 
-        // ── Reset SO MANUAL — paksa semua "Sudah SO" jadi "SO Ulang".
+    // ── Reset SO MANUAL — paksa semua "Sudah SO" jadi "SO Ulang".
     //    Master data (nama/harga/stok) & riwayat SO TIDAK terhapus.
     //    so_at di-set ke sentinel (2000-01-01), BUKAN NULL — supaya
     //    badge jadi "SO Ulang" kuning, bukan "SO" merah.
@@ -2512,7 +2517,9 @@ export default function UnifiedBarangContent() {
                                                                 </td>
                                                                 <td className="px-3 py-3 text-xs text-zinc-500">{row.sumber || <Dash />}</td>
                                                                 <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : <Dash />}</td>
-                                                                <td className="px-3 py-3 text-xs text-zinc-500">{row.sn || (row.sn_note ? <span className="text-zinc-400">{row.sn_note}</span> : <Dash />)}</td>
+                                                                <td className="px-3 py-3 text-xs text-zinc-500">
+                                                                    {row.sn || (row.sn_note ? <span className="text-zinc-400">{row.sn_note}</span> : <Dash />)}
+                                                                </td>
                                                                 <td className="px-3 py-3 text-xs text-center tabular-nums">
                                                                     <span className={(row.stok_tersedia ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok_tersedia ?? <Dash />}</span>
                                                                 </td>

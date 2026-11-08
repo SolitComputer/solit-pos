@@ -35,6 +35,29 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
+        // ⬅️ BARU: cegah arsip kalau masih ada unit yang terkunci di Kelompok MSJ.
+    //  Tanpa ini, unit yang masih hidup di kelompok ikut "terjebak" di barang
+    //  terarsip — hilang dari Data Barang & tak bisa dicari via SN (bug 0005579).
+    if (archived) {
+      const { data: lockedUnits } = await supabase
+        .from("laptop_units")
+        .select("serial_number")
+        .eq("laptop_id", id)
+        .not("msj_group_id", "is", null)
+        .not("status", "in", "(SOLD,TERJUAL,KELUAR,RETURNED,RESERVED,HELD,PACKING,PENDING)");
+
+      if (lockedUnits && lockedUnits.length > 0) {
+        const sns = lockedUnits.map((u) => u.serial_number).join(", ");
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Tidak bisa mengarsipkan: masih ada ${lockedUnits.length} unit terkunci di Kelompok MSJ (SN: ${sns}). Lepaskan dari halaman Minus Siap Jual dulu sebelum mengarsipkan barang ini.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const payload = archived
       ? { archived_at: new Date().toISOString(), archived_by: user.name, archive_reason: "MANUAL" }
       : { archived_at: null, archived_by: null, archive_reason: null };

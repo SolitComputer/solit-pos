@@ -101,7 +101,7 @@ interface Props {
     showSparepart?: boolean;
     /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
     showTotalJual?: boolean;
-       /** Tampilkan kolom Kelengkapan unit (opt-in — halaman Units) */
+    /** Tampilkan kolom Kelengkapan unit (opt-in — halaman Units) */
     showKelengkapan?: boolean;
     /** Tampilkan kolom Cabang (opt-in — Kelola Unit & Barang Siap Jual) */
     showBranch?: boolean;
@@ -283,11 +283,11 @@ export default function InventoryTable({
                         {showTotalJual && canSeeStock && <Th right sortKey="TOTAL_JUAL" activeSort={sortBy} onSort={onSort}>Total Jual</Th>}
                         {canSeePrivate && <Th sortKey="SUMBER" activeSort={sortBy} onSort={onSort}>Sumber</Th>}
                         {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>{dateColumnLabel ?? "Tanggal Masuk"}</Th>}
-                                             <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
+                        <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
                         {showBranch && <Th center>Cabang</Th>}
                         {showKelengkapan && <Th>Kelengkapan</Th>}
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
-                                                <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
+                        <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {showMinusSiapJual && <Th center sortKey="MSJ" activeSort={sortBy} onSort={onSort} title="Minus Siap Jual">MSJ</Th>}
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
                         {renderSo && <Th center sortKey="SO" activeSort={sortBy} onSort={onSort}>SO</Th>}
@@ -443,7 +443,7 @@ export default function InventoryTable({
                                 </td>
                             )}
 
-                                                       <td className="px-3 py-3.5 whitespace-nowrap">
+                            <td className="px-3 py-3.5 whitespace-nowrap">
                                 {row.sn ? (
                                     <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{row.sn}</code>
                                 ) : row.sn_note ? <Note>{row.sn_note}</Note> : <Dash />}
