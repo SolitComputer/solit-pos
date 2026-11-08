@@ -15,10 +15,31 @@ interface ArchivedRow {
     kategori: string | null;
     brand: string | null;
     harga_jual: number;
+    sn: string | null;
     archived_at: string;
     archived_by: string | null;
     archive_reason: string | null;
 }
+
+// Ekstrak SN dari berbagai kemungkinan bentuk data (flat field atau nested units[]).
+// Dipakai untuk Laptop & Aksesoris karena nama kolom di API bisa beda-beda.
+const extractSN = (obj: any): string | null => {
+    if (!obj) return null;
+    // 1) Field datar yang paling umum
+    const direct =
+        obj.serial_number ?? obj.sn ?? obj.serial ??
+        obj.sn_laptop ?? obj.imei ?? obj.serial_no;
+    if (direct) return String(direct);
+    // 2) Nested units[] (fitur Kelola Unit Laptop/Aksesoris)
+    const units = obj.units ?? obj.laptop_units ?? obj.accessory_units ?? obj.sn_list;
+    if (Array.isArray(units) && units.length > 0) {
+        const sns = units
+            .map((u: any) => (typeof u === "string" ? u : u?.serial_number ?? u?.sn ?? u?.serial))
+            .filter(Boolean);
+        if (sns.length > 0) return sns.join(", ");
+    }
+    return null;
+};
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 const formatDate = (iso: string) =>
@@ -74,6 +95,7 @@ export default function ArsipContent() {
                     id: l.id, tipe: "LAPTOP" as const, nama: l.laptop_name,
                     kategori: l.category_name ?? null, brand: l.brand || null,
                     harga_jual: l.selling_price || 0,
+                    sn: extractSN(l),
                     archived_at: l.archived_at, archived_by: l.archived_by ?? null,
                     archive_reason: l.archive_reason ?? null,
                 }));
@@ -84,6 +106,7 @@ export default function ArsipContent() {
                     id: a.id, tipe: "AKSESORIS" as const, nama: a.name,
                     kategori: a.category ?? null, brand: a.brand || null,
                     harga_jual: a.sell_price || 0,
+                    sn: extractSN(a),
                     archived_at: a.archived_at, archived_by: a.archived_by ?? null,
                     archive_reason: a.archive_reason ?? null,
                 }));
@@ -121,14 +144,14 @@ export default function ArsipContent() {
             setRestoringId(null);
         }
     };
-
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return rows;
         return rows.filter(r =>
             r.nama.toLowerCase().includes(q) ||
             (r.brand || "").toLowerCase().includes(q) ||
-            (r.kategori || "").toLowerCase().includes(q)
+            (r.kategori || "").toLowerCase().includes(q) ||
+            (r.sn || "").toLowerCase().includes(q)
         );
     }, [rows, search]);
 
@@ -160,7 +183,7 @@ export default function ArsipContent() {
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Cari nama, brand, kategori..."
+                        placeholder="Cari nama, brand, kategori, atau SN..."
                         className="w-full pl-8 pr-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400"
                     />
                 </div>
@@ -193,6 +216,7 @@ export default function ArsipContent() {
                                     <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Nama Barang</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Kategori</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Merk</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">SN</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-right font-semibold px-4 py-3">Harga Jual</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-center font-semibold px-4 py-3">Alasan</th>
                                     <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Diarsipkan</th>
@@ -213,6 +237,9 @@ export default function ArsipContent() {
                                         </td>
                                         <td className="px-4 py-3 text-gray-600">{row.kategori || <span className="text-gray-300">—</span>}</td>
                                         <td className="px-4 py-3 text-gray-600">{row.brand || <span className="text-gray-300">—</span>}</td>
+                                        <td className="px-4 py-3 text-gray-700 font-mono text-[12px] tabular-nums whitespace-nowrap">
+                                            {row.sn || <span className="text-gray-300 font-sans">—</span>}
+                                        </td>
                                         <td className="px-4 py-3 text-right tabular-nums text-gray-800 font-medium">{fmt(row.harga_jual)}</td>
                                         <td className="px-4 py-3 text-center"><ReasonBadge reason={row.archive_reason} /></td>
                                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap tabular-nums">
