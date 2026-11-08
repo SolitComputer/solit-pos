@@ -122,63 +122,87 @@ export async function reconcileClosedLoans(supabase: SupabaseClient): Promise<nu
   // 1) Pinjaman aktif (APPROVED) yang unitnya sudah keluar.
   const { data: loans } = await supabase
     .from("item_loans")
-    .select("id, unit_id, item_type")
+    .select("id, unit_id, serial_number, item_type")
     .eq("status", "APPROVED")
     .not("unit_id", "is", null);
   if (!loans || loans.length === 0) return closed;
 
   const unitIds = Array.from(new Set(loans.map(l => l.unit_id).filter(Boolean))) as string[];
+  const serials = Array.from(new Set(loans.map(l => l.serial_number).filter(Boolean))) as string[];
   if (unitIds.length === 0) return closed;
 
-  const [accRes, lapRes, outRes] = await Promise.all([
+  const [accRes, lapRes, outRes, txiUnitRes, txiSnRes] = await Promise.all([
     supabase.from("accessory_units").select("id, status").in("id", unitIds),
     supabase.from("laptop_units").select("id, status").in("id", unitIds),
     supabase.from("accessory_outflows")
-      .select("unit_id, source_type, transaction_invoice")
-      .eq("status", "active").in("unit_id", unitIds),
+      .select("unit_id, source_type").eq("status", "active").in("unit_id", unitIds),
+    // ✅ NEW: laptop terjual lewat transaksi → transaction_items.unit_id
+    supabase.from("transaction_items").select("unit_id, invoice_number").in("unit_id", unitIds),
+    // ✅ NEW: aksesoris terjual lewat transaksi → transaction_items.serial_number.
+    //    (unit_id di transaction_items SELALU null untuk aksesoris — lihat
+    //    transaction/create — makanya outflow-nya pun ber-unit_id null & tak
+    //    pernah kecocok. SN inilah jembatan yang andal.)
+    serials.length > 0
+      ? supabase.from("transaction_items").select("serial_number, invoice_number").in("serial_number", serials)
+      : Promise.resolve({ data: [] as any[] }),
   ]);
 
   const accStatus = new Map((accRes.data ?? []).map(u => [u.id, u.status]));
   const lapStatus = new Map((lapRes.data ?? []).map(u => [u.id, u.status]));
   const outflows = outRes.data ?? [];
+  const txiByUnit = txiUnitRes.data ?? [];
+  const txiBySn = (txiSnRes as any).data ?? [];
 
-  const invoices = Array.from(new Set(
-    outflows.filter(o => o.source_type === "transaction" && o.transaction_invoice)
-            .map(o => o.transaction_invoice as string),
-  ));
+  // Ambil status tiap transaksi yang menyentuh pinjaman ini.
+  const invoiceSet = new Set<string>();
+  for (const ti of txiByUnit) if (ti.invoice_number) invoiceSet.add(ti.invoice_number);
+  for (const ti of txiBySn) if (ti.invoice_number) invoiceSet.add(ti.invoice_number);
+
   const txStatus = new Map<string, string>();
-  if (invoices.length > 0) {
+  if (invoiceSet.size > 0) {
     const { data: txs } = await supabase
-      .from("transactions").select("invoice_number, status").in("invoice_number", invoices);
+      .from("transactions").select("invoice_number, status").in("invoice_number", [...invoiceSet]);
     for (const t of txs ?? []) txStatus.set(t.invoice_number, t.status);
   }
+  // Pending pun dihitung "terjual"; hanya transaksi CANCELLED yang TIDAK menutup.
+  const soldInvoice = (inv?: string | null) =>
+    inv && txStatus.get(inv) !== "CANCELLED" ? inv : null;
 
-  // Transaksi PENDING sekarang DIHITUNG "keluar" (pinjaman → Terjual). Hanya
-  // transaksi CANCELLED yang TIDAK menutup pinjaman.
-  const NOT_FINAL = new Set(["CANCELLED"]);
+  const soldByUnit = new Map<string, string>();
+  for (const ti of txiByUnit) { const inv = soldInvoice(ti.invoice_number); if (ti.unit_id && inv) soldByUnit.set(ti.unit_id, inv); }
+  const soldBySn = new Map<string, string>();
+  for (const ti of txiBySn) { const inv = soldInvoice(ti.invoice_number); if (ti.serial_number && ti.serial_number !== "-" && inv) soldBySn.set(ti.serial_number, inv); }
 
-  const goneByOutflow = new Map<string, string>(); // unit_id -> ref sold_invoice
+  // Outflow service / pengambilan manual tetap jadi sinyal keluar (aksesoris).
+  const goneByOutflow = new Map<string, string>();
   for (const o of outflows) {
     if (!o.unit_id) continue;
     if (o.source_type === "service") goneByOutflow.set(o.unit_id, "SERVICE");
     else if (o.source_type === "manual") goneByOutflow.set(o.unit_id, "PENGAMBILAN");
-    else if (o.source_type === "transaction" && o.transaction_invoice) {
-      const st = txStatus.get(o.transaction_invoice);
-      if (!st || !NOT_FINAL.has(st)) goneByOutflow.set(o.unit_id, o.transaction_invoice);
-    }
   }
 
   const idsByRef = new Map<string, string[]>();
   for (const l of loans) {
     const uid = l.unit_id as string;
+    const sn = (l.serial_number as string | null) ?? null;
     let ref: string | null = null;
-    if (l.item_type === "AKSESORIS") {
-      const st = accStatus.get(uid);
-      if (st === "TERJUAL" || st === "KELUAR") ref = "BACKFILL";
-      else ref = goneByOutflow.get(uid) ?? null;
-    } else if (l.item_type === "LAPTOP") {
-      if (lapStatus.get(uid) === "SOLD") ref = "BACKFILL";
+
+    // 1) Terjual lewat transaksi (langsung, pending/penyiapan, maupun pelunasan
+    //    confirm-payment) — laptop via unit_id, aksesoris via serial_number.
+    if (soldByUnit.has(uid)) ref = soldByUnit.get(uid)!;
+    else if (sn && soldBySn.has(sn)) ref = soldBySn.get(sn)!;
+
+    // 2) Fallback: status unit + outflow service/manual.
+    if (!ref) {
+      if (l.item_type === "AKSESORIS") {
+        const st = accStatus.get(uid);
+        if (st === "TERJUAL" || st === "KELUAR") ref = "BACKFILL";
+        else ref = goneByOutflow.get(uid) ?? null;
+      } else if (l.item_type === "LAPTOP") {
+        if (lapStatus.get(uid) === "SOLD") ref = "BACKFILL";
+      }
     }
+
     if (ref) {
       const arr = idsByRef.get(ref);
       if (arr) arr.push(l.id); else idsByRef.set(ref, [l.id]);
