@@ -65,6 +65,21 @@ const SECTIONS: Section[] = [
     { k: "omzet", label: "Omzet", type: "num", rp: true },
     { k: "roas", label: "ROAS", type: "text" },
   ]},
+  { key: "tiktok_ads", label: "TikTok Ads", hasNo: true, spendKey: "budget", cols: [
+    { k: "akun", label: "Akun TikTok", type: "text", min: 140 },
+    { k: "barang", label: "Barang Diiklankan", type: "text", min: 180 },
+    { k: "budget", label: "Budget", type: "num", rp: true },
+    { k: "durasi", label: "Durasi", type: "text" },
+    { k: "tayangan", label: "Tayangan", type: "num" },
+    { k: "klik", label: "Klik", type: "num" },
+    { k: "ctr", label: "CTR", type: "text" },
+    { k: "chat", label: "Chat / Leads", type: "num" },
+    { k: "cpl", label: "CPL", type: "num", rp: true },
+    { k: "closing", label: "Closing", type: "num" },
+    { k: "omzet", label: "Omzet", type: "num", rp: true },
+    { k: "roas", label: "ROAS", type: "text" },
+    { k: "catatan", label: "Catatan", type: "text", min: 200 },
+  ]},
 ];
 
 interface AdsRow { id: string; sort_order: number; report_date: string; data: Record<string, string> }
