@@ -2463,7 +2463,7 @@ function AttendanceSummaryDetailModal({ detail, onClose }: {
                                         )}
                                     </div>
                                 </div>
-                                                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
                                     {item.isHalfDay && (
                                         <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-rose-100 text-rose-700 border-rose-200">
                                             ½ Hari
@@ -4204,7 +4204,7 @@ export default function AttendanceDashboardPage() {
     const [attendanceSummaryDetail, setAttendanceSummaryDetail] = useState<AttendanceSummaryDetail | null>(null);
     const [leaveDetail, setLeaveDetail] = useState<{ name: string; dates: string[] } | null>(null);
     const [holidayWorkDetail, setHolidayWorkDetail] = useState<{ name: string; dates: string[] } | null>(null);
-       const [pendingDetail, setPendingDetail] = useState<{ name: string; dates: string[] } | null>(null); // ✅ NEW
+    const [pendingDetail, setPendingDetail] = useState<{ name: string; dates: string[] } | null>(null); // ✅ NEW
     const [halfDayDetail, setHalfDayDetail] = useState<{ name: string; dates: string[] } | null>(null); // ✅ NEW — setengah hari
     const [absentPopupMode, setAbsentPopupMode] = useState<"karyawan" | "pkl" | null>(null);
     const [pklFilterMode, setPklFilterMode] = useState(false);
@@ -5191,7 +5191,13 @@ export default function AttendanceDashboardPage() {
                     let isHalfDay = false;
                     if (checkoutIsoForDay) {
                         const effDay = effectiveShiftFor(resolvedUserIdForDay, dk);
-                        const checkoutMinActual = preciseMinutesOfDayWIB(checkoutIsoForDay);
+                        let checkoutMinActual = preciseMinutesOfDayWIB(checkoutIsoForDay);
+                        // ✅ FIX: pergantian hari absensi jam 04:00 WIB — pulang jam
+                        // 00:00–03:59 WIB itu lanjutan shift kemarin (lembur sampai
+                        // dini hari), BUKAN pulang kecepetan. Tambah 24 jam biar
+                        // selisihnya jadi negatif (lembur), bukan malah dicap ½ hari.
+                        // Sama persis dengan koreksi di computeAfterOutOvertimeMinutes.
+                        if (checkoutMinActual < 4 * 60) checkoutMinActual += 24 * 60;
                         // pulang lebih awal dari jadwal (eff.checkout) lebih dari ambang
                         if (effDay.checkout - checkoutMinActual > HALF_DAY_EARLY_LEAVE_MINUTES) {
                             isHalfDay = true;
@@ -5984,7 +5990,10 @@ export default function AttendanceDashboardPage() {
                 const coIso = checkoutTimes[`${userId}_${dk}`];
                 if (coIso) {
                     const effDay = effectiveShiftFor(userId, dk);
-                    const coMin = preciseMinutesOfDayWIB(coIso);
+                    let coMin = preciseMinutesOfDayWIB(coIso);
+                    // ✅ FIX: pulang jam 00:00–03:59 WIB = lanjutan shift kemarin
+                    // (lembur dini hari), bukan pulang kecepetan — tambah 24 jam.
+                    if (coMin < 4 * 60) coMin += 24 * 60;
                     if (effDay.checkout - coMin > HALF_DAY_EARLY_LEAVE_MINUTES) isHalfDay = true;
                 }
                 items.push({ date: dk, type: dayStatus, checkInTime, method, manualCreatedBy, isHalfDay });
@@ -5997,7 +6006,7 @@ export default function AttendanceDashboardPage() {
             items,
             monthLabel: `${MONTH_NAMES[calMonth]} ${calYear}`,
         };
-       }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser, checkoutTimes, effectiveShiftFor]);
+    }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser, checkoutTimes, effectiveShiftFor]);
 
     const lastRefreshRef = useRef<number>(Date.now());
 
@@ -6886,7 +6895,7 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Pending</th>
-                                                                                       <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Cuti</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Cuti</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">½ Hari</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Lembur Libur</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
@@ -6988,7 +6997,7 @@ export default function AttendanceDashboardPage() {
                                                             <span className="text-gray-200 text-sm font-black">—</span>
                                                         )}
                                                     </td>
-                                                                                                     <td className="px-4 py-4 text-center">
+                                                    <td className="px-4 py-4 text-center">
                                                         {u.leave > 0 ? (
                                                             <button
                                                                 onClick={() => setLeaveDetail({ name: u.name, dates: u.leaveDates })}
@@ -7143,7 +7152,7 @@ export default function AttendanceDashboardPage() {
                         )}
 
                         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
-                                                      {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-rose-400", "Setengah Hari = 0.5 poin (pulang >3 jam lebih awal)"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"], ["bg-orange-400", "Pending Absensi = 0 poin sementara (belum absen pulang)"], ["bg-purple-400", "Lembur Libur = 0 poin (dibayar lembur, bukan kehadiran)"]].map(([c, l]) => (
+                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-rose-400", "Setengah Hari = 0.5 poin (pulang >3 jam lebih awal)"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"], ["bg-orange-400", "Pending Absensi = 0 poin sementara (belum absen pulang)"], ["bg-purple-400", "Lembur Libur = 0 poin (dibayar lembur, bukan kehadiran)"]].map(([c, l]) => (
                                 <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
                             ))}
                             <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
@@ -8771,7 +8780,7 @@ export default function AttendanceDashboardPage() {
                 />
             )}
 
-                     {pendingDetail && (
+            {pendingDetail && (
                 <PendingAttendanceDetailModal
                     name={pendingDetail.name}
                     dates={pendingDetail.dates}
