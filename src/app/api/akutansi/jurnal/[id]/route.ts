@@ -48,10 +48,11 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
   if (!id) return NextResponse.json({ success: false, message: "ID tidak valid" }, { status: 400 });
 
   const body = await req.json();
-  const { tanggal, keterangan, ref, lines } = body as {
+  const { tanggal, keterangan, ref, is_closing, lines } = body as {
     tanggal: string;
     keterangan: string;
     ref?: string | null;
+    is_closing?: boolean;
     lines: DraftLine[];
   };
 
@@ -95,6 +96,9 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
       ref: ref?.trim() || null,
       total: totalOf(merged),
       is_edited: true,
+      // Pertahankan/ubah flag jurnal penutup saat edit. Kalau field tidak dikirim
+      // (undefined), biarkan nilai lama di DB apa adanya — tidak di-reset.
+      ...(is_closing === undefined ? {} : { is_closing: is_closing === true }),
       updated_by: user.id,
       updated_at: new Date().toISOString(),
     })

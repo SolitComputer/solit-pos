@@ -110,8 +110,9 @@ export async function GET(request: Request) {
       face_distance: item.face_distance,
       created_at: item.created_at,
       late_weight: item.late_weight != null ? Number(item.late_weight) : null,
-      direction: item.direction ?? "IN", // ✅ NEW — biar frontend bisa pisahin IN vs OUT
+       direction: item.direction ?? "IN", // ✅ NEW — biar frontend bisa pisahin IN vs OUT
       shift_snapshot: item.shift_snapshot ?? null, // ✅ NEW — shift yg dikunci saat absen (null utk record lama)
+      schedule_checkout_minute: item.schedule_checkout_minute ?? null, // ✅ NEW — jam pulang jadwal (menit) dikunci saat absen; dipakai deteksi ½ hari
       branch: item.branch ?? "UTAMA", // ✅ NEW — penanda cabang absensi (UTAMA/JOGJA)
     }));
 

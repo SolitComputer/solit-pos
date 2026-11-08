@@ -43,6 +43,16 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href === "/dashboard/attendance") return pathname === "/dashboard/attendance";
   if (href === "/dashboard/profile") return pathname === "/dashboard/profile";
 
+  // ⚠️ FIX: /dashboard/cashflow vs /dashboard/cashflow-pribadi
+  // Tanpa special case, "/dashboard/cashflow-pribadi" akan match prefix
+  // "/dashboard/cashflow" → dua menu aktif bersamaan. Guard dengan separator "/".
+  if (href === "/dashboard/cashflow") {
+    return pathname === "/dashboard/cashflow" || pathname.startsWith("/dashboard/cashflow/");
+  }
+  if (href === "/dashboard/cashflow-pribadi") {
+    return pathname === "/dashboard/cashflow-pribadi" || pathname.startsWith("/dashboard/cashflow-pribadi/");
+  }
+
   if (href.startsWith("/dashboard/data-barang")) {
     return (
       pathname === "/dashboard/data-barang" ||

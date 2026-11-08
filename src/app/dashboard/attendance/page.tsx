@@ -4119,7 +4119,7 @@ export default function AttendanceDashboardPage() {
     // ✅ NEW — key sama (`${user_id}_${dateKey}`) → lokasi & metode absen PULANG (OUT).
     // Dipisah dari checkoutTimes karena checkoutTimes cuma simpan jam (string),
     // sedangkan ini butuh beberapa field. Dipakai di kolom "Lokasi Pulang" & "Metode Pulang".
-    const [checkoutMeta, setCheckoutMeta] = useState<Record<string, { latitude: number | null; longitude: number | null; method: string | null }>>({});
+      const [checkoutMeta, setCheckoutMeta] = useState<Record<string, { latitude: number | null; longitude: number | null; method: string | null; scheduleCheckoutMinute: number | null }>>({});
     const [afterOutOvertime, setAfterOutOvertime] = useState<Record<string, { minutes: number; status: string; auditStatus: string }>>({});
     // ✅ NEW — key: `${user_id}_${dateKey}`. Isi: lembur yang SUDAH otomatis
     // kedeteksi sistem dari absen OUT lewat jam pulang.
@@ -4275,12 +4275,12 @@ export default function AttendanceDashboardPage() {
         setAttendances(inRows.map((a) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" })));
 
         const co: Record<string, string> = {};
-        const coMeta: Record<string, { latitude: number | null; longitude: number | null; method: string | null }> = {};
+        const coMeta: Record<string, { latitude: number | null; longitude: number | null; method: string | null; scheduleCheckoutMinute: number | null }> = {};
         outRows.forEach(a => {
             const key = `${a.user_id}_${toWIBDateKey(a.check_in_time || a.created_at)}`;
             co[key] = a.check_in_time || a.created_at;
-            // ✅ NEW — simpan lokasi & metode absen pulang untuk kolom baru
-            coMeta[key] = { latitude: a.latitude, longitude: a.longitude, method: a.method };
+            // ✅ NEW — simpan lokasi, metode, & snapshot jam pulang jadwal dari record OUT
+            coMeta[key] = { latitude: a.latitude, longitude: a.longitude, method: a.method, scheduleCheckoutMinute: (a as any).schedule_checkout_minute ?? null };
         });
         setCheckoutTimes(co);
         setCheckoutMeta(coMeta);
@@ -4941,24 +4941,14 @@ export default function AttendanceDashboardPage() {
     // schedule_checkout_minute). Ini sumber kebenaran buat deteksi ½ hari:
     // kebal perubahan jadwal belakangan, dan akurat per-orang (bukan default
     // shift). Record lama (sebelum fitur) tidak punya nilai ini → null.
-    const snapshotCheckoutMinByUserDate = useMemo(() => {
-        const m: Record<string, number> = {};
-        attendances.forEach(a => {
-            if (!a.user_id) return;
-            if (typeof a.schedule_checkout_minute === "number") {
-                m[`${a.user_id}_${toWIBDateKey(a.check_in_time || a.created_at)}`] = a.schedule_checkout_minute;
-            }
-        });
-        return m;
-    }, [attendances]);
-
-    // Mengembalikan jam pulang jadwal (menit) HANYA kalau ada snapshot per-record.
-    // null = tidak ada snapshot (record lama) → caller memperlakukan sebagai
-    // BUKAN ½ hari (sesuai keputusan: record terlanjur jangan dicap ½ hari).
+    // ✅ FIX: snapshot jam pulang ADA di record OUT (checkoutMeta), BUKAN di
+    // record IN (attendances). Versi sebelumnya baca dari attendances → selalu
+    // null karna record IN memang tak punya snapshot checkout → ½ hari tak pernah
+    // kedeteksi. Sekarang baca langsung dari checkoutMeta.
     const scheduledCheckoutMinFor = useCallback((userId: string, dk: string): number | null => {
-        const v = snapshotCheckoutMinByUserDate[`${userId}_${dk}`];
-        return typeof v === "number" ? v : null;
-    }, [snapshotCheckoutMinByUserDate]);
+        const meta = checkoutMeta[`${userId}_${dk}`];
+        return typeof meta?.scheduleCheckoutMinute === "number" ? meta.scheduleCheckoutMinute : null;
+    }, [checkoutMeta]);
 
     // ✅ NEW — daftar tanggal LALU (sebelum hari ini) milik user yang sedang
     // login yang masih berpotensi lembur (masuk lebih awal / pulang lebih
@@ -5231,7 +5221,7 @@ export default function AttendanceDashboardPage() {
                         // selisihnya jadi negatif (lembur), bukan malah dicap ½ hari.
                         // Sama persis dengan koreksi di computeAfterOutOvertimeMinutes.
                         if (checkoutMinActual < 4 * 60) checkoutMinActual += 24 * 60;
-                                            // pulang lebih awal dari jadwal (snapshot) lebih dari ambang.
+                        // pulang lebih awal dari jadwal (snapshot) lebih dari ambang.
                         // scheduledCheckoutMin null (record lama) → lewati, bukan ½ hari.
                         if (scheduledCheckoutMin != null && scheduledCheckoutMin - checkoutMinActual > HALF_DAY_EARLY_LEAVE_MINUTES) {
                             isHalfDay = true;
@@ -6023,12 +6013,12 @@ export default function AttendanceDashboardPage() {
                 let isHalfDay = false;
                 const coIso = checkoutTimes[`${userId}_${dk}`];
                 if (coIso) {
-                                      const scheduledCheckoutMin = scheduledCheckoutMinFor(userId, dk);
+                    const scheduledCheckoutMin = scheduledCheckoutMinFor(userId, dk);
                     let coMin = preciseMinutesOfDayWIB(coIso);
                     // ✅ FIX: pulang jam 00:00–03:59 WIB = lanjutan shift kemarin
                     // (lembur dini hari), bukan pulang kecepetan — tambah 24 jam.
                     if (coMin < 4 * 60) coMin += 24 * 60;
-                                       if (scheduledCheckoutMin != null && scheduledCheckoutMin - coMin > HALF_DAY_EARLY_LEAVE_MINUTES) isHalfDay = true;
+                    if (scheduledCheckoutMin != null && scheduledCheckoutMin - coMin > HALF_DAY_EARLY_LEAVE_MINUTES) isHalfDay = true;
                 }
                 items.push({ date: dk, type: dayStatus, checkInTime, method, manualCreatedBy, isHalfDay });
             }
