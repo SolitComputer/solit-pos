@@ -5,7 +5,7 @@ import { hasAnyRole, SALES_REPORT_AUDIT_ROLES } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 const TABLE = "ads_report_rows";
-const SECTIONS = ["ringkasan", "fb_toko", "shopee", "fb_pribadi"];
+const SECTIONS = ["ringkasan", "fb_toko", "shopee", "fb_pribadi", "tiktok_ads"];
 
 function getRoles(user: AuthUser): string[] {
   const u = user as any;
