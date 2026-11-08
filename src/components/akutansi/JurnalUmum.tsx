@@ -341,7 +341,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     const [expandAll, setExpandAll] = useState(false); // buka/tutup SEMUA detail akun sekaligus
     const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
     const [showOnlyOutOfSync, setShowOnlyOutOfSync] = useState(false);
-        const [showSortSourceModal, setShowSortSourceModal] = useState(false);
+    const [showSortSourceModal, setShowSortSourceModal] = useState(false);
     const [showSyncAllModal, setShowSyncAllModal] = useState(false);
     const [syncAllBusy, setSyncAllBusy] = useState(false);
     const [undoState, setUndoState] = useState<{ previousEntries: JournalEntry[]; batches: { date: string; orderedIds: string[] }[] } | null>(null);
@@ -956,7 +956,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     const hasWarning = useCallback((e: JournalEntry) => Boolean(e.has_warning), []);
     const warningCount = useMemo(() => entries.filter(hasWarning).length, [entries, hasWarning]);
 
-       const isOutOfSync = useCallback((e: JournalEntry) => Boolean(e.sync_available), []);
+    const isOutOfSync = useCallback((e: JournalEntry) => Boolean(e.sync_available), []);
     const outOfSyncCount = useMemo(() => entries.filter(isOutOfSync).length, [entries, isOutOfSync]);
     const outOfSyncEntries = useMemo(() => entries.filter(isOutOfSync), [entries, isOutOfSync]);
 
@@ -1358,7 +1358,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                         </div>
                     </div>
 
-                                      <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                         <div className="flex items-center gap-1 border border-slate-200/80 bg-slate-100/80 rounded-xl p-1 shrink-0">
                             <button
                                 onClick={() => setShowOnlyWarnings((v) => !v)}
@@ -1441,7 +1441,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                 )}
                             </div>
                         </div>
-                                              {outOfSyncCount > 0 && (
+                        {outOfSyncCount > 0 && (
                             <button
                                 onClick={() => setShowSyncAllModal(true)}
                                 title="Lihat & sinkronkan semua entri yang nominal/keterangannya berubah di sumber"
@@ -1824,7 +1824,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                     busy={bulkBusy}
                 />
             )}
-                      {showSortSourceModal && (
+            {showSortSourceModal && (
                 <SortBySourceModal
                     period={period}
                     onClose={() => setShowSortSourceModal(false)}
@@ -2690,10 +2690,11 @@ function EntryFormModal({
         const today = jakartaDate(new Date().toISOString());
         return today.startsWith(period) ? today : `${period}-01`;
     });
-        const [keterangan, setKeterangan] = useState(entry?.keterangan ?? "");
+    const [keterangan, setKeterangan] = useState(entry?.keterangan ?? "");
     const [ref, setRef] = useState(entry?.ref ?? "");
     const [template, setTemplate] = useState("CUSTOM");
-    const [isClosing, setIsClosing] = useState(false); // ⬅️ BARU — tandai jurnal ini sebagai Jurnal Penutup
+       const [isClosing, setIsClosing] = useState<boolean>((entry as any)?.is_closing === true); // ⬅️ tandai jurnal penutup; saat edit ambil nilai dari entry
+    const [autoFilling, setAutoFilling] = useState(false); // ⬅️ BARU — proses tarik saldo jurnal penutup otomatis
 
     const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
     const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
@@ -2833,6 +2834,36 @@ function EntryFormModal({
     const kredit = sumSide(lines, "KREDIT");
     const balanced = isBalanced(lines);
 
+    // ⬅️ BARU — tarik saldo semua akun Pendapatan/Beban & rakit jurnal penutup otomatis.
+    const autoFillClosing = async () => {
+        if (autoFilling) return;
+        if (lines.some((l) => Number(l.nominal) > 0) && !confirm("Ganti semua baris saat ini dengan jurnal penutup otomatis?")) return;
+        setAutoFilling(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/akutansi/jurnal/closing-draft?period=${period}`);
+            const json = await res.json();
+            if (!json.success) { setError(json.message ?? "Gagal menghitung jurnal penutup"); return; }
+            const d = json.data;
+            const built: (DraftLine & { _id: string })[] = (d.nominal_lines ?? []).map((l: any) => ({
+                account_code: l.account_code, side: l.side, nominal: l.nominal, keterangan: "", _id: crypto.randomUUID(),
+            }));
+            if (d.laba_line) {
+                built.push({ account_code: d.laba_line.account_code, side: d.laba_line.side, nominal: d.laba_line.nominal, keterangan: "Laba bersih periode", _id: crypto.randomUUID() });
+            }
+            if (built.length < 2) { setError("Tidak ada saldo Pendapatan/Beban untuk ditutup di periode ini."); return; }
+            setLines(built);
+            setTanggal(d.tanggal);
+            setIsClosing(true);
+            if (!keterangan.trim()) setKeterangan(d.keterangan);
+            if (!d.laba_account_found) setError("Akun Laba belum ketemu — isi akun di baris terakhir (Laba) sebelum simpan.");
+        } catch {
+            setError("Koneksi bermasalah saat menghitung jurnal penutup");
+        } finally {
+            setAutoFilling(false);
+        }
+    };
+
     const submit = async () => {
         setError("");
         if (!keterangan.trim()) return setError("Keterangan wajib diisi");
@@ -2844,12 +2875,12 @@ function EntryFormModal({
             const res = await fetch(url, {
                 method: isEdit ? "PUT" : "POST",
                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
+                body: JSON.stringify({
                     tanggal,
                     keterangan: keterangan.trim(),
                     ref: ref.trim() || null,
                     source_category: isEdit ? undefined : template,
-                    is_closing: isEdit ? undefined : isClosing, // ⬅️ BARU — tandai jurnal penutup
+                    is_closing: isClosing, // ⬅️ kirim selalu — route edit kini juga baca flag ini
                     lines: lines.map(({ _id, ...rest }) => rest),
                 }),
             });
@@ -2992,7 +3023,7 @@ function EntryFormModal({
 
                     <div>
                         <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Keterangan</label>
-                                                <input
+                        <input
                             value={keterangan}
                             onChange={(e) => setKeterangan(e.target.value)}
                             placeholder="Tipe laptop - SN - Nama customer"
@@ -3000,26 +3031,36 @@ function EntryFormModal({
                         />
                     </div>
 
-                    {/* ⬅️ BARU — Jurnal Penutup (cuma saat buat baru, bukan edit). Baris penutup
-                        di-exclude dari Laba Rugi periode berjalan, jadi pendapatan/beban bulan ini
-                        tetap tampil utuh walau akun-akunnya sudah di-nol-kan di Buku Besar. */}
-                    {!isEdit && (
-                        <label className="flex items-start gap-2.5 p-3 rounded-xl border border-amber-200 bg-amber-50/60 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={isClosing}
-                                onChange={(e) => setIsClosing(e.target.checked)}
-                                className="w-4 h-4 mt-0.5 rounded border-amber-300 accent-amber-600 shrink-0"
-                            />
-                            <span className="text-[11.5px] leading-snug">
-                                <b className="text-amber-800">Tandai sebagai Jurnal Penutup</b>
-                                <span className="block text-amber-700/80 mt-0.5">
-                                    Dipakai saat tutup buku (biasanya akhir tahun) untuk me-nol-kan akun
-                                    Pendapatan &amp; Beban ke akun Laba. Baris penutup tidak mengurangi Laba
-                                    Rugi periode berjalan.
-                                </span>
+                    {/* ⬅️ Jurnal Penutup — tampil saat buat baru DAN saat edit (biar flag bisa
+                        dilihat & dikoreksi). Baris penutup di-exclude dari Laba Rugi periode
+                        berjalan, jadi pendapatan/beban bulan ini tetap tampil utuh walau
+                        akun-akunnya sudah di-nol-kan di Buku Besar. */}
+                    <label className="flex items-start gap-2.5 p-3 rounded-xl border border-amber-200 bg-amber-50/60 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={isClosing}
+                            onChange={(e) => setIsClosing(e.target.checked)}
+                            className="w-4 h-4 mt-0.5 rounded border-amber-300 accent-amber-600 shrink-0"
+                        />
+                        <span className="text-[11.5px] leading-snug">
+                            <b className="text-amber-800">Tandai sebagai Jurnal Penutup</b>
+                            <span className="block text-amber-700/80 mt-0.5">
+                                Dipakai saat tutup buku (biasanya akhir tahun) untuk me-nol-kan akun
+                                Pendapatan &amp; Beban ke akun Laba. Baris penutup tidak mengurangi Laba
+                                Rugi periode berjalan.
                             </span>
-                        </label>
+                        </span>
+                    </label>
+
+                    {!isEdit && (
+                        <button
+                            type="button"
+                            onClick={autoFillClosing}
+                            disabled={autoFilling}
+                            className="w-full h-10 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-bold hover:bg-amber-100 active:scale-[0.98] transition-all duration-150 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                        >
+                            {autoFilling ? "Menghitung saldo akun..." : "⚡ Isi Otomatis Jurnal Penutup (tarik saldo Pendapatan & Beban)"}
+                        </button>
                     )}
 
                     <div>
