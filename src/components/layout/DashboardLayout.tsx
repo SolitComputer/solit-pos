@@ -18,6 +18,7 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { isPrepSilent } from "@/lib/prepAlarm";
 import { expandRolesWithParents } from "@/lib/permissions";
 import PengajuanDanaNotifier from "@/components/layout/PengajuanDanaNotifier";
+import PengajuanDanaExecuteNotifier from "@/components/layout/PengajuanDanaExecuteNotifier"; 
 import ItemLoanNotifier from "@/components/layout/ItemLoanNotifier";
 import VehiclePendingNotifier from "@/components/layout/VehiclePendingNotifier";
 
@@ -101,6 +102,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <ReminderPopupModal userId={soundUserId} />
         <PatchNoteFab />
         <PengajuanDanaNotifier userRoles={authUserRoles} userId={soundUserId} />
+        {/* ⬅️ BARU: notif eksekusi — self-gate ke user yang dicentang di
+            modal "Akses Eksekusi" (meta.executorIds). Tidak perlu userRoles
+            karena akses eksekusi di-manage per-akun, bukan per-role. */}
+        <PengajuanDanaExecuteNotifier userId={soundUserId} />
         <ItemLoanNotifier userRoles={authUserRoles} userId={soundUserId} />
         {/* Notifikasi ACC kendaraan — self-gate ke Kepala Sales di dalam komponen.
             Sengaja TIDAK dibungkus !isSilentAdmin karena Kepala Sales bukan role

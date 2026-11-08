@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";import { isKasbonCicilanCategory } from "@/lib/cashflow";
 import { notifyPengajuanDanaResolved } from "@/hooks/usePengajuanDanaNotify";
+import { notifyPengajuanDanaExecuteResolved } from "@/hooks/usePengajuanDanaExecuteNotify";
 import BranchPaymentFields, { type BranchPaymentValue, cashSourceLabel } from "@/components/cashflow/BranchPaymentFields";
 import CategorySelect from "@/components/cashflow/CategorySelect";
 import {
@@ -1546,6 +1547,9 @@ export default function PengajuanDanaPage() {
       // Stop alarm SEKETIKA begitu disetujui — tanpa nunggu poll 15 detik.
       // (reject punya jalurnya sendiri di RejectModal, lihat di bawah.)
       if (action === "approve") notifyPengajuanDanaResolved(id);
+      // ⬅️ BARU: begitu eksekutor klik Eksekusi, alarm "silakan dieksekusi"
+      // mati seketika tanpa nunggu polling 15 detik berikutnya di klien.
+      if (action === "execute") notifyPengajuanDanaExecuteResolved(id);
       const msgs: Record<string, string> = {
         approve: "Pengajuan disetujui", unapprove: "Persetujuan dibatalkan",
         execute: "Ditandai sudah dieksekusi", unexecute: "Status eksekusi dibatalkan",
