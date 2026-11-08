@@ -1,7 +1,7 @@
 "use client";
 // src/app/dashboard/service/history/page.tsx
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
@@ -40,6 +40,47 @@ function fmtRupiah(n?: number | null) {
   const num = Number(n ?? 0);
   if (!num) return null;
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num);
+}
+
+//  NEW — kompres & resize foto sebelum upload (sama persis seperti ServicePaymentModal).
+//  Foto kamera HP bisa 5-10MB, dikompres jadi <1MB biar lolos limit 5MB di /api/service/upload-payment-proof.
+async function compressImage(file: File, maxDimension = 1600, quality = 0.75): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context gagal dibuat"));
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error("Kompres gambar gagal"));
+          resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Gagal memuat gambar"));
+    };
+    img.src = objectUrl;
+  });
 }
 
 // ── BARU: Helper filter periode (berdasarkan tanggal_masuk) ────────────────
@@ -142,6 +183,20 @@ const IconDollar = () => (
 const IconInfoSm = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
+//  NEW — ikon kamera & galeri utk popup pilih sumber foto
+const IconCamera = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+    <circle cx="12" cy="13" r="4" />
+  </svg>
+);
+const IconGallery = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
   </svg>
 );
 
@@ -707,6 +762,16 @@ function EditPaymentModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  //  NEW — state untuk foto bukti payment (3-state: foto lama / foto baru / hapus)
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState<string | null>(order.payment_proof_url || null);
+  const [removeProof, setRemoveProof] = useState(false);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [compressing, setCompressing] = useState(false);
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false); //  NEW — popup Kamera/Galeri
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null); //  NEW — khusus buka kamera di HP
+
   //  NEW — simpan sparepart dari tab (reuse action "sparepart" di backend)
   const handleSparepartConfirm = async (payload: {
     mode: "stock" | "manual";
@@ -753,6 +818,41 @@ function EditPaymentModal({
   const willBecomeNonZero = Number(amount) > 0;
   const willAutoJournal = wasZero && willBecomeNonZero && order.status === "SUDAH_DIAMBIL";
 
+  //  NEW — handler pilih file (kamera atau galeri), kompres dulu baru set state
+  const handleFileSelect = async (file: File | null) => {
+    if (!file) return;
+    setError("");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Format foto harus JPG, PNG, atau WEBP");
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      setError("Ukuran foto maksimal 20MB");
+      return;
+    }
+    setCompressing(true);
+    try {
+      const compressed = await compressImage(file);
+      setProofFile(compressed);
+      setProofPreview(URL.createObjectURL(compressed));
+      setRemoveProof(false);
+    } catch {
+      setError("Gagal memproses foto, coba lagi");
+    } finally {
+      setCompressing(false);
+    }
+  };
+
+  //  NEW — hapus foto (foto lama di server ATAU foto baru yang baru dipilih)
+  const handleRemoveProof = () => {
+    setProofFile(null);
+    setProofPreview(null);
+    //  cuma flag "hapus di server" kalau emang order sebelumnya punya foto
+    setRemoveProof(!!order.payment_proof_url);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
   const save = async () => {
     const parsed = Number(amount);
     if (!Number.isFinite(parsed) || parsed < 0) {
@@ -762,6 +862,35 @@ function EditPaymentModal({
     setSaving(true);
     setError("");
     try {
+      //  NEW — STEP 1: Upload foto bukti dulu kalau user pilih file baru.
+      //  payment_proof_url 3-state:
+      //   • undefined → gak disentuh, backend TIDAK update kolom
+      //   • string    → foto baru, update
+      //   • null      → user hapus, kosongin
+      let payment_proof_url: string | null | undefined = undefined;
+      if (proofFile) {
+        setUploadingProof(true);
+        const fd = new FormData();
+        fd.append("file", proofFile);
+        fd.append("order_id", order.id); //  CHANGED — sesuai field yg diminta backend
+        const upRes = await fetch("/api/service/upload-payment-proof", { //  CHANGED — pakai endpoint yg sudah ada
+          method: "POST",
+          body: fd,
+        });
+        const upJson = await upRes.json();
+        setUploadingProof(false);
+        if (!upJson.success) {
+          setError(upJson.message || "Gagal upload bukti pembayaran");
+          setSaving(false);
+          return;
+        }
+        payment_proof_url = upJson.data.url as string; //  CHANGED — response backend: { data: { url, path } }
+      } else if (removeProof) {
+        payment_proof_url = null;
+      }
+
+      //  STEP 2: Simpan payment. Field proof di-spread conditional supaya
+      //  kalau gak disentuh, gak dikirim sama sekali → backend gak nimpa data lama.
       const res = await fetch(`/api/service/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -770,6 +899,7 @@ function EditPaymentModal({
           payment_amount: parsed,
           payment_method: method,
           payment_note: note.trim() || null,
+          ...(payment_proof_url !== undefined && { payment_proof_url }), //  NEW
         }),
       });
       const json = await res.json();
@@ -780,6 +910,7 @@ function EditPaymentModal({
       setError("Gagal menyimpan — periksa koneksi internet");
     } finally {
       setSaving(false);
+      setUploadingProof(false);
     }
   };
 
@@ -831,7 +962,7 @@ function EditPaymentModal({
         </div>
 
         {tab === "payment" && ( //  NEW
-        <div className="space-y-4 px-5 py-4">
+        <div className="space-y-4 px-5 py-4 max-h-[65vh] overflow-y-auto"> {/*  NEW — scroll biar section foto fit di HP */}
           {error && (
             <div className="rounded-xl bg-red-50 px-3.5 py-2.5 text-[12px] font-medium text-red-600">
               {error}
@@ -884,6 +1015,138 @@ function EditPaymentModal({
               placeholder="Catatan pembayaran..."
               className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 text-[13px] outline-none transition focus:border-[#1a1a2e]/30 focus:bg-white focus:ring-2 focus:ring-[#1a1a2e]/10"
             />
+          </div>
+
+          {/*  NEW — Foto Bukti Pembayaran */}
+          <div>
+            <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-gray-400">
+              Foto Bukti Pembayaran <span className="font-normal normal-case text-gray-300">(opsional)</span>
+            </label>
+
+            {proofPreview && !removeProof ? (
+              <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                <img
+                  src={proofPreview}
+                  alt="Preview bukti pembayaran"
+                  className="max-h-56 w-full object-contain"
+                />
+                {compressing && (
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-white/80 text-[11px] font-black text-gray-500">
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Mengompres...
+                  </div>
+                )}
+                {proofFile && !compressing && (
+                  <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-lg bg-blue-500 px-2 py-0.5 text-[10px] font-black text-white">
+                    Foto Baru
+                  </span>
+                )}
+                <div className="flex items-center justify-between gap-2 border-t border-gray-100 bg-white px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-gray-500">
+                    {proofFile ? proofFile.name : "Bukti saat ini"}
+                  </span>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowPhotoOptions(v => !v)}
+                      disabled={compressing || uploadingProof}
+                      className="h-7 rounded-md bg-gray-100 px-2.5 text-[10px] font-black text-gray-600 transition hover:bg-gray-200 disabled:opacity-50"
+                    >
+                      Ganti
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveProof}
+                      disabled={compressing || uploadingProof}
+                      className="h-7 rounded-md bg-rose-100 px-2.5 text-[10px] font-black text-rose-600 transition hover:bg-rose-200 disabled:opacity-50"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowPhotoOptions(v => !v)}
+                className="flex h-24 w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400 transition hover:border-[#1a1a2e]/30 hover:bg-white hover:text-[#1a1a2e]"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <span className="text-[11px] font-black">Upload Foto Bukti</span>
+                <span className="text-[10px] font-medium text-gray-300">JPG / PNG / WEBP, maks 20MB</span>
+              </button>
+            )}
+
+            {/*  NEW — popup pilihan sumber foto: Kamera atau Galeri */}
+            {showPhotoOptions && (
+              <>
+                <div
+                  className="fixed inset-0 z-[70]"
+                  onClick={() => setShowPhotoOptions(false)}
+                />
+                <div className="relative z-[80] mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPhotoOptions(false);
+                      cameraInputRef.current?.click();
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-[13px] font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    <span className="text-[#1a1a2e]"><IconCamera /></span>
+                    Ambil dari Kamera
+                  </button>
+                  <div className="h-px bg-gray-100" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPhotoOptions(false);
+                      fileInputRef.current?.click();
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-[13px] font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    <span className="text-[#1a1a2e]"><IconGallery /></span>
+                    Pilih dari Galeri
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Input file tersembunyi */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              hidden
+              onChange={e => {
+                handleFileSelect(e.target.files?.[0] ?? null);
+                e.target.value = ""; //  NEW — reset biar bisa pilih file sama lagi
+              }}
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              capture="environment" //  NEW — buka kamera belakang di HP
+              hidden
+              onChange={e => {
+                handleFileSelect(e.target.files?.[0] ?? null);
+                e.target.value = "";
+              }}
+            />
+
+            {removeProof && (
+              <p className="mt-1.5 text-[11px] font-semibold text-rose-500">
+                Bukti saat ini akan dihapus saat disimpan.
+              </p>
+            )}
           </div>
 
           {willAutoJournal && (
@@ -962,17 +1225,19 @@ function EditPaymentModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-11 flex-1 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 transition hover:bg-gray-200"
+              disabled={saving || uploadingProof || compressing}
+              className="h-11 flex-1 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 transition hover:bg-gray-200 disabled:opacity-50"
             >
               Batal
             </button>
             <button
               type="button"
               onClick={save}
-              disabled={saving}
+              disabled={saving || uploadingProof || compressing} //  CHANGED — disable saat compress/upload juga
               className="h-11 flex-1 rounded-xl bg-[#1a1a2e] text-[13px] font-black text-white transition hover:bg-[#2a2a4e] disabled:opacity-50"
             >
-              {saving ? "Menyimpan..." : "Simpan"}
+              {/*  CHANGED — 4-state feedback biar user tau proses di tahap mana */}
+              {compressing ? "Mengompres..." : uploadingProof ? "Mengunggah foto..." : saving ? "Menyimpan..." : "Simpan"}
             </button>
           </div>
         ) : (

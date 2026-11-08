@@ -225,7 +225,7 @@ export async function PATCH(
     payment_status?: "LUNAS" | "DP"; //  NEW
     total_tagihan?: number; //  NEW
     cicilan_amount?: number; //  NEW
-    payment_proof_url?: string; //  NEW — wajib untuk action "bayar_dimuka"
+    payment_proof_url?: string | null; //  CHANGED — izinkan null utk hapus foto dari action "update_payment"
     sparepart_mode?: "stock" | "manual"; //  NEW
     sparepart_modal?: number; //  NEW
     sparepart_entry?: string; //  NEW
@@ -420,7 +420,7 @@ export async function PATCH(
         return NextResponse.json({ success: false, message: "Status tidak valid untuk diambil" }, { status: 400 });
 
       //  NEW — kalau ada nominal payment yang ditagihkan (bukan Garansi gratis), foto bukti wajib
-      if (payment_amount !== undefined && payment_amount > 0 && !payment_proof_url?.trim()) {
+      if (payment_amount !== undefined && payment_amount > 0 && !payment_proof_url?.toString().trim()) {
         return NextResponse.json({ success: false, message: "Foto bukti pembayaran wajib diupload" }, { status: 400 });
       }
 
@@ -435,7 +435,7 @@ export async function PATCH(
           payment_amount,
           payment_note: payment_note || null,
           payment_method: payment_method || "CASH",
-          payment_proof_url: payment_proof_url?.trim() || null, //  NEW
+          payment_proof_url: payment_proof_url?.toString().trim() || null, //  NEW
           payment_by: user.id,
           payment_confirmed_at: new Date().toISOString(),
         };
@@ -451,7 +451,7 @@ export async function PATCH(
             total_tagihan: total_tagihan ?? payment_amount, //  NEW
             payment_note: payment_note || null,
             payment_method: payment_method || "CASH",
-            payment_proof_url: payment_proof_url?.trim() || null, //  NEW
+            payment_proof_url: payment_proof_url?.toString().trim() || null, //  NEW
             payment_by: user.id,
             payment_confirmed_at: new Date().toISOString(),
           } : {}),
@@ -518,7 +518,7 @@ export async function PATCH(
         return NextResponse.json({ success: false, message: "Order ini sudah punya catatan pembayaran. Gunakan tombol Lunas/Cicil." }, { status: 400 });
       if (!payment_amount || payment_amount <= 0)
         return NextResponse.json({ success: false, message: "Nominal pembayaran wajib diisi" }, { status: 400 });
-      if (!payment_proof_url?.trim()) //  NEW — foto bukti wajib, backend juga validasi (bukan cuma frontend)
+      if (!payment_proof_url?.toString().trim()) //  NEW — foto bukti wajib, backend juga validasi (bukan cuma frontend)
         return NextResponse.json({ success: false, message: "Foto bukti pembayaran wajib diupload" }, { status: 400 });
 
       const statusBayarDimuka = payment_status === "DP" ? "DP" : "LUNAS";
@@ -531,7 +531,7 @@ export async function PATCH(
         total_tagihan: totalTagihanDimuka,
         payment_note: payment_note || null,
         payment_method: payment_method || "CASH",
-        payment_proof_url: payment_proof_url.trim(), //  NEW
+        payment_proof_url: payment_proof_url.toString().trim(), //  NEW
         payment_by: user.id,
         payment_confirmed_at: new Date().toISOString(),
       };
@@ -631,34 +631,86 @@ export async function PATCH(
       logCatatan = "Dikembalikan ke antrian";
       break;
 
-    // ✅ Update payment saja (tanpa ubah status)
-    case "update_payment":
+    // ✅ Update payment saja (tanpa ubah status) — dipakai dari halaman Riwayat Servis
+    case "update_payment": {
       //  NEW — edit payment (dari Riwayat) HANYA admin
       if (!hasAnyRole(getEffectiveRoles(user), ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]))
         return NextResponse.json({ success: false, message: "Hanya admin yang boleh mengedit payment" }, { status: 403 });
       if (payment_amount === undefined || !Number.isFinite(Number(payment_amount)) || Number(payment_amount) < 0)
         return NextResponse.json({ success: false, message: "Jumlah biaya wajib diisi dan tidak boleh negatif" }, { status: 400 });
+
+      //  NEW — susun payload update. payment_proof_url bersifat 3-state:
+      //   • undefined  → user tidak menyentuh foto, JANGAN update kolom (biarin foto lama tetap)
+      //   • string     → user upload foto baru, update ke url baru
+      //   • null       → user hapus foto tanpa ganti, set jadi null
+      const updatePaymentPayload: Record<string, unknown> = {
+        payment_amount,
+        payment_note: payment_note || null,
+        payment_method: payment_method || "CASH",
+        payment_by: user.id,
+        payment_confirmed_at: new Date().toISOString(),
+      };
+
+      //  NEW — tangkap url foto lama SEBELUM update, buat dihapus dari storage kalau berubah
+      const oldProofUrl = (current as { payment_proof_url?: string | null }).payment_proof_url ?? null;
+      let shouldDeleteOldProof = false;
+      if (payment_proof_url !== undefined) {
+        const newProofUrl = payment_proof_url?.toString().trim() || null;
+
+        //  NEW — validasi URL (defense-in-depth):
+        //  Walaupun frontend kita yg generate URL ini, endpoint ini bisa dipanggil dari mana saja.
+        //  Pastikan URL harus https:// atau null — cegah input URL aneh (javascript:, data:, dll).
+        if (newProofUrl && !newProofUrl.startsWith("https://")) {
+          return NextResponse.json({ success: false, message: "URL bukti pembayaran tidak valid" }, { status: 400 });
+        }
+
+        updatePaymentPayload.payment_proof_url = newProofUrl;
+        //  foto lama perlu dihapus kalau: ada foto lama + url berubah (ganti/hapus)
+        shouldDeleteOldProof = !!oldProofUrl && oldProofUrl !== newProofUrl;
+      }
+
       const { data: paid, error: payErr } = await supabase
         .from("service_orders")
-        .update({
-          payment_amount,
-          payment_note: payment_note || null,
-          payment_method: payment_method || "CASH",
-          payment_by: user.id,
-          payment_confirmed_at: new Date().toISOString(),
-        })
+        .update(updatePaymentPayload)
         .eq("id", id)
         .select("*")
         .single();
       if (payErr) return NextResponse.json({ success: false, message: payErr.message }, { status: 500 });
+
+      //  NEW — best-effort hapus file foto lama dari storage (gak blok response kalau gagal)
+      //  Ini mencegah orphan file numpuk di bucket Supabase Storage.
+      if (shouldDeleteOldProof && oldProofUrl) {
+        try {
+          //  Extract path dari public URL:
+          //  https://xxx.supabase.co/storage/v1/object/public/payment-proofs/<path>
+          const match = oldProofUrl.match(/\/storage\/v1\/object\/public\/payment-proofs\/(.+)$/);
+          if (match?.[1]) {
+            const oldPath = decodeURIComponent(match[1]);
+            const { error: delErr } = await supabase.storage.from("payment-proofs").remove([oldPath]);
+            if (delErr) console.error("[update_payment] gagal hapus foto lama:", delErr.message);
+          }
+        } catch (e) {
+          console.error("[update_payment] exception hapus foto lama:", e);
+        }
+      }
+
+      //  NEW — catatan log ikut sebut perubahan foto biar audit-trail jelas
+      const proofLogSuffix =
+        payment_proof_url === undefined
+          ? ""
+          : payment_proof_url
+            ? " · bukti foto diperbarui"
+            : " · bukti foto dihapus";
+
       await supabase.from("service_order_logs").insert({
         service_order_id: id,
         status_from: oldStatus,
         status_to: oldStatus,
-        catatan: `Payment diperbarui: Rp ${payment_amount.toLocaleString("id-ID")} · ${payment_method || "CASH"}`,
+        catatan: `Payment diperbarui: Rp ${payment_amount.toLocaleString("id-ID")} · ${payment_method || "CASH"}${proofLogSuffix}`,
         changed_by: user.id,
       });
       return NextResponse.json({ success: true, data: paid });
+    }
 
     default:
       return NextResponse.json({ success: false, message: `Aksi '${action}' tidak dikenal` }, { status: 400 });
