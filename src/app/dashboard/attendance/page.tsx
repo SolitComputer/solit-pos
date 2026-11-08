@@ -62,6 +62,7 @@ type Attendance = {
     source?: "AUTO" | "MANUAL";
     direction?: "IN" | "OUT"; // ✅ NEW
     shift_snapshot?: "PAGI" | "SORE" | null; // ✅ NEW — shift yg berlaku saat absen (dikunci)
+    schedule_checkout_minute?: number | null; // ✅ NEW — jam pulang jadwal (menit) dikunci saat absen
 };
 
 type ManualAttendance = {
@@ -4929,6 +4930,36 @@ export default function AttendanceDashboardPage() {
         };
     }, [schedulesByUser, configsByUser, allUsers]);
 
+    // ✅ NEW — jadwal pulang buat deteksi SETENGAH HARI, di-resolve dari
+    // shift_snapshot yang DIKUNCI saat absen (per record), BUKAN effectiveShiftFor
+    // yang baca config/jadwal LIVE. Alasannya: user_shift_config tidak punya
+    // riwayat — kalau shift/jam pulang seseorang diubah belakangan, jadwal untuk
+    // tanggal lampau ikut berubah, dan default SORE (21:00) bisa keliru nempel ke
+    // orang PAGI → absen pulang 17:00 salah dicap "kecepetan 4 jam". shift_snapshot
+    // ("PAGI"/"SORE") sama dengan yang dipakai kolom Shift & mesin lembur.
+    // ✅ NEW — jam pulang jadwal yang DIKUNCI saat absen (dari kolom
+    // schedule_checkout_minute). Ini sumber kebenaran buat deteksi ½ hari:
+    // kebal perubahan jadwal belakangan, dan akurat per-orang (bukan default
+    // shift). Record lama (sebelum fitur) tidak punya nilai ini → null.
+    const snapshotCheckoutMinByUserDate = useMemo(() => {
+        const m: Record<string, number> = {};
+        attendances.forEach(a => {
+            if (!a.user_id) return;
+            if (typeof a.schedule_checkout_minute === "number") {
+                m[`${a.user_id}_${toWIBDateKey(a.check_in_time || a.created_at)}`] = a.schedule_checkout_minute;
+            }
+        });
+        return m;
+    }, [attendances]);
+
+    // Mengembalikan jam pulang jadwal (menit) HANYA kalau ada snapshot per-record.
+    // null = tidak ada snapshot (record lama) → caller memperlakukan sebagai
+    // BUKAN ½ hari (sesuai keputusan: record terlanjur jangan dicap ½ hari).
+    const scheduledCheckoutMinFor = useCallback((userId: string, dk: string): number | null => {
+        const v = snapshotCheckoutMinByUserDate[`${userId}_${dk}`];
+        return typeof v === "number" ? v : null;
+    }, [snapshotCheckoutMinByUserDate]);
+
     // ✅ NEW — daftar tanggal LALU (sebelum hari ini) milik user yang sedang
     // login yang masih berpotensi lembur (masuk lebih awal / pulang lebih
     // larut / lembur hari libur) tapi belum diajukan / belum ditandai
@@ -5190,7 +5221,9 @@ export default function AttendanceDashboardPage() {
                     const checkoutIsoForDay = checkoutTimes[`${resolvedUserIdForDay}_${dk}`];
                     let isHalfDay = false;
                     if (checkoutIsoForDay) {
-                        const effDay = effectiveShiftFor(resolvedUserIdForDay, dk);
+                        // ✅ FIX: jadwal pulang dari snapshot per-record (dikunci saat
+                        // absen). null = record lama → JANGAN dicap ½ hari.
+                        const scheduledCheckoutMin = scheduledCheckoutMinFor(resolvedUserIdForDay, dk);
                         let checkoutMinActual = preciseMinutesOfDayWIB(checkoutIsoForDay);
                         // ✅ FIX: pergantian hari absensi jam 04:00 WIB — pulang jam
                         // 00:00–03:59 WIB itu lanjutan shift kemarin (lembur sampai
@@ -5198,8 +5231,9 @@ export default function AttendanceDashboardPage() {
                         // selisihnya jadi negatif (lembur), bukan malah dicap ½ hari.
                         // Sama persis dengan koreksi di computeAfterOutOvertimeMinutes.
                         if (checkoutMinActual < 4 * 60) checkoutMinActual += 24 * 60;
-                        // pulang lebih awal dari jadwal (eff.checkout) lebih dari ambang
-                        if (effDay.checkout - checkoutMinActual > HALF_DAY_EARLY_LEAVE_MINUTES) {
+                                            // pulang lebih awal dari jadwal (snapshot) lebih dari ambang.
+                        // scheduledCheckoutMin null (record lama) → lewati, bukan ½ hari.
+                        if (scheduledCheckoutMin != null && scheduledCheckoutMin - checkoutMinActual > HALF_DAY_EARLY_LEAVE_MINUTES) {
                             isHalfDay = true;
                         }
                     }
@@ -5280,7 +5314,7 @@ export default function AttendanceDashboardPage() {
         });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
-    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, monthlyOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData, checkoutTimes, effectiveShiftFor]);
+    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, monthlyOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData, checkoutTimes, effectiveShiftFor, scheduledCheckoutMinFor]);
 
     // ✅ NEW — Sinkronisasi otomatis leaderboard "Kualitas Absensi" (ditampilkan
     // di halaman terpisah /dashboard/lencana, BUKAN di sini) ke server, tiap
@@ -5989,12 +6023,12 @@ export default function AttendanceDashboardPage() {
                 let isHalfDay = false;
                 const coIso = checkoutTimes[`${userId}_${dk}`];
                 if (coIso) {
-                    const effDay = effectiveShiftFor(userId, dk);
+                                      const scheduledCheckoutMin = scheduledCheckoutMinFor(userId, dk);
                     let coMin = preciseMinutesOfDayWIB(coIso);
                     // ✅ FIX: pulang jam 00:00–03:59 WIB = lanjutan shift kemarin
                     // (lembur dini hari), bukan pulang kecepetan — tambah 24 jam.
                     if (coMin < 4 * 60) coMin += 24 * 60;
-                    if (effDay.checkout - coMin > HALF_DAY_EARLY_LEAVE_MINUTES) isHalfDay = true;
+                                       if (scheduledCheckoutMin != null && scheduledCheckoutMin - coMin > HALF_DAY_EARLY_LEAVE_MINUTES) isHalfDay = true;
                 }
                 items.push({ date: dk, type: dayStatus, checkInTime, method, manualCreatedBy, isHalfDay });
             }
@@ -6006,7 +6040,7 @@ export default function AttendanceDashboardPage() {
             items,
             monthLabel: `${MONTH_NAMES[calMonth]} ${calYear}`,
         };
-    }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser, checkoutTimes, effectiveShiftFor]);
+    }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser, checkoutTimes, scheduledCheckoutMinFor]);
 
     const lastRefreshRef = useRef<number>(Date.now());
 

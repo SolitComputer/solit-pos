@@ -228,6 +228,12 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     // lampau TIDAK ikut berubah kalau shift default diganti belakangan.
     shift_snapshot: shiftLabel,
     branch, // ✅ NEW — cabang absensi (UTAMA/JOGJA), untuk filter Model A
+    // ✅ NEW — snapshot JAM PULANG jadwal (menit dari 00:00) yang berlaku
+    // tanggal ini. Dikunci per-record supaya deteksi "setengah hari" di rekap
+    // pakai jadwal yang benar saat itu, TIDAK ikut berubah kalau jadwal/shift
+    // diganti belakangan. `schedule.checkout` sudah di-resolve benar di atas
+    // (override jadwal tanggal ini > config akun > default shift).
+    schedule_checkout_minute: schedule.checkout.h * 60 + schedule.checkout.m,
   };
   if (p.latitude != null) insertPayload.latitude = p.latitude;
   if (p.longitude != null) insertPayload.longitude = p.longitude;
