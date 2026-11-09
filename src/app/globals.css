@@ -501,3 +501,41 @@ html.dark .bg-clip-text.text-transparent.from-\[\#1a1545\],
 html.dark .bg-clip-text.text-transparent.from-\[\#0f0c29\] {
   -webkit-text-fill-color:#f1f5f9 !important; color:#f1f5f9 !important;
 }
+
+/* =========================================================
+   DARK MODE v6.5 — remap VARIABEL GRADIENT Tailwind (--tw-gradient-*)
+   untuk stop warna TERANG → gelap. Ini yang bikin kartu statistik /
+   banner gradient (from-zinc-100 to-zinc-200/50, from-blue-50 to-
+   blue-100/50, dll) nyala putih di Siap Dikirim/Sedang Diantar/
+   Riwayat Pengantaran. Remap var → semua arah gradient ikut, aman
+   (brand gradient gelap from-[#1a1545]/zinc-800 TIDAK tersentuh).
+   ========================================================= */
+
+/* ---- from-* (stop awal) terang → gelap ---- */
+html.dark .from-zinc-100, html.dark .from-gray-100, html.dark .from-slate-100 { --tw-gradient-from: #1a263a var(--tw-gradient-from-position) !important; }
+html.dark .from-slate-100\/70 { --tw-gradient-from: #141c2b var(--tw-gradient-from-position) !important; }
+html.dark .from-slate-50, html.dark .from-gray-50, html.dark .from-zinc-50 { --tw-gradient-from: #151f30 var(--tw-gradient-from-position) !important; }
+html.dark .from-blue-50, html.dark .from-sky-50, html.dark .from-indigo-50, html.dark .from-cyan-50 { --tw-gradient-from: #0c1e36 var(--tw-gradient-from-position) !important; }
+html.dark .from-blue-100\/90 { --tw-gradient-from: #142e50 var(--tw-gradient-from-position) !important; }
+html.dark .from-emerald-50, html.dark .from-green-50 { --tw-gradient-from: #072517 var(--tw-gradient-from-position) !important; }
+html.dark .from-red-50, html.dark .from-rose-50 { --tw-gradient-from: #2d0e17 var(--tw-gradient-from-position) !important; }
+html.dark .from-amber-50, html.dark .from-orange-50, html.dark .from-yellow-50 { --tw-gradient-from: #2b1b06 var(--tw-gradient-from-position) !important; }
+
+/* ---- via-* (stop tengah) terang → gelap ---- */
+html.dark .via-indigo-100\/80 { --tw-gradient-via: #142e50 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-\[\#f7f8fa\] { --tw-gradient-via: #0b1019 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+
+/* ---- to-* (stop akhir) terang → gelap, termasuk varian opacity ---- */
+html.dark .to-white { --tw-gradient-to: #101827 var(--tw-gradient-to-position) !important; }
+html.dark .to-zinc-200\/50, html.dark .to-zinc-200\/70, html.dark .to-gray-200\/50, html.dark .to-slate-200\/50 { --tw-gradient-to: #24344d var(--tw-gradient-to-position) !important; }
+html.dark .to-gray-100\/50, html.dark .to-zinc-100\/50, html.dark .to-slate-100\/50 { --tw-gradient-to: #1a263a var(--tw-gradient-to-position) !important; }
+html.dark .to-blue-100\/50, html.dark .to-sky-100\/50, html.dark .to-indigo-100\/50, html.dark .to-cyan-100\/50 { --tw-gradient-to: #142e50 var(--tw-gradient-to-position) !important; }
+html.dark .to-emerald-100\/50, html.dark .to-green-100\/50 { --tw-gradient-to: #0d3824 var(--tw-gradient-to-position) !important; }
+html.dark .to-red-100\/50, html.dark .to-red-100\/70, html.dark .to-rose-100\/50 { --tw-gradient-to: #451522 var(--tw-gradient-to-position) !important; }
+html.dark .to-amber-100\/50, html.dark .to-orange-100\/50, html.dark .to-yellow-100\/50 { --tw-gradient-to: #422a09 var(--tw-gradient-to-position) !important; }
+html.dark .to-purple-100\/90, html.dark .to-violet-100\/90 { --tw-gradient-to: #2e1c55 var(--tw-gradient-to-position) !important; }
+html.dark .to-\[\#f7f8fa\], html.dark .to-\[\#F7F8FA\] { --tw-gradient-to: #0b1019 var(--tw-gradient-to-position) !important; }
+
+/* ---- Shell terang tambahan ---- */
+html.dark .bg-\[\#F7F7F8\]\/95, html.dark .bg-\[\#f7f7f8\]\/95 { background-color: rgba(7,10,18,.95) !important; }
+html.dark .min-h-screen.bg-gradient-to-b.from-slate-100\/70 { background-image: linear-gradient(to bottom, #070a12 0%, #0d1424 100%) !important; }
