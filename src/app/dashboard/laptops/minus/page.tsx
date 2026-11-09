@@ -9,6 +9,7 @@ import {
   Package, Wrench, ClipboardList, Clock, AlertTriangle, type LucideIcon,
 } from "lucide-react";
 import QcDecisionModal from "./QcDecisionModal";
+import AntrianSparepartTab from "./AntrianSparepartTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MinusUnit {
@@ -417,7 +418,9 @@ function MinusContent() {
   const [filterMinusStatus, setFilterMinusStatus] = useState<"ALL" | "BELUM_DIATASI" | "SUDAH_DIATASI">("ALL");
   // ── Tab pemisah: "UMUM" = unit minus lama (existing flow),
   //                "DARI_QC" = unit yang ditandai MINUS dari Team QC (alur baru)
-  const [activeTab, setActiveTab] = useState<"UMUM" | "DARI_QC">("UMUM");
+  // Tab: UMUM = unit minus lama (teknisi flow) | DARI_QC = unit ditandai Team QC |
+  //      ANTRIAN = daftar sparepart menunggu dibeli.
+  const [activeTab, setActiveTab] = useState<"UMUM" | "DARI_QC" | "ANTRIAN">("UMUM");
 
   // Modals
   const [editTarget, setEditTarget] = useState<MinusUnit | null>(null);
@@ -596,14 +599,15 @@ function MinusContent() {
             <div className="flex">
               <button
                 onClick={() => setActiveTab("UMUM")}
-                className={`flex-1 h-12 px-4 flex items-center justify-center gap-2 text-sm font-semibold transition-all border-b-2 ${
+                className={`flex-1 h-12 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold transition-all border-b-2 ${
                   activeTab === "UMUM"
                     ? "text-gray-800 border-gray-700 bg-gray-50"
                     : "text-gray-400 border-transparent hover:text-gray-600 hover:bg-gray-50/60"
                 }`}
               >
                 <Wrench size={16} />
-                Perbaikan Umum
+                <span className="hidden sm:inline">Perbaikan Umum</span>
+                <span className="sm:hidden">Umum</span>
                 <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold ${
                   activeTab === "UMUM" ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-500"
                 }`}>
@@ -612,25 +616,41 @@ function MinusContent() {
               </button>
               <button
                 onClick={() => setActiveTab("DARI_QC")}
-                className={`flex-1 h-12 px-4 flex items-center justify-center gap-2 text-sm font-semibold transition-all border-b-2 ${
+                className={`flex-1 h-12 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold transition-all border-b-2 ${
                   activeTab === "DARI_QC"
                     ? "text-indigo-700 border-indigo-600 bg-indigo-50/60"
                     : "text-gray-400 border-transparent hover:text-indigo-600 hover:bg-indigo-50/30"
                 }`}
               >
                 <AlertTriangle size={16} />
-                Dari Team QC
+                <span className="hidden sm:inline">Dari Team QC</span>
+                <span className="sm:hidden">QC</span>
                 <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold ${
                   activeTab === "DARI_QC" ? "bg-indigo-600 text-white" : "bg-indigo-100 text-indigo-600"
                 }`}>
                   {units.filter(u => u.qc_status === "FROM_QC").length}
                 </span>
               </button>
+              <button
+                onClick={() => setActiveTab("ANTRIAN")}
+                className={`flex-1 h-12 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold transition-all border-b-2 ${
+                  activeTab === "ANTRIAN"
+                    ? "text-emerald-700 border-emerald-600 bg-emerald-50/60"
+                    : "text-gray-400 border-transparent hover:text-emerald-600 hover:bg-emerald-50/30"
+                }`}
+              >
+                <Package size={16} />
+                <span className="hidden sm:inline">Antrian Sparepart</span>
+                <span className="sm:hidden">Sparepart</span>
+              </button>
             </div>
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* ─── Tab ANTRIAN: render komponen khusus (sembunyikan Summary/Filter/Table) ─── */}
+          {activeTab === "ANTRIAN" && <AntrianSparepartTab />}
+
+          {/* Summary Cards — sembunyikan saat tab ANTRIAN (karena content beda) */}
+          <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${activeTab === "ANTRIAN" ? "hidden" : ""}`}>
             {[
               { label: "Total Unit", value: units.length, color: "text-gray-800", bar: "bg-gray-600", icon: <Package size={20} /> },
               { label: "Belum Terpegang", value: repairCounts["NOT_STARTED"] || 0, color: "text-gray-600", bar: "bg-gray-400", icon: <Pause size={20} /> },
@@ -650,8 +670,8 @@ function MinusContent() {
             ))}
           </div>
 
-          {/* Filter Panel */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+          {/* Filter Panel — sembunyikan saat tab ANTRIAN */}
+          <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 ${activeTab === "ANTRIAN" ? "hidden" : ""}`}>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
               <Wrench size={14} /> Status Perbaikan
             </p>
@@ -721,8 +741,8 @@ function MinusContent() {
             </div>
           </div>
 
-          {/* Table */}
-          {isLoading ? (
+          {/* Table — sembunyikan saat tab ANTRIAN (render AntrianSparepartTab sebagai gantinya di atas) */}
+          {activeTab !== "ANTRIAN" && (isLoading ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
               <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin mx-auto" />
               <p className="text-xs text-gray-400 mt-3">Memuat data...</p>
@@ -847,7 +867,7 @@ function MinusContent() {
                 </p>
               </div>
             </div>
-          )}
+          ))}
         </div>
       </main>
 
