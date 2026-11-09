@@ -8,11 +8,13 @@ import { notifyPengajuanDanaResolved } from "@/hooks/usePengajuanDanaNotify";
 import { notifyPengajuanDanaExecuteResolved } from "@/hooks/usePengajuanDanaExecuteNotify";
 import BranchPaymentFields, { type BranchPaymentValue, cashSourceLabel } from "@/components/cashflow/BranchPaymentFields";
 import CategorySelect from "@/components/cashflow/CategorySelect";
+import { canEditNoteKembalian } from "@/lib/fundConfig";
 import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, X, CheckCheck, RotateCcw, Banknote,
   ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon, Pencil,
   Search, ChevronLeft, ChevronRight, Bell, BellRing, Ban, MapPin, Shield,
+  StickyNote,
 } from "lucide-react";
 
 interface FundRequest {
@@ -48,6 +50,10 @@ interface FundRequest {
   realisasi_by_id: string | null;
   realisasi_by_name: string | null;
   realisasi_at: string | null;
+  // ⬅️ BARU: note kembalian — hanya diisi oleh user whitelist
+  note_kembalian: string | null;
+  note_kembalian_by: string | null;
+  note_kembalian_at: string | null;
 }
 
 interface Meta {
@@ -1020,6 +1026,19 @@ function DetailModal({
               </span>
             </div>
           </div>
+          {/* ⬅️ BARU: Note Kembalian di detail modal */}
+          {fundRequest.note_kembalian && (
+            <div className="border-t border-slate-100 pt-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <StickyNote className="w-3.5 h-3.5 text-amber-600" />
+                <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Note Kembalian</p>
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-amber-50/60 border border-amber-200/60 rounded-xl px-3 py-2">{fundRequest.note_kembalian}</p>
+              {fundRequest.note_kembalian_at && (
+                <p className="text-[10px] text-slate-400 mt-1.5">Terakhir diubah · {formatDateTime(fundRequest.note_kembalian_at)}</p>
+              )}
+            </div>
+          )}
         </div>
         <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/60">
           <button onClick={onClose} className={`w-full h-10 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition ${FOCUS_RING}`}>Tutup</button>
@@ -1434,6 +1453,88 @@ function ExecuteAccessModal({ onClose, onSaved }: { onClose: () => void; onSaved
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  NOTE KEMBALIAN MODAL — isi/edit catatan kembalian pengajuan dana.
+ *  Hanya untuk user yang ada di whitelist (lib/fundConfig.ts).
+ * ════════════════════════════════════════════════════════════════════════════ */
+function NoteKembalianModal({
+  fundRequest, onClose, onSaved,
+}: {
+  fundRequest: FundRequest;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [note, setNote] = useState(fundRequest.note_kembalian ?? "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pengajuan-dana/${fundRequest.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_note_kembalian", note_kembalian: note.trim() || null }),
+      });
+      const json = await res.json();
+      if (!json.success) { toast.error(json.message || "Gagal menyimpan note kembalian"); return; }
+      toast.success(note.trim() ? "Note kembalian tersimpan" : "Note kembalian dihapus");
+      onSaved();
+      onClose();
+    } catch { toast.error("Terjadi kesalahan koneksi"); }
+    finally { setSaving(false); }
+  };
+
+  const hasExisting = !!fundRequest.note_kembalian;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><StickyNote size={16} /></div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">{hasExisting ? "Edit Note Kembalian" : "Tambah Note Kembalian"}</p>
+              <p className="text-[11px] text-slate-400 line-clamp-1 max-w-[260px]">{fundRequest.purpose}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className={`w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition ${FOCUS_RING}`}><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="rounded-xl bg-amber-50/60 border border-amber-200/60 px-3 py-2 text-[11px] text-amber-700">
+            Catatan kembalian berguna kalau pengajuan ini punya sisa dana yang perlu dicatat (misal: nominal realisasi lebih kecil dari pengajuan, atau ada kembalian dari pembelian).
+          </div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">Note Kembalian</label>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={4}
+            placeholder="Contoh: Sisa Rp 15.000 dari pembelian paket data, disetor kembali ke kas Utama"
+            className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 focus:bg-white transition-all resize-none placeholder:text-slate-400"
+            autoFocus
+          />
+          {hasExisting && (
+            <p className="text-[10px] text-slate-400">
+              Terakhir diubah oleh <b>{fundRequest.requester_name ?? "-"}</b> · {formatDateTime(fundRequest.note_kembalian_at)}
+            </p>
+          )}
+        </div>
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 bg-slate-50/60">
+          <button onClick={onClose} disabled={saving} className={`flex-1 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition disabled:opacity-50 ${FOCUS_RING}`}>Batal</button>
+          <button onClick={submit} disabled={saving} className={`flex-1 h-10 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 transition disabled:opacity-60 ${FOCUS_RING}`}>{saving ? "Menyimpan..." : hasExisting && !note.trim() ? "Hapus Note" : "Simpan Note"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  MAIN PAGE
  * ════════════════════════════════════════════════════════════════════════════ */
 export default function PengajuanDanaPage() {
@@ -1441,6 +1542,7 @@ export default function PengajuanDanaPage() {
   const [meta, setMeta] = useState<Meta>({ approverIds: [], executorIds: [] });
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>(""); // ⬅️ BARU: untuk cek whitelist Note Kembalian
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1451,6 +1553,8 @@ export default function PengajuanDanaPage() {
   const [rejectTarget, setRejectTarget] = useState<FundRequest | null>(null);
   // ⬅️ BARU: target modal pembatalan setelah eksekusi
   const [cancelTarget, setCancelTarget] = useState<FundRequest | null>(null);
+  // ⬅️ BARU: target modal edit Note Kembalian
+  const [noteKembalianTarget, setNoteKembalianTarget] = useState<FundRequest | null>(null);
   const [showExecuteAccessModal, setShowExecuteAccessModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1463,6 +1567,7 @@ export default function PengajuanDanaPage() {
       .then((d) => {
         if (d.success && d.user) {
           setUserId(d.user.id);
+          setUserName(d.user.name ?? ""); // ⬅️ BARU: untuk cek whitelist Note Kembalian
           setUserRoles(d.user.roles ?? [d.user.role].filter(Boolean));
         }
       })
@@ -1488,6 +1593,10 @@ export default function PengajuanDanaPage() {
           branch: r.branch === "JOGJA" ? "JOGJA" : "UTAMA",
           cash_location: r.cash_location === "JOGJA" ? "JOGJA" : r.cash_location === "UTAMA" ? "UTAMA" : null,
           created_at: r.created_at ?? new Date(0).toISOString(),
+          // ⬅️ BARU: note kembalian — fallback ke null kalau kolom belum ada / belum diisi
+          note_kembalian: typeof r.note_kembalian === "string" ? r.note_kembalian : null,
+          note_kembalian_by: r.note_kembalian_by ?? null,
+          note_kembalian_at: r.note_kembalian_at ?? null,
         }));
         setData(safeRows);
         if (json.meta) setMeta(json.meta);
@@ -1516,6 +1625,8 @@ export default function PengajuanDanaPage() {
   const canManageExecuteAccess = userRoles.some((r) => ["ADMIN", "PURCHASING"].includes(r));
   // ⬅️ BARU: lonceng untuk approver + ADMIN (tombol Setujui/Tolak tetap ikut canApprove)
   const showBell = canApprove || userRoles.includes("ADMIN");
+  // ⬅️ BARU: siapa yang boleh isi Note Kembalian (whitelist di fundConfig.ts)
+  const canEditNote = canEditNoteKembalian(userName);
 
   const handleSubmit = async (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO", branch: "UTAMA" | "JOGJA", cashLocation: "UTAMA" | "JOGJA" | null) => {
     setSubmitting(true);
@@ -1941,7 +2052,7 @@ export default function PengajuanDanaPage() {
           ) : (
             <>
             <div className="hidden md:block overflow-x-auto -mx-1 rounded-2xl border border-slate-100">
-              <table className="w-full text-sm min-w-[1140px]">
+              <table className="w-full text-sm min-w-[1260px]">
                 <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-slate-100">
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider w-10">No</th>
@@ -1954,6 +2065,8 @@ export default function PengajuanDanaPage() {
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l border-slate-100">Persetujui</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Eksekusi</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Realisasi</th>
+                    {/* ⬅️ BARU: kolom Note Kembalian */}
+                    <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Note Kembalian</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tanggal</th>
                   </tr>
                 </thead>
@@ -2167,6 +2280,34 @@ export default function PengajuanDanaPage() {
                           )}
                         </td>
 
+                        {/* ⬅️ BARU: cell Note Kembalian — read-only untuk semua, editable utk whitelist */}
+                        <td className="px-4 py-4 text-center">
+                          {row.note_kembalian ? (
+                            <div className="inline-flex flex-col items-center gap-1 max-w-[180px]">
+                              <button
+                                type="button"
+                                onClick={() => canEditNote ? setNoteKembalianTarget(row) : setDetailTarget(row)}
+                                title={canEditNote ? "Klik untuk edit note kembalian" : row.note_kembalian}
+                                className={`w-8 h-8 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center transition ${canEditNote ? `hover:bg-amber-200 cursor-pointer ${FOCUS_RING}` : "cursor-default"}`}
+                              >
+                                <StickyNote className="w-4 h-4" />
+                              </button>
+                              <span className="text-[10px] text-slate-500 line-clamp-2 leading-tight text-center">{row.note_kembalian}</span>
+                            </div>
+                          ) : canEditNote ? (
+                            <button
+                              type="button"
+                              onClick={() => setNoteKembalianTarget(row)}
+                              title="Tambah note kembalian"
+                              className={`w-8 h-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-amber-400 hover:bg-amber-50 flex items-center justify-center mx-auto transition-all hover:scale-110 active:scale-90 ${FOCUS_RING}`}
+                            >
+                              <Plus className="w-4 h-4 text-slate-300 group-hover:text-amber-500" />
+                            </button>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </td>
+
                         <td className="px-4 py-4 text-center">
                           <div className="flex flex-col items-center leading-tight">
                             <span className="text-xs text-slate-500 font-medium whitespace-nowrap tabular-nums">{formatDate(row.created_at)}</span>
@@ -2312,6 +2453,32 @@ export default function PengajuanDanaPage() {
                         Realisasi {formatRupiah(row.realisasi_nominal ?? 0)} · {row.realisasi_by_name} · {formatDateTime(row.realisasi_at)}
                       </p>
                     )}
+
+                    {/* ⬅️ BARU: section Note Kembalian di kartu mobile */}
+                    {(row.note_kembalian || canEditNote) && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
+                            <StickyNote className="w-3 h-3" />
+                            Note Kembalian
+                          </div>
+                          {canEditNote && (
+                            <button
+                              onClick={() => setNoteKembalianTarget(row)}
+                              className={`text-[10px] font-semibold text-amber-600 hover:text-amber-700 inline-flex items-center gap-1 ${FOCUS_RING}`}
+                            >
+                              <Pencil className="w-3 h-3" />
+                              {row.note_kembalian ? "Edit" : "Tambah"}
+                            </button>
+                          )}
+                        </div>
+                        {row.note_kembalian ? (
+                          <p className="text-[11px] text-slate-700 leading-relaxed whitespace-pre-wrap">{row.note_kembalian}</p>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 italic">Belum ada note kembalian</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -2387,6 +2554,15 @@ export default function PengajuanDanaPage() {
             setEditMetodeTarget(detailTarget);
             setDetailTarget(null);
           }}
+        />
+      )}
+
+      {/* ⬅️ BARU: render modal Note Kembalian */}
+      {noteKembalianTarget && (
+        <NoteKembalianModal
+          fundRequest={noteKembalianTarget}
+          onClose={() => setNoteKembalianTarget(null)}
+          onSaved={fetchData}
         />
       )}
     </DashboardLayout>

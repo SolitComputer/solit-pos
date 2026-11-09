@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { FUND_APPROVER_IDS, canExecuteFund } from "@/lib/fundConfig";
+import { FUND_APPROVER_IDS, canExecuteFund, canEditNoteKembalian } from "@/lib/fundConfig";
 
 function db() {
   return createClient(
@@ -25,7 +25,7 @@ export async function PATCH(
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { action?: string; payment_method?: string; reason?: string; cash_location?: string; branch?: string };
+  let body: { action?: string; payment_method?: string; reason?: string; cash_location?: string; branch?: string; note_kembalian?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -392,6 +392,41 @@ export async function PATCH(
     const { data, error } = await supabase
       .from("fund_requests")
       .update({ payment_method: newMethod, cash_location: newCashLocation, ...(newBranch ? { branch: newBranch } : {}) })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  }
+
+  // ── Update Note Kembalian ─────────────────────────────────────────────────────
+  // Catatan kembalian pengajuan dana — hanya boleh diisi oleh user yang ada di
+  // whitelist NOTE_KEMBALIAN_ALLOWED_NAMES (lihat lib/fundConfig.ts).
+  // Note bisa diisi/diubah/dihapus kapan saja, termasuk setelah realisasi.
+  // Kirim note_kembalian = null atau string kosong untuk menghapus note.
+  if (action === "update_note_kembalian") {
+    if (!canEditNoteKembalian(userName)) {
+      return NextResponse.json(
+        { success: false, message: "Anda tidak memiliki wewenang untuk mengisi Note Kembalian" },
+        { status: 403 }
+      );
+    }
+
+    const rawNote = body.note_kembalian;
+    const normalizedNote =
+      typeof rawNote === "string" && rawNote.trim().length > 0 ? rawNote.trim() : null;
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({
+        note_kembalian: normalizedNote,
+        note_kembalian_by: normalizedNote ? userId : null,
+        note_kembalian_at: normalizedNote ? new Date().toISOString() : null,
+      })
       .eq("id", id)
       .select()
       .single();
