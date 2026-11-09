@@ -4,6 +4,7 @@ import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
 import { BARANG_FULL_ACCESS_ROLES, LAPTOP_DELETE_ROLES, hasAnyRole, expandRolesWithParents, canEditConditionChecks, type UserRole } from "@/lib/permissions";
+import { isUnitQcComplete } from "@/lib/qcCriteria";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 interface Props {
@@ -125,6 +126,39 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     // Status unit berubah → sinkronkan qty parent.
     if (status !== undefined) {
       await recalcLaptopParentQty(supabase, data?.laptop_id ?? before?.laptop_id);
+    }
+
+    // ── Auto-cek kelengkapan QC ─────────────────────────────────────────
+    // Kalau unit ini masih dalam alur QC (qc_status = NEEDS_QC) dan SEMUA
+    // field wajib sudah lengkap setelah update, auto naikkan ke QC_DONE +
+    // SIAP_JUAL. Ini bikin alur QC jalan transparan — Team QC nggak harus
+    // klik tombol khusus, cukup isi field via UnitDetailModal / modal manapun
+    // yang hit endpoint ini, sistem yang handle transition-nya.
+    // NULL/undefined/"" = kosong, 0 = sudah diisi (lihat lib/qcCriteria.ts).
+    if (data && data.qc_status === "NEEDS_QC") {
+      const { data: laptop } = await supabase
+        .from("laptops").select("*").eq("id", data.laptop_id).single();
+
+      if (laptop && isUnitQcComplete(data, laptop)) {
+        await supabase.from("laptop_units").update({
+          qc_status: "QC_DONE",
+          status: "SIAP_JUAL",
+          qc_completed_at: new Date().toISOString(),
+          qc_completed_by: user.id,
+        }).eq("id", id);
+
+        // Log ke qc_history untuk audit trail
+        await supabase.from("qc_history").insert({
+          unit_id: id, laptop_id: data.laptop_id,
+          from_qc_status: "NEEDS_QC", to_qc_status: "QC_DONE",
+          from_status: data.status, to_status: "SIAP_JUAL",
+          actor_user_id: user.id, actor_name: user.name,
+          reason: "Kriteria QC lengkap — otomatis via edit unit",
+        });
+
+        // Sync qty parent karena status unit berubah (BELUM_SIAP → SIAP_JUAL)
+        await recalcLaptopParentQty(supabase, data.laptop_id);
+      }
     }
 
     //  Kalau model laptop ini cuma punya 1 unit aktif (stok = 1) dan Harga

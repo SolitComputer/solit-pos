@@ -6,14 +6,16 @@
   import UnifiedBarangContent from "./UnifiedBarangContent";
   import OutflowsContent from "./OutflowsContent";
   import CategoriesContent from "./CategoriesContent";
+  import TeamQcContent from "./TeamQcContent";
   import ArsipContent from "./ArsipContent";
   import SoLaptopContent from "./SoLaptopContent"; 
   import ReturnsContent from "./ReturnsContent";
   import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
   import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
+  
 
 
-  type TabKey = "barang" | "so-laptop" | "arsip" | "return" | "outflows" | "pedagang" | "kategori";
+type TabKey = "barang" | "team-qc" | "so-laptop" | "arsip" | "return" | "outflows" | "pedagang" | "kategori";
 
   interface TabDef {
     key: TabKey;
@@ -28,6 +30,15 @@
       label: "Data Barang",
       roles: DATA_BARANG_LAPTOP_ROLES,
       icon: "ti-device-laptop",
+    },
+    {
+      key: "team-qc",
+      label: "Team QC",
+      // Team QC = Kepala Admin Barang + Admin Barang + FULL_ACCESS.
+      // Dipakai untuk isi kriteria QC unit yang baru di-SN sampai lengkap
+      // → otomatis naik ke SIAP_JUAL. Lihat lib/permissions.ts → TEAM_QC_ROLES.
+      roles: ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG"],
+      icon: "ti-clipboard-check-green",
     },
     {
       key: "so-laptop",
@@ -135,6 +146,15 @@
             <rect x="8" y="2" width="8" height="4" rx="1" />
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
             <polyline points="9 14 11 16 15 12" />
+          </svg>
+        );
+      case "ti-clipboard-check-green":
+        // Icon clipboard + checkmark untuk tab Team QC — sama bentuk dengan SO
+        // tapi akan di-warna hijau via Tailwind text-emerald-* saat aktif
+        // (opsional, kalau mau bedain lebih jelas dari SO).
+        return (
+          <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2l3 7h7l-5.5 4.5 2 7.5-6.5-4.5-6.5 4.5 2-7.5L2 9h7z" />
           </svg>
         );
       default:
@@ -293,7 +313,8 @@
             </div>
           ) : (
             <>
-               {activeTab === "barang" && visibleTabs.some((t) => t.key === "barang") && <UnifiedBarangContent />}
+              {activeTab === "barang" && visibleTabs.some((t) => t.key === "barang") && <UnifiedBarangContent />}
+              {activeTab === "team-qc" && visibleTabs.some((t) => t.key === "team-qc") && <TeamQcContent />}
               {activeTab === "so-laptop" && visibleTabs.some((t) => t.key === "so-laptop") && <SoLaptopContent />}
               {activeTab === "arsip" && visibleTabs.some((t) => t.key === "arsip") && <ArsipContent />}
               {activeTab === "return" && visibleTabs.some((t) => t.key === "return") && <ReturnsContent />}

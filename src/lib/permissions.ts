@@ -216,6 +216,19 @@ export const FIXED_ASSET_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CE
 export const MINUS_REVIEW_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
 ];
+
+// ── Team QC (Isi Kriteria Unit Baru) ─────────────────────────────────────────
+// Role yang masuk tim QC → isi semua field unit yang baru di-SN sampai lengkap.
+// Ketika semua field terisi (NULL = kosong, 0 = terisi), unit otomatis naik
+// ke qc_status = QC_DONE + status = SIAP_JUAL. Dipakai di:
+//   - /api/laptops/qc        (list + submit kriteria)
+//   - /api/laptops/qc/mark-minus (tandai minus → lempar ke Pengelola Barang)
+//   - /dashboard/data-barang → tab "Team QC"
+//   - /api/units/[id]        (auto cek kelengkapan setiap edit unit)
+export const TEAM_QC_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_ADMIN_BARANG", "ADMIN_BARANG",
+];
 export const DEAD_ASSET_ROLES: UserRole[] = [
   ...FIXED_ASSET_ROLES, "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
 ];
@@ -639,6 +652,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI"],
     "/api/laptops/minus-siap-jual-units": ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL_SALES", "SOLIT_JOGJA"],
+  // ── Team QC endpoints ──
+  // Prefix ini menutup /api/laptops/qc & /api/laptops/qc/mark-minus. Ditulis
+  // literal karena TEAM_QC_ROLES didefinisikan sebelum ROUTE_PERMISSIONS, jadi
+  // sebenarnya bisa pakai spread — tapi biar konsisten dengan entry lain di sini.
+  "/api/laptops/qc": ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG"],
   // Kelompok MSJ — ditulis literal (bukan spread) karena MSJ_GROUP_VIEW_ROLES
   // didefinisikan SETELAH ROUTE_PERMISSIONS. Samakan manual kalau daftar diubah.
   // Prefix ini menutup /api/msj-groups, /api/msj-groups/[id], /api/msj-groups/search-sn.
