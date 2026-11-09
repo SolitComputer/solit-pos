@@ -15,7 +15,7 @@ interface ArchivedRow {
     kategori: string | null;
     brand: string | null;
     harga_jual: number;
-    sn: string | null;
+    sn: string[] | null;
     archived_at: string;
     archived_by: string | null;
     archive_reason: string | null;
@@ -23,20 +23,21 @@ interface ArchivedRow {
 
 // Ekstrak SN dari berbagai kemungkinan bentuk data (flat field atau nested units[]).
 // Dipakai untuk Laptop & Aksesoris karena nama kolom di API bisa beda-beda.
-const extractSN = (obj: any): string | null => {
+const extractSN = (obj: any): string[] | null => {
     if (!obj) return null;
     // 1) Field datar yang paling umum
     const direct =
         obj.serial_number ?? obj.sn ?? obj.serial ??
         obj.sn_laptop ?? obj.imei ?? obj.serial_no;
-    if (direct) return String(direct);
+    if (direct) return [String(direct)];
     // 2) Nested units[] (fitur Kelola Unit Laptop/Aksesoris)
     const units = obj.units ?? obj.laptop_units ?? obj.accessory_units ?? obj.sn_list;
     if (Array.isArray(units) && units.length > 0) {
-        const sns = units
+        const sns: string[] = units
             .map((u: any) => (typeof u === "string" ? u : u?.serial_number ?? u?.sn ?? u?.serial))
-            .filter(Boolean);
-        if (sns.length > 0) return sns.join(", ");
+            .filter(Boolean)
+            .map((s: any) => String(s));
+        if (sns.length > 0) return sns;
     }
     return null;
 };
@@ -62,6 +63,15 @@ export default function ArsipContent() {
     const [search, setSearch] = useState("");
     const [restoringId, setRestoringId] = useState<string | null>(null);
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const [expandedSNs, setExpandedSNs] = useState<Set<string>>(new Set());
+
+    const toggleSN = (key: string) => {
+        setExpandedSNs(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    };
 
     const canManage = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
 
@@ -151,7 +161,7 @@ export default function ArsipContent() {
             r.nama.toLowerCase().includes(q) ||
             (r.brand || "").toLowerCase().includes(q) ||
             (r.kategori || "").toLowerCase().includes(q) ||
-            (r.sn || "").toLowerCase().includes(q)
+            (r.sn || []).join(" ").toLowerCase().includes(q)
         );
     }, [rows, search]);
 
@@ -237,8 +247,34 @@ export default function ArsipContent() {
                                         </td>
                                         <td className="px-4 py-3 text-gray-600">{row.kategori || <span className="text-gray-300">—</span>}</td>
                                         <td className="px-4 py-3 text-gray-600">{row.brand || <span className="text-gray-300">—</span>}</td>
-                                        <td className="px-4 py-3 text-gray-700 font-mono text-[12px] tabular-nums whitespace-nowrap">
-                                            {row.sn || <span className="text-gray-300 font-sans">—</span>}
+                                        <td className="px-4 py-3 align-top">
+                                            {row.sn && row.sn.length > 0 ? (
+                                                <div className="max-w-[260px]">
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {(expandedSNs.has(`${row.tipe}-${row.id}`) ? row.sn : row.sn.slice(0, 3)).map((s, idx) => (
+                                                            <span
+                                                                key={`${row.id}-sn-${idx}`}
+                                                                className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700 font-mono text-[11px] tabular-nums border border-gray-200"
+                                                            >
+                                                                {s}
+                                                            </span>
+                                                        ))}
+                                                        {row.sn.length > 3 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleSN(`${row.tipe}-${row.id}`)}
+                                                                className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 text-[11px] font-semibold border border-sky-200 hover:bg-sky-100 cursor-pointer transition"
+                                                            >
+                                                                {expandedSNs.has(`${row.tipe}-${row.id}`)
+                                                                    ? "Sembunyikan"
+                                                                    : `+${row.sn.length - 3} lagi`}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-300">—</span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-right tabular-nums text-gray-800 font-medium">{fmt(row.harga_jual)}</td>
                                         <td className="px-4 py-3 text-center"><ReasonBadge reason={row.archive_reason} /></td>
