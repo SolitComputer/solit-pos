@@ -384,3 +384,69 @@ html.dark .border-amber-200\/60            { border-color: #5c390a; }
 
 /* Blue (detail terpilih) → dark blue senada badge info */
 html.dark .bg-blue-50\/40                  { background-color: rgba(12,30,54,.55); }
+
+/* =========================================================
+   DARK MODE v6 — tutup sisa celah HOVER yang lolos v4 & v5.
+   Penyebab utama "baris/kotak putih saat di-hover" di tabel
+   (hover:bg-gray-50/60, hover:bg-slate-50/60) + hover badge
+   berwarna skala -100/-50 & shadow-2xl. Scoped html.dark.
+   HANYA menambah warna — tidak mematikan apa pun (aman).
+   ========================================================= */
+
+/* Hover baris tabel pakai opacity (/60,/50,/40) → sorotan gelap halus */
+html.dark .hover\:bg-gray-50\/60:hover,
+html.dark .hover\:bg-slate-50\/60:hover,
+html.dark .hover\:bg-zinc-50\/60:hover,
+html.dark .hover\:bg-gray-50\/50:hover,
+html.dark .hover\:bg-slate-50\/50:hover,
+html.dark .hover\:bg-gray-50\/40:hover,
+html.dark .hover\:bg-slate-50\/40:hover { background-color: #182335; }
+
+/* Hover penuh netral skala -100 dengan opacity */
+html.dark .hover\:bg-slate-100\/60:hover,
+html.dark .hover\:bg-gray-100\/60:hover { background-color: #202d42; }
+
+/* Hover badge/tombol berwarna skala -100 */
+html.dark .hover\:bg-emerald-100:hover, html.dark .hover\:bg-green-100:hover   { background-color: #0d3824; }
+html.dark .hover\:bg-sky-100:hover,     html.dark .hover\:bg-blue-100:hover,
+html.dark .hover\:bg-indigo-100:hover,  html.dark .hover\:bg-cyan-100:hover    { background-color: #142e50; }
+html.dark .hover\:bg-amber-100:hover,   html.dark .hover\:bg-yellow-100:hover,
+html.dark .hover\:bg-orange-100:hover                                          { background-color: #422a09; }
+html.dark .hover\:bg-red-100:hover,     html.dark .hover\:bg-rose-100:hover    { background-color: #451522; }
+html.dark .hover\:bg-purple-100:hover,  html.dark .hover\:bg-violet-100:hover  { background-color: #2e1c55; }
+
+/* Hover badge/tombol berwarna skala -50 */
+html.dark .hover\:bg-emerald-50:hover, html.dark .hover\:bg-green-50:hover { background-color: #072517; }
+html.dark .hover\:bg-sky-50:hover,     html.dark .hover\:bg-blue-50:hover  { background-color: #0c1e36; }
+html.dark .hover\:bg-amber-50:hover                                        { background-color: #2b1b06; }
+html.dark .hover\:bg-red-50:hover,     html.dark .hover\:bg-rose-50:hover  { background-color: #2d0e17; }
+
+/* Shadow modal besar (belum ada di v4) */
+html.dark .shadow-2xl { box-shadow: 0 24px 50px rgba(0,0,0,.7); }
+
+/* =========================================================
+   DARK MODE v6.1 — lengkapi hover netral skala -100 & -200
+   (zinc/neutral/gray/slate) yang belum tercakup section 6.
+   Tombol kecil (Reset, Batal, icon edit) ikut gelap saat hover.
+   ========================================================= */
+html.dark .hover\:bg-zinc-100:hover,
+html.dark .hover\:bg-neutral-100:hover { background-color: #202d42; }
+
+html.dark .hover\:bg-slate-200:hover,
+html.dark .hover\:bg-gray-200:hover,
+html.dark .hover\:bg-zinc-200:hover,
+html.dark .hover\:bg-neutral-200:hover { background-color: #24344d; }
+
+/* =========================================================
+   DARK MODE v6.2 — teks badge skala -800/-900 (kadang dipakai
+   di badge berwarna) biar tidak gelap-di-atas-gelap. Mirror
+   dari mapping -700. Aman: hanya melembutkan teks di dark.
+   ========================================================= */
+html.dark .text-emerald-800, html.dark .text-green-800    { color: #34d399; }
+html.dark .text-red-800,     html.dark .text-rose-800     { color: #fb7185; }
+html.dark .text-amber-900,   html.dark .text-yellow-800,
+html.dark .text-orange-800                                { color: #fbbf24; }
+html.dark .text-blue-800,    html.dark .text-sky-800,
+html.dark .text-indigo-800,  html.dark .text-cyan-800     { color: #60a5fa; }
+html.dark .text-purple-800,  html.dark .text-violet-800   { color: #c084fc; }
+html.dark .text-teal-800                                  { color: #2dd4bf; }

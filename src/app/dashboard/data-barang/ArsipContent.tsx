@@ -201,7 +201,7 @@ export default function ArsipContent() {
                     <button onClick={loadArchived} className="text-sm font-semibold text-red-700 underline underline-offset-2">Coba lagi</button>
                 </div>
             ) : filtered.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 p-10 text-center">
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:bg-white/[0.02] p-10 text-center">
                     <p className="text-sm text-gray-500 font-medium">
                         {rows.length === 0 ? "Belum ada barang di arsip." : "Tidak ada barang yang cocok dengan pencarian."}
                     </p>
@@ -225,7 +225,7 @@ export default function ArsipContent() {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {filtered.map((row, i) => (
-                                    <tr key={`${row.tipe}-${row.id}`} className="hover:bg-gray-50/60 transition">
+                                    <tr key={`${row.tipe}-${row.id}`} className="hover:bg-gray-50/60 dark:hover:bg-white/5 transition">
                                         <td className="px-4 py-3 text-gray-400 tabular-nums">{String(i + 1).padStart(2, "0")}</td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
@@ -253,7 +253,7 @@ export default function ArsipContent() {
                                                     disabled={restoringId === row.id}
                                                     title="Kembalikan ke Data Barang"
                                                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
-                                                        bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100
+                                                        bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30 dark:hover:bg-sky-500/20
                                                         ${restoringId === row.id ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}`}
                                                 >
                                                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

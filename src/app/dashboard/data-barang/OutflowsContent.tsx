@@ -350,7 +350,7 @@ export default function OutflowsContent() {
                     </button>
                 </div>
             ) : filtered.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 p-10 text-center">
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 dark:bg-white/[0.02] p-10 text-center">
                     <p className="text-sm text-gray-500 font-medium">
                         {rows.length === 0 ? "Belum ada data pengambilan barang." : "Tidak ada data yang sesuai filter."}
                     </p>
@@ -379,7 +379,7 @@ export default function OutflowsContent() {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {filtered.map((row, i) => (
-                                    <tr key={row.id} className="hover:bg-gray-50/60 transition">
+                                    <tr key={row.id} className="hover:bg-gray-50/60 dark:hover:bg-white/5 transition">
                                         <td className="px-4 py-3 text-gray-400 tabular-nums">
                                             {String(i + 1).padStart(2, "0")}
                                         </td>
@@ -461,7 +461,7 @@ export default function OutflowsContent() {
                                             ) : row.is_restored ? (
                                                 <span
                                                     title={`Dikembalikan oleh ${row.restored_by ?? "—"} · ${row.restored_at ? formatDate(row.restored_at) : ""}`}
-                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-sky-50 text-sky-700 border-sky-200"
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30"
                                                 >
                                                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                                                         <polyline points="20 6 9 17 4 12" />
