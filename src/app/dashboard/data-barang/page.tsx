@@ -234,7 +234,7 @@ type TabKey = "barang" | "team-qc" | "so-laptop" | "arsip" | "return" | "outflow
         <div ref={topRef} className="bg-white border border-gray-200/80 rounded-2xl shadow-sm overflow-hidden mb-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 gap-3 sm:gap-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 sm:w-9 sm:h-9 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md shadow-zinc-900/25">
+              <div className="w-10 h-10 sm:w-9 sm:h-9 bg-gradient-to-br from-zinc-700 to-zinc-900 dark:from-zinc-600 dark:to-zinc-800 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md shadow-zinc-900/25">
                 <svg
                   className="w-[18px] h-[18px] sm:w-[17px] sm:h-[17px]"
                   viewBox="0 0 24 24"
@@ -284,7 +284,7 @@ type TabKey = "barang" | "team-qc" | "so-laptop" | "arsip" | "return" | "outflow
                       "text-[13px] border-b-2 -mb-px transition-all duration-150 select-none",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-1 rounded-sm",
                       isActive
-                        ? "border-zinc-900 text-zinc-900 font-semibold" 
+                        ? "border-zinc-900 dark:border-[#2bb6cd] text-zinc-900 font-semibold"
                         : "border-transparent text-gray-500 font-normal hover:text-gray-800 hover:border-gray-300",
                     ].join(" ")}
                   >
