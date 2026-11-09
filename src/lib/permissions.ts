@@ -229,6 +229,19 @@ export const TEAM_QC_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_ADMIN_BARANG", "ADMIN_BARANG",
 ];
+
+// ── Pengelola Barang — keputusan untuk unit MINUS dari Team QC ───────────────
+// Role yang berhak memutuskan: PERBAIKI (ke antrian sparepart) / MSJ / ASET_MATOT.
+// Dipakai di:
+//   - /api/laptops/qc/from-qc          (list unit FROM_QC)
+//   - /api/laptops/pengelola/decision  (post keputusan 3 opsi)
+//   - /api/laptops/sparepart-queue/*   (CRUD antrian sparepart)
+//   - /dashboard/laptops/minus         (tab "Dari QC" + "Antrian Sparepart")
+export const PENGELOLA_DECISION_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "KEPALA_ADMIN_BARANG", // kepala admin barang juga boleh (overlap tim)
+];
 export const DEAD_ASSET_ROLES: UserRole[] = [
   ...FIXED_ASSET_ROLES, "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
 ];

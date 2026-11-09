@@ -10,11 +10,10 @@ export interface CreatedUnit {
 }
 
 const GRADE_OPTIONS = ["A", "B", "C"] as const;
-const STATUS_OPTIONS = [
-    { value: "SIAP_JUAL", label: "Siap Jual" },
-    { value: "BELUM_SIAP", label: "Belum Siap" },
-    { value: "SERVICE", label: "Service" },
-];
+// STATUS_OPTIONS dihapus — alur QC baru: unit baru otomatis BELUM_SIAP + NEEDS_QC
+// (muncul di Tab Team QC). Kalau mau langsung SERVICE/SIAP_JUAL, edit lewat
+// UnitFormModal setelah create, atau lewat Tab Team QC untuk otomatis SIAP_JUAL
+// saat semua field terisi.
 
 export default function AddUnitModal({
     laptopId,
@@ -37,7 +36,7 @@ export default function AddUnitModal({
         purchase_price: "",
         sparepart_cost: "",
         selling_price: String(defaultSellingPrice || ""),
-        status: "SIAP_JUAL",
+        // status dihapus — API otomatis set BELUM_SIAP + qc_status NEEDS_QC
         branch: "", // ⬅️ BARU: cabang per unit (unit-level). "" = belum ditentukan → null
         notes: "",
     });
@@ -63,12 +62,17 @@ export default function AddUnitModal({
                                 body: JSON.stringify({
                     serial_number: form.serial_number.trim(),
                     grade: form.grade,
-                    condition_note: form.condition_note,
+                    // ✅ Kosong dikirim sebagai string "" — API yang handle
+                    // konversi ke NULL (bukan 0) supaya qcCriteria bisa bedain
+                    // "belum diisi" vs "sengaja isi 0".
+                    condition_note: form.condition_note.trim() || null,
                     source: form.source.trim() || null,
-                    purchase_price: Number(form.purchase_price) || 0,
-                    selling_price: Number(form.selling_price) || 0,
-                    sparepart_cost: Number(form.sparepart_cost) || 0,
-                                       status: form.status,
+                    // Harga: "" → null, angka → number. JANGAN pakai `|| 0` lagi
+                    // karena 0 dianggap "terisi" di qc_status check.
+                    purchase_price: form.purchase_price.trim() === "" ? null : Number(form.purchase_price),
+                    selling_price: form.selling_price.trim() === "" ? null : Number(form.selling_price),
+                    sparepart_cost: form.sparepart_cost.trim() === "" ? null : Number(form.sparepart_cost),
+                    // status & qc_status TIDAK dikirim → API set default BELUM_SIAP + NEEDS_QC
                     branch: form.branch || null, // ⬅️ BARU: "" dikirim sebagai null
                     notes: form.notes,
                 }),
@@ -109,17 +113,21 @@ export default function AddUnitModal({
                             placeholder="Contoh: SN-12345" className={inputCls} autoFocus />
                     </Field>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field label="Grade">
-                            <select name="grade" value={form.grade} onChange={handleChange} className={inputCls}>
-                                {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                            </select>
-                        </Field>
-                                               <Field label="Status">
-                            <select name="status" value={form.status} onChange={handleChange} className={inputCls}>
-                                {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                            </select>
-                        </Field>
+                    <Field label="Grade">
+                        <select name="grade" value={form.grade} onChange={handleChange} className={inputCls}>
+                            {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                    </Field>
+
+                    {/* Info alur QC baru — unit baru otomatis BELUM_SIAP sampai semua field lengkap */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
+                        <svg className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-[11px] text-amber-800 leading-snug">
+                            Unit baru otomatis masuk <span className="font-bold">Belum Siap Jual</span> dan muncul di <span className="font-bold">Tab Team QC</span>.
+                            Status akan auto-naik ke <span className="font-bold">Siap Jual</span> setelah semua field terisi.
+                        </p>
                     </div>
 
                                         <Field label="Sumber">

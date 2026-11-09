@@ -1,75 +1,75 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
-import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
-import { expandRolesWithParents, BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
-import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
-import { logActivity } from "@/lib/activityLogger";
-import { recalcLaptopParentQty } from "@/lib/laptopStock";
+  import { NextRequest, NextResponse } from "next/server";
+  import { supabase } from "@/services/supabase";
+  import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+  import { expandRolesWithParents, BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
+  import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
+  import { logActivity } from "@/lib/activityLogger";
+  import { recalcLaptopParentQty } from "@/lib/laptopStock";
 
-// Markup tetap untuk Harga Official = Harga Setor + markup ini.
-const OFFICIAL_PRICE_MARKUP = 300_000;
+  // Markup tetap untuk Harga Official = Harga Setor + markup ini.
+  const OFFICIAL_PRICE_MARKUP = 300_000;
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
-
-// ── GET: Ambil semua unit milik laptop tertentu ───────────────────────────────
-async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
-  try {
-    const { id } = await props.params;
-
-    // Unit yang terikat transaksi PENDING (DP = RESERVED, Ambil Dulu = HELD,
-    // E-commerce = PACKING, atau PENDING) TIDAK boleh tampil di Kelola Unit —
-    // bukan stok yang bisa diproses selama transaksi aktif. SOLD sengaja TIDAK
-    // difilter (halaman masih hitung jumlah "Terjual"). Setelah transaksi
-    // di-restore, unit balik ke BELUM_SIAP sehingga otomatis muncul lagi.
-    const HIDDEN_WHILE_PENDING = ["RESERVED", "HELD", "PACKING", "PENDING"];
-
-    const { data, error } = await supabase
-      .from("laptop_units")
-      .select("*")
-      .eq("laptop_id", id)
-      .not("status", "in", `(${HIDDEN_WHILE_PENDING.join(",")})`)
-      .order("serial_number", { ascending: true }); // ← konsisten dgn /api/units
-
-    if (error) throw error;
-
-    // ✅ SECURITY FIX: VIEW_UNITS mencakup role sales (CREW_SALES,
-    // KEPALA_SALES, dst) yang seharusnya TIDAK lihat harga modal — dulu
-    // select("*") dikirim mentah, sama seperti field sensitif yang sudah
-    // benar disaring di GET /api/laptops (list).
-    const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
-    const safeData = canSeePrivate
-      ? data
-      : (data ?? []).map((u: Record<string, any>) => {
-          const { purchase_price, sparepart_cost, ...rest } = u;
-          return rest;
-        });
-
-    return NextResponse.json({ success: true, data: safeData });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json(
-      { success: false, message: "Gagal mengambil data units" },
-      { status: 500 }
-    );
+  interface Props {
+    params: Promise<{ id: string }>;
   }
-}
 
-// ── POST: Tambah satu unit baru ke laptop ─────────────────────────────────────
-async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
-  try {
-    const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
-    const hasStaticAccess = effectiveRoles.some(r => (PERMISSIONS.CREATE_UNITS as string[]).includes(r));
-    if (!hasStaticAccess) {
-      const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/units", "create");
-      if (!dyn.allowed) {
-        return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
-      }
+  // ── GET: Ambil semua unit milik laptop tertentu ───────────────────────────────
+  async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
+    try {
+      const { id } = await props.params;
+
+      // Unit yang terikat transaksi PENDING (DP = RESERVED, Ambil Dulu = HELD,
+      // E-commerce = PACKING, atau PENDING) TIDAK boleh tampil di Kelola Unit —
+      // bukan stok yang bisa diproses selama transaksi aktif. SOLD sengaja TIDAK
+      // difilter (halaman masih hitung jumlah "Terjual"). Setelah transaksi
+      // di-restore, unit balik ke BELUM_SIAP sehingga otomatis muncul lagi.
+      const HIDDEN_WHILE_PENDING = ["RESERVED", "HELD", "PACKING", "PENDING"];
+
+      const { data, error } = await supabase
+        .from("laptop_units")
+        .select("*")
+        .eq("laptop_id", id)
+        .not("status", "in", `(${HIDDEN_WHILE_PENDING.join(",")})`)
+        .order("serial_number", { ascending: true }); // ← konsisten dgn /api/units
+
+      if (error) throw error;
+
+      // ✅ SECURITY FIX: VIEW_UNITS mencakup role sales (CREW_SALES,
+      // KEPALA_SALES, dst) yang seharusnya TIDAK lihat harga modal — dulu
+      // select("*") dikirim mentah, sama seperti field sensitif yang sudah
+      // benar disaring di GET /api/laptops (list).
+      const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
+      const safeData = canSeePrivate
+        ? data
+        : (data ?? []).map((u: Record<string, any>) => {
+            const { purchase_price, sparepart_cost, ...rest } = u;
+            return rest;
+          });
+
+      return NextResponse.json({ success: true, data: safeData });
+    } catch (err) {
+      console.error(err);
+      return NextResponse.json(
+        { success: false, message: "Gagal mengambil data units" },
+        { status: 500 }
+      );
     }
+  }
 
-    const { id } = await props.params;
-    const body = await req.json();
+  // ── POST: Tambah satu unit baru ke laptop ─────────────────────────────────────
+  async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
+    try {
+      const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+      const hasStaticAccess = effectiveRoles.some(r => (PERMISSIONS.CREATE_UNITS as string[]).includes(r));
+      if (!hasStaticAccess) {
+        const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/units", "create");
+        if (!dyn.allowed) {
+          return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+        }
+      }
+
+      const { id } = await props.params;
+      const body = await req.json();
 
         const {
       serial_number,
@@ -80,7 +80,9 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       selling_price,
       sparepart_cost,
       official_price, // ← kolom baru
-           status,
+      // status dihapus — API hardcode BELUM_SIAP + qc_status NEEDS_QC untuk alur QC baru.
+      // Kalau nanti butuh override (misal bulk import langsung SIAP_JUAL), tambah
+      // flag `skip_qc_flow: boolean` di body + conditional di insert di bawah.
       branch, // ⬅️ BARU: cabang per unit (UTAMA/JOGJA/null)
       notes,
       received_at,
@@ -88,82 +90,91 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       kelengkapan,      // ← keterangan kelengkapan unit (teks bebas)
     } = body;
 
-    // Cek duplikat SN sebelum insert.
-    // Pakai limit(1) tanpa .single() — .single() error (dan lolos) kalau SN
-    // justru sudah terduplikasi (>1 baris).
-    const { data: existingRows } = await supabase
-      .from("laptop_units")
-      .select("id, status, laptop:laptops(laptop_name)")
-      .eq("serial_number", serial_number)
-      .limit(1);
+      // Cek duplikat SN sebelum insert.
+      // Pakai limit(1) tanpa .single() — .single() error (dan lolos) kalau SN
+      // justru sudah terduplikasi (>1 baris).
+      const { data: existingRows } = await supabase
+        .from("laptop_units")
+        .select("id, status, laptop:laptops(laptop_name)")
+        .eq("serial_number", serial_number)
+        .limit(1);
 
-    if (existingRows && existingRows.length > 0) {
-      const dup = existingRows[0] as any;
-      const lap = Array.isArray(dup.laptop) ? dup.laptop[0] : dup.laptop;
-      const lokasi = lap?.laptop_name ? ` pada unit "${lap.laptop_name}"` : "";
+      if (existingRows && existingRows.length > 0) {
+        const dup = existingRows[0] as any;
+        const lap = Array.isArray(dup.laptop) ? dup.laptop[0] : dup.laptop;
+        const lokasi = lap?.laptop_name ? ` pada unit "${lap.laptop_name}"` : "";
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Serial number "${serial_number}" sudah terdaftar${lokasi} (status: ${dup.status ?? "—"}). Cek di Data Barang → Reset filter, lalu filter Status Stok "Minus".`,
+            status_unit: dup.status ?? null,
+          },
+          { status: 409 }
+        );
+      }
+
+      const { data, error } = await supabase
+        .from("laptop_units")
+            .insert({
+          laptop_id: id,
+          serial_number,
+          grade,
+          // ✅ NULL-safe: kosong dari form tetap NULL di DB, bukan 0.
+          // Bedakan "belum diisi" (null) vs "sengaja isi 0" (0) di qcCriteria.
+          condition_note: condition_note?.trim() || null,
+          source: source || null,
+          purchase_price: purchase_price != null && purchase_price !== "" ? Math.round(Number(purchase_price)) : null,
+          selling_price: selling_price != null && selling_price !== "" ? Math.round(Number(selling_price)) : null,
+          sparepart_cost: sparepart_cost != null && sparepart_cost !== "" ? Math.round(Number(sparepart_cost)) : null,
+          // Official price auto dari selling + markup. Kalau selling null → official juga null.
+          official_price: selling_price != null && selling_price !== ""
+            ? Math.round(Number(selling_price)) + OFFICIAL_PRICE_MARKUP
+            : null,
+          // ✅ Alur QC baru — hardcode BELUM_SIAP + NEEDS_QC untuk setiap unit baru.
+          // Unit otomatis muncul di Tab Team QC, dan naik ke SIAP_JUAL otomatis
+          // saat semua field dilengkapi (via PUT /api/units/[id]).
+          status: "BELUM_SIAP",
+          qc_status: "NEEDS_QC",
+          branch: branch === "UTAMA" || branch === "JOGJA" ? branch : null, // ⬅️ BARU
+          notes,
+          condition_checks: condition_checks ?? {},
+          kelengkapan: kelengkapan ?? null,
+          ...(received_at ? { created_at: received_at } : {}),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Sinkronkan qty parent setelah menambah unit.
+      await recalcLaptopParentQty(supabase, id);
+
+      const { data: laptop } = await supabase
+        .from("laptops")
+        .select("laptop_name")
+        .eq("id", id)
+        .single();
+
+      await logActivity({
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: "CREATE",
+        entity: "unit",
+        entityId: data.id,
+        entityLabel: `SN: ${data.serial_number}${laptop ? ` (${laptop.laptop_name})` : ""}`,
+        afterData: data,
+      });
+
+      return NextResponse.json({ success: true, data });
+    } catch (err) {
+      console.error(err);
       return NextResponse.json(
-        {
-          success: false,
-          message: `Serial number "${serial_number}" sudah terdaftar${lokasi} (status: ${dup.status ?? "—"}). Cek di Data Barang → Reset filter, lalu filter Status Stok "Minus".`,
-          status_unit: dup.status ?? null,
-        },
-        { status: 409 }
+        { success: false, message: "Gagal menambahkan unit" },
+        { status: 500 }
       );
     }
-
-    const { data, error } = await supabase
-      .from("laptop_units")
-           .insert({
-        laptop_id: id,
-        serial_number,
-        grade,
-        condition_note,
-        source: source || null,
-        purchase_price: purchase_price != null ? Math.round(Number(purchase_price)) : 0,
-        selling_price: selling_price != null ? Math.round(Number(selling_price)) : 0,
-        sparepart_cost: sparepart_cost != null ? Math.round(Number(sparepart_cost)) : 0,
-        official_price: selling_price != null ? Math.round(Number(selling_price)) + OFFICIAL_PRICE_MARKUP : 0, // ← auto: Harga Setor + markup
-               status,
-        branch: branch === "UTAMA" || branch === "JOGJA" ? branch : null, // ⬅️ BARU
-        notes,
-        condition_checks: condition_checks ?? {},
-        kelengkapan: kelengkapan ?? null,
-        ...(received_at ? { created_at: received_at } : {}),
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Sinkronkan qty parent setelah menambah unit.
-    await recalcLaptopParentQty(supabase, id);
-
-    const { data: laptop } = await supabase
-      .from("laptops")
-      .select("laptop_name")
-      .eq("id", id)
-      .single();
-
-    await logActivity({
-      userId: user.id,
-      userName: user.name,
-      userRole: user.role,
-      action: "CREATE",
-      entity: "unit",
-      entityId: data.id,
-      entityLabel: `SN: ${data.serial_number}${laptop ? ` (${laptop.laptop_name})` : ""}`,
-      afterData: data,
-    });
-
-    return NextResponse.json({ success: true, data });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json(
-      { success: false, message: "Gagal menambahkan unit" },
-      { status: 500 }
-    );
   }
-}
 
-export const GET = withAuth(getHandler, PERMISSIONS.VIEW_UNITS);
-export const POST = withAuth(postHandler);
+  export const GET = withAuth(getHandler, PERMISSIONS.VIEW_UNITS);
+  export const POST = withAuth(postHandler);

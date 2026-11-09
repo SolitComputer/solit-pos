@@ -488,15 +488,12 @@ function MinusContent() {
         u.progress_pengerjaan?.toLowerCase().includes(t)
       );
     }
-    const ORDER: Record<string, number> = {
-      NOT_STARTED: 0, WAITING_PARTS: 1, HARD_PARTS: 2, OTHER: 3, GIVE_UP: 4, DEAD: 5, DONE: 6,
-    };
+    // Urutkan dari tanggal MASUK terbaru → paling lama (created_at DESC).
+    // Unit tanpa created_at (edge case) ditaruh paling bawah.
     list.sort((a, b) => {
-      const repairDiff =
-        (ORDER[a.repair_status || "NOT_STARTED"] ?? 9) -
-        (ORDER[b.repair_status || "NOT_STARTED"] ?? 9);
-      if (repairDiff !== 0) return repairDiff;
-      return (a.laptop?.laptop_name ?? "").localeCompare(b.laptop?.laptop_name ?? "", "id");
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateB - dateA; // DESC: besar (baru) dulu
     });
     return list;
   }, [units, filterStatus, filterMinusStatus, filterRepair, search]);
