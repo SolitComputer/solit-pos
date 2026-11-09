@@ -18,7 +18,7 @@ export const GET = withAuth(async () => {
 
   const { data, error } = await supabase
     .from("chart_of_accounts")
-    .select("code, name, type, is_builtin, created_at, updated_at")
+    .select("code, name, type, is_builtin, is_active, created_at, updated_at")
     .order("code", { ascending: true });
 
   if (error) {

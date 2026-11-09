@@ -2717,7 +2717,10 @@ function EntryFormModal({
     useEffect(() => {
         fetch("/api/akutansi/accounts")
             .then((r) => r.json())
-            .then((j) => { if (j.success) setAllAccounts(j.data); })
+            // Hanya akun AKTIF yang bisa dipilih di jurnal manual. Akun arsip
+            // (is_active=false) disembunyikan dari dropdown — tapi tetap muncul
+            // di Buku Besar/Neraca/Filter Akun (histori utuh).
+            .then((j) => { if (j.success) setAllAccounts((j.data ?? []).filter((a: any) => a.is_active !== false)); })
             .catch(() => { });
     }, []);
 

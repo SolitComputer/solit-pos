@@ -9,6 +9,7 @@ interface AccountRow {
     name: string;
     type: string;
     is_builtin?: boolean;
+    is_active?: boolean;
 }
 
 export default function AkunManager() {
@@ -37,6 +38,29 @@ export default function AkunManager() {
         const t = setTimeout(() => setToast(null), 3000);
         return () => clearTimeout(t);
     }, [toast]);
+
+    const handleToggleActive = async (acc: AccountRow) => {
+        const next = !(acc.is_active ?? true);
+        // Optimistic — langsung ubah di layar, balikin kalau gagal.
+        setAccounts((prev) => prev.map((a) => (a.code === acc.code ? { ...a, is_active: next } : a)));
+        try {
+            const res = await fetch(`/api/akutansi/accounts/${acc.code}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: next }),
+            });
+            const json = await res.json();
+            if (!json.success) {
+                setAccounts((prev) => prev.map((a) => (a.code === acc.code ? { ...a, is_active: !next } : a)));
+                setToast(json.message ?? "Gagal mengubah status akun");
+                return;
+            }
+            setToast(next ? "Akun diaktifkan" : "Akun diarsipkan (disembunyikan dari dropdown jurnal)");
+        } catch {
+            setAccounts((prev) => prev.map((a) => (a.code === acc.code ? { ...a, is_active: !next } : a)));
+            setToast("Koneksi bermasalah");
+        }
+    };
 
     const handleDelete = async (acc: AccountRow) => {
         const warning = acc.is_builtin
@@ -151,6 +175,13 @@ export default function AkunManager() {
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                     <button
+                                        onClick={() => handleToggleActive(a)}
+                                        title={(a.is_active ?? true) ? "Aktif — klik untuk arsipkan" : "Arsip — klik untuk aktifkan"}
+                                        className={`relative w-9 h-5 rounded-full transition-colors duration-150 shrink-0 self-center ${(a.is_active ?? true) ? "bg-emerald-500" : "bg-gray-300"}`}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-150 ${(a.is_active ?? true) ? "translate-x-4" : ""}`} />
+                                    </button>
+                                    <button
                                         onClick={() => { setEditing(a); setShowForm(true); }}
                                         title="Edit akun"
                                         className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
@@ -219,6 +250,13 @@ export default function AkunManager() {
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    onClick={() => handleToggleActive(a)}
+                                                    title={(a.is_active ?? true) ? "Aktif — klik untuk arsipkan (sembunyikan dari dropdown jurnal)" : "Arsip — klik untuk aktifkan kembali"}
+                                                    className={`relative w-9 h-5 rounded-full transition-colors duration-150 shrink-0 ${(a.is_active ?? true) ? "bg-emerald-500" : "bg-gray-300"}`}
+                                                >
+                                                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-150 ${(a.is_active ?? true) ? "translate-x-4" : ""}`} />
+                                                </button>
                                                 <button
                                                     onClick={() => { setEditing(a); setShowForm(true); }}
                                                     title="Edit akun"

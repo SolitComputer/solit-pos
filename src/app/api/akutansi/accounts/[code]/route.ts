@@ -71,11 +71,95 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
     .from("chart_of_accounts")
     .update({ name: name.trim(), type, updated_by: user.id, updated_at: new Date().toISOString() })
     .eq("code", effectiveCode)
-    .select("code, name, type, is_builtin, updated_at")
+    .select("code, name, type, is_builtin, is_active, updated_at")
     .single();
 
   if (error) {
     console.error("[accounts PUT]", error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, data: updated });
+}, AKUNTANSI_MANAGE_ROLES);
+
+// ── PATCH — toggle saklar aktif/arsip akun (soft-archive, TIDAK menghapus apa pun) ──
+// Akun non-aktif disembunyikan dari dropdown pilih akun di buat/edit jurnal
+// manual. Laporan (Neraca/Buku Besar/Filter Akun) TIDAK terpengaruh — histori
+// tetap utuh. Pengaman: akun bersaldo ≠ 0 tidak boleh diarsipkan (biar tidak
+// ada saldo "nyangkut" yang tak bisa dikoreksi karena akunnya hilang dari input).
+export const PATCH = withAuth(async (req, ctx, user: any) => {
+  const { code } = await ctx.params;
+  if (!code) return NextResponse.json({ success: false, message: "Kode tidak valid" }, { status: 400 });
+
+  const body = await req.json();
+  const { is_active } = body as { is_active?: boolean };
+  if (typeof is_active !== "boolean")
+    return NextResponse.json({ success: false, message: "is_active harus true/false" }, { status: 400 });
+
+  const supabase = getAdmin();
+
+  const { data: existing } = await supabase
+    .from("chart_of_accounts")
+    .select("code")
+    .eq("code", code)
+    .maybeSingle();
+  if (!existing)
+    return NextResponse.json({ success: false, message: "Akun tidak ditemukan" }, { status: 404 });
+
+  // Mau MENONAKTIFKAN → cek saldo akun harus 0 dulu.
+  // Saldo = Saldo Awal Manual + seluruh mutasi jurnal (DEBIT +, KREDIT −).
+  if (!is_active) {
+    const { data: openingRow, error: openErr } = await supabase
+      .from("journal_opening_balances")
+      .select("side, nominal")
+      .eq("account_code", code)
+      .maybeSingle();
+    if (openErr) {
+      console.error("[accounts PATCH] cek opening:", openErr.message);
+      return NextResponse.json({ success: false, message: "Gagal memverifikasi saldo awal akun" }, { status: 500 });
+    }
+
+    let saldo = openingRow
+      ? openingRow.side === "DEBIT" ? Number(openingRow.nominal) : -Number(openingRow.nominal)
+      : 0;
+
+    // Jumlahkan semua baris jurnal akun ini (di-page, bisa >1000 baris).
+    const PAGE_SIZE = 1000;
+    let from = 0;
+    while (true) {
+      const { data: page, error: lineErr } = await supabase
+        .from("journal_lines")
+        .select("side, nominal")
+        .eq("account_code", code)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (lineErr) {
+        console.error("[accounts PATCH] cek mutasi:", lineErr.message);
+        return NextResponse.json({ success: false, message: "Gagal memverifikasi saldo akun" }, { status: 500 });
+      }
+      if (!page || page.length === 0) break;
+      for (const l of page as any[]) saldo += l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
+      if (page.length < PAGE_SIZE) break;
+      from += page.length;
+    }
+
+    if (Math.round(saldo) !== 0) {
+      return NextResponse.json(
+        { success: false, message: "Akun ini masih punya saldo — nolkan dulu (pindahkan lewat jurnal) sebelum diarsipkan" },
+        { status: 409 }
+      );
+    }
+  }
+
+  const { data: updated, error } = await supabase
+    .from("chart_of_accounts")
+    .update({ is_active, updated_by: user.id, updated_at: new Date().toISOString() })
+    .eq("code", code)
+    .select("code, name, type, is_builtin, is_active")
+    .single();
+
+  if (error) {
+    console.error("[accounts PATCH]", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
