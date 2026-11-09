@@ -1001,7 +1001,7 @@ function ReadyContent() {
              * - p-3 di HP supaya tabel punya lebih banyak ruang horizontal
              * - space-y-3 di HP supaya konten lebih compact
              */}
-            <main className="min-h-screen bg-gradient-to-b from-[#F7F7F8] via-[#F7F7F8] to-[#ECECF0] p-3 sm:p-6 lg:p-8">
+<main className="min-h-screen bg-gradient-to-b from-[#F7F7F8] via-[#F7F7F8] to-[#ECECF0] dark:from-[#090d16] dark:via-[#090d16] dark:to-[#0d1424] p-3 sm:p-6 lg:p-8">
                 <div className="max-w-full mx-auto space-y-3 sm:space-y-5 lg:space-y-6">
 
                     {/* ── Header ──────────────────────────────────────────────────────────────
