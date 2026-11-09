@@ -26,6 +26,11 @@ interface MinusUnit {
   analisa: string | null;
   progress_pengerjaan: string | null;
   minus_status: string; // 'BELUM_DIATASI' | 'SUDAH_DIATASI'
+  // ── BARU (alur QC): penanda unit dari Team QC ──
+  // 'FROM_QC' = ditandai MINUS oleh Team QC → butuh keputusan Pengelola Barang
+  // 'IN_SPAREPART' = sedang di antrian sparepart
+  // null = unit lama (pre-fitur QC) atau diluar alur QC
+  qc_status?: string | null;
   created_at: string;
   laptop?: {
     id: string;
@@ -409,6 +414,9 @@ function MinusContent() {
   const [filterRepair, setFilterRepair] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterMinusStatus, setFilterMinusStatus] = useState<"ALL" | "BELUM_DIATASI" | "SUDAH_DIATASI">("ALL");
+  // ── Tab pemisah: "UMUM" = unit minus lama (existing flow),
+  //                "DARI_QC" = unit yang ditandai MINUS dari Team QC (alur baru)
+  const [activeTab, setActiveTab] = useState<"UMUM" | "DARI_QC">("UMUM");
 
   // Modals
   const [editTarget, setEditTarget] = useState<MinusUnit | null>(null);
@@ -471,6 +479,14 @@ function MinusContent() {
 
   const filtered = useMemo(() => {
     let list = [...units];
+    // ── Filter tab: pisahkan unit dari alur QC baru vs unit minus lama ──
+    // DARI_QC: cuma unit yang qc_status === 'FROM_QC' (dilempar Team QC)
+    // UMUM: sisanya (qc_status null atau !== FROM_QC)
+    if (activeTab === "DARI_QC") {
+      list = list.filter(u => u.qc_status === "FROM_QC");
+    } else {
+      list = list.filter(u => u.qc_status !== "FROM_QC");
+    }
     if (filterStatus !== "ALL") list = list.filter(u => u.status === filterStatus);
     if (filterMinusStatus !== "ALL") list = list.filter(u => (u.minus_status || "BELUM_DIATASI") === filterMinusStatus);
     if (filterRepair !== "ALL") {
@@ -496,7 +512,7 @@ function MinusContent() {
       return dateB - dateA; // DESC: besar (baru) dulu
     });
     return list;
-  }, [units, filterStatus, filterMinusStatus, filterRepair, search]);
+  }, [units, filterStatus, filterMinusStatus, filterRepair, search, activeTab]);
 
   // Counts
   const repairCounts = useMemo(() => {
@@ -568,6 +584,49 @@ function MinusContent() {
               </p>
             </div>
           )}
+
+          {/* ── Tab Strip: Pemisah "Perbaikan Umum" vs "Dari QC" ─────── */}
+          {/* UMUM = unit minus existing (alur lama teknisi).
+              DARI_QC = unit yang di-tandai MINUS oleh Team QC → butuh keputusan
+                       Pengelola Barang (Perbaiki / MSJ / Aset Matot).
+              Angka badge dihitung dari seluruh `units` (bukan hasil filter),
+              supaya counter tetap akurat walau filter lain aktif. */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex">
+              <button
+                onClick={() => setActiveTab("UMUM")}
+                className={`flex-1 h-12 px-4 flex items-center justify-center gap-2 text-sm font-semibold transition-all border-b-2 ${
+                  activeTab === "UMUM"
+                    ? "text-gray-800 border-gray-700 bg-gray-50"
+                    : "text-gray-400 border-transparent hover:text-gray-600 hover:bg-gray-50/60"
+                }`}
+              >
+                <Wrench size={16} />
+                Perbaikan Umum
+                <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold ${
+                  activeTab === "UMUM" ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-500"
+                }`}>
+                  {units.filter(u => u.qc_status !== "FROM_QC").length}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("DARI_QC")}
+                className={`flex-1 h-12 px-4 flex items-center justify-center gap-2 text-sm font-semibold transition-all border-b-2 ${
+                  activeTab === "DARI_QC"
+                    ? "text-indigo-700 border-indigo-600 bg-indigo-50/60"
+                    : "text-gray-400 border-transparent hover:text-indigo-600 hover:bg-indigo-50/30"
+                }`}
+              >
+                <AlertTriangle size={16} />
+                Dari Team QC
+                <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold ${
+                  activeTab === "DARI_QC" ? "bg-indigo-600 text-white" : "bg-indigo-100 text-indigo-600"
+                }`}>
+                  {units.filter(u => u.qc_status === "FROM_QC").length}
+                </span>
+              </button>
+            </div>
+          </div>
 
           {/* Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
