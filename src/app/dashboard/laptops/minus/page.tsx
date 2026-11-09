@@ -8,6 +8,7 @@ import {
   RefreshCw, Pause, Ban, Skull, Search, CheckCircle2, FileText,
   Package, Wrench, ClipboardList, Clock, AlertTriangle, type LucideIcon,
 } from "lucide-react";
+import QcDecisionModal from "./QcDecisionModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MinusUnit {
@@ -850,8 +851,11 @@ function MinusContent() {
         </div>
       </main>
 
-      {/* Edit Modal */}
-      {editTarget && (
+      {/* ─── Modal: Routing berdasarkan tab aktif ──────────────────────────
+          Tab "UMUM" (Perbaikan Umum) → EditRepairModal existing (teknisi flow).
+          Tab "DARI_QC" (Dari Team QC) → QcDecisionModal baru (3 opsi keputusan).
+          Dipisah supaya UX & role flow jelas. */}
+      {editTarget && activeTab === "UMUM" && (
         <EditRepairModal
           unit={editTarget}
           canReview={canReview}
@@ -868,6 +872,31 @@ function MinusContent() {
                 ? "Unit dipindahkan ke Siap Jual "
                 : "Status perbaikan diperbarui "
             );
+          }}
+        />
+      )}
+
+      {editTarget && activeTab === "DARI_QC" && (
+        <QcDecisionModal
+          unit={{
+            id: editTarget.id,
+            serial_number: editTarget.serial_number,
+            condition_note: editTarget.condition_note,
+            analisa: editTarget.analisa,
+            laptop: editTarget.laptop ? {
+              laptop_name: editTarget.laptop.laptop_name,
+              brand: editTarget.laptop.brand,
+              cpu: editTarget.laptop.cpu,
+              ram: editTarget.laptop.ram,
+              storage: editTarget.laptop.storage,
+            } : undefined,
+          }}
+          onClose={() => setEditTarget(null)}
+          onSuccess={(msg) => {
+            // Unit sudah pindah ke tempat lain (SERVICE/MSJ/dihapus) → remove dari list
+            setUnits(prev => prev.filter(u => u.id !== editTarget.id));
+            setAlertMsg(msg);
+            setEditTarget(null);
           }}
         />
       )}
