@@ -7,12 +7,13 @@
   import OutflowsContent from "./OutflowsContent";
   import CategoriesContent from "./CategoriesContent";
   import ArsipContent from "./ArsipContent";
+  import SoLaptopContent from "./SoLaptopContent"; 
   import ReturnsContent from "./ReturnsContent";
   import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
   import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
 
 
-  type TabKey = "barang" | "arsip" | "return" | "outflows" | "pedagang" | "kategori";
+  type TabKey = "barang" | "so-laptop" | "arsip" | "return" | "outflows" | "pedagang" | "kategori";
 
   interface TabDef {
     key: TabKey;
@@ -27,6 +28,16 @@
       label: "Data Barang",
       roles: DATA_BARANG_LAPTOP_ROLES,
       icon: "ti-device-laptop",
+    },
+    {
+      key: "so-laptop",
+      label: "SO Laptop",
+      // Role yang bisa akses tab ini sengaja disamakan dengan DATA_BARANG_LAPTOP_ROLES
+      // supaya semua role yang bisa lihat Data Barang juga bisa lihat tab SO.
+      // Guard tombol "Tandai SO" sendiri sudah pakai SO_ROLES di dalam SoLaptopContent,
+      // jadi role view-only tetap aman — mereka cuma lihat daftar tanpa bisa toggle.
+      roles: DATA_BARANG_LAPTOP_ROLES,
+      icon: "ti-clipboard-check",
     },
     {
       key: "arsip",
@@ -115,6 +126,15 @@
           <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 2v6h6" />
             <path d="M3 8a9 9 0 1 0 2.5-5.3L3 8" />
+          </svg>
+        );
+      case "ti-clipboard-check":
+        // Icon clipboard + checkmark — pas untuk "SO" (stock opname = pencocokan fisik)
+        return (
+          <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="8" y="2" width="8" height="4" rx="1" />
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+            <polyline points="9 14 11 16 15 12" />
           </svg>
         );
       default:
@@ -274,6 +294,7 @@
           ) : (
             <>
                {activeTab === "barang" && visibleTabs.some((t) => t.key === "barang") && <UnifiedBarangContent />}
+              {activeTab === "so-laptop" && visibleTabs.some((t) => t.key === "so-laptop") && <SoLaptopContent />}
               {activeTab === "arsip" && visibleTabs.some((t) => t.key === "arsip") && <ArsipContent />}
               {activeTab === "return" && visibleTabs.some((t) => t.key === "return") && <ReturnsContent />}
               {activeTab === "outflows" && visibleTabs.some((t) => t.key === "outflows") && <OutflowsContent />}
