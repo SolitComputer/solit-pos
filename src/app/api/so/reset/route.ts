@@ -24,9 +24,9 @@ import {
 async function handler(_req: NextRequest, _ctx: unknown, user: AuthUser) {
   try {
     const roles = expandRolesWithParents(user.roles ?? [user.role]);
-    if (!hasAnyRole(roles, SO_RESET_ROLES)) {
+if (!hasAnyRole(roles, SO_RESET_ROLES)) {
       return NextResponse.json(
-        { success: false, message: "Forbidden: hanya Admin, Kepala Admin Barang, dan Admin Barang yang boleh reset SO" },
+        { success: false, message: "Forbidden: hanya Admin dan Kepala Admin Barang yang boleh reset SO" },
         { status: 403 }
       );
     }

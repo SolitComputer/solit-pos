@@ -1504,7 +1504,6 @@ export const SO_LIMITED_USER_IDS: string[] = [
 export const SO_RESET_ROLES: UserRole[] = [
   "ADMIN",
   "KEPALA_ADMIN_BARANG",
-  "ADMIN_BARANG",
 ];
 
 // ── Riwayat Transaksi: akses per-AKUN (bukan per-role) ───────────────────────

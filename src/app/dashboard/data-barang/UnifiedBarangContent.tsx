@@ -2487,7 +2487,7 @@ export default function UnifiedBarangContent() {
                                                                     {row.kategori || "Tanpa Kategori"}
                                                                 </span>
                                                             </td>
-                                                            <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 ${rowBg}`} title={row.nama}>{row.nama}</td>
+                                                            <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 dark:group-hover:bg-[#202d42] ${rowBg}`} title={row.nama}>{row.nama}</td>
                                                             <td className="px-3 py-3 whitespace-nowrap"><BranchBadge branch={row.branch} /></td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.brand || <Dash />}</td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.cpu || <Dash />}</td>
