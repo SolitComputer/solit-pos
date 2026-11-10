@@ -10,6 +10,11 @@ const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 // Management User — dikunci per-akun, bukan per-role.
 const DELETE_USER_ALLOWED_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
 
+// Suffix nama user yang sudah diarsipkan. Dipakai di cron purge biar
+// user "Ex Karyawan/PKL Solit" TIDAK ikut di-purge permanen — nama mereka
+// harus tetap muncul di jurnal, cashflow, dan laporan lama selamanya.
+const ARCHIVE_SUFFIXES = [" (Ex Karyawan Solit)", " (Ex PKL Solit)"];
+
 // Role yang sudah dipensiunkan — tidak boleh di-assign ke user baru maupun
 // ditambahkan ke user lama lewat edit/API. User yang SUDAH memilikinya tidak
 // diutak-atik supaya datanya tidak hilang.
@@ -436,7 +441,14 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
   return NextResponse.json({ success: true, user: data });
 }
 
-// ── DELETE — hapus user ────────────────────────────────────────────────────
+
+// ── DELETE — arsipkan user sebagai Ex Karyawan / Ex PKL ────────────────────
+// Catatan arsitektur: tombol "Hapus Akun" di UI sebenarnya memanggil endpoint
+// ini untuk SOFT-DELETE + RENAME, bukan hard delete. Alasannya: FK dari tabel
+// seperti sales_online_reports (CASCADE) dan journal_entries (SET NULL) akan
+// bikin data historis hilang atau jadi "Unknown" kalau user beneran dihapus.
+// Dengan pola ini, row user tetap ada di tabel, cuma nama & akses-nya diubah
+// — jurnal lama tetap nunjukin "Nabila (Ex PKL Solit)" dengan benar.
 async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
   const currentUserRoles: string[] = currentUser.roles ?? [currentUser.role];
   if (!isFullAccess(currentUserRoles)) {
@@ -444,7 +456,7 @@ async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) 
   }
 
   // Hapus akun dikunci khusus 1 ID — admin/programmer lain tetap punya
-  // full access ke fitur lain, tapi tidak bisa menghapus user.
+  // full access ke fitur lain, tapi tidak bisa mengarsipkan user.
   if (currentUser.id !== DELETE_USER_ALLOWED_ID) {
     return NextResponse.json(
       { success: false, message: "Akses ditolak — hanya akun tertentu yang bisa menghapus user" },
@@ -465,35 +477,49 @@ async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) 
     );
   }
 
+  // Cek status user — biar pesan error-nya informatif (nama + apakah udah arsip).
   const { data: existingUser } = await supabaseAdmin
     .from("users")
-    .select("profile_photo_url")
+    .select("name, role, deleted_at")
     .eq("id", id)
     .maybeSingle();
 
-  const { error } = await supabaseAdmin.from("users").delete().eq("id", id);
-
-  if (error) {
-    // 23503 = foreign_key_violation — ID user masih dipakai di tabel lain
-    // (mis. journal_entries.updated_by). Kasih pesan yang jelas, bukan error mentah.
-    if ((error as { code?: string }).code === "23503") {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "User tidak bisa dihapus permanen karena datanya masih terhubung ke modul lain (mis. jurnal akuntansi). Pakai 'Nonaktifkan Akun' saja, atau minta programmer melepas keterkaitannya dulu.",
-        },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-  }
-  const oldAvatarPath = existingUser?.profile_photo_url ? extractAvatarPath(existingUser.profile_photo_url) : null;
-  if (oldAvatarPath) {
-    await supabaseAdmin.storage.from(AVATAR_BUCKET).remove([oldAvatarPath]);
+  if (!existingUser) {
+    return NextResponse.json(
+      { success: false, message: "User tidak ditemukan" },
+      { status: 404 }
+    );
   }
 
-  return NextResponse.json({ success: true });
+  if (existingUser.deleted_at) {
+    return NextResponse.json(
+      { success: false, message: "User ini sudah diarsipkan sebelumnya" },
+      { status: 400 }
+    );
+  }
+
+  // ARSIPKAN sebagai Ex Karyawan / Ex PKL (soft delete + rename).
+  // Nama lama tetap muncul di jurnal, cashflow, dan sales report lama.
+  const { error: rpcError } = await supabaseAdmin.rpc("archive_user_as_ex", {
+    target_user_id: id,
+    actor_user_id: currentUser.id,
+  });
+
+  if (rpcError) {
+    return NextResponse.json(
+      { success: false, message: `Gagal mengarsipkan user: ${rpcError.message}` },
+      { status: 500 }
+    );
+  }
+
+  const isPKL =
+    existingUser.role?.startsWith("PKL") || existingUser.role?.includes("_PKL");
+  const labelType = isPKL ? "Ex PKL" : "Ex Karyawan";
+
+  return NextResponse.json({
+    success: true,
+    message: `${existingUser.name} berhasil diarsipkan sebagai ${labelType} Solit. Nama ini akan tetap muncul di jurnal & laporan lama.`,
+  });
 }
 
 export const GET = withAuth(getHandler);

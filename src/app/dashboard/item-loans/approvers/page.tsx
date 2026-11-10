@@ -58,12 +58,20 @@ function ApproversContent() {
 
   const approverIds = useMemo(() => new Set(approvers.map(a => a.user_id)), [approvers]);
 
-  // Filter user untuk dropdown pilih (exclude yg sudah jadi approver)
+  // Filter user untuk dropdown pilih:
+  // 1. Hanya user dengan role = "ADMIN_BARANG" (konsep: Kepala Admin Barang atur,
+  //    Admin Barang yang eksekusi ACC peminjaman/pengembalian)
+  // 2. Exclude user yang SUDAH jadi approver aktif
+  // 3. Exclude by search text (nama atau role)
+  // Catatan: approver existing dengan role selain ADMIN_BARANG (misal legacy ADMIN)
+  // TETAP muncul di section "Approver Aktif" di atas — filter ini hanya di
+  // dropdown "Tambah", bukan di list yang sudah ada.
   const availableUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allUsers
+      .filter(u => u.role === "ADMIN_BARANG") // ← HANYA Admin Barang yang bisa jadi approver
       .filter(u => !approverIds.has(u.id))
-      .filter(u => !q || u.name.toLowerCase().includes(q) || u.role.toLowerCase().includes(q))
+      .filter(u => !q || u.name.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [allUsers, approverIds, search]);
 
@@ -99,7 +107,7 @@ function ApproversContent() {
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-base sm:text-lg font-bold text-zinc-900 truncate">Pengaturan Approver Peminjaman</h1>
-              <p className="text-[11.5px] text-zinc-400 mt-0.5">Atur siapa yang boleh Approve/Reject pengajuan pinjam barang</p>
+              <p className="text-[11.5px] text-zinc-400 mt-0.5">Pilih <span className="font-semibold text-zinc-700">Admin Barang</span> yang boleh Approve/Reject peminjaman &amp; pengembalian</p>
             </div>
           </div>
         </div>
@@ -173,9 +181,17 @@ function ApproversContent() {
 
         {/* Add User Picker */}
         <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-zinc-500" />
-            <h3 className="text-sm font-bold text-zinc-800">Tambah Approver</h3>
+          <div className="px-5 py-3 border-b border-zinc-100">
+            <div className="flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-zinc-500" />
+              <h3 className="text-sm font-bold text-zinc-800">Tambah Approver</h3>
+              <span className="ml-auto text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full">
+                Admin Barang saja
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-1 ml-6">
+              Hanya user dengan role Admin Barang yang bisa dijadikan approver peminjaman barang.
+            </p>
           </div>
           <div className="p-4 space-y-3">
             <div className="relative">
@@ -194,7 +210,9 @@ function ApproversContent() {
             </div>
             {availableUsers.length === 0 ? (
               <p className="text-xs text-zinc-400 text-center py-6">
-                {search ? "Tidak ada user cocok" : "Semua user sudah jadi approver"}
+                {search
+                  ? "Tidak ada Admin Barang cocok dengan pencarian"
+                  : "Semua Admin Barang sudah jadi approver — atau role Admin Barang belum ada user"}
               </p>
             ) : (
               <div className="max-h-80 overflow-y-auto space-y-1">

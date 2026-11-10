@@ -852,12 +852,20 @@ function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
         style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
           style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><Trash2 className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
-        <h3 className="font-black text-slate-800 text-center text-base mb-1">Hapus Akun {user.name}?</h3>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">Arsipkan Akun {user.name}?</h3>
         <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
-          Akun ini akan dihapus permanen dari sistem.
+          Nama user akan diubah jadi{" "}
+          <b className="text-slate-600">
+            &quot;{user.name} ({isPKLRole(user.role) ? "Ex PKL" : "Ex Karyawan"} Solit)&quot;
+          </b>
+          .
+        </p>
+        <p className="text-xs text-slate-400 text-center mb-2 leading-relaxed">
+          User tidak bisa login lagi dan hilang dari list. Tapi nama ini tetap muncul
+          di jurnal akuntansi, cashflow, laporan sales, dan transaksi lama supaya audit tetap jelas.
         </p>
         <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
-          style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
+          style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Tindakan ini tidak bisa dibatalkan!
         </div>
         <div className="flex gap-2.5">
@@ -871,7 +879,7 @@ function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
             style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-              : <><Trash2 className="w-4 h-4" /> Ya, Hapus</>}
+              : <><Trash2 className="w-4 h-4" /> Ya, Arsipkan</>}
           </button>
         </div>
       </div>
@@ -1171,7 +1179,7 @@ export default function UsersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`Akun ${confirmDeleteUser.name} berhasil dihapus`, "ok");
+        showToast(data.message ?? `Akun ${confirmDeleteUser.name} berhasil diarsipkan`, "ok");
         fetchUsers();
       } else {
         showToast(data.message ?? "Gagal menghapus user", "err");
@@ -1883,7 +1891,7 @@ export default function UsersPage() {
                                     </ActionBtn>
                                   )}
                                   {canDeleteUsers && currentUserInfo && user.id !== currentUserInfo.id && (
-                                    <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
+                                    <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Arsipkan akun ${user.name}`} bg="#fff1f2" color="#dc2626">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                           d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1949,7 +1957,7 @@ export default function UsersPage() {
                                     </ActionBtn>
                                   )}
                                   {canDeleteUsers && currentUserInfo && user.id !== currentUserInfo.id && (
-                                    <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
+                                    <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Arsipkan akun ${user.name}`} bg="#fff1f2" color="#dc2626">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                           d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

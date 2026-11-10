@@ -251,6 +251,15 @@ export const LOAN_APPROVER_MANAGE_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_ADMIN_BARANG",
 ];
+
+// ── Laptop Card Merge (Deduplikasi Manual) ────────────────────────────
+// Role yang boleh merge 2 laptop cards yang datanya SAMA PERSIS jadi 1.
+// Aksi ini mempengaruhi SEMUA units dari laptop source (ikut pindah ke target),
+// jadi dibatasi role yang paham struktur inventaris.
+export const LAPTOP_MERGE_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_ADMIN_BARANG", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+];
 export const DEAD_ASSET_ROLES: UserRole[] = [
   ...FIXED_ASSET_ROLES, "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
 ];

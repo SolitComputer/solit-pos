@@ -24,11 +24,18 @@ export async function POST(req: NextRequest) {
 
   const cutoff = new Date(Date.now() - PURGE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
+  // SKIP user yang namanya sudah pakai suffix "(Ex Karyawan Solit)" atau
+  // "(Ex PKL Solit)" — mereka adalah user ARSIP yang sengaja dipertahankan
+  // selamanya biar nama tetap muncul di jurnal, cashflow, dan laporan lama.
+  // Yang di-purge hanya user yang di-soft-delete TANPA rename (misal dari
+  // pattern lama atau bug sebelum fitur archive di-implement).
   const { data: dueForPurge, error: fetchError } = await supabaseAdmin
     .from("users")
     .select("id, name, profile_photo_url")
     .not("deleted_at", "is", null)
-    .lt("deleted_at", cutoff);
+    .lt("deleted_at", cutoff)
+    .not("name", "ilike", "%(Ex Karyawan Solit)%")
+    .not("name", "ilike", "%(Ex PKL Solit)%");
 
   if (fetchError) {
     return NextResponse.json({ success: false, message: fetchError.message }, { status: 500 });

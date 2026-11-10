@@ -3,8 +3,9 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
-import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop, LAPTOP_DELETE_ROLES } from "@/lib/permissions";
-import { Laptop } from "lucide-react";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop, LAPTOP_DELETE_ROLES, LAPTOP_MERGE_ROLES } from "@/lib/permissions";
+import { Laptop, Merge } from "lucide-react";
+import MergeCardModal from "@/components/inventory/MergeCardModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
 import LaptopUnitsPreview, { PreviewUnit } from "@/components/inventory/LaptopUnitsPreview";
@@ -420,6 +421,9 @@ export function LaptopsContent() {
 
     //  Full Access barang → boleh Edit semua field unit lewat Pop-up Detail
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
+    // Boleh gabungkan card? → Dedup Manual (Fitur 5B).
+    // Hanya role di LAPTOP_MERGE_ROLES yang bisa lihat tombol "Gabungkan".
+    const canMergeLaptop = hasAnyRole(userRoles, LAPTOP_MERGE_ROLES);
     //  Boleh lihat Harga Modal / Sumber / Tgl Masuk + kolom ST & M. Sales = false.
     //  Satu konstanta dipakai untuk semuanya supaya tidak ada 3 daftar role
     //  terpisah yang harus diedit bersamaan tiap ada perubahan.
@@ -460,6 +464,9 @@ export function LaptopsContent() {
     //  di LaptopUnitsPreview (Pop-up Detail Laptop) saat daftar unit masih kosong,
     //  atau dari kolom Aksi tabel langsung (tanpa buka Detail dulu).
     const [addUnitTarget, setAddUnitTarget] = useState<Laptop | null>(null);
+    // ── Gabungkan Card (Dedup Manual) ──────────────────────────────────
+    // State target untuk modal MergeCardModal. Pattern mirror addUnitTarget.
+    const [mergeTarget, setMergeTarget] = useState<Laptop | null>(null);
 
     const showAlert = (msg: string) => setAlertModal(msg);
 
@@ -1422,6 +1429,15 @@ export function LaptopsContent() {
                                                     Tambah Unit
                                                 </button>
                                             )}
+                                            {canMergeLaptop && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setMergeTarget(l); }}
+                                                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-150"
+                                                    title="Gabungkan ke Card lain (dedup manual)"
+                                                >
+                                                    <Merge className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                             {canDeleteLaptop && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleDelete(l.id); }}
@@ -1719,6 +1735,21 @@ export function LaptopsContent() {
 
             {barcodeTarget && (
                 <BarcodeModal laptopId={barcodeTarget.id} laptopName={barcodeTarget.name} onClose={() => setBarcodeTarget(null)} />
+            )}
+            {mergeTarget && (
+                <MergeCardModal
+                    source={{
+                        id: mergeTarget.id,
+                        brand: mergeTarget.brand ?? null,
+                        laptop_name: mergeTarget.laptop_name ?? null,
+                        cpu: mergeTarget.cpu ?? null,
+                        ram: mergeTarget.ram ?? null,
+                        storage: mergeTarget.storage ?? null,
+                        gpu: mergeTarget.gpu ?? null,
+                    }}
+                    onClose={() => setMergeTarget(null)}
+                    onMerged={() => { setMergeTarget(null); fetchLaptops(); }}
+                />
             )}
             {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
             {confirmModal && (
