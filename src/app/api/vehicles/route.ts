@@ -97,7 +97,43 @@ export async function GET(request: NextRequest) {
 
   if (activeRes.error) return NextResponse.json({ success: false, message: activeRes.error.message }, { status: 500 });
 
-  const mineRaw = [...(activeRes.data ?? []), ...(rejectedRes.data ?? [])];
+  // FIX bug Raesty gabisa checkout — safety net:
+  // Kalau ada vehicle DIPAKAI dengan borrower_id === me.id di lastUsage TAPI
+  // request-nya tidak ketangkap di activeRes (misalnya karena id format mismatch,
+  // atau enrichRequests ngedrop, atau kolom user_id nyimpen value beda), tarik
+  // ulang langsung by lastUsage.request_id. Peminjam asli PASTI bisa checkout.
+  const activeIds = new Set((activeRes.data ?? []).map((r: any) => r.id));
+  const missingRequestIds: string[] = [];
+  for (const v of vehiclesOut) {
+    if (
+      v.status === "DIPAKAI" &&
+      v.lastUsage?.status === "APPROVED" &&
+      v.lastUsage?.borrower_id === me.id &&
+      v.lastUsage?.request_id &&
+      !activeIds.has(v.lastUsage.request_id)
+    ) {
+      missingRequestIds.push(v.lastUsage.request_id);
+    }
+  }
+
+  let patchedActive: any[] = [];
+  if (missingRequestIds.length > 0) {
+    const { data: patchRows } = await supabaseVehicles
+      .from("vehicle_borrow_requests")
+      .select("*")
+      .in("id", missingRequestIds);
+    if (patchRows && patchRows.length > 0) {
+      patchedActive = patchRows;
+      console.warn(
+        "[vehicles] myRequests patched via lastUsage fallback — periksa konsistensi user_id. me.id:",
+        me.id,
+        "patched_ids:",
+        missingRequestIds
+      );
+    }
+  }
+
+  const mineRaw = [...(activeRes.data ?? []), ...patchedActive, ...(rejectedRes.data ?? [])];
   const myRequests = await enrichRequests(mineRaw as BorrowRequestRow[]);
 
   return NextResponse.json({
