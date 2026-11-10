@@ -14,6 +14,7 @@ export interface Account {
 }
 
 export const AKUN = {
+  KEUNTUNGAN_LAIN_LAIN: "400", // ⬅️ BARU — kategori Keuntungan Lain-Lain (Pemasukan)
   KAS_SALDO: "110",
   KAS_CASH: "120",
   KAS_CASH_JOGJA: "121", // ⬅️ BARU — kas cash fisik Cabang Jogja (bank/saldo tetap 110 shared)
@@ -216,6 +217,7 @@ export function kasAccountFromCashflow(pm?: string | null, branch?: string | nul
 // lib/cashflow.ts).
 export const CASHFLOW_ACCOUNT: Record<string, string> = {
   // ── 16 kategori baru sesuai daftar divisi accounting ──
+  KEUNTUNGAN_LAIN_LAIN: AKUN.KEUNTUNGAN_LAIN_LAIN, // 400 ⬅️ BARU
   BELANJA_LAPTOP: AKUN.HPP,                        // 130
   PIUTANG: AKUN.PIUTANG,                           // 140
   KASBON: AKUN.KASBON,                             // 141 — ⬅️ BARU
@@ -554,7 +556,11 @@ export function labaRugiGroup(acc: {
   const num = parseInt(acc.code, 10);
   if (!Number.isFinite(num)) return null;
 
-  if (num >= 410 && num <= 439) return "PENDAPATAN";
+  // ⬅️ UPDATE: dulu 410-439. Diperluas jadi 400-439 supaya akun 400 (Keuntungan
+  // Lain-Lain) dan akun custom lain di range 400-409 ikut masuk grup PENDAPATAN
+  // di Laba Rugi. Tanpa ini, nominal akun 400 jadi "saldo gantung" — kelihatan
+  // di Buku Besar tapi hilang dari L/R.
+  if (num >= 400 && num <= 439) return "PENDAPATAN";
   if (num >= 440 && num <= 499) return "MODAL_KELUAR";
   if (num >= 500 && num <= 529) return "OPERASIONAL";
   if (num >= 530 && num <= 599) return "LUAR_OPERASIONAL";
