@@ -291,7 +291,7 @@ export default function PatchNotesAdminPage() {
                       style={
                         active
                           ? { background: meta.bg, color: meta.text, borderColor: meta.border }
-                          : { background: "white", color: "#6b7280", borderColor: "#e5e7eb" }
+                          : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", borderColor: "rgb(var(--border))" }
                       }
                     >
                       <span className="inline-flex items-center gap-1.5">

@@ -539,3 +539,28 @@ html.dark .to-\[\#f7f8fa\], html.dark .to-\[\#F7F8FA\] { --tw-gradient-to: #0b10
 /* ---- Shell terang tambahan ---- */
 html.dark .bg-\[\#F7F7F8\]\/95, html.dark .bg-\[\#f7f7f8\]\/95 { background-color: rgba(7,10,18,.95) !important; }
 html.dark .min-h-screen.bg-gradient-to-b.from-slate-100\/70 { background-image: linear-gradient(to bottom, #070a12 0%, #0d1424 100%) !important; }
+
+/* =========================================================
+   DARK MODE v6.5b — lengkapi gradient stop warna yang belum
+   di v6.5 (violet/purple/pink/teal/fuchsia) + varian opacity
+   tambahan. Fix kartu "DIKIRIM" (from-violet-50) di Selesai
+   Disiapkan dan kartu warna sejenis.
+   ========================================================= */
+html.dark .from-violet-50, html.dark .from-purple-50, html.dark .from-fuchsia-50 { --tw-gradient-from: #1d1236 var(--tw-gradient-from-position) !important; }
+html.dark .from-purple-100, html.dark .from-violet-100 { --tw-gradient-from: #2e1c55 var(--tw-gradient-from-position) !important; }
+html.dark .from-pink-50, html.dark .from-rose-100 { --tw-gradient-from: #3a1c2c var(--tw-gradient-from-position) !important; }
+html.dark .from-teal-50 { --tw-gradient-from: #0a2524 var(--tw-gradient-from-position) !important; }
+html.dark .from-teal-100, html.dark .from-cyan-100 { --tw-gradient-from: #123d3b var(--tw-gradient-from-position) !important; }
+html.dark .from-indigo-100 { --tw-gradient-from: #142e50 var(--tw-gradient-from-position) !important; }
+
+html.dark .to-violet-100\/50, html.dark .to-purple-100\/50, html.dark .to-fuchsia-100\/50 { --tw-gradient-to: #2e1c55 var(--tw-gradient-to-position) !important; }
+html.dark .to-violet-200\/50, html.dark .to-purple-200\/50 { --tw-gradient-to: #3a2d55 var(--tw-gradient-to-position) !important; }
+html.dark .to-pink-100\/50, html.dark .to-rose-100\/70 { --tw-gradient-to: #3a1c2c var(--tw-gradient-to-position) !important; }
+html.dark .to-teal-100\/50, html.dark .to-cyan-100\/50 { --tw-gradient-to: #123d3b var(--tw-gradient-to-position) !important; }
+html.dark .to-indigo-100\/50 { --tw-gradient-to: #142e50 var(--tw-gradient-to-position) !important; }
+
+/* varian opacity lain (jaga-jaga, netral & warna) */
+html.dark .to-zinc-200\/30, html.dark .to-zinc-200\/40, html.dark .to-zinc-200\/60, html.dark .to-gray-200\/40 { --tw-gradient-to: #24344d var(--tw-gradient-to-position) !important; }
+html.dark .to-emerald-100\/40, html.dark .to-green-100\/40 { --tw-gradient-to: #0d3824 var(--tw-gradient-to-position) !important; }
+html.dark .to-blue-100\/40, html.dark .to-sky-100\/40 { --tw-gradient-to: #142e50 var(--tw-gradient-to-position) !important; }
+html.dark .to-amber-100\/40, html.dark .to-orange-100\/40 { --tw-gradient-to: #422a09 var(--tw-gradient-to-position) !important; }
