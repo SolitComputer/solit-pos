@@ -74,11 +74,16 @@ export async function GET(request: NextRequest) {
   const missingVehicleIds = dipakaiVehicleIds.filter((id) => !runningVehicleIds.has(id));
 
   if (missingVehicleIds.length > 0) {
+    // FIX bug "Sedang Berjalan 3 tapi nampil 2" — tangkap JUGA stuck-COMPLETED
+    // (status=COMPLETED + duration_minutes=null) selain APPROVED. Stuck itu
+    // hasil auto-expire di atas yang berhasil update request tapi gagal nge-release
+    // vehicle (non-transaksional). Vehicle tetap DIPAKAI, request udah COMPLETED
+    // → tanpa fallback ini, peminjam asli (Raesty) kelewat terus dari dashboard.
     const { data: missingRaw } = await supabaseVehicles
       .from("vehicle_borrow_requests")
       .select("*")
-      .eq("status", "APPROVED")
       .in("vehicle_id", missingVehicleIds)
+      .or("status.eq.APPROVED,and(status.eq.COMPLETED,duration_minutes.is.null)")
       .order("requested_at", { ascending: false });
 
     if (missingRaw && missingRaw.length > 0) {

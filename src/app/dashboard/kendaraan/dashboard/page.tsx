@@ -159,10 +159,12 @@ export default function KendaraanDashboardPage() {
                   )}
                 </div>
                 {(() => {
-                  // Jaring pengaman tampilan: sembunyikan peminjaman "nyangkut" (> 12 jam).
-                  // Backend (FIX 2A) yang menutup datanya; ini cuma mencegah durasi
-                  // ekstrem sempat terlihat saat race dengan auto-expire.
-                  const STALE_MINUTES = 12 * 60;
+                  // Jaring pengaman tampilan — dinaikkan ke 72 jam supaya stuck
+                  // state (vehicle DIPAKAI tapi request auto-expired, lihat FIX #2
+                  // di /api/vehicles/dashboard) TETAP tampil di sini, bukan malah
+                  // tersembunyi — justru harus kelihatan biar peminjam asli
+                  // ingat untuk checkout, atau admin bisa force-release.
+                  const STALE_MINUTES = 72 * 60;
 
                   // Enrich: kalau ada vehicle DIPAKAI yang tidak muncul di data.running
                   // (indikasi query backend /api/vehicles/dashboard ada yang terlewat),

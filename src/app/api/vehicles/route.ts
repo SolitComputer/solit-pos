@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   if (vehicleIds.length) {
     const { data: usageRows } = await supabaseVehicles
       .from("vehicle_borrow_requests")
-      .select("id, vehicle_id, user_id, status, return_fuel_level, return_condition, actual_start, actual_end, requested_at, approved_by")
+         .select("id, vehicle_id, user_id, status, return_fuel_level, return_condition, actual_start, actual_end, requested_at, approved_by, duration_minutes")
       .in("vehicle_id", vehicleIds)
       .in("status", ["APPROVED", "COMPLETED"])
       .order("requested_at", { ascending: false });
@@ -57,11 +57,18 @@ export async function GET(request: NextRequest) {
       const { data: us } = await supabaseVehicles.from("users").select("id, name").in("id", uids);
       (us ?? []).forEach((u: any) => (nameMap[u.id] = u.name));
     }
+    // Map status vehicle per id — dipakai buat deteksi "stuck state":
+    // vehicle masih DIPAKAI padahal request-nya udah ter-auto-expire ke COMPLETED
+    // (karena di /api/vehicles/dashboard auto-expire sukses update request tapi
+    // GAGAL update vehicle → non-transaksional, data jadi yatim).
+    const vehicleStatusMap: Record<string, string> = {};
+    (vehicles ?? []).forEach((v) => (vehicleStatusMap[v.id] = v.status));
+
+    // Pass 1: prioritaskan request APPROVED (= yang beneran masih aktif dipakai).
     for (const r of usageRows ?? []) {
-      if (lastUsageMap[r.vehicle_id]) continue; // sudah ambil yang terbaru (order desc)
+      if (r.status !== "APPROVED") continue;
+      if (lastUsageMap[r.vehicle_id]) continue;
       lastUsageMap[r.vehicle_id] = {
-        // FIX bug "Sedang dipakai karyawan lain" — frontend butuh id-nya untuk
-        // fallback deteksi "saya peminjam-nya" kalau myRequests query missing.
         request_id: r.id,
         borrower_id: r.user_id,
         borrower_name: nameMap[r.user_id] ?? "—",
@@ -72,6 +79,36 @@ export async function GET(request: NextRequest) {
         condition: r.return_condition ?? null,
         at: r.actual_end ?? r.actual_start ?? r.requested_at ?? null,
       };
+    }
+
+    // Pass 2: sisanya pakai COMPLETED terbaru.
+    // FIX stuck state: kalau request COMPLETED + duration_minutes=null + vehicle
+    // masih DIPAKAI → relabel status jadi "APPROVED" supaya UI tetap kasih
+    // tombol Check-out ke peminjam asli (mis. Raesty).
+    for (const r of usageRows ?? []) {
+      if (r.status !== "COMPLETED") continue;
+      if (lastUsageMap[r.vehicle_id]) continue;
+      const isStuckAutoExpired =
+        r.duration_minutes === null && vehicleStatusMap[r.vehicle_id] === "DIPAKAI";
+      lastUsageMap[r.vehicle_id] = {
+        // FIX bug "Sedang dipakai karyawan lain" — frontend butuh id-nya untuk
+        // fallback deteksi "saya peminjam-nya" kalau myRequests query missing.
+        request_id: r.id,
+        borrower_id: r.user_id,
+        borrower_name: nameMap[r.user_id] ?? "—",
+        approver_id: r.approved_by ?? null,
+        approver_name: r.approved_by ? (nameMap[r.approved_by] ?? "—") : null,
+        status: isStuckAutoExpired ? "APPROVED" : r.status,
+        fuel: r.return_fuel_level ?? null,
+        condition: r.return_condition ?? null,
+        at: r.actual_end ?? r.actual_start ?? r.requested_at ?? null,
+      };
+      if (isStuckAutoExpired && process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[vehicles] STUCK STATE — request auto-expired tapi vehicle masih DIPAKAI:",
+          { vehicle_id: r.vehicle_id, request_id: r.id, borrower_id: r.user_id }
+        );
+      }
     }
   }
   const vehiclesOut = (vehicles ?? []).map((v) => ({ ...v, lastUsage: lastUsageMap[v.id] ?? null }));
@@ -123,7 +160,15 @@ export async function GET(request: NextRequest) {
       .select("*")
       .in("id", missingRequestIds);
     if (patchRows && patchRows.length > 0) {
-      patchedActive = patchRows;
+      // FIX stuck state: normalisasi COMPLETED (duration_minutes=null) ke "APPROVED"
+      // di myRequests juga — supaya myActiveFor() di frontend ngematch, dan
+      // peminjam asli (Raesty) langsung lihat tombol Check-out dengan request asli
+      // (bukan stub fallback dari lastUsage).
+      patchedActive = patchRows.map((r: any) =>
+        r.status === "COMPLETED" && r.duration_minutes === null
+          ? { ...r, status: "APPROVED" }
+          : r
+      );
       console.warn(
         "[vehicles] myRequests patched via lastUsage fallback — periksa konsistensi user_id. me.id:",
         me.id,

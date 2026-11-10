@@ -131,11 +131,44 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         { status: 403 }
       );
     }
-    if (req.status !== "APPROVED")
+    // FIX stuck state — auto-expire di /api/vehicles/dashboard kadang set request
+    // → COMPLETED tapi gagal lepas vehicle (non-transaksional). Request jadi
+    // COMPLETED + duration_minutes=null, vehicle tetap DIPAKAI. Peminjam asli
+    // harus tetap bisa "menutup" peminjamannya biar vehicle ke-release beneran.
+    const isStuckAutoExpired =
+      req.status === "COMPLETED" && (req as any).duration_minutes === null;
+
+    if (req.status !== "APPROVED" && !isStuckAutoExpired)
       return NextResponse.json(
         { success: false, message: "Pengajuan ini tidak sedang dipakai." },
         { status: 400 }
       );
+
+    // Guard tambahan untuk stuck: pastikan vehicle memang masih DIPAKAI.
+    // Kalau sudah TERSEDIA/MAINTENANCE artinya situasi sudah normal, bukan stuck
+    // beneran — tolak biar request COMPLETED lama gak bisa di-"revive" iseng.
+    if (isStuckAutoExpired) {
+      const { data: vCheck } = await supabaseVehicles
+        .from("vehicles")
+        .select("status")
+        .eq("id", req.vehicle_id)
+        .single();
+      if (vCheck?.status !== "DIPAKAI")
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Pengajuan ini sudah diselesaikan otomatis dan kendaraan sudah bebas. Tidak ada yang perlu di-checkout.",
+          },
+          { status: 400 }
+        );
+      console.warn("[borrow/CHECKOUT] Recovery stuck state:", {
+        request_id: req.id,
+        vehicle_id: req.vehicle_id,
+        borrower_id: req.user_id,
+        actor_id: me.id,
+      });
+    }
 
     const fuel = (body?.return_fuel_level ?? "").trim();
     const condition = body?.return_condition;
@@ -148,6 +181,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const start = req.actual_start ? new Date(req.actual_start).getTime() : Date.now();
     const durationMinutes = Math.max(0, Math.round((Date.now() - start) / 60000));
 
+    // Guard optimistik — normal case: APPROVED. Stuck recovery: COMPLETED.
+    // Dipakai .in() biar atomik di DB side dan gak race dengan auto-expire lain.
+    const allowedStatuses = isStuckAutoExpired ? ["COMPLETED"] : ["APPROVED"];
     const { data, error } = await supabaseVehicles
       .from("vehicle_borrow_requests")
       .update({
@@ -158,7 +194,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         duration_minutes: durationMinutes,
       })
       .eq("id", id)
-      .eq("status", "APPROVED")
+      .in("status", allowedStatuses)
       .select("*")
       .single();
 
