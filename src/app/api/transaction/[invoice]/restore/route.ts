@@ -26,7 +26,8 @@ type RestorableStatus = (typeof RESTORABLE_STATUSES)[number];
 
 // Kembalikan unit laptop ke stok: unit MSJ → MINUS_SIAP_JUAL, unit biasa → BELUM_SIAP.
 async function releaseLaptopUnitsToStock(
-  unitIds: string[]
+  unitIds: string[],
+  invoice: string // ⬅️ BARU: dipakai untuk catatan "Sudah di QC (restore transaksi ...)"
 ): Promise<{ error: string | null; msjGroupIds: string[] }> {
   if (unitIds.length === 0) return { error: null, msjGroupIds: [] };
 
@@ -47,10 +48,15 @@ async function releaseLaptopUnitsToStock(
   if (normalIds.length > 0) {
     const { error } = await supabase
       .from("laptop_units")
-      // ✅ Setelah di-restore, unit jadi BELUM_SIAP (bukan langsung SIAP_JUAL) —
-      // supaya pengelola barang cek/validasi dulu sebelum dijual lagi. BELUM_SIAP
-      // tidak masuk daftar hidden di GET /units, jadi unit otomatis muncul lagi.
-      .update({ status: "BELUM_SIAP", reserved_by: null, reserved_invoice: null })
+      // ✅ UBAH: unit hasil restore langsung SIAP_JUAL — sebelumnya sudah lolos QC
+      //  & pernah terjual, jadi tidak perlu di-QC ulang. Ditandai lewat catatan
+      //  "Sudah di QC" supaya jelas di riwayat unit kenapa langsung siap jual.
+      .update({
+        status: "SIAP_JUAL",
+        notes: `Sudah di QC (restore transaksi ${invoice})`,
+        reserved_by: null,
+        reserved_invoice: null,
+      })
       .in("id", normalIds);
     if (error) return { error: error.message, msjGroupIds: [] };
   }
@@ -291,7 +297,7 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
 
       // ✅ MSJ: unit dari Kelompok MSJ balik ke kelompoknya (MINUS_SIAP_JUAL),
       // unit biasa tetap SIAP_JUAL seperti sebelumnya.
-      const release = await releaseLaptopUnitsToStock(unitIds);
+           const release = await releaseLaptopUnitsToStock(unitIds, invoice);
       if (release.error) {
         console.error("[RESTORE] unit update error:", release.error);
         return NextResponse.json(
@@ -335,6 +341,10 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
           qty: newQty,
           status: parentStatus,
           ready_to_sell: newQty > 0,
+          // ⬅️ BARU: barang hasil restore keluar dari Arsip Barang (punya stok lagi).
+          archived_at: null,
+          archived_by: null,
+          archive_reason: null,
         })
         .eq("id", laptopId);
     }
@@ -607,7 +617,7 @@ async function handlePartialRestore({
 
     // 2. Kembalikan unit terpilih ke stok — unit MSJ balik ke kelompoknya
     //    (MINUS_SIAP_JUAL), unit biasa ke SIAP_JUAL.
-    const release = await releaseLaptopUnitsToStock(selectedUnitIds);
+       const release = await releaseLaptopUnitsToStock(selectedUnitIds, invoice);
     if (release.error) {
       return NextResponse.json(
         { success: false, message: "Gagal mengembalikan status unit: " + release.error },
@@ -641,7 +651,8 @@ async function handlePartialRestore({
 
       await supabase
         .from("laptops")
-        .update({ qty: newQty, status: parentStatus, ready_to_sell: newQty > 0 })
+        // ⬅️ BARU: ikut keluar dari Arsip Barang kalau restore sebagian mengembalikan stok.
+        .update({ qty: newQty, status: parentStatus, ready_to_sell: newQty > 0, archived_at: null, archived_by: null, archive_reason: null })
         .eq("id", laptopId);
     }
 
