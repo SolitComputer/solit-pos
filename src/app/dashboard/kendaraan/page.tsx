@@ -346,7 +346,7 @@ function FuelRing({ level, TypeIcon }: { level: string | null | undefined; TypeI
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#F0F0F1" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgb(var(--border))" strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}

@@ -124,7 +124,7 @@ const ACTION_FILTER_OPTIONS = [
 // Palet gradient avatar — dipilih berdasarkan hash nama, supaya tiap karyawan
 // punya warna yang konsisten setiap kali muncul di log.
 const AVATAR_PALETTE: { from: string; to: string }[] = [
-    { from: "#8b5cf6", to: "#6d28d9" }, // violet
+    { from: "#8b5cf6", to: "rgb(var(--fg))" }, // violet
     { from: "#38bdf8", to: "#0369a1" }, // sky
     { from: "#34d399", to: "#047857" }, // emerald
     { from: "#fbbf24", to: "#b45309" }, // amber
@@ -190,30 +190,28 @@ function DiffView({ before, after }: { before: any; after: any }) {
     if (!before && !after) return null;
     const keys = diffKeys(before, after);
     if (keys.length === 0)
-        return <p className="text-xs italic" style={{ color: "#94a3b8" }}>Tidak ada perubahan terdeteksi.</p>;
+        return <p className="text-xs italic" style={{ color: "rgb(var(--fg-muted))" }}>Tidak ada perubahan terdeteksi.</p>;
 
     return (
         <div className="mt-3 space-y-3">
             {keys.map((k) => (
                 <div key={k}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2 font-mono" style={{ color: "#94a3b8" }}>{k}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2 font-mono" style={{ color: "rgb(var(--fg-muted))" }}>{k}</p>
                     <div className="flex flex-col sm:flex-row gap-2">
                         {before?.[k] !== undefined && (
-                            <div className="flex-1 flex items-start gap-2 rounded-[9px] px-3 py-2.5"
-                                style={{ background: "#fff1f2", border: "1px solid #fecdd3" }}>
+                            <div className="flex-1 flex items-start gap-2 rounded-[9px] px-3 py-2.5 bg-red-50 border border-red-200">
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fb7185" strokeWidth="2.5" strokeLinecap="round" className="flex-shrink-0 mt-0.5">
                                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                                 </svg>
-                                <span className="text-xs font-mono break-all line-through opacity-80" style={{ color: "#e11d48" }}>{String(before[k] ?? "—")}</span>
+                                <span className="text-xs font-mono break-all line-through opacity-80 text-red-600">{String(before[k] ?? "—")}</span>
                             </div>
                         )}
                         {after?.[k] !== undefined && (
-                            <div className="flex-1 flex items-start gap-2 rounded-[9px] px-3 py-2.5"
-                                style={{ background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+                            <div className="flex-1 flex items-start gap-2 rounded-[9px] px-3 py-2.5 bg-emerald-50 border border-emerald-200">
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" className="flex-shrink-0 mt-0.5">
                                     <polyline points="20 6 9 17 4 12" />
                                 </svg>
-                                <span className="text-xs font-mono break-all font-semibold" style={{ color: "#047857" }}>{String(after[k] ?? "—")}</span>
+                                <span className="text-xs font-mono break-all font-semibold text-emerald-600">{String(after[k] ?? "—")}</span>
                             </div>
                         )}
                     </div>
@@ -226,11 +224,11 @@ function DiffView({ before, after }: { before: any; after: any }) {
 function DateDivider({ label }: { label: string }) {
     return (
         <div className="flex items-center gap-3 py-1 mb-2">
-            <div className="h-px flex-1" style={{ background: "#e8ecf5" }} />
-            <span className="text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono" style={{ color: "#cbd5e1" }}>
+            <div className="h-px flex-1" style={{ background: "rgb(var(--border))" }} />
+            <span className="text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono" style={{ color: "rgb(var(--fg-subtle))" }}>
                 {label}
             </span>
-            <div className="h-px flex-1" style={{ background: "#e8ecf5" }} />
+            <div className="h-px flex-1" style={{ background: "rgb(var(--border))" }} />
         </div>
     );
 }
@@ -245,7 +243,7 @@ function LogCard({
     onToggle: () => void;
 }) {
     const hasDiff = !!(log.before_data || log.after_data);
-    const dotColor = ACTION_HEX[log.action] ?? "#94a3b8";
+    const dotColor = ACTION_HEX[log.action] ?? "rgb(var(--fg-muted))";
     const avatar = getAvatarGradient(log.user_name);
 
     return (
@@ -263,7 +261,7 @@ function LogCard({
                 ? (ACTION_BORDER_EXPANDED[log.action] ?? "border-gray-200")
                 : "hover:shadow-md"
                 }`}
-                style={!isExpanded ? { borderColor: "#f0f0f8" } : undefined}>
+                style={!isExpanded ? { borderColor: "rgb(var(--border))" } : undefined}>
                 <div className="p-4 sm:p-5">
 
                     {/* ── Top row: action badge + user avatar + name + role ── */}
@@ -278,27 +276,27 @@ function LogCard({
                                 style={{ background: `linear-gradient(135deg, ${avatar.from}, ${avatar.to})` }}>
                                 {log.user_name?.charAt(0).toUpperCase() ?? "U"}
                             </div>
-                            <span className="text-[13px] font-bold leading-none" style={{ color: "#0f172a" }}>
+                            <span className="text-[13px] font-bold leading-none" style={{ color: "rgb(var(--fg))" }}>
                                 {log.user_name}
                             </span>
                         </div>
 
                         <span className="text-[11px] px-2 py-0.5 rounded-full"
-                            style={{ color: "#94a3b8", background: "#f8fafc", border: "1px solid #f1f5f9" }}>
+                            style={{ color: "rgb(var(--fg-muted))", background: "rgb(var(--surface-2))", border: "1px solid rgb(var(--border))" }}>
                             {log.user_role?.replace(/_/g, " ")}
                         </span>
                     </div>
 
                     {/* ── Description row ── */}
-                    <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[13px]" style={{ color: "#64748b" }}>
+                    <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[13px]" style={{ color: "rgb(var(--fg-muted))" }}>
                         <span>{ACTION_VERB[log.action] ?? log.action}</span>
                         <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-[9px]"
-                            style={{ color: "#334155", background: "#f5f7ff", border: "1px solid #e8ecf5" }}>
+                            style={{ color: "rgb(var(--fg))", background: "rgb(var(--surface-2))", border: "1px solid rgb(var(--border))" }}>
                             {ENTITY_ICON[log.entity]}
                             {ENTITY_LABEL[log.entity] ?? log.entity}
                         </span>
                         {log.entity_label && (
-                            <span className="text-xs font-mono italic break-words max-w-full" style={{ color: "#94a3b8" }}>
+                            <span className="text-xs font-mono italic break-words max-w-full" style={{ color: "rgb(var(--fg-muted))" }}>
                                 &quot;{log.entity_label}&quot;
                             </span>
                         )}
@@ -306,12 +304,12 @@ function LogCard({
 
                     {/* ── Footer row: timestamp + expand toggle ── */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono min-w-0" style={{ color: "#94a3b8" }}>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono min-w-0" style={{ color: "rgb(var(--fg-muted))" }}>
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                             </svg>
-                            <span className="font-semibold" style={{ color: "#64748b" }}>{formatRelativeTime(log.created_at)}</span>
-                            <span className="hidden sm:inline" style={{ color: "#e2e8f0" }}>•</span>
+                            <span className="font-semibold" style={{ color: "rgb(var(--fg-muted))" }}>{formatRelativeTime(log.created_at)}</span>
+                            <span className="hidden sm:inline" style={{ color: "rgb(var(--border))" }}>•</span>
                             <span className="hidden sm:inline">{formatDate(log.created_at)}</span>
                         </div>
 
@@ -319,7 +317,7 @@ function LogCard({
                             <button
                                 onClick={onToggle}
                                 className="inline-flex items-center gap-1.5 text-xs font-semibold transition-colors flex-shrink-0"
-                                style={{ color: isExpanded ? "#4338ca" : "#94a3b8" }}
+                                style={{ color: isExpanded ? "rgb(var(--fg))" : "rgb(var(--fg-muted))" }}
                             >
                                 <svg
                                     width="13" height="13" viewBox="0 0 24 24" fill="none"
@@ -335,10 +333,10 @@ function LogCard({
 
                     {/* ── Diff panel ── */}
                     {isExpanded && (
-                        <div className="mt-4 pt-4 animate-slideDown" style={{ borderTop: "1px solid #f1f5f9" }}>
+                        <div className="mt-4 pt-4 animate-slideDown" style={{ borderTop: "1px solid rgb(var(--border))" }}>
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="w-0.5 h-3.5 rounded-full block" style={{ background: "#c7d2fe" }} />
-                                <span className="text-[10px] font-bold uppercase tracking-widest font-mono" style={{ color: "#94a3b8" }}>
+                                <span className="text-[10px] font-bold uppercase tracking-widest font-mono" style={{ color: "rgb(var(--fg-muted))" }}>
                                     Detail perubahan
                                 </span>
                             </div>
@@ -354,20 +352,20 @@ function LogCard({
 function LogSkeleton() {
     return (
         <div className="relative pl-8 mb-3">
-            <span className="absolute left-0 top-5 w-3 h-3 rounded-full border-2 border-white" style={{ background: "#e2e8f0" }} />
-            <div className="bg-white rounded-2xl p-4 sm:p-5 animate-pulse space-y-3" style={{ border: "1px solid #f0f0f8" }}>
+            <span className="absolute left-0 top-5 w-3 h-3 rounded-full border-2 border-white" style={{ background: "rgb(var(--border))" }} />
+            <div className="bg-white rounded-2xl p-4 sm:p-5 animate-pulse space-y-3" style={{ border: "1px solid rgb(var(--border))" }}>
                 <div className="flex items-center gap-2">
-                    <div className="w-16 h-6 rounded-lg" style={{ background: "#f1f5f9" }} />
-                    <div className="w-6 h-6 rounded-full" style={{ background: "#f1f5f9" }} />
-                    <div className="w-28 h-4 rounded" style={{ background: "#f1f5f9" }} />
-                    <div className="w-20 h-4 rounded-full" style={{ background: "#f1f5f9" }} />
+                    <div className="w-16 h-6 rounded-lg" style={{ background: "rgb(var(--surface-2))" }} />
+                    <div className="w-6 h-6 rounded-full" style={{ background: "rgb(var(--surface-2))" }} />
+                    <div className="w-28 h-4 rounded" style={{ background: "rgb(var(--surface-2))" }} />
+                    <div className="w-20 h-4 rounded-full" style={{ background: "rgb(var(--surface-2))" }} />
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-16 h-3 rounded" style={{ background: "#f1f5f9" }} />
-                    <div className="w-20 h-6 rounded-[9px]" style={{ background: "#f1f5f9" }} />
-                    <div className="w-24 h-3 rounded" style={{ background: "#f1f5f9" }} />
+                    <div className="w-16 h-3 rounded" style={{ background: "rgb(var(--surface-2))" }} />
+                    <div className="w-20 h-6 rounded-[9px]" style={{ background: "rgb(var(--surface-2))" }} />
+                    <div className="w-24 h-3 rounded" style={{ background: "rgb(var(--surface-2))" }} />
                 </div>
-                <div className="w-44 h-3 rounded" style={{ background: "#f1f5f9" }} />
+                <div className="w-44 h-3 rounded" style={{ background: "rgb(var(--surface-2))" }} />
             </div>
         </div>
     );
@@ -376,14 +374,14 @@ function LogSkeleton() {
 function EmptyState({ hasFilters }: { hasFilters: boolean }) {
     return (
         <div className="text-center py-20">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "#f5f7ff" }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "rgb(var(--surface-2))" }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c7d2fe" strokeWidth="1.5">
                     <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
                     <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
                 </svg>
             </div>
-            <p className="text-sm font-semibold" style={{ color: "#334155" }}>Belum ada log aktivitas</p>
-            <p className="text-xs mt-1" style={{ color: "#94a3b8" }}>
+            <p className="text-sm font-semibold" style={{ color: "rgb(var(--fg))" }}>Belum ada log aktivitas</p>
+            <p className="text-xs mt-1" style={{ color: "rgb(var(--fg-muted))" }}>
                 {hasFilters ? "Tidak ada log yang cocok dengan filter ini." : "Setiap perubahan data akan tercatat otomatis di sini."}
             </p>
         </div>
@@ -412,7 +410,7 @@ function FilterChips({
                         className="px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all flex-shrink-0 active:scale-95"
                         style={active
                             ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
-                            : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}
+                            : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }}
                     >
                         {opt.label}
                     </button>
@@ -497,7 +495,7 @@ export default function ActivityLogPage() {
 
     return (
         <DashboardLayout>
-            <div className="min-h-screen" style={{ background: "#F7F7F8" }}>
+            <div className="min-h-screen" style={{ background: "var(--app-bg)" }}>
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
 
                     {/* ── Header ─────────────────────────────────────────────── */}
@@ -511,10 +509,10 @@ export default function ActivityLogPage() {
                                 </svg>
                             </div>
                             <div className="min-w-0">
-                                <h1 className="text-xl sm:text-2xl font-black tracking-tight truncate" style={{ color: "#0f172a" }}>
+                                <h1 className="text-xl sm:text-2xl font-black tracking-tight truncate" style={{ color: "rgb(var(--fg))" }}>
                                     Log Aktivitas
                                 </h1>
-                                <p className="text-xs sm:text-[13px] mt-0.5" style={{ color: "#94a3b8" }}>
+                                <p className="text-xs sm:text-[13px] mt-0.5" style={{ color: "rgb(var(--fg-muted))" }}>
                                     Jejak audit setiap perubahan data di sistem
                                 </p>
                             </div>
@@ -522,27 +520,27 @@ export default function ActivityLogPage() {
 
                         {/* Total logs pill */}
                         <div className="flex items-center gap-1.5 bg-white rounded-xl px-3.5 py-2 flex-shrink-0"
-                            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                            style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2">
                                 <rect x="3" y="4" width="18" height="18" rx="2" />
                                 <line x1="16" y1="2" x2="16" y2="6" />
                                 <line x1="8" y1="2" x2="8" y2="6" />
                                 <line x1="3" y1="10" x2="21" y2="10" />
                             </svg>
-                            <span className="text-sm font-black tabular-nums font-mono" style={{ color: "#0f172a" }}>{total}</span>
-                            <span className="text-xs" style={{ color: "#94a3b8" }}>logs</span>
+                            <span className="text-sm font-black tabular-nums font-mono" style={{ color: "rgb(var(--fg))" }}>{total}</span>
+                            <span className="text-xs" style={{ color: "rgb(var(--fg-muted))" }}>logs</span>
                         </div>
                     </div>
 
                     {/* ── Filter Card ────────────────────────────────────────── */}
-                    <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
 
                         {/* Filter card header (always visible) */}
-                        <div className="flex items-center justify-between px-5 sm:px-6 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+                        <div className="flex items-center justify-between px-5 sm:px-6 py-3.5" style={{ borderBottom: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))" }}>
                             <button
                                 onClick={() => setShowMobileFilters(!showMobileFilters)}
                                 className="sm:hidden flex items-center gap-2 text-sm font-bold"
-                                style={{ color: "#334155" }}
+                                style={{ color: "rgb(var(--fg))" }}
                             >
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -557,7 +555,7 @@ export default function ActivityLogPage() {
                                 </svg>
                             </button>
 
-                            <div className="hidden sm:flex items-center gap-2 text-sm font-bold" style={{ color: "#334155" }}>
+                            <div className="hidden sm:flex items-center gap-2 text-sm font-bold" style={{ color: "rgb(var(--fg))" }}>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
                                 </svg>
@@ -566,7 +564,7 @@ export default function ActivityLogPage() {
 
                             {activeFilterCount > 0 && (
                                 <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                                    style={{ background: "#f3f0ff", color: "#6d28d9" }}>
+                                    style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }}>
                                     {activeFilterCount} aktif
                                 </span>
                             )}
@@ -577,7 +575,7 @@ export default function ActivityLogPage() {
 
                             {/* Search nama karyawan */}
                             <div className="relative">
-                                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94a3b8" }}>
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "rgb(var(--fg-muted))" }}>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                                         <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                                     </svg>
@@ -588,13 +586,13 @@ export default function ActivityLogPage() {
                                     onChange={(e) => setSearchName(e.target.value)}
                                     placeholder="Cari invoice, nama, atau SN..."
                                     className="w-full pl-9 pr-8 h-10 rounded-xl text-sm font-medium outline-none focus:ring-2 transition-all"
-                                    style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+                                    style={{ border: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }}
                                 />
                                 {searchName && (
                                     <button
                                         onClick={() => setSearchName("")}
                                         className="absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors"
-                                        style={{ color: "#cbd5e1" }}
+                                        style={{ color: "rgb(var(--fg-subtle))" }}
                                     >
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                                             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -605,19 +603,19 @@ export default function ActivityLogPage() {
 
                             {/* Filter entitas */}
                             <div>
-                                <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: "#94a3b8" }}>Entitas</p>
+                                <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: "rgb(var(--fg-muted))" }}>Entitas</p>
                                 <FilterChips options={ENTITY_FILTER_OPTIONS} value={filterEntity} onChange={setFilterEntity} />
                             </div>
 
                             {/* Filter aksi */}
                             <div>
-                                <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: "#94a3b8" }}>Jenis Aksi</p>
+                                <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: "rgb(var(--fg-muted))" }}>Jenis Aksi</p>
                                 <FilterChips options={ACTION_FILTER_OPTIONS} value={filterAction} onChange={setFilterAction} />
                             </div>
 
                             {/* Filter tanggal */}
                             <div>
-                                <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: "#94a3b8" }}>Tanggal</p>
+                                <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: "rgb(var(--fg-muted))" }}>Tanggal</p>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="date"
@@ -625,27 +623,27 @@ export default function ActivityLogPage() {
                                         onChange={(e) => setFilterDateFrom(e.target.value)}
                                         max={filterDateTo || undefined}
                                         className="flex-1 h-10 px-3 rounded-xl text-sm font-medium outline-none focus:ring-2 transition-all"
-                                        style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+                                        style={{ border: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }}
                                     />
-                                    <span className="text-xs font-semibold flex-shrink-0" style={{ color: "#cbd5e1" }}>s/d</span>
+                                    <span className="text-xs font-semibold flex-shrink-0" style={{ color: "rgb(var(--fg-subtle))" }}>s/d</span>
                                     <input
                                         type="date"
                                         value={filterDateTo}
                                         onChange={(e) => setFilterDateTo(e.target.value)}
                                         min={filterDateFrom || undefined}
                                         className="flex-1 h-10 px-3 rounded-xl text-sm font-medium outline-none focus:ring-2 transition-all"
-                                        style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+                                        style={{ border: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }}
                                     />
                                 </div>
                             </div>
 
                             {/* Filter footer */}
-                            <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid #f5f5fb" }}>
+                            <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid rgb(var(--border))" }}>
                                 {hasFilters ? (
                                     <button
                                         onClick={() => { setFilterEntity(""); setFilterAction(""); setSearchName(""); setFilterDateFrom(""); setFilterDateTo(""); }}
                                         className="text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                                        style={{ color: "#94a3b8" }}
+                                        style={{ color: "rgb(var(--fg-muted))" }}
                                     >
                                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                                             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -655,7 +653,7 @@ export default function ActivityLogPage() {
                                 ) : <div />}
 
                                 <span className="text-xs font-bold px-3 py-1 rounded-full tabular-nums font-mono"
-                                    style={{ background: total > 0 ? "#f5f7ff" : "transparent", color: total > 0 ? "#475569" : "#cbd5e1" }}>
+                                    style={{ background: total > 0 ? "rgb(var(--surface-2))" : "transparent", color: total > 0 ? "rgb(var(--fg-muted))" : "rgb(var(--fg-subtle))" }}>
                                     {total} {total === 1 ? "log" : "logs"}
                                 </span>
                             </div>
@@ -668,13 +666,13 @@ export default function ActivityLogPage() {
                             {[1, 2, 3, 4, 5].map((i) => <LogSkeleton key={i} />)}
                         </div>
                     ) : logs.length === 0 ? (
-                        <div className="bg-white rounded-2xl" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                        <div className="bg-white rounded-2xl" style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                             <EmptyState hasFilters={hasFilters} />
                         </div>
                     ) : (
                         <div className="relative">
                             {/* Vertical timeline line */}
-                            <div className="absolute left-[10px] top-3 bottom-3 w-px pointer-events-none" style={{ background: "#e8ecf5" }} />
+                            <div className="absolute left-[10px] top-3 bottom-3 w-px pointer-events-none" style={{ background: "rgb(var(--border))" }} />
 
                             <div className="space-y-1">
                                 {groupedLogs.map((group) => (
@@ -703,15 +701,15 @@ export default function ActivityLogPage() {
                             {page === totalPages && (
                                 <div className="relative pt-6 pb-2">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex-1 h-px" style={{ borderTop: "2px dashed #e2e8f0" }} />
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <div className="flex-1 h-px" style={{ borderTop: "2px dashed rgb(var(--border))" }} />
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--fg-subtle))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" />
                                             <line x1="20" y1="4" x2="8.12" y2="15.88" /><line x1="14.47" y1="14.48" x2="20" y2="20" /><line x1="8.12" y1="8.12" x2="12" y2="12" />
                                         </svg>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest font-mono whitespace-nowrap" style={{ color: "#cbd5e1" }}>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest font-mono whitespace-nowrap" style={{ color: "rgb(var(--fg-subtle))" }}>
                                             Akhir log · {total} entri tercatat
                                         </span>
-                                        <div className="flex-1 h-px" style={{ borderTop: "2px dashed #e2e8f0" }} />
+                                        <div className="flex-1 h-px" style={{ borderTop: "2px dashed rgb(var(--border))" }} />
                                     </div>
                                 </div>
                             )}
@@ -725,7 +723,7 @@ export default function ActivityLogPage() {
                                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                                 disabled={page === 1}
                                 className="flex items-center gap-1 px-3.5 py-2 text-sm font-medium rounded-xl bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-all group"
-                                style={{ border: "1px solid #e8ecf5", color: "#64748b" }}
+                                style={{ border: "1px solid rgb(var(--border))", color: "rgb(var(--fg-muted))" }}
                             >
                                 <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeLinecap="round">
                                     <polyline points="15 18 9 12 15 6" />
@@ -736,7 +734,7 @@ export default function ActivityLogPage() {
                             <div className="flex flex-wrap items-center justify-center gap-1">
                                 {pageNumbers.map((p, idx) =>
                                     p === "..." ? (
-                                        <span key={idx} className="text-xs px-1 select-none" style={{ color: "#cbd5e1" }}>···</span>
+                                        <span key={idx} className="text-xs px-1 select-none" style={{ color: "rgb(var(--fg-subtle))" }}>···</span>
                                     ) : (
                                         <button
                                             key={idx}
@@ -744,7 +742,7 @@ export default function ActivityLogPage() {
                                             className="min-w-[34px] h-[34px] text-sm font-bold rounded-xl transition-all"
                                             style={page === p
                                                 ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 2px 8px rgba(15,12,41,0.25)" }
-                                                : { color: "#64748b", border: "1px solid transparent" }}
+                                                : { color: "rgb(var(--fg-muted))", border: "1px solid transparent" }}
                                         >
                                             {p}
                                         </button>
@@ -756,7 +754,7 @@ export default function ActivityLogPage() {
                                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
                                 className="flex items-center gap-1 px-3.5 py-2 text-sm font-medium rounded-xl bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-all group"
-                                style={{ border: "1px solid #e8ecf5", color: "#64748b" }}
+                                style={{ border: "1px solid rgb(var(--border))", color: "rgb(var(--fg-muted))" }}
                             >
                                 <span className="hidden sm:inline">Selanjutnya</span>
                                 <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeLinecap="round">

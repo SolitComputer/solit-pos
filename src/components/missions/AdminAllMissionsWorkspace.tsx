@@ -88,8 +88,7 @@ function ProgressBar({ done, total, pct }: { done: number; total: number; pct: n
 /** Badge kecil untuk CEO tag */
 function CeoTag() {
   return (
-    <span className="inline-flex items-center gap-0.5 h-4 px-1.5 text-[9px] font-black rounded tracking-wide"
-      style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>
+    <span className="inline-flex items-center gap-0.5 h-4 px-1.5 text-[9px] font-black rounded tracking-wide bg-blue-50 text-blue-700 border border-blue-200">
       <Crown className="w-2.5 h-2.5" /> CEO
     </span>
   );
@@ -98,7 +97,7 @@ function CeoTag() {
 /** Expanded detail row untuk desktop */
 function ExpandedDetail({ m }: { m: Mission }) {
   return (
-    <tr style={{ background: "#f8f8ff" }}>
+    <tr style={{ background: "rgb(var(--surface-2))" }}>
       <td colSpan={7} className="px-5 py-4" style={{ boxShadow: "inset 3px 0 0 #6366f1" }}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
           {m.description && (
@@ -108,8 +107,7 @@ function ExpandedDetail({ m }: { m: Mission }) {
             </div>
           )}
           {m.rejection_reason && (
-            <div className="col-span-2 lg:col-span-4 rounded-xl px-3.5 py-3"
-              style={{ background: "#fff1f2", border: "1px solid #fecdd3" }}>
+            <div className="col-span-2 lg:col-span-4 rounded-xl px-3.5 py-3 bg-rose-50 border border-rose-200">
               <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-1.5">Alasan Ditolak</p>
               <p className="text-rose-700 leading-relaxed">{m.rejection_reason}</p>
             </div>
@@ -158,7 +156,7 @@ function MobileExpandedDetail({ m }: { m: Mission }) {
         </div>
       )}
       {m.rejection_reason && (
-        <div className="rounded-xl px-3 py-2.5" style={{ background: "#fff1f2", border: "1px solid #fecdd3" }}>
+        <div className="rounded-xl px-3 py-2.5 bg-rose-50 border border-rose-200">
           <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest mb-1">Alasan Ditolak</p>
           <p className="text-xs text-rose-700 leading-relaxed">{m.rejection_reason}</p>
         </div>
@@ -337,7 +335,7 @@ export default function AdminAllMissionsWorkspace() {
                   style={
                     showFilters || activeFilterCount > 0
                       ? { background: "linear-gradient(180deg,#4f46e5,#4338ca)", color: "#fff", boxShadow: "0 2px 8px -2px rgba(79,70,229,0.4)" }
-                      : { background: "#f8fafc", color: "#475569", border: "1px solid #e2e8f0" }
+                      : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }
                   }
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -487,7 +485,7 @@ export default function AdminAllMissionsWorkspace() {
                             <tr
                               onClick={() => setOpenId(isOpen ? null : m.id)}
                               className="group cursor-pointer hover:bg-slate-50/60 transition-colors"
-                              style={isOpen ? { background: "#f5f4ff", boxShadow: "inset 3px 0 0 #6366f1" } : undefined}
+                              style={isOpen ? { background: "rgb(var(--surface-2))", boxShadow: "inset 3px 0 0 #6366f1" } : undefined}
                             >
                               {/* Misi */}
                               <td className="px-4 py-3 max-w-[220px]">
