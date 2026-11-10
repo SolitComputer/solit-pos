@@ -1012,9 +1012,14 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                 const matchText = !q || (
                     e.keterangan.toLowerCase().includes(q) ||
                     (e.ref ?? "").toLowerCase().includes(q) ||
+                    (e.journal_no ?? "").toLowerCase().includes(q) ||
                     (isPengajuan && "pengajuan dana".includes(q)) ||
                     (e.trx_meta?.nama ?? "").toLowerCase().includes(q) ||
-                    e.lines.some((l) => l.account_code.includes(q) || l.account_name.toLowerCase().includes(q))
+                    e.lines.some((l) =>
+                        l.account_code.includes(q) ||
+                        l.account_name.toLowerCase().includes(q) ||
+                        (l.keterangan ?? "").toLowerCase().includes(q)
+                    )
                 );
                 const matchNominal = !qNomDigits || e.lines.some((l) => String(Math.round(Number(l.nominal))).startsWith(qNomDigits));
                 return matchText && matchNominal;
@@ -1064,7 +1069,12 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                 badge.label.toLowerCase().includes(q) ||
                 (isPengajuan && "pengajuan dana".includes(q)) ||
                 (companyBadge?.label.toLowerCase().includes(q) ?? false) ||
-                specParts.some((s) => s.toLowerCase().includes(q))
+                specParts.some((s) => s.toLowerCase().includes(q)) ||
+                d.lines.some((l) =>
+                    (l.keterangan ?? "").toLowerCase().includes(q) ||
+                    accountName(l.account_code).toLowerCase().includes(q) ||
+                    l.account_code.includes(q)
+                )
             );
         });
     }, [pending, deferredPendingSearch, showOnlyWarnings]);
@@ -1087,7 +1097,11 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                 d.keterangan.toLowerCase().includes(q) ||
                 badgeLabel.toLowerCase().includes(q) ||
                 (isPengajuan && "pengajuan dana".includes(q)) ||
-                d.lines.some((l) => l.account_code.includes(q) || accountName(l.account_code).toLowerCase().includes(q))
+                d.lines.some((l) =>
+                    l.account_code.includes(q) ||
+                    accountName(l.account_code).toLowerCase().includes(q) ||
+                    (l.keterangan ?? "").toLowerCase().includes(q)
+                )
             );
             const matchNom = !qNom || d.lines.some((l) => String(Math.round(Number(l.nominal))).includes(qNom));
             return matchText && matchNom;
@@ -1343,7 +1357,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                             <input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Cari keterangan, akun, ref..."
+                                placeholder="Cari keterangan, keterangan baris, akun, ref, kode GJ..."
                                 className="w-full h-10 border border-slate-200 bg-white rounded-xl pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition"
                             />
                         </div>

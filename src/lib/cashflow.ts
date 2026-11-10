@@ -30,6 +30,7 @@ export const CASHFLOW_CATEGORIES = {
   DANA_MARKETING: "Dana Marketing",                  // 181
   DOMPET_LAIN_LAIN: "Dana Pensiun",                  // 190
   HUTANG: "Hutang",                                  // 210
+  KEUNTUNGAN_LAIN_LAIN: "Keuntungan Lain-Lain",      // 400 ⬅️ BARU
   MODAL_LAPTOP_KELUAR: "Modal Laptop Keluar",        // 440
   BIAYA_PRINTILAN: "Biaya Printilan Barang",         // 450
   MODAL_SERVICE_KELUAR: "Modal Service Keluar",      // 460
