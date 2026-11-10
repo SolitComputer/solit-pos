@@ -33,6 +33,7 @@ export async function getRequester(request: NextRequest): Promise<Requester | nu
       : [];
   let id = request.headers.get("x-user-id") || "";
   let name = decodeURIComponent(request.headers.get("x-user-name") || "");
+  const headerId = id; // FIX debug — simpan buat log kalau fallback dipake
 
   if (roles.length === 0 || !id) {
     const user = await getCurrentUser();
@@ -40,6 +41,16 @@ export async function getRequester(request: NextRequest): Promise<Requester | nu
     if (roles.length === 0) roles = user.roles?.length ? user.roles : [user.role];
     if (!id) id = user.id;
     if (!name) name = user.name;
+
+    // FIX debug — kalau fallback ke session dipake, itu wajar;
+    // tapi kalau BEDA sama header, ada ketidakcocokan yang perlu di-audit.
+    if (process.env.NODE_ENV !== "production" && headerId && headerId !== user.id) {
+      console.warn("[getRequester] Header id != session id!", {
+        headerId,
+        sessionId: user.id,
+        sessionName: user.name,
+      });
+    }
   }
   if (!id) return null;
 

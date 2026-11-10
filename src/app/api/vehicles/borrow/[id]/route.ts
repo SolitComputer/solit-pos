@@ -110,11 +110,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   // ─── CHECKOUT (selesai pakai) ────────────────────────────────────────────────
   if (action === "CHECKOUT") {
-    if (me.id !== req.user_id)
+    // FIX bug Raesty gabisa checkout — validasi ownership pakai DUA jalur:
+    // 1. me.id === req.user_id (jalur normal)
+    // 2. Admin SELALU boleh force-checkout (safety valve kalau peminjam asli
+    //    hilang data / logout / ID mismatch gara-gara middleware)
+    // Kalau dua-duanya gagal, baru tolak + log detail buat debug.
+    const isOwner = me.id === req.user_id;
+    const canForceCheckout = me.isAdmin;
+    if (!isOwner && !canForceCheckout) {
+      console.warn("[borrow/CHECKOUT] Ownership mismatch:", {
+        me_id: me.id,
+        me_name: me.name,
+        me_roles: me.roles,
+        req_user_id: req.user_id,
+        req_id: req.id,
+        vehicle_id: req.vehicle_id,
+      });
       return NextResponse.json(
         { success: false, message: "Hanya peminjam yang bisa melakukan check-out kendaraan ini." },
         { status: 403 }
       );
+    }
     if (req.status !== "APPROVED")
       return NextResponse.json(
         { success: false, message: "Pengajuan ini tidak sedang dipakai." },

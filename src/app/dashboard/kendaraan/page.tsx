@@ -584,9 +584,40 @@ function VehicleCard({
             </>
           )}
           {v.status === "DIPAKAI" && !iAmUsing && (
-            <div className="text-[10.5px] text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 font-semibold flex items-center gap-1.5">
-              <Ban size={12} /> Sedang dipakai karyawan lain
-            </div>
+            <>
+              <div className="text-[10.5px] text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 font-semibold flex items-center gap-1.5">
+                <Ban size={12} /> Sedang dipakai karyawan lain
+              </div>
+              {/* FIX safety valve — Admin bisa force-checkout kalau peminjam asli
+                  kena bug ID mismatch. Backend CHECKOUT udah izinkan admin. */}
+              {isAdmin && v.lastUsage?.request_id && (
+                <button
+                  onClick={() => {
+                    const stub: BorrowRequest = {
+                      id: v.lastUsage!.request_id!,
+                      vehicle_id: v.id,
+                      user_id: v.lastUsage!.borrower_id ?? "",
+                      status: "APPROVED",
+                      requested_at: v.lastUsage!.at ?? new Date().toISOString(),
+                      approved_at: v.lastUsage!.at ?? null,
+                      rejection_note: null,
+                      actual_start: v.lastUsage!.at ?? null,
+                      vehicle: v,
+                      borrower: v.lastUsage!.borrower_name
+                        ? { id: v.lastUsage!.borrower_id ?? "", name: v.lastUsage!.borrower_name, role: "" }
+                        : null,
+                      approver: v.lastUsage!.approver_name
+                        ? { id: v.lastUsage!.approver_id ?? "", name: v.lastUsage!.approver_name, role: "" }
+                        : null,
+                    };
+                    onCheckout(stub);
+                  }}
+                  className="h-10 bg-white border border-amber-200 text-amber-700 rounded-xl text-[11px] font-semibold hover:bg-amber-50 transition active:scale-[0.97] flex items-center justify-center gap-1.5"
+                >
+                  <LogOut size={12} /> Force Check-out (Admin)
+                </button>
+              )}
+            </>
           )}
           {v.status === "MAINTENANCE" && (
             <div className="text-[10.5px] text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 font-semibold flex items-center gap-1.5">
