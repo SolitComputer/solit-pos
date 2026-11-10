@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { toast } from "sonner";
-import { Search, X, Check, Ban, RotateCcw, Laptop as LaptopIcon, Wrench, Package, HandHelping, Camera, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, X, Check, Ban, RotateCcw, Laptop as LaptopIcon, Wrench, Package, HandHelping, Camera, ChevronDown, ChevronUp, Shield } from "lucide-react";
+import Link from "next/link";
+import { LOAN_APPROVER_MANAGE_ROLES } from "@/lib/permissions";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -45,7 +47,10 @@ export default function ItemLoansPage() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userName, setUserName] = useState("");
     const [userId, setUserId] = useState("");
-    const canApprove = hasAnyRole(userRoles, ITEM_LOAN_APPROVE_ROLES);
+    // canApprove sekarang DINAMIS — fetch dari /api/item-loans/approvers (whitelist).
+    // Fallback ke role check kalau whitelist kosong (grace period).
+    const [canApprove, setCanApprove] = useState(false);
+    const canManageApprovers = hasAnyRole(userRoles, LOAN_APPROVER_MANAGE_ROLES);
 
     const [snQuery, setSnQuery] = useState("");
     const [snResults, setSnResults] = useState<SnResult[]>([]);
@@ -86,6 +91,19 @@ export default function ItemLoansPage() {
                 setUserName((u as any)?.name ?? "");
                 setUserId((u as any)?.id ?? "");
             } catch { setUserRoles([]); }
+        })();
+    }, []);
+
+    // Fetch status "apakah user ini approver?" dari whitelist dinamis.
+    // Dipanggil sekali saat mount — kalau Kepala Admin Barang update whitelist,
+    // user existing yg sudah login perlu refresh page untuk dapat state terbaru.
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/item-loans/approvers");
+                const json = await res.json();
+                if (json.success) setCanApprove(json.data.can_approve_now === true);
+            } catch { setCanApprove(false); }
         })();
     }, []);
 
@@ -455,9 +473,23 @@ export default function ItemLoansPage() {
                             </div>
                             <div className="min-w-0 flex-1">
                                 <h1 className="text-base sm:text-lg font-bold text-zinc-900 tracking-tight leading-tight truncate">Peminjaman Barang</h1>
-                                <p className="text-[11.5px] text-zinc-400 mt-1 truncate">Ajukan pinjam barang inventaris, lalu disetujui Pengelola Barang</p>
+                                <p className="text-[11.5px] text-zinc-400 mt-1 truncate">Ajukan pinjam barang inventaris, lalu disetujui Approver</p>
                             </div>
+                            {/* Tombol "Atur Approver" — hanya muncul utk Kepala Admin Barang + Admin */}
+                            {canManageApprovers && (
+                                <Link href="/dashboard/item-loans/approvers"
+                                    className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition flex-shrink-0">
+                                    <Shield size={14} /> Atur Approver
+                                </Link>
+                            )}
                         </div>
+                        {/* Tombol mobile — di bawah header supaya nggak crowded */}
+                        {canManageApprovers && (
+                            <Link href="/dashboard/item-loans/approvers"
+                                className="sm:hidden flex items-center justify-center gap-1.5 h-10 border-t border-zinc-100 text-xs font-semibold text-indigo-700 bg-indigo-50/60 hover:bg-indigo-50 transition">
+                                <Shield size={14} /> Atur Approver
+                            </Link>
+                        )}
                     </div>
 
                     <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 sm:p-5 space-y-3.5">

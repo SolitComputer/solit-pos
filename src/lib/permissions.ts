@@ -242,6 +242,15 @@ export const PENGELOLA_DECISION_ROLES: UserRole[] = [
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "KEPALA_ADMIN_BARANG", // kepala admin barang juga boleh (overlap tim)
 ];
+
+// ── Loan Approver Management (Kepala Admin Barang atur siapa boleh ACC pinjam) ─
+// Role yang boleh mengatur WHITELIST approver di /dashboard/item-loans/approvers.
+// Approver sendiri (siapa yang boleh klik Approve/Reject pinjaman) diatur per-USER
+// di tabel loan_approvers, BUKAN per-role. Ini constant hanya gating halaman admin.
+export const LOAN_APPROVER_MANAGE_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_ADMIN_BARANG",
+];
 export const DEAD_ASSET_ROLES: UserRole[] = [
   ...FIXED_ASSET_ROLES, "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "KEPALA_PENGELOLA_BARANG",
 ];

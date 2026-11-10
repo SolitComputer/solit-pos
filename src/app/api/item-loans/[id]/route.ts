@@ -14,11 +14,39 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { data: loan } = await supabaseAdmin.from("item_loans").select("*").eq("id", id).single();
     if (!loan) return NextResponse.json({ success: false, message: "Data pinjaman tidak ditemukan" }, { status: 404 });
 
-    // approve/reject/approve-return/reject-return = khusus role ACC.
+    // approve/reject/approve-return/reject-return = khusus APPROVER (dari whitelist).
     // request-return = HANYA peminjam (pemilik) — admin/approver pun TIDAK boleh.
     const userRoles = user.roles ?? [user.role];
-    const isApprover = hasAnyRole(userRoles, ITEM_LOAN_APPROVE_ROLES);
     const isBorrower = loan.borrower_id === user.id;
+
+    // ── Cek isApprover: STRICT whitelist dgn grace period ──────────────
+    // Kalau tabel loan_approvers KOSONG (belum di-setup Kepala Admin Barang)
+    //   → fallback ke role check (ITEM_LOAN_APPROVE_ROLES) supaya operasional
+    //     sehari pertama rilis tidak lock-out.
+    // Kalau tabel sudah di-populate (≥ 1 approver aktif)
+    //   → STRICT: user harus ada di whitelist.
+    let isApprover = false;
+    {
+      const { data: inWhitelist } = await supabaseAdmin
+        .from("loan_approvers")
+        .select("user_id")
+        .eq("is_active", true)
+        .eq("user_id", user.id)
+        .limit(1);
+
+      if ((inWhitelist?.length ?? 0) > 0) {
+        isApprover = true;
+      } else {
+        // Belum di whitelist → cek apakah whitelist kosong (grace period)
+        const { count } = await supabaseAdmin
+          .from("loan_approvers")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true);
+        if ((count ?? 0) === 0) {
+          isApprover = hasAnyRole(userRoles, ITEM_LOAN_APPROVE_ROLES);
+        }
+      }
+    }
 
     let updates: Record<string, unknown>;
     if (action === "approve") {

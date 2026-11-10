@@ -37,6 +37,44 @@ const fmt = (n: number | null) => n == null ? "—" : "Rp " + n.toLocaleString("
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 
+// ─── Reusable Input Field ──────────────────────────────────────────────
+// WAJIB di module level (BUKAN di dalam QcEditModal) supaya identity-nya
+// stable antar re-render. Dulu di-define inside modal → tiap ketik 1 huruf,
+// Input jadi fungsi baru → React unmount & remount → focus hilang → user
+// harus klik ulang tiap huruf. Extract ke sini = focus ketahanan 100%.
+type FormShape = {
+  serial_number: string; grade: string; source: string; condition_note: string;
+  purchase_price: string; sparepart_cost: string; selling_price: string; official_price: string;
+  brand: string; cpu: string; ram: string; storage: string; laptop_name: string;
+};
+function QcInputField({
+  label, name, type = "text", required = false, form, setForm,
+}: {
+  label: string;
+  name: keyof FormShape;
+  type?: string;
+  required?: boolean;
+  form: FormShape;
+  setForm: React.Dispatch<React.SetStateAction<FormShape>>;
+}) {
+  const isEmpty = form[name].trim() === "";
+  return (
+    <div>
+      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+      </label>
+      <input
+        type={type}
+        value={form[name]}
+        onChange={(e) => setForm(f => ({ ...f, [name]: e.target.value }))}
+        className={`w-full h-10 border rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 focus:border-indigo-400 focus:bg-white transition ${
+          isEmpty && required ? "border-amber-300 bg-amber-50/30" : "border-gray-200"
+        }`}
+      />
+    </div>
+  );
+}
+
 // ─── Edit Modal ────────────────────────────────────────────────────────
 function QcEditModal({
   unit, onClose, onSaved,
@@ -130,26 +168,8 @@ function QcEditModal({
     } finally { setMarkingMinus(false); }
   };
 
-  const Input = ({ label, name, type = "text", required = false }: {
-    label: string; name: keyof typeof form; type?: string; required?: boolean;
-  }) => {
-    const isEmpty = form[name].trim() === "";
-    return (
-      <div>
-        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
-          {label}{required && <span className="text-red-400 ml-0.5">*</span>}
-        </label>
-        <input
-          type={type}
-          value={form[name]}
-          onChange={(e) => setForm(f => ({ ...f, [name]: e.target.value }))}
-          className={`w-full h-10 border rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 focus:border-indigo-400 focus:bg-white transition ${
-            isEmpty && required ? "border-amber-300 bg-amber-50/30" : "border-gray-200"
-          }`}
-        />
-      </div>
-    );
-  };
+  // Input helper sudah dipindah ke module level (QcInputField) — lihat atas file.
+  // Jangan define component di dalam modal: re-render bikin focus hilang.
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
@@ -187,11 +207,11 @@ function QcEditModal({
               <LaptopIcon size={14} /> Spesifikasi Model
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input label="Nama Laptop" name="laptop_name" required />
-              <Input label="Brand" name="brand" required />
-              <Input label="CPU" name="cpu" required />
-              <Input label="RAM" name="ram" required />
-              <Input label="Storage" name="storage" required />
+              <QcInputField label="Nama Laptop" name="laptop_name" required form={form} setForm={setForm} />
+              <QcInputField label="Brand" name="brand" required form={form} setForm={setForm} />
+              <QcInputField label="CPU" name="cpu" required form={form} setForm={setForm} />
+              <QcInputField label="RAM" name="ram" required form={form} setForm={setForm} />
+              <QcInputField label="Storage" name="storage" required form={form} setForm={setForm} />
             </div>
           </div>
 
@@ -201,15 +221,15 @@ function QcEditModal({
               <CheckCircle2 size={14} /> Data Unit (per SN)
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input label="Serial Number" name="serial_number" required />
-              <Input label="Grade (A/B/C)" name="grade" required />
-              <Input label="Sumber" name="source" required />
-              <Input label="Harga Modal (Rp)" name="purchase_price" type="number" required />
-              <Input label="Biaya Sparepart (Rp)" name="sparepart_cost" type="number" required />
-              <Input label="Harga Setor (Rp)" name="selling_price" type="number" required />
-              <Input label="Harga Official (Rp)" name="official_price" type="number" required />
+              <QcInputField label="Serial Number" name="serial_number" required form={form} setForm={setForm} />
+              <QcInputField label="Grade (A/B/C)" name="grade" required form={form} setForm={setForm} />
+              <QcInputField label="Sumber" name="source" required form={form} setForm={setForm} />
+              <QcInputField label="Harga Modal (Rp)" name="purchase_price" type="number" required form={form} setForm={setForm} />
+              <QcInputField label="Biaya Sparepart (Rp)" name="sparepart_cost" type="number" required form={form} setForm={setForm} />
+              <QcInputField label="Harga Setor (Rp)" name="selling_price" type="number" required form={form} setForm={setForm} />
+              <QcInputField label="Harga Official (Rp)" name="official_price" type="number" required form={form} setForm={setForm} />
               <div className="md:col-span-2">
-                <Input label="Kondisi & Catatan" name="condition_note" required />
+                <QcInputField label="Kondisi & Catatan" name="condition_note" required form={form} setForm={setForm} />
               </div>
             </div>
           </div>
