@@ -15,12 +15,15 @@ import { ApproveRequestModal, RejectRequestModal } from "@/components/kendaraan/
 import VehicleSopGate from "@/components/kendaraan/VehicleSopGate";
 
 type LastUsage = {
+  request_id?: string;             // FIX — id request APPROVED aktif, buat stub checkout kalau myActive kosong
+  borrower_id?: string | null;     // id peminjam aktif — fallback kalau myRequests kacau
   borrower_name: string;
   status: string;
   fuel: string | null;
   condition: string | null;
   at: string | null;
-  approver_name?: string | null; // nama admin yang meng-ACC
+  approver_id?: string | null;     // FIX — id admin yang ACC, biar stub approver type-safe
+  approver_name?: string | null;   // nama admin yang meng-ACC
 };
 type Vehicle = {
   id: string;
@@ -54,7 +57,8 @@ export default function KendaraanPage() {
   const [myRequests, setMyRequests] = useState<BorrowRequest[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [canApprove, setCanApprove] = useState(false);
-  const [queue, setQueue] = useState<BorrowRequest[]>([]);
+    const [queue, setQueue] = useState<BorrowRequest[]>([]);
+    const [currentUserId, setCurrentUserId] = useState<string>("");
   // Terkunci by default (aman) sampai VehicleSopGate memastikan status SOP.
   const [sopBlocked, setSopBlocked] = useState(true);
 
@@ -75,6 +79,7 @@ export default function KendaraanPage() {
       setMyRequests(d.myRequests);
       setIsAdmin(d.isAdmin);
       setCanApprove(d.canApprove);
+      setCurrentUserId(d.currentUserId ?? "");
       if (d.canApprove) {
         const qr = await fetch("/api/vehicles/borrow?queue=1", { cache: "no-store" });
         const qd = await qr.json();
@@ -228,6 +233,7 @@ export default function KendaraanPage() {
               vehicles={motors}
               isAdmin={isAdmin}
               sopBlocked={sopBlocked}
+              currentUserId={currentUserId}
               myActiveFor={myActiveFor}
               onBorrow={setBorrowTarget}
               onCheckout={setCheckoutTarget}
@@ -240,6 +246,7 @@ export default function KendaraanPage() {
               vehicles={mobils}
               isAdmin={isAdmin}
               sopBlocked={sopBlocked}
+              currentUserId={currentUserId}
               myActiveFor={myActiveFor}
               onBorrow={setBorrowTarget}
               onCheckout={setCheckoutTarget}
@@ -265,13 +272,14 @@ export default function KendaraanPage() {
 
 // ─── SECTION ─────────────────────────────────────────────────────────────────
 function VehicleSection({
-  title, icon, vehicles, isAdmin, sopBlocked, myActiveFor, onBorrow, onCheckout, onEdit, onReload,
+  title, icon, vehicles, isAdmin, sopBlocked, currentUserId, myActiveFor, onBorrow, onCheckout, onEdit, onReload,
 }: {
   title: string;
   icon: React.ReactNode;
   vehicles: Vehicle[];
   isAdmin: boolean;
   sopBlocked: boolean;
+  currentUserId: string;
   myActiveFor: (id: string) => BorrowRequest | undefined;
   onBorrow: (v: Vehicle) => void;
   onCheckout: (r: BorrowRequest) => void;
@@ -300,6 +308,7 @@ function VehicleSection({
               vehicle={v}
               isAdmin={isAdmin}
               sopBlocked={sopBlocked}
+              currentUserId={currentUserId}
               myActive={myActiveFor(v.id)}
               onBorrow={() => onBorrow(v)}
               onCheckout={onCheckout}
@@ -392,11 +401,12 @@ function avatarTone(name?: string | null): string {
 
 // ─── CARD ────────────────────────────────────────────────────────────────────
 function VehicleCard({
-  vehicle: v, isAdmin, sopBlocked, myActive, onBorrow, onCheckout, onEdit, onReload,
+  vehicle: v, isAdmin, sopBlocked, currentUserId, myActive, onBorrow, onCheckout, onEdit, onReload,
 }: {
   vehicle: Vehicle;
   isAdmin: boolean;
   sopBlocked: boolean;
+  currentUserId: string;
   myActive?: BorrowRequest;
   onBorrow: () => void;
   onCheckout: (r: BorrowRequest) => void;
@@ -438,8 +448,25 @@ function VehicleCard({
     }
   };
 
-  const iAmUsing = myActive?.status === "APPROVED" && v.status === "DIPAKAI";
+  // Fallback: kalau myRequests dari backend somehow tidak include request APPROVED
+  // kita, cek via lastUsage.borrower_id vs currentUserId supaya peminjam asli
+  // tetap bisa check-out. Logging bantu debug kalau fallback yang kepakai.
+  const matchedByLastUsage =
+    v.status === "DIPAKAI" &&
+    !!currentUserId &&
+    !!v.lastUsage?.borrower_id &&
+    v.lastUsage.borrower_id === currentUserId &&
+    v.lastUsage.status === "APPROVED"; // FIX — guard dari data inconsistent
+
+  const iAmUsing =
+    (myActive?.status === "APPROVED" && v.status === "DIPAKAI") || matchedByLastUsage;
+
   const iAmPending = myActive?.status === "PENDING";
+
+  if (process.env.NODE_ENV !== "production" && matchedByLastUsage && !myActive) {
+    // Backend/api/vehicles seharusnya mengembalikan request APPROVED ini di myRequests.
+    console.warn("[Kendaraan] iAmUsing via fallback lastUsage.borrower_id — periksa GET /api/vehicles myRequests query", { vehicleId: v.id });
+  }
 
   const TypeIcon = v.type === "MOTOR" ? Bike : Car;
   const accent: Record<string, string> = {
@@ -519,8 +546,39 @@ function VehicleCard({
           )}
           {iAmUsing && (
             <>
-              <ApprovedByNote name={myActive?.approver?.name} />
-              <button onClick={() => myActive && onCheckout(myActive)} className={`${primaryBtn} flex-none`}>
+              <ApprovedByNote name={myActive?.approver?.name ?? v.lastUsage?.approver_name ?? null} />
+              <button
+                onClick={() => {
+                  // Prefer request dari myRequests. Kalau kosong (fallback path),
+                  // pakai request_id dari lastUsage — route /api/vehicles/borrow/[id]
+                  // yang nerima action CHECKOUT bakal validasi ownership sendiri.
+                  if (myActive) {
+                    onCheckout(myActive);
+                    return;
+                  }
+                  const stub: BorrowRequest = {
+                    id: v.lastUsage?.request_id ?? "",
+                    vehicle_id: v.id,
+                    user_id: currentUserId,
+                    status: "APPROVED",
+                    requested_at: v.lastUsage?.at ?? new Date().toISOString(),
+                    approved_at: v.lastUsage?.at ?? null,
+                    rejection_note: null,
+                    actual_start: v.lastUsage?.at ?? null,
+                    vehicle: v,
+                    borrower: null,
+                    approver: v.lastUsage?.approver_name
+                      ? { id: v.lastUsage.approver_id ?? "", name: v.lastUsage.approver_name, role: "" }
+                      : null,
+                  };
+                  if (!stub.id) {
+                    alert("Data peminjaman tidak lengkap. Reload halaman lalu coba lagi, atau laporkan ke admin.");
+                    return;
+                  }
+                  onCheckout(stub);
+                }}
+                className={`${primaryBtn} flex-none`}
+              >
                 <LogOut size={14} /> Check-out (Selesai Pakai)
               </button>
             </>

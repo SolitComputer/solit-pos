@@ -14,6 +14,18 @@ type Req = {
   actual_start: string | null;
   vehicle?: { name: string } | null;
   borrower?: UserLite | null;
+  _synthetic?: boolean; // ditandai true kalau entry ini di-synth dari lastUsage (bukan dari /api/vehicles/dashboard)
+};
+type VehicleLite = {
+  id: string;
+  name: string;
+  status: "TERSEDIA" | "DIPAKAI" | "MAINTENANCE";
+  lastUsage?: {
+    borrower_name: string;
+    status: string;
+    at: string | null;
+    approver_name?: string | null;
+  } | null;
 };
 type DashboardData = {
   isAdmin: boolean;
@@ -38,6 +50,7 @@ export default function KendaraanDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [nowMs, setNowMs] = useState(0);
+  const [vehiclesSnapshot, setVehiclesSnapshot] = useState<VehicleLite[]>([]);
 
   const [approveTarget, setApproveTarget] = useState<ApprovalRequest | null>(null);
   const [rejectTarget, setRejectTarget] = useState<ApprovalRequest | null>(null);
@@ -45,15 +58,20 @@ export default function KendaraanDashboardPage() {
   const reload = useCallback(async () => {
     setError("");
     try {
-      const [dashRes, histRes] = await Promise.all([
+      const [dashRes, histRes, vehRes] = await Promise.all([
         fetch("/api/vehicles/dashboard", { cache: "no-store" }),
         fetch("/api/vehicles/history", { cache: "no-store" }),
+        fetch("/api/vehicles", { cache: "no-store" }),
       ]);
       const d = await dashRes.json();
       if (!dashRes.ok || !d.success) throw new Error(d.message || `Error ${dashRes.status}`);
       setData(d);
       const h = await histRes.json();
       if (histRes.ok && h.success) setHistory(h.requests);
+      // Cross-reference ke /api/vehicles supaya kalau /dashboard query missing entry,
+      // kita bisa synth dari lastUsage. Diamkan kalau gagal — ini cuma safety net.
+      const vd = await vehRes.json();
+      if (vehRes.ok && vd.success) setVehiclesSnapshot(vd.vehicles ?? []);
     } catch (e: any) {
       setError(e.message || "Gagal memuat data");
     } finally {
@@ -128,14 +146,52 @@ export default function KendaraanDashboardPage() {
                   <span className="w-8 h-8 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center">
                     <Clock size={16} />
                   </span>
-                  <h2 className="text-sm font-black text-gray-900">Sedang Berjalan ({data.running.length})</h2>
+                  <h2 className="text-sm font-black text-gray-900">
+                    Sedang Berjalan ({Math.max(data.running.length, m!.inUse)})
+                  </h2>
+                  {m!.inUse !== data.running.length && (
+                    <span
+                      title={`Mismatch: ${m!.inUse} vehicle DIPAKAI vs ${data.running.length} request aktif. Kemungkinan bug di backend /api/vehicles/dashboard.`}
+                      className="text-[9px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 border border-amber-200 px-2 py-1 rounded"
+                    >
+                      ⚠️ sync issue
+                    </span>
+                  )}
                 </div>
                 {(() => {
                   // Jaring pengaman tampilan: sembunyikan peminjaman "nyangkut" (> 12 jam).
                   // Backend (FIX 2A) yang menutup datanya; ini cuma mencegah durasi
                   // ekstrem sempat terlihat saat race dengan auto-expire.
                   const STALE_MINUTES = 12 * 60;
-                  const runningVisible = data.running.filter(
+
+                  // Enrich: kalau ada vehicle DIPAKAI yang tidak muncul di data.running
+                  // (indikasi query backend /api/vehicles/dashboard ada yang terlewat),
+                  // synth entry dari lastUsage supaya peminjam tetap kelihatan.
+                  const existingNames = new Set(
+                    data.running.map((r) => r.vehicle?.name).filter(Boolean) as string[]
+                  );
+                  const synthetic: Req[] = vehiclesSnapshot
+                    .filter((v) => v.status === "DIPAKAI" && !existingNames.has(v.name))
+                    .map((v) => ({
+                      id: `synth-${v.id}`,
+                      requested_at: v.lastUsage?.at ?? new Date().toISOString(),
+                      actual_start: v.lastUsage?.at ?? null,
+                      vehicle: { name: v.name },
+                      borrower: v.lastUsage?.borrower_name
+                        ? { id: "", name: v.lastUsage.borrower_name, role: "" }
+                        : null,
+                      _synthetic: true,
+                    }));
+
+                  if (process.env.NODE_ENV !== "production" && synthetic.length > 0) {
+                    console.warn(
+                      "[Dashboard Kendaraan] running list dari /api/vehicles/dashboard missing entries:",
+                      synthetic.map((s) => s.vehicle?.name)
+                    );
+                  }
+
+                  const runningMerged = [...data.running, ...synthetic];
+                  const runningVisible = runningMerged.filter(
                     (r) => liveDurationMinutes(r.actual_start, nowMs || Date.now()) <= STALE_MINUTES
                   );
                   return runningVisible.length === 0 ? (
@@ -143,15 +199,32 @@ export default function KendaraanDashboardPage() {
                   ) : (
                     <div className="space-y-2.5">
                       {runningVisible.map((r) => (
-                      <div key={r.id} className="border border-gray-100 hover:border-gray-200 rounded-xl p-3.5 flex items-center justify-between gap-3 bg-gray-50/40 transition-colors">
+                      <div
+                        key={r.id}
+                        className={`border rounded-xl p-3.5 flex items-center justify-between gap-3 transition-colors ${
+                          r._synthetic
+                            ? "border-amber-200 bg-amber-50/40 hover:border-amber-300"
+                            : "border-gray-100 hover:border-gray-200 bg-gray-50/40"
+                        }`}
+                      >
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-gray-900 truncate">{r.vehicle?.name ?? "—"}</p>
+                          <p className="text-xs font-bold text-gray-900 truncate flex items-center gap-1.5">
+                            {r.vehicle?.name ?? "—"}
+                            {r._synthetic && (
+                              <span
+                                title="Data direkonstruksi dari snapshot vehicle — request tidak terbaca di query dashboard. Cek backend."
+                                className="text-[8px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded"
+                              >
+                                recon
+                              </span>
+                            )}
+                          </p>
                           <p className="text-[10px] text-gray-500 truncate">
                             {r.borrower?.name ?? "—"} · sejak {formatTime(r.actual_start)}
                           </p>
                         </div>
                         <span className="text-[11px] font-black tabular-nums text-zinc-800 whitespace-nowrap">
-                          {formatDuration(liveDurationMinutes(r.actual_start, nowMs))}
+                          {formatDuration(liveDurationMinutes(r.actual_start, nowMs || Date.now()))}
                         </span>
                       </div>
                     ))}
