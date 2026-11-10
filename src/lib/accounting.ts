@@ -554,6 +554,11 @@ export function labaRugiGroup(acc: {
   const num = parseInt(acc.code, 10);
   if (!Number.isFinite(num)) return null;
 
+  // Pengecualian: 550 (Pengeluaran Tahunan) dimasukkan ke Beban Operasional
+  // walau kodenya ada di rentang 530–599. Keputusan Rayhan — hanya 550 yang
+  // pindah; 530 (Biaya Lain-lain) & 540 (Keuntungan Mitra) tetap di Luar Operasional.
+  if (num === 550) return "OPERASIONAL";
+
   if (num >= 410 && num <= 439) return "PENDAPATAN";
   if (num >= 440 && num <= 499) return "MODAL_KELUAR";
   if (num >= 500 && num <= 529) return "OPERASIONAL";

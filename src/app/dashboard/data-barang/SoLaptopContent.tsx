@@ -87,6 +87,9 @@ export default function SoLaptopContent() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
     const [soingUnitId, setSoingUnitId] = useState<string | null>(null);
+    // ⬅️ BARU: modal konfirmasi + catatan SO (muncul sebelum eksekusi). null = tertutup.
+    const [soPromptTarget, setSoPromptTarget] = useState<SoUnitRow | null>(null);
+    const [soNote, setSoNote] = useState("");
 
     // Filter state
     const [search, setSearch] = useState("");
@@ -276,19 +279,24 @@ export default function SoLaptopContent() {
     }, [rows, soStatusFilter, unitStatusFilter, deferredSearch]);
 
     // ── Toggle SO per-unit ───────────────────────────────────────────────────
-    const toggleUnitSo = async (row: SoUnitRow) => {
-        // Cek per-row, bukan cuma global canManageSo. Alasan: user di
-        // SO_LIMITED_USER_IDS cuma boleh SO unit SIAP_JUAL. Kalau masih pakai
-        // canManageSo, user limited bisa bypass tombol disabled lewat devtools
-        // → kirim PATCH ke unit BELUM_SIAP → server reject 403 → UX jelek.
-        // Guard final tetap ada di server (canSoUnit), ini cuma mirror.
+    // ⬅️ UBAH: klik tombol SO sekarang BUKA modal catatan dulu, bukan langsung
+    //  eksekusi. Proses sebenarnya ada di confirmUnitSo() setelah user konfirmasi.
+    const toggleUnitSo = (row: SoUnitRow) => {
+        if (!canSoRow(row)) return;
+        setSoNote("");           // reset catatan tiap buka modal baru
+        setSoPromptTarget(row);  // buka modal
+    };
+
+    // ⬅️ BARU: eksekusi SO + kirim catatan ke server (ikut tercatat di riwayat).
+    const confirmUnitSo = async (row: SoUnitRow, note: string) => {
+        // Guard final tetap ada di server (canSoUnit), ini cuma mirror client.
         if (!canSoRow(row)) return;
         setSoingUnitId(row.unit_id);
         try {
             const res = await fetch(`/api/units/${row.unit_id}/so`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ notes: "" }),
+                body: JSON.stringify({ notes: note.trim() }), // ⬅️ catatan ikut dikirim
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal update SO");
@@ -305,6 +313,7 @@ export default function SoLaptopContent() {
                     : r
             ));
             toast.success(row.is_so_active ? "Status SO diperbarui (SO Ulang)" : "Unit ditandai Sudah SO");
+            setSoPromptTarget(null); // tutup modal setelah sukses
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal update SO");
         } finally {
@@ -549,6 +558,18 @@ export default function SoLaptopContent() {
                 )}
             </div>
 
+            {/* ⬅️ BARU: Modal konfirmasi + catatan SO (muncul sebelum eksekusi) */}
+            {soPromptTarget && (
+                <SoNotePromptModal
+                    unit={soPromptTarget}
+                    note={soNote}
+                    onNoteChange={setSoNote}
+                    loading={soingUnitId === soPromptTarget.unit_id}
+                    onCancel={() => { if (soingUnitId !== soPromptTarget.unit_id) setSoPromptTarget(null); }}
+                    onConfirm={() => confirmUnitSo(soPromptTarget, soNote)}
+                />
+            )}
+
             {/* Modal Riwayat SO per-unit */}
             {historyTarget && (
                 <HistorySoModal
@@ -660,6 +681,59 @@ function HistorySoModal({
                     <button onClick={onClose} className="w-full h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition">
                         Tutup
                     </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Modal konfirmasi + Catatan SO per-unit — muncul sebelum "Tandai SO".
+// Catatan opsional, ikut tersimpan ke riwayat SO lewat endpoint /api/units/[id]/so.
+// ═══════════════════════════════════════════════════════════════════════════
+function SoNotePromptModal({
+    unit, note, onNoteChange, onConfirm, onCancel, loading,
+}: {
+    unit: SoUnitRow; note: string; onNoteChange: (v: string) => void;
+    onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel, loading]);
+
+    const isActive = unit.is_so_active;
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !loading && onCancel()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className={`h-1 w-full bg-gradient-to-r ${isActive ? "from-emerald-400 via-emerald-600 to-emerald-800" : "from-red-400 via-red-600 to-red-800"}`} />
+                <div className={`px-5 py-4 ${isActive ? "bg-emerald-600" : "bg-red-600"}`}>
+                    <p className="font-bold text-white text-sm">{isActive ? "Tandai Ulang SO" : "Tandai Sudah SO"}</p>
+                    <p className="text-xs text-white/70 mt-0.5 truncate">{unit.laptop_name} · SN {unit.serial_number}</p>
+                </div>
+                <div className="p-5">
+                    <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
+                        Catatan SO (opsional)
+                    </label>
+                    <textarea
+                        autoFocus
+                        rows={3}
+                        placeholder="Kondisi barang, lokasi rak, dll"
+                        value={note}
+                        onChange={e => onNoteChange(e.target.value)}
+                        className={`w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:bg-white transition resize-none ${isActive ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-red-500/20 focus:border-red-400"}`}
+                    />
+                    <div className="flex gap-3 mt-5">
+                        <button onClick={onCancel} disabled={loading} className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 transition disabled:opacity-50">Batal</button>
+                        <button onClick={onConfirm} disabled={loading}
+                            className={`flex-1 h-10 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isActive ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}>
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Konfirmasi
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
