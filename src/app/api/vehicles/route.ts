@@ -25,18 +25,21 @@ export async function GET(request: NextRequest) {
   const lastUsageMap: Record<
     string,
     {
+      request_id: string;
+      borrower_id: string;
       borrower_name: string;
+      approver_id: string | null;
+      approver_name: string | null;
       status: string;
       fuel: string | null;
       condition: string | null;
       at: string | null;
-      approver_name: string | null;
     }
   > = {};
   if (vehicleIds.length) {
     const { data: usageRows } = await supabaseVehicles
       .from("vehicle_borrow_requests")
-      .select("vehicle_id, user_id, status, return_fuel_level, return_condition, actual_start, actual_end, requested_at, approved_by")
+      .select("id, vehicle_id, user_id, status, return_fuel_level, return_condition, actual_start, actual_end, requested_at, approved_by")
       .in("vehicle_id", vehicleIds)
       .in("status", ["APPROVED", "COMPLETED"])
       .order("requested_at", { ascending: false });
@@ -57,12 +60,17 @@ export async function GET(request: NextRequest) {
     for (const r of usageRows ?? []) {
       if (lastUsageMap[r.vehicle_id]) continue; // sudah ambil yang terbaru (order desc)
       lastUsageMap[r.vehicle_id] = {
+        // FIX bug "Sedang dipakai karyawan lain" — frontend butuh id-nya untuk
+        // fallback deteksi "saya peminjam-nya" kalau myRequests query missing.
+        request_id: r.id,
+        borrower_id: r.user_id,
         borrower_name: nameMap[r.user_id] ?? "—",
+        approver_id: r.approved_by ?? null,
+        approver_name: r.approved_by ? (nameMap[r.approved_by] ?? "—") : null,
         status: r.status,
         fuel: r.return_fuel_level ?? null,
         condition: r.return_condition ?? null,
         at: r.actual_end ?? r.actual_start ?? r.requested_at ?? null,
-        approver_name: r.approved_by ? (nameMap[r.approved_by] ?? "—") : null,
       };
     }
   }
@@ -94,6 +102,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
+    currentUserId: me.id, // FIX — dipakai frontend untuk cross-check peminjam aktif
     vehicles: vehiclesOut,
     myRequests,
     isAdmin: me.isAdmin,
