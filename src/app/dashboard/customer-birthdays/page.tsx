@@ -98,16 +98,15 @@ function formatCountdown(days: number): string {
 
 // ── Pill hitung mundur (gaya identik halaman karyawan) ────────────────────────
 function CountdownPill({ days }: { days: number }) {
-    const tone =
+    const toneCls =
         days === 0
-            ? { bg: "#fef3c7", text: "#92400e", border: "#fde68a" }
+            ? "bg-amber-100 text-amber-700 border-amber-200"
             : days <= 7
-                ? { bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" }
-                : { bg: "#f8fafc", text: "#64748b", border: "#e8ecf5" };
+                ? "bg-violet-50 text-violet-700 border-violet-200"
+                : "bg-slate-50 text-slate-600 border-slate-200";
     return (
         <span
-            className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10.5px] font-black whitespace-nowrap tabular-nums ${days === 0 ? "animate-pulse" : ""}`}
-            style={{ background: tone.bg, color: tone.text, border: `1px solid ${tone.border}` }}
+            className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10.5px] font-black whitespace-nowrap tabular-nums border ${toneCls} ${days === 0 ? "animate-pulse" : ""}`}
         >
             {formatCountdown(days)}
         </span>
@@ -225,7 +224,7 @@ function NextUpBanner({ person }: { person: BirthdayCustomer }) {
     return (
         <section
             className="bg-white rounded-2xl sm:rounded-3xl px-4 sm:px-6 py-4 sm:py-5"
-            style={{ border: "1px solid #ebebf8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+            style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
         >
             <div className="flex items-center gap-2 mb-3.5">
                 <Clock className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#7c3aed" }} />
@@ -242,15 +241,15 @@ function NextUpBanner({ person }: { person: BirthdayCustomer }) {
                     {getInitials(person.customer_name)}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm sm:text-base font-black truncate leading-tight" style={{ color: "#0f172a" }}>
+                    <p className="text-sm sm:text-base font-black truncate leading-tight" style={{ color: "rgb(var(--fg))" }}>
                         {person.customer_name}
                     </p>
                     {person.customer_phone && (
-                        <p className="text-[10.5px] sm:text-xs mt-1 truncate" style={{ color: "#94a3b8" }}>
+                        <p className="text-[10.5px] sm:text-xs mt-1 truncate" style={{ color: "rgb(var(--fg-subtle))" }}>
                             {person.customer_phone}
                         </p>
                     )}
-                    <p className="text-[10.5px] sm:text-xs mt-0.5 font-bold" style={{ color: "#64748b" }}>
+                    <p className="text-[10.5px] sm:text-xs mt-0.5 font-bold" style={{ color: "rgb(var(--fg-muted))" }}>
                         {shortBirthDate(person.customer_birth_date)} &middot; ke-{person.age}
                     </p>
                 </div>
@@ -315,7 +314,7 @@ export default function CustomerBirthdaysPage() {
 
     return (
         <DashboardLayout>
-            <div className="min-h-screen" style={{ background: "#f8f7ff" }}>
+            <div className="min-h-screen" style={{ background: "var(--app-bg)" }}>
                 <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-5">
 
                     {/* ── Header ── */}
@@ -373,7 +372,7 @@ export default function CustomerBirthdaysPage() {
                         </div>
                     </div>
 
-                    {/* ── Sorotan: ultah hari ini / terdekat (gaya halaman karyawan) ── */}f
+                    {/* ── Sorotan: ultah hari ini / terdekat (gaya halaman karyawan) ── */}
                     {!loading && todayList.length > 0 && <TodayBanner people={todayList} />}
                     {!loading && todayList.length === 0 && nextUp && <NextUpBanner person={nextUp} />}
 
@@ -443,7 +442,7 @@ export default function CustomerBirthdaysPage() {
                                 <div
                                     key={i}
                                     className="h-24 rounded-2xl animate-pulse"
-                                    style={{ background: "linear-gradient(90deg, #e2e2f0 0%, #ededf9 50%, #e2e2f0 100%)" }}
+                                    style={{ background: "rgb(var(--surface-2))" }}
                                 />
                             ))}
                         </div>
@@ -452,8 +451,8 @@ export default function CustomerBirthdaysPage() {
                         <div
                             className="rounded-2xl overflow-hidden"
                             style={{
-                                background: "#fff",
-                                border: "1px solid #ebebf8",
+                                background: "rgb(var(--surface))",
+                                border: "1px solid rgb(var(--border))",
                                 boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
                             }}
                         >
@@ -471,8 +470,8 @@ export default function CustomerBirthdaysPage() {
                         <div
                             className="rounded-2xl overflow-hidden"
                             style={{
-                                background: "#fff",
-                                border: "1px solid #ebebf8",
+                                background: "rgb(var(--surface))",
+                                border: "1px solid rgb(var(--border))",
                                 boxShadow: "0 2px 16px rgba(0,0,0,0.05)",
                             }}
                         >
@@ -486,7 +485,7 @@ export default function CustomerBirthdaysPage() {
                                         className="relative transition-colors duration-150"
                                         style={{
                                             borderBottom:
-                                                idx < filteredCustomers.length - 1 ? "1px solid #f0f0fa" : "none",
+                                                idx < filteredCustomers.length - 1 ? "1px solid rgb(var(--border))" : "none",
                                         }}
                                     >
                                         {/* Subtle left accent stripe */}

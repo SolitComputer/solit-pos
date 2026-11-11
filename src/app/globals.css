@@ -529,7 +529,7 @@ html.dark .via-\[\#f7f8fa\] { --tw-gradient-via: #0b1019 var(--tw-gradient-via-p
 html.dark .to-white { --tw-gradient-to: #101827 var(--tw-gradient-to-position) !important; }
 html.dark .to-zinc-200\/50, html.dark .to-zinc-200\/70, html.dark .to-gray-200\/50, html.dark .to-slate-200\/50 { --tw-gradient-to: #24344d var(--tw-gradient-to-position) !important; }
 html.dark .to-gray-100\/50, html.dark .to-zinc-100\/50, html.dark .to-slate-100\/50 { --tw-gradient-to: #1a263a var(--tw-gradient-to-position) !important; }
-html.dark .to-blue-100\/50, html.dark .to-sky-100\/50, html.dark .to-indigo-100\/50, html.dark .to-cyan-100\/50 { --tw-gradient-to: #142e50 var(--tw-gradient-to-position) !important; }
+html.dark .to-blue-100\/50, html.dark .to-sky-100\/50, html.dark .to-indigo-100\/50 { --tw-gradient-to: #142e50 var(--tw-gradient-to-position) !important; }
 html.dark .to-emerald-100\/50, html.dark .to-green-100\/50 { --tw-gradient-to: #0d3824 var(--tw-gradient-to-position) !important; }
 html.dark .to-red-100\/50, html.dark .to-red-100\/70, html.dark .to-rose-100\/50 { --tw-gradient-to: #451522 var(--tw-gradient-to-position) !important; }
 html.dark .to-amber-100\/50, html.dark .to-orange-100\/50, html.dark .to-yellow-100\/50 { --tw-gradient-to: #422a09 var(--tw-gradient-to-position) !important; }
@@ -564,3 +564,38 @@ html.dark .to-zinc-200\/30, html.dark .to-zinc-200\/40, html.dark .to-zinc-200\/
 html.dark .to-emerald-100\/40, html.dark .to-green-100\/40 { --tw-gradient-to: #0d3824 var(--tw-gradient-to-position) !important; }
 html.dark .to-blue-100\/40, html.dark .to-sky-100\/40 { --tw-gradient-to: #142e50 var(--tw-gradient-to-position) !important; }
 html.dark .to-amber-100\/40, html.dark .to-orange-100\/40 { --tw-gradient-to: #422a09 var(--tw-gradient-to-position) !important; }
+
+/* =========================================================
+   DARK MODE v6.6 — lengkapi gradient stop warna -50/-100 yang
+   belum ter-remap. Dipakai kartu Daftar Hadir (Pagi/Siang/Sore)
+   & ikon bulat section. Tanpa ini: from-* sudah gelap tapi
+   via-* dan to-* tetap terang → kartu belang (gelap atas, terang
+   bawah, paling kelihatan di kolom "Masuk Sore").
+   ========================================================= */
+
+/* via-* (stop tengah, varian /60) terang → gelap */
+html.dark .via-orange-50\/60 { --tw-gradient-via: #2b1b06 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-blue-50\/60   { --tw-gradient-via: #0c1e36 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-violet-50\/60 { --tw-gradient-via: #1d1236 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-teal-50\/60   { --tw-gradient-via: #0a2524 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+
+/* to-* (stop akhir, -50 solid) terang → gelap */
+html.dark .to-yellow-50 { --tw-gradient-to: #2b1b06 var(--tw-gradient-to-position) !important; }
+html.dark .to-cyan-50   { --tw-gradient-to: #0c1e36 var(--tw-gradient-to-position) !important; }
+html.dark .to-purple-50 { --tw-gradient-to: #1d1236 var(--tw-gradient-to-position) !important; }
+html.dark .to-green-50  { --tw-gradient-to: #072517 var(--tw-gradient-to-position) !important; }
+html.dark .to-orange-50 { --tw-gradient-to: #2b1b06 var(--tw-gradient-to-position) !important; }
+
+/* from-* (stop awal, -100 untuk ikon bulat section) terang → gelap */
+html.dark .from-amber-100   { --tw-gradient-from: #422a09 var(--tw-gradient-from-position) !important; }
+html.dark .from-sky-100     { --tw-gradient-from: #142e50 var(--tw-gradient-from-position) !important; }
+html.dark .from-emerald-100 { --tw-gradient-from: #0d3824 var(--tw-gradient-from-position) !important; }
+/* =========================================================
+   DARK MODE v6.7 — metric clip-text PERAK (podium rank-2 di
+   halaman Pelanggaran) terlalu redup di dark. Mirror pola v6.4:
+   clip-text gradient gelap dibuat solid terang. Scoped ke kombo
+   3 class biar hanya metric rank-2 yang kena. Light mode aman.
+   ========================================================= */
+html.dark .bg-clip-text.text-transparent.from-slate-500 {
+  -webkit-text-fill-color: #cbd5e1 !important; color: #cbd5e1 !important;
+}

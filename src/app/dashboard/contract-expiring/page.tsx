@@ -120,23 +120,23 @@ function StatCard({
   return (
     <div
       className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden transition-all hover:shadow-md"
-      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+      style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
     >
       <div className="absolute top-0 left-0 w-1 h-full" style={{ background: accent }} />
       <div className="pl-2.5 sm:pl-3">
         <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
-          <span style={{ color: muted ? "#cbd5e1" : "#334155" }}>{icon}</span>
+          <span style={{ color: muted ? "rgb(var(--fg-subtle))" : "rgb(var(--fg))" }}>{icon}</span>
           <span
             className="text-2xl sm:text-3xl font-black tabular-nums leading-none"
-            style={{ color: muted ? "#cbd5e1" : "#0f172a" }}
+            style={{ color: muted ? "rgb(var(--fg-subtle))" : "rgb(var(--fg))" }}
           >
             {value}
           </span>
         </div>
-        <p className="text-[10.5px] sm:text-[11px] font-bold truncate" style={{ color: "#475569" }}>
+        <p className="text-[10.5px] sm:text-[11px] font-bold truncate" style={{ color: "rgb(var(--fg-muted))" }}>
           {label}
         </p>
-        <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>
+        <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate" style={{ color: "rgb(var(--fg-subtle))" }}>
           {sub}
         </p>
       </div>
@@ -236,7 +236,7 @@ function JenjangTable({
 }) {
   if (busy) {
     return (
-      <div className="py-14 text-center text-xs font-semibold" style={{ color: "#94a3b8" }}>
+      <div className="py-14 text-center text-xs font-semibold" style={{ color: "rgb(var(--fg-subtle))" }}>
         Memuat data…
       </div>
     );
@@ -244,8 +244,8 @@ function JenjangTable({
   if (rows.length === 0) {
     return (
       <div className="text-center py-14 px-5">
-        <Inbox className="w-9 h-9 mx-auto mb-3" style={{ color: "#cbd5e1" }} />
-        <p className="text-sm font-bold" style={{ color: "#475569" }}>
+        <Inbox className="w-9 h-9 mx-auto mb-3" style={{ color: "rgb(var(--fg-subtle))" }} />
+        <p className="text-sm font-bold" style={{ color: "rgb(var(--fg-muted))" }}>
           Tidak ada data
         </p>
       </div>
@@ -272,19 +272,19 @@ function JenjangTable({
         <tbody>
           {rows.map((p, i) => (
             <tr key={p.id} className="transition-colors hover:bg-amber-50/40">
-              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#64748b" }}>
+              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid rgb(var(--border))", color: "rgb(var(--fg-muted))" }}>
                 {i + 1}
               </td>
-              <td className="px-2.5 py-1.5 font-semibold" style={{ border: "1px solid #eef2f7", color: "#0f172a" }}>
+              <td className="px-2.5 py-1.5 font-semibold" style={{ border: "1px solid rgb(var(--border))", color: "rgb(var(--fg))" }}>
                 {p.name}
               </td>
-              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#475569" }}>
+              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid rgb(var(--border))", color: "rgb(var(--fg-muted))" }}>
                 {p.role ? getRoleLabel(p.role, lookup) : "-"}
               </td>
-              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#64748b" }}>
+              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid rgb(var(--border))", color: "rgb(var(--fg-muted))" }}>
                 {durationLabel(p.contract_duration_months)}
               </td>
-              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid #eef2f7", color: "#334155" }}>
+              <td className="px-2.5 py-1.5 text-center" style={{ border: "1px solid rgb(var(--border))", color: "rgb(var(--fg))" }}>
                 {p.career_level ?? "-"}
               </td>
             </tr>
@@ -426,7 +426,7 @@ export default function ContractExpiringPage() {
             <div className="min-w-0">
               <h1
                 className="text-base sm:text-xl font-black tracking-tight truncate"
-                style={{ color: "#0f172a" }}
+                style={{ color: "rgb(var(--fg))" }}
               >
                 Daftar Kontrak
               </h1>
@@ -436,15 +436,13 @@ export default function ContractExpiringPage() {
           {/* ── Error ───────────────────────────────────────────────── */}
           {error && (
             <div
-              className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-xs font-semibold"
-              style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}
+              className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700"
             >
               <AlertTriangle className="w-4 h-4 flex-shrink-0" />
               <span className="flex-1 min-w-0">{error}</span>
               <button
                 onClick={load}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex-shrink-0 transition-all active:scale-95"
-                style={{ background: "#fecdd3", color: "#9f1239" }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex-shrink-0 transition-all active:scale-95 bg-rose-100 text-rose-700"
               >
                 <RotateCcw className="w-3 h-3" /> Coba lagi
               </button>
@@ -498,7 +496,7 @@ export default function ContractExpiringPage() {
           {/* ── Filter ──────────────────────────────────────────────── */}
           <div
             className="bg-white rounded-2xl overflow-hidden"
-            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+            style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
           >
             <div className="p-3 sm:p-4 space-y-2.5 sm:space-y-3">
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -506,7 +504,7 @@ export default function ContractExpiringPage() {
                 <div className="relative flex-1 min-w-0">
                   <Search
                     className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
-                    style={{ color: "#94a3b8" }}
+                    style={{ color: "rgb(var(--fg-subtle))" }}
                   />
                   <input
                     type="text"
@@ -515,7 +513,7 @@ export default function ContractExpiringPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full h-10 sm:h-9 rounded-xl pl-9 pr-9 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                    style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+                    style={{ border: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }}
                   />
                   {search && (
                     <button
@@ -523,7 +521,7 @@ export default function ContractExpiringPage() {
                       aria-label="Hapus pencarian"
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-slate-100 active:scale-90"
                     >
-                      <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+                      <X className="w-3.5 h-3.5" style={{ color: "rgb(var(--fg-subtle))" }} />
                     </button>
                   )}
                 </div>
@@ -541,7 +539,7 @@ export default function ContractExpiringPage() {
                     style={
                       month === i
                         ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
-                        : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }
+                        : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }
                     }
                   >
                     {m.slice(0, 3)}
@@ -554,11 +552,11 @@ export default function ContractExpiringPage() {
           {/* ── Daftar ──────────────────────────────────────────────── */}
           <div
             className="bg-white rounded-2xl overflow-hidden"
-            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+            style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
           >
             <div
               className="px-3.5 sm:px-5 py-3 flex items-center gap-2.5"
-              style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}
+              style={{ borderBottom: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))" }}
             >
               <span
                 className="w-1 h-4 rounded-full flex-shrink-0"
@@ -566,7 +564,7 @@ export default function ContractExpiringPage() {
               />
               <p
                 className="text-[10.5px] sm:text-[11px] font-bold truncate"
-                style={{ color: "#64748b" }}
+                style={{ color: "rgb(var(--fg-muted))" }}
               >
                 {`${jenjangList.length} karyawan — kontrak habis di ${MONTH_NAMES_ID[month]}`}
               </p>

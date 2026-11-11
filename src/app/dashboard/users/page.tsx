@@ -318,7 +318,7 @@ function ModalHeader({ title, subtitle, icon, onClose }: {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="text-[10.5px] font-bold mb-1.5 block uppercase tracking-widest" style={{ color: "#94a3b8" }}>
+      <label className="text-[10.5px] font-bold mb-1.5 block uppercase tracking-widest" style={{ color: "rgb(var(--fg-subtle))" }}>
         {label}
       </label>
       {children}
@@ -331,7 +331,7 @@ function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className="w-full h-11 sm:h-10 border rounded-xl px-3.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
-      style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#1e293b" }}
+      style={{ borderColor: "rgb(var(--border))", background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }}
     />
   );
 }
@@ -396,7 +396,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
                 className="flex-1 h-11 sm:h-10 rounded-full text-xs font-bold border transition-all active:scale-95"
                 style={gender === v
                   ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
-                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                  : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }}>
                 <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
               </button>
             ))}
@@ -404,7 +404,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
         </Field>
         <Field label="Nomor WhatsApp">
           <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789" />
-          <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>Digunakan sebagai username login</p>
+          <p className="text-[10px] mt-1.5" style={{ color: "rgb(var(--fg-subtle))" }}>Digunakan sebagai username login</p>
         </Field>
         <Field label="Role (bisa pilih lebih dari 1)">
           <MultiRoleSelect values={roles} onChange={setRoles} />
@@ -416,7 +416,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
                 className="flex-1 h-11 sm:h-10 rounded-full text-xs font-bold border transition-all active:scale-95"
                 style={shift === s
                   ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
-                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                  : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }}>
                 {s === "PAGI"
                   ? <span className="inline-flex items-center gap-1.5"><Sunrise className="w-3.5 h-3.5" /> Pagi</span>
                   : <span className="inline-flex items-center gap-1.5"><Sunset className="w-3.5 h-3.5" /> Sore</span>}
@@ -425,10 +425,10 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </div>
         </Field>
       </div>
-      <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
+      <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid rgb(var(--border))" }}>
         <button onClick={onClose}
           className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
-          style={{ background: "#f1f5f9", color: "#64748b" }}>
+          style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
           Batal
         </button>
         <button onClick={save} disabled={saving}
@@ -554,7 +554,7 @@ function MultiRoleSelect({
     <div className="space-y-3">
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5 p-2.5 rounded-2xl min-h-[40px]"
-          style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}>
+          style={{ background: "rgb(var(--surface-2))", border: "1px solid rgb(var(--border))" }}>
           {values.map((role, idx) => {
             const badge = getBadge(role);
             const isPrimary = idx === 0;
@@ -596,14 +596,14 @@ function MultiRoleSelect({
 
       {/* Kolom pencarian role — styling selaras search "Cari nama atau nomor..." */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "#94a3b8" }} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "rgb(var(--fg-subtle))" }} />
         <input
           type="text"
           value={roleSearch}
           onChange={(e) => setRoleSearch(e.target.value)}
           placeholder="Cari role..."
           className="w-full h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400/30 transition"
-          style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+          style={{ border: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }}
         />
         {roleSearch && (
           <button
@@ -611,7 +611,7 @@ function MultiRoleSelect({
             onClick={() => setRoleSearch("")}
             className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform"
           >
-            <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3" style={{ color: "rgb(var(--fg-subtle))" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -620,13 +620,13 @@ function MultiRoleSelect({
 
       <div className="max-h-48 overflow-y-auto space-y-2 pr-0.5">
         {filteredGroups.length === 0 ? (
-          <p className="text-[11px] text-center py-4 font-semibold" style={{ color: "#94a3b8" }}>
+          <p className="text-[11px] text-center py-4 font-semibold" style={{ color: "rgb(var(--fg-subtle))" }}>
             Role tidak ditemukan
           </p>
         ) : filteredGroups.map(group => (
           <div key={group.label}>
             <p className="text-[9px] font-bold uppercase tracking-widest mb-1"
-              style={{ color: "#94a3b8" }}>
+              style={{ color: "rgb(var(--fg-subtle))" }}>
               {group.label}
             </p>
             <div className="flex flex-wrap gap-1">
@@ -641,7 +641,7 @@ function MultiRoleSelect({
                     className="px-2 py-1 rounded-full text-[10px] font-bold transition-all active:scale-95 border"
                     style={isSelected
                       ? { background: badge.bg, color: badge.text, borderColor: badge.border, boxShadow: `0 0 0 1.5px ${badge.border}` }
-                      : { background: "#f8fafc", color: "#94a3b8", borderColor: "#e2e8f0" }
+                      : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-subtle))", borderColor: "rgb(var(--border))" }
                     }
                   >
                     {isSelected && <Check className="w-2.5 h-2.5 inline mr-0.5" />}
@@ -720,7 +720,7 @@ function EditUserModal({ user, onClose, onSaved, onResetFace }: {
         )}
         {user.is_active === false && (
           <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
-            style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", color: "#475569" }}>
+            style={{ background: "rgb(var(--surface-2))", border: "1px solid rgb(var(--border))", color: "rgb(var(--fg-muted))" }}>
             <UserX className="w-3.5 h-3.5 flex-shrink-0" />
             <span>
               Akun ini sedang nonaktif — user tidak bisa login.
@@ -743,7 +743,7 @@ function EditUserModal({ user, onClose, onSaved, onResetFace }: {
                 className="flex-1 h-11 sm:h-10 rounded-full text-xs font-bold border transition-all active:scale-95"
                 style={gender === v
                   ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
-                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                  : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }}>
                 <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
               </button>
             ))}
@@ -756,7 +756,7 @@ function EditUserModal({ user, onClose, onSaved, onResetFace }: {
         {onResetFace && (
           <Field label="Data Wajah (Absensi)">
             <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl"
-              style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              style={{ background: "rgb(var(--surface-2))", border: "1px solid rgb(var(--border))" }}>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold"
                 style={{ color: user.face_embedding ? "#059669" : "#94a3b8" }}>
                 <ScanFace className="w-3.5 h-3.5" />
@@ -771,7 +771,7 @@ function EditUserModal({ user, onClose, onSaved, onResetFace }: {
               )}
             </div>
             {user.face_embedding && user.face_enrolled_at && (
-              <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>
+              <p className="text-[10px] mt-1.5" style={{ color: "rgb(var(--fg-subtle))" }}>
                 Didaftarkan {formatDateTime(user.face_enrolled_at)}
               </p>
             )}
@@ -784,17 +784,17 @@ function EditUserModal({ user, onClose, onSaved, onResetFace }: {
                 className="flex-1 h-11 sm:h-10 rounded-full text-xs font-bold border transition-all active:scale-95"
                 style={shift === s
                   ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
-                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                  : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }}>
                 {s === "PAGI" ? <Sunrise className="w-3.5 h-3.5 inline" /> : <Sunset className="w-3.5 h-3.5 inline" />} {s}
               </button>
             ))}
           </div>
         </Field>
       </div>
-      <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
+      <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid rgb(var(--border))" }}>
         <button onClick={onClose}
           className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
-          style={{ background: "#f1f5f9", color: "#64748b" }}>
+          style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
           Batal
         </button>
         <button onClick={save} disabled={saving}
@@ -825,7 +825,7 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
             className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
@@ -863,7 +863,7 @@ function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
             className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
@@ -901,7 +901,7 @@ function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
             className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
@@ -935,7 +935,7 @@ function ConfirmResetBiometricModal({ user, onClose, onConfirm, loading }: {
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
             className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
@@ -966,10 +966,10 @@ function ConfirmToggleActiveModal({ user, onClose, onConfirm, loading }: {
         style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
           style={isDeactivating
-            ? { background: "#f8fafc", border: "1px solid #cbd5e1" }
+            ? { background: "rgb(var(--surface-2))", border: "1px solid rgb(var(--border))" }
             : { background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
           {isDeactivating
-            ? <UserX className="w-8 h-8" style={{ color: "#475569" }} />
+            ? <UserX className="w-8 h-8" style={{ color: "rgb(var(--fg-muted))" }} />
             : <UserCheck className="w-8 h-8" style={{ color: "#059669" }} />}
         </div>
         <h3 className="font-black text-slate-800 text-center text-base mb-1">
@@ -982,7 +982,7 @@ function ConfirmToggleActiveModal({ user, onClose, onConfirm, loading }: {
         </p>
         <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
           style={isDeactivating
-            ? { background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }
+            ? { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }
             : { background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" }}>
           <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" />
           {isDeactivating ? "Bisa diaktifkan lagi kapan saja — bukan hapus akun" : "Status akun kembali normal"}
@@ -990,7 +990,7 @@ function ConfirmToggleActiveModal({ user, onClose, onConfirm, loading }: {
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
             className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
@@ -1329,7 +1329,7 @@ export default function UsersPage() {
             <div className="flex gap-2.5">
               <button onClick={() => setConfirmReset(null)}
                 className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold hover:bg-slate-100 transition-all"
-                style={{ background: "#f1f5f9", color: "#64748b" }}>
+                style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
                 Batal
               </button>
               <button onClick={() => handleReset(confirmReset)} disabled={resetting === confirmReset.id}
@@ -1499,7 +1499,7 @@ export default function UsersPage() {
                     style={
                       mainTab === t.key
                         ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff" }
-                        : { background: "#f5f7ff", color: "#64748b" }
+                        : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }
                     }
                   >
                     <span>{t.icon}</span>
@@ -1526,13 +1526,13 @@ export default function UsersPage() {
                         className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
                         style={activeTab === t.key
                           ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
-                          : { background: "#f5f7ff", color: "#64748b" }}>
+                          : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
                         <span>{t.icon}</span>
                         <span>{t.label}</span>
                         <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black"
                           style={activeTab === t.key
                             ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
-                            : { background: "#e8ecf5", color: "#64748b" }}>
+                            : { background: "#e8ecf5", color: "rgb(var(--fg-muted))" }}>
                           {t.count}
                         </span>
                       </button>
@@ -1550,17 +1550,17 @@ export default function UsersPage() {
                     <div className="px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-3.5 space-y-3">
                       <div className="flex gap-2 items-center">
                         <div className="relative flex-1 min-w-0">
-                          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }}
+                          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "rgb(var(--fg-subtle))" }}
                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                           </svg>
                           <input type="text" placeholder="Cari nama atau nomor..."
                             value={search} onChange={e => setSearch(e.target.value)}
                             className="w-full h-10 sm:h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400/30 transition"
-                            style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }} />
+                            style={{ border: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }} />
                           {search && (
                             <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform">
-                              <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3 h-3" style={{ color: "rgb(var(--fg-subtle))" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                               </svg>
                             </button>
@@ -1585,7 +1585,7 @@ export default function UsersPage() {
                             className="px-2.5 py-1 rounded-full text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
                             style={filterRole === r
                               ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff" }
-                              : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
+                              : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }}>
                             {r === "Semua" ? `Semua (${totalInTab})` : <>{getRoleIcon(r)} {getRoleLabel(r)}</>}
                           </button>
                         ))}
@@ -1597,11 +1597,11 @@ export default function UsersPage() {
                   <div className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
 
                     <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100"
-                      style={{ background: "#fafbff" }}>
+                      style={{ background: "rgb(var(--surface-2))" }}>
                       <div className="flex items-center gap-2 min-w-0 flex-wrap">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
-                          <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
+                          <p className="text-[11px] font-bold truncate" style={{ color: "rgb(var(--fg-muted))" }}>
                             {filtered.length === totalInTab
                               ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
                               : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
@@ -1622,7 +1622,7 @@ export default function UsersPage() {
                           </span>
                           {genderInTab.unknown > 0 && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
-                              style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0" }}
+                              style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }}
                               title="Belum diisi jenis kelamin">
                               ? {genderInTab.unknown}
                             </span>
@@ -1630,7 +1630,7 @@ export default function UsersPage() {
                         </div>
                       </div>
                       {isAdmin && (
-                        <div className="hidden sm:flex items-center gap-3 text-[10px] flex-shrink-0" style={{ color: "#94a3b8" }}>
+                        <div className="hidden sm:flex items-center gap-3 text-[10px] flex-shrink-0" style={{ color: "rgb(var(--fg-subtle))" }}>
                           <span className="flex items-center gap-1.5">
                             <div className="w-2 h-2 rounded-full bg-emerald-400" />Wajah OK
                           </span>
@@ -1660,9 +1660,9 @@ export default function UsersPage() {
                       </div>
                     ) : filtered.length === 0 ? (
                       <div className="text-center py-16 sm:py-20 px-4">
-                        <div className="flex justify-center mb-3"><Inbox className="w-9 h-9" style={{ color: "#cbd5e1" }} /></div>
-                        <p className="text-sm font-bold" style={{ color: "#475569" }}>Tidak ada user ditemukan</p>
-                        <p className="text-xs mt-1" style={{ color: "#94a3b8" }}>Coba ubah filter atau kata kunci pencarian</p>
+                        <div className="flex justify-center mb-3"><Inbox className="w-9 h-9" style={{ color: "rgb(var(--fg-subtle))" }} /></div>
+                        <p className="text-sm font-bold" style={{ color: "rgb(var(--fg-muted))" }}>Tidak ada user ditemukan</p>
+                        <p className="text-xs mt-1" style={{ color: "rgb(var(--fg-subtle))" }}>Coba ubah filter atau kata kunci pencarian</p>
                         {(search || filterRole !== "Semua") && (
                           <button onClick={() => { setSearch(""); setFilterRole("Semua"); }}
                             className="mt-4 text-xs font-bold px-4 py-2 rounded-xl transition-all hover:scale-105"
@@ -1720,7 +1720,7 @@ export default function UsersPage() {
 
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/dashboard/profile/${user.id}`)} title={`Lihat profil ${user.name}`}>
                                   <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                    <span className="text-sm font-bold truncate max-w-full hover:underline inline-flex items-center gap-1" style={{ color: "#0f172a" }}>
+                                    <span className="text-sm font-bold truncate max-w-full hover:underline inline-flex items-center gap-1" style={{ color: "rgb(var(--fg))" }}>
                                       {user.name}
                                       <GenderIcon gender={user.gender} />
                                     </span>
@@ -1739,7 +1739,7 @@ export default function UsersPage() {
                                     })}
                                     {isAdmin && isInactive && (
                                       <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                                        style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1" }}>
+                                        style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }}>
                                         <UserX className="w-2.5 h-2.5" /> Nonaktif
                                       </span>
                                     )}
@@ -1782,7 +1782,7 @@ export default function UsersPage() {
                                     </div>
                                   )}
                                   {isAdmin && isInactive && (
-                                    <p className="text-[10.5px] mt-0.5 inline-flex items-center gap-1 flex-wrap" style={{ color: "#64748b" }}>
+                                    <p className="text-[10.5px] mt-0.5 inline-flex items-center gap-1 flex-wrap" style={{ color: "rgb(var(--fg-muted))" }}>
                                       <UserX className="w-3 h-3 flex-shrink-0" />
                                                                             {/* 3 kondisi beda: nama ketemu / admin-nya dihapus / memang tidak pernah tercatat */}
                                       Dinonaktifkan oleh{" "}
