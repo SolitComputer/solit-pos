@@ -119,19 +119,18 @@ function Avatar({
 
 // ── Pill countdown ────────────────────────────────────────────────────────────
 function CountdownPill({ days }: { days: number }) {
-  const tone =
+  const toneCls =
     days === 0
-      ? { bg: "#fef3c7", text: "#92400e", border: "#fde68a" }
+      ? "bg-amber-100 text-amber-700 border-amber-200"
       : days <= 7
-        ? { bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" }
-        : { bg: "#f8fafc", text: "#64748b", border: "#e8ecf5" };
+        ? "bg-violet-50 text-violet-700 border-violet-200"
+        : "bg-slate-50 text-slate-600 border-slate-200";
 
   return (
     <span
-      className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10.5px] font-black whitespace-nowrap tabular-nums ${
+      className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10.5px] font-black whitespace-nowrap tabular-nums border ${toneCls} ${
         days === 0 ? "animate-pulse" : ""
       }`}
-      style={{ background: tone.bg, color: tone.text, border: `1px solid ${tone.border}` }}
     >
       {formatCountdown(days)}
     </span>
@@ -157,23 +156,23 @@ function StatCard({
   return (
     <div
       className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden transition-all hover:shadow-md"
-      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+      style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
     >
       <div className="absolute top-0 left-0 w-1 h-full" style={{ background: accent }} />
       <div className="pl-2.5 sm:pl-3">
         <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
-          <span style={{ color: muted ? "#cbd5e1" : "#334155" }}>{icon}</span>
+          <span style={{ color: muted ? "rgb(var(--fg-subtle))" : "rgb(var(--fg))" }}>{icon}</span>
           <span
             className="text-2xl sm:text-3xl font-black tabular-nums leading-none"
-            style={{ color: muted ? "#cbd5e1" : "#0f172a" }}
+            style={{ color: muted ? "rgb(var(--fg-subtle))" : "rgb(var(--fg))" }}
           >
             {value}
           </span>
         </div>
-        <p className="text-[10.5px] sm:text-[11px] font-bold truncate" style={{ color: "#475569" }}>
+        <p className="text-[10.5px] sm:text-[11px] font-bold truncate" style={{ color: "rgb(var(--fg-muted))" }}>
           {label}
         </p>
-        <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>
+        <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate" style={{ color: "rgb(var(--fg-subtle))" }}>
           {sub}
         </p>
       </div>
@@ -267,7 +266,7 @@ function NextUpBanner({
   return (
     <section
       className="bg-white rounded-2xl sm:rounded-3xl px-4 sm:px-6 py-4 sm:py-5"
-      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+      style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
     >
       <div className="flex items-center gap-2 mb-3.5">
         <Clock3 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#7c3aed" }} />
@@ -284,14 +283,14 @@ function NextUpBanner({
         <div className="min-w-0 flex-1">
           <p
             className="text-sm sm:text-base font-black truncate leading-tight"
-            style={{ color: "#0f172a" }}
+            style={{ color: "rgb(var(--fg))" }}
           >
             {person.name}
           </p>
-          <p className="text-[10.5px] sm:text-xs mt-1 truncate" style={{ color: "#94a3b8" }}>
+          <p className="text-[10.5px] sm:text-xs mt-1 truncate" style={{ color: "rgb(var(--fg-subtle))" }}>
             {getRoleLabel(person.role, lookup)}
           </p>
-          <p className="text-[10.5px] sm:text-xs mt-0.5 font-bold" style={{ color: "#64748b" }}>
+          <p className="text-[10.5px] sm:text-xs mt-0.5 font-bold" style={{ color: "rgb(var(--fg-muted))" }}>
             {shortDate(person.birth)} &middot; ke-{person.turningAge}
           </p>
         </div>
@@ -320,8 +319,8 @@ function BirthdayRow({
     <li
       className="relative px-3.5 sm:px-5 py-3 sm:py-3.5 transition-colors hover:bg-slate-50/70"
       style={{
-        borderBottom: isLast ? "none" : "1px solid #f5f5fb",
-        background: isToday ? "#fffdf5" : undefined,
+        borderBottom: isLast ? "none" : "1px solid rgb(var(--border))",
+        background: isToday ? "rgba(251,191,36,0.1)" : undefined,
       }}
     >
       {isToday && (
@@ -339,7 +338,7 @@ function BirthdayRow({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span
               className="text-[13px] sm:text-sm font-bold truncate max-w-[9.5rem] sm:max-w-none"
-              style={{ color: "#0f172a" }}
+              style={{ color: "rgb(var(--fg))" }}
             >
               {person.name}
             </span>
@@ -353,9 +352,9 @@ function BirthdayRow({
 
           <p
             className="text-[10.5px] sm:text-[11px] font-medium mt-1 truncate"
-            style={{ color: "#94a3b8" }}
+            style={{ color: "rgb(var(--fg-subtle))" }}
           >
-            <span className="font-bold" style={{ color: "#64748b" }}>
+            <span className="font-bold" style={{ color: "rgb(var(--fg-muted))" }}>
               {shortDate(person.birth)}
             </span>{" "}
             &middot; {person.birth.getFullYear()} &middot; {person.age} th &rarr; ke-{person.turningAge}
@@ -377,22 +376,22 @@ function GroupLabel({ label, count, hint }: { label: string; count: number; hint
     <li
       className="px-3.5 sm:px-5 py-2 flex items-center gap-2"
       style={{
-        background: "#fafbff",
-        borderTop: "1px solid #f5f5fb",
-        borderBottom: "1px solid #f5f5fb",
+        background: "rgb(var(--surface-2))",
+        borderTop: "1px solid rgb(var(--border))",
+        borderBottom: "1px solid rgb(var(--border))",
       }}
     >
-      <span className="text-[9.5px] font-black uppercase tracking-[0.14em]" style={{ color: "#94a3b8" }}>
+      <span className="text-[9.5px] font-black uppercase tracking-[0.14em]" style={{ color: "rgb(var(--fg-subtle))" }}>
         {label}
       </span>
       <span
         className="px-1.5 py-0.5 rounded-full text-[9.5px] font-black tabular-nums"
-        style={{ background: "#e8ecf5", color: "#64748b" }}
+        style={{ background: "rgb(var(--border))", color: "rgb(var(--fg-muted))" }}
       >
         {count}
       </span>
       {hint && (
-        <span className="text-[9.5px] hidden sm:inline" style={{ color: "#cbd5e1" }}>
+        <span className="text-[9.5px] hidden sm:inline" style={{ color: "rgb(var(--fg-subtle))" }}>
           {hint}
         </span>
       )}
@@ -559,7 +558,7 @@ export default function EmployeeBirthdaysClient() {
             <div className="min-w-0">
               <h1
                 className="text-base sm:text-xl font-black tracking-tight truncate"
-                style={{ color: "#0f172a" }}
+                style={{ color: "rgb(var(--fg))" }}
               >
                 Ulang Tahun Karyawan
               </h1>
@@ -569,15 +568,13 @@ export default function EmployeeBirthdaysClient() {
           {/* ── Error ───────────────────────────────────────────────── */}
           {error && (
             <div
-              className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-xs font-semibold"
-              style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}
+              className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700"
             >
               <AlertTriangle className="w-4 h-4 flex-shrink-0" />
               <span className="flex-1 min-w-0">{error}</span>
               <button
                 onClick={load}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex-shrink-0 transition-all active:scale-95"
-                style={{ background: "#fecdd3", color: "#9f1239" }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex-shrink-0 transition-all active:scale-95 bg-rose-100 text-rose-700"
               >
                 <RotateCcw className="w-3 h-3" /> Coba lagi
               </button>
@@ -634,7 +631,7 @@ export default function EmployeeBirthdaysClient() {
           {/* ── Filter ──────────────────────────────────────────────── */}
           <div
             className="bg-white rounded-2xl overflow-hidden"
-            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+            style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
           >
             <div className="p-3 sm:p-4 space-y-2.5 sm:space-y-3">
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -642,7 +639,7 @@ export default function EmployeeBirthdaysClient() {
                 <div className="relative flex-1 min-w-0">
                   <Search
                     className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
-                    style={{ color: "#94a3b8" }}
+                    style={{ color: "rgb(var(--fg-subtle))" }}
                   />
                   <input
                     type="text"
@@ -651,7 +648,7 @@ export default function EmployeeBirthdaysClient() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full h-10 sm:h-9 rounded-xl pl-9 pr-9 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                    style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+                    style={{ border: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }}
                   />
                   {search && (
                     <button
@@ -659,7 +656,7 @@ export default function EmployeeBirthdaysClient() {
                       aria-label="Hapus pencarian"
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-slate-100 active:scale-90"
                     >
-                      <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+                      <X className="w-3.5 h-3.5" style={{ color: "rgb(var(--fg-subtle))" }} />
                     </button>
                   )}
                 </div>
@@ -667,7 +664,7 @@ export default function EmployeeBirthdaysClient() {
                 {/* Toggle tampilan — full width di HP, auto di laptop */}
                 <div
                   className="flex gap-1 p-1 rounded-xl flex-shrink-0"
-                  style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}
+                  style={{ background: "rgb(var(--surface-2))", border: "1px solid rgb(var(--border))" }}
                 >
                   {(
                     [
@@ -687,7 +684,7 @@ export default function EmployeeBirthdaysClient() {
                               color: "#fff",
                               boxShadow: "0 2px 8px rgba(15,12,41,0.22)",
                             }
-                          : { background: "transparent", color: "#64748b" }
+                          : { background: "transparent", color: "rgb(var(--fg-muted))" }
                       }
                     >
                       {t.label}
@@ -709,7 +706,7 @@ export default function EmployeeBirthdaysClient() {
                       style={
                         month === i
                           ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
-                          : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }
+                          : { background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px solid rgb(var(--border))" }
                       }
                     >
                       {m.slice(0, 3)}
@@ -723,11 +720,11 @@ export default function EmployeeBirthdaysClient() {
           {/* ── Daftar ──────────────────────────────────────────────── */}
           <div
             className="bg-white rounded-2xl overflow-hidden"
-            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+            style={{ border: "1px solid rgb(var(--border))", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
           >
             <div
               className="px-3.5 sm:px-5 py-3 flex items-center gap-2.5"
-              style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}
+              style={{ borderBottom: "1px solid rgb(var(--border))", background: "rgb(var(--surface-2))" }}
             >
               <span
                 className="w-1 h-4 rounded-full flex-shrink-0"
@@ -735,7 +732,7 @@ export default function EmployeeBirthdaysClient() {
               />
               <p
                 className="text-[10.5px] sm:text-[11px] font-bold truncate"
-                style={{ color: "#64748b" }}
+                style={{ color: "rgb(var(--fg-muted))" }}
               >
                 {view === "bulan"
                   ? `${visible.length} karyawan lahir di ${MONTH_NAMES_ID[month]}`
@@ -749,28 +746,28 @@ export default function EmployeeBirthdaysClient() {
                   <li
                     key={i}
                     className="px-3.5 sm:px-5 py-3.5 flex items-center gap-3 animate-pulse"
-                    style={{ borderBottom: "1px solid #f8f8fc" }}
+                    style={{ borderBottom: "1px solid rgb(var(--border))" }}
                   >
-                    <div className="w-11 h-11 rounded-2xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
+                    <div className="w-11 h-11 rounded-2xl flex-shrink-0" style={{ background: "rgb(var(--surface-2))" }} />
                     <div className="flex-1 space-y-2 min-w-0">
-                      <div className="h-3 rounded-full w-32 max-w-full" style={{ background: "#e2e8f0" }} />
-                      <div className="h-2.5 rounded-full w-24" style={{ background: "#f1f5f9" }} />
+                      <div className="h-3 rounded-full w-32 max-w-full" style={{ background: "rgb(var(--border))" }} />
+                      <div className="h-2.5 rounded-full w-24" style={{ background: "rgb(var(--surface-2))" }} />
                     </div>
-                    <div className="w-16 h-6 rounded-full flex-shrink-0" style={{ background: "#f1f5f9" }} />
+                    <div className="w-16 h-6 rounded-full flex-shrink-0" style={{ background: "rgb(var(--surface-2))" }} />
                   </li>
                 ))}
               </ul>
             ) : visible.length === 0 ? (
               <div className="text-center py-14 sm:py-20 px-5">
                 <div className="flex justify-center mb-3">
-                  <Inbox className="w-9 h-9" style={{ color: "#cbd5e1" }} />
+                  <Inbox className="w-9 h-9" style={{ color: "rgb(var(--fg-subtle))" }} />
                 </div>
-                <p className="text-sm font-bold" style={{ color: "#475569" }}>
+                <p className="text-sm font-bold" style={{ color: "rgb(var(--fg-muted))" }}>
                   Belum ada data ulang tahun di sini
                 </p>
                 <p
                   className="text-xs mt-1.5 leading-relaxed max-w-xs mx-auto"
-                  style={{ color: "#94a3b8" }}
+                  style={{ color: "rgb(var(--fg-subtle))" }}
                 >
                   {search
                     ? "Coba kata kunci lain."
@@ -782,7 +779,7 @@ export default function EmployeeBirthdaysClient() {
                   <button
                     onClick={() => setSearch("")}
                     className="mt-4 text-xs font-bold px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95"
-                    style={{ color: "#6366f1", background: "#eff3ff" }}
+                    style={{ color: "#6366f1", background: "rgb(var(--surface-2))" }}
                   >
                     Reset pencarian
                   </button>
@@ -812,7 +809,7 @@ export default function EmployeeBirthdaysClient() {
           </div>
 
           {!isBusy && missingBirthDate > 0 && (
-            <p className="text-[10.5px] text-center px-4 leading-relaxed" style={{ color: "#94a3b8" }}>
+            <p className="text-[10.5px] text-center px-4 leading-relaxed" style={{ color: "rgb(var(--fg-subtle))" }}>
               {missingBirthDate} karyawan belum mengisi tanggal lahir dan tidak muncul di daftar.
             </p>
           )}

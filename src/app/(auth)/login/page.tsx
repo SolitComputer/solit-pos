@@ -148,7 +148,7 @@ function LoginInner() {
           <div className="flex flex-col items-center mb-8">
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500" />
-              <div className="relative w-16 h-16 bg-white rounded-2xl overflow-hidden shadow-lg">
+              <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-lg" style={{ background: "#fff" }}>
                 <img
                   src="/assets/solit03.jpeg"
                   alt="Logo Solit"
@@ -343,7 +343,7 @@ function LoginInner() {
                   className="relative w-full group mt-4"
                 >
                   <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl blur opacity-40 group-hover:opacity-70 transition duration-300" />
-                  <div className="relative w-full bg-white rounded-xl h-12 font-semibold text-sm text-[#03030a] flex items-center justify-center gap-2 hover:bg-white/95 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                   <div className="relative w-full rounded-xl h-12 font-semibold text-sm text-[#03030a] flex items-center justify-center gap-2 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: "#fff" }}>
                     {loading ? (
                       <>
                         <svg
@@ -460,7 +460,7 @@ function LoginInner() {
                   className="relative w-full group mt-2"
                 >
                   <div className="absolute -inset-0.5 bg-gradient-to-r from-green-600 to-teal-600 rounded-xl blur opacity-40 group-hover:opacity-70 transition duration-300" />
-                  <div className="relative w-full bg-white rounded-xl h-12 font-semibold text-sm text-[#03030a] flex items-center justify-center gap-2 hover:bg-white/95 active:scale-[0.98] transition-all duration-200 disabled:opacity-50">
+                  <div className="relative w-full rounded-xl h-12 font-semibold text-sm text-[#03030a] flex items-center justify-center gap-2 active:scale-[0.98] transition-all duration-200 disabled:opacity-50" style={{ background: "#fff" }}>
                     {pwLoading ? (
                       <>
                         <svg
