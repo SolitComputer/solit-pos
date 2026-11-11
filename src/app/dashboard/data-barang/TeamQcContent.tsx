@@ -37,6 +37,10 @@ const fmt = (n: number | null) => n == null ? "—" : "Rp " + n.toLocaleString("
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 
+// ✅ Markup tetap: Harga Official = Harga Setor + markup ini. Sama persis
+// dengan OFFICIAL_PRICE_MARKUP di Data Barang/InventoryTable biar konsisten.
+const OFFICIAL_PRICE_MARKUP = 300_000;
+
 // ─── Reusable Input Field ──────────────────────────────────────────────
 // WAJIB di module level (BUKAN di dalam QcEditModal) supaya identity-nya
 // stable antar re-render. Dulu di-define inside modal → tiap ketik 1 huruf,
@@ -48,7 +52,7 @@ type FormShape = {
   brand: string; cpu: string; ram: string; storage: string; laptop_name: string;
 };
 function QcInputField({
-  label, name, type = "text", required = false, form, setForm,
+  label, name, type = "text", required = false, form, setForm, readOnly = false, hint,
 }: {
   label: string;
   name: keyof FormShape;
@@ -56,6 +60,8 @@ function QcInputField({
   required?: boolean;
   form: FormShape;
   setForm: React.Dispatch<React.SetStateAction<FormShape>>;
+  readOnly?: boolean;   // ⬅️ BARU: field auto, tidak bisa diketik manual
+  hint?: string;        // ⬅️ BARU: teks kecil di bawah input
 }) {
   const isEmpty = form[name].trim() === "";
   return (
@@ -66,11 +72,17 @@ function QcInputField({
       <input
         type={type}
         value={form[name]}
-        onChange={(e) => setForm(f => ({ ...f, [name]: e.target.value }))}
-        className={`w-full h-10 border rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 focus:border-indigo-400 focus:bg-white transition ${
-          isEmpty && required ? "border-amber-300 bg-amber-50/30" : "border-gray-200"
+        readOnly={readOnly}
+        onChange={(e) => { if (!readOnly) setForm(f => ({ ...f, [name]: e.target.value })); }}
+        className={`w-full h-10 border rounded-xl px-3 text-sm transition focus:outline-none ${
+          readOnly
+            ? "bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed"
+            : `bg-gray-50 focus:ring-2 focus:ring-indigo-400/20 focus:border-indigo-400 focus:bg-white ${
+                isEmpty && required ? "border-amber-300 bg-amber-50/30" : "border-gray-200"
+              }`
         }`}
       />
+      {hint && <p className="text-[10px] text-gray-400 mt-1">{hint}</p>}
     </div>
   );
 }
@@ -113,6 +125,18 @@ function QcEditModal({
     const n = Number(s);
     return Number.isNaN(n) ? null : n;
   };
+
+  // ✅ Harga Official OTOMATIS = Harga Setor + markup tetap (Rp 300.000).
+  //  Begitu Team QC isi/ubah Harga Setor, Harga Official langsung ikut
+  //  (field-nya read-only). Jalan juga saat modal dibuka — kalau data lama
+  //  official-nya beda, otomatis dinormalkan. Dijaga agar tidak loop:
+  //  hanya set-state kalau nilainya memang beda.
+  useEffect(() => {
+    const setor = parseNumber(form.selling_price);
+    const official = setor != null ? String(setor + OFFICIAL_PRICE_MARKUP) : "";
+    setForm(f => (f.official_price === official ? f : { ...f, official_price: official }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.selling_price]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,7 +251,7 @@ function QcEditModal({
               <QcInputField label="Harga Modal (Rp)" name="purchase_price" type="number" required form={form} setForm={setForm} />
               <QcInputField label="Biaya Sparepart (Rp)" name="sparepart_cost" type="number" required form={form} setForm={setForm} />
               <QcInputField label="Harga Setor (Rp)" name="selling_price" type="number" required form={form} setForm={setForm} />
-              <QcInputField label="Harga Official (Rp)" name="official_price" type="number" required form={form} setForm={setForm} />
+                          <QcInputField label="Harga Official (Rp)" name="official_price" type="number" required readOnly hint="Otomatis: Harga Setor + Rp 300.000" form={form} setForm={setForm} />
               <div className="md:col-span-2">
                 <QcInputField label="Kondisi & Catatan" name="condition_note" required form={form} setForm={setForm} />
               </div>

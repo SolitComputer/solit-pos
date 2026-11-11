@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     let allData: any[] = [];
     let from = 0;
 
-    while (true) {
+     while (true) {
       let query = supabase
         .from("face_verifications")
         .select(`
@@ -54,6 +54,11 @@ export async function GET(request: Request) {
           )
         `)
         .in("status", ["SUCCESS"])
+        // ✅ FIX: skip face_verifications milik user yang sudah diarsipkan
+        // (Ex Karyawan/PKL Solit). Nama mereka tetap muncul di jurnal akuntansi
+        // dan laporan lama, TAPI jangan muncul lagi di ringkasan absensi aktif.
+        // Pakai .filter() karena deleted_at ada di embedded resource users.
+        .filter("users.deleted_at", "is", null)
         .order("created_at", { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
 

@@ -17,6 +17,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
       .from("users")
       .select("id, name, role, shift, created_at, contract_status, contract_valid_until, career_level")
       .eq("is_active", true)
+      .is("deleted_at", null)   // ← TAMBAH: skip user yang sudah diarsipkan (Ex Karyawan/PKL)
       .order("name", { ascending: true });
 
     if (error) {
@@ -31,6 +32,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     .select("id, name, role, shift, created_at, contract_status, contract_valid_until, career_level")
     .in("id", scope.visibleIds)
     .eq("is_active", true)
+    .is("deleted_at", null)   // ← TAMBAH: skip user yang sudah diarsipkan (Ex Karyawan/PKL)
     .order("name", { ascending: true });
 
   if (error) {
