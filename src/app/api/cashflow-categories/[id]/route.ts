@@ -71,7 +71,7 @@ export const PUT = withAuth(async (req, ctx, _user) => {
         // hardcoded. Alasan sama dengan POST handler di route.ts — supaya akun custom
         // & akun bawaan apa pun yang tercatat di DB bisa dipakai untuk edit kategori.
         const { data: accountFromDB, error: accCheckErr } = await supabase
-            .from("accounts")
+            .from("chart_of_accounts")
             .select("code, name, is_active")
             .eq("code", account_code)
             .maybeSingle();
