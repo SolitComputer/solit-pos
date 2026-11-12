@@ -789,3 +789,30 @@ html.dark .via-pink-100 { --tw-gradient-via: #3a1c2c var(--tw-gradient-via-posit
 html.dark .via-teal-50 { --tw-gradient-via: #0a2524 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
 html.dark .via-teal-100 { --tw-gradient-via: #123d3b var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
 html.dark .via-white { --tw-gradient-via: #101827 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+
+/* ============================================================================
+   v8.1 PROSE DARK — Tailwind Typography (.prose) di mode gelap.
+   SopMarkdown (isi SOP), preview MarkdownEditor, dan konten markdown lain
+   memakai .prose. Warna prose datang dari variabel --tw-prose-* sendiri,
+   jadi LOLOS dari remap .text-gray-900 dll. Tanpa blok ini: heading dan teks
+   tebal (hitam) tak terlihat, body jadi abu samar. Semua dipetakan ke palet
+   gelap konsisten (slate). Satu blok, berlaku untuk SEMUA halaman ber-prose.
+   ========================================================================== */
+html.dark .prose {
+  --tw-prose-body: #cbd5e1;            /* slate-300  — teks isi */
+  --tw-prose-headings: #f1f5f9;        /* slate-100  — judul */
+  --tw-prose-lead: #94a3b8;            /* slate-400 */
+  --tw-prose-links: #60a5fa;           /* blue-400   — link kebaca di gelap */
+  --tw-prose-bold: #f1f5f9;            /* slate-100  — label tebal terang */
+  --tw-prose-counters: #94a3b8;        /* slate-400  — nomor list */
+  --tw-prose-bullets: #64748b;         /* slate-500  — bullet dot */
+  --tw-prose-hr: #334155;              /* slate-700  — garis pemisah */
+  --tw-prose-quotes: #e2e8f0;          /* slate-200 */
+  --tw-prose-quote-borders: #334155;   /* slate-700 */
+  --tw-prose-captions: #94a3b8;        /* slate-400 */
+  --tw-prose-code: #f1f5f9;            /* slate-100  — inline code */
+  --tw-prose-pre-code: #e2e8f0;        /* slate-200 */
+  --tw-prose-pre-bg: #0b1220;          /* panel code gelap */
+  --tw-prose-th-borders: #334155;      /* slate-700  — border header tabel */
+  --tw-prose-td-borders: #24344d;      /* border sel tabel */
+}

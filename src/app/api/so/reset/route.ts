@@ -1,6 +1,6 @@
 // src/app/api/so/reset/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import {
@@ -24,7 +24,7 @@ import {
 async function handler(_req: NextRequest, _ctx: unknown, user: AuthUser) {
   try {
     const roles = expandRolesWithParents(user.roles ?? [user.role]);
-if (!hasAnyRole(roles, SO_RESET_ROLES)) {
+    if (!hasAnyRole(roles, SO_RESET_ROLES)) {
       return NextResponse.json(
         { success: false, message: "Forbidden: hanya Admin dan Kepala Admin Barang yang boleh reset SO" },
         { status: 403 }
@@ -40,17 +40,22 @@ if (!hasAnyRole(roles, SO_RESET_ROLES)) {
     // Kolom `so_by` SENGAJA dipertahankan — info siapa terakhir SO tetap ada.
     const SO_RESET_SENTINEL_ISO = "2000-01-01T00:00:00.000Z";
 
+    // ⚠️ WAJIB pakai supabaseAdmin (service role) — client `supabase` biasa
+    // tunduk ke RLS, dan tabel accessories/accessory_units punya policy yang
+    // nolak UPDATE dari user non-admin. Tanpa ini, 4 tabel di-call tapi cuma
+    // laptops & laptop_units yang beneran ter-update, sisanya silent fail
+    // (no error dilempar, tapi 0 row affected → user kira sukses padahal engga).
     const [lapRes, lapUnitRes, accRes, accUnitRes] = await Promise.all([
-      supabase.from("laptops")
+      supabaseAdmin.from("laptops")
         .update({ so_at: SO_RESET_SENTINEL_ISO })
         .not("so_at", "is", null),
-      supabase.from("laptop_units")
+      supabaseAdmin.from("laptop_units")
         .update({ so_at: SO_RESET_SENTINEL_ISO })
         .not("so_at", "is", null),
-      supabase.from("accessories")
+      supabaseAdmin.from("accessories")
         .update({ so_at: SO_RESET_SENTINEL_ISO })
         .not("so_at", "is", null),
-      supabase.from("accessory_units")
+      supabaseAdmin.from("accessory_units")
         .update({ so_at: SO_RESET_SENTINEL_ISO })
         .not("so_at", "is", null),
     ]);
