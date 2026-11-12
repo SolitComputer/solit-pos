@@ -33,6 +33,13 @@ interface MinusUnit {
   // 'IN_SPAREPART' = sedang di antrian sparepart
   // null = unit lama (pre-fitur QC) atau diluar alur QC
   qc_status?: string | null;
+  // ── BARU (penanda Team QC): kapan & siapa yang nandain MINUS dari QC ──
+  //  Diisi API /api/laptops/qc/mark-minus → disimpan ke kolom
+  //  qc_marked_minus_at & qc_marked_minus_by di laptop_units.
+  //  by_name hasil JOIN ke tabel users di API /api/laptops/minus.
+  //  Hanya terisi kalau qc_status === 'FROM_QC'.
+  qc_marked_minus_at?: string | null;
+  qc_marked_minus_by_name?: string | null;
   created_at: string;
   laptop?: {
     id: string;
@@ -485,11 +492,19 @@ function MinusContent() {
     let list = [...units];
     // ── Filter tab: pisahkan unit dari alur QC baru vs unit minus lama ──
     // DARI_QC: cuma unit yang qc_status === 'FROM_QC' (dilempar Team QC)
-    // UMUM: sisanya (qc_status null atau !== FROM_QC)
+    // UMUM: HANYA unit legacy (pre-QC flow) — semua qc_status dari flow baru
+    //       (FROM_QC, IN_SPAREPART, NEEDS_QC, QC_DONE) harus EXCLUDED supaya
+    //       tidak crossover ke halaman perbaikan umum teknisi.
+    //       + exclude unit yang repair_status='DONE' (sudah selesai perbaikan)
+    //         supaya tidak nyampah di list Perbaikan Umum.
     if (activeTab === "DARI_QC") {
       list = list.filter(u => u.qc_status === "FROM_QC");
     } else {
-      list = list.filter(u => u.qc_status !== "FROM_QC");
+      // UMUM: strict — hanya unit tanpa qc_status (legacy) DAN belum selesai perbaikan
+      list = list.filter(u =>
+        (u.qc_status === null || u.qc_status === undefined)
+        && u.repair_status !== "DONE"
+      );
     }
     if (filterStatus !== "ALL") list = list.filter(u => u.status === filterStatus);
     if (filterMinusStatus !== "ALL") list = list.filter(u => (u.minus_status || "BELUM_DIATASI") === filterMinusStatus);
@@ -611,7 +626,10 @@ function MinusContent() {
                 <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold ${
                   activeTab === "UMUM" ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-500"
                 }`}>
-                  {units.filter(u => u.qc_status !== "FROM_QC").length}
+                  {units.filter(u =>
+                    (u.qc_status === null || u.qc_status === undefined)
+                    && u.repair_status !== "DONE"
+                  ).length}
                 </span>
               </button>
               <button
@@ -649,8 +667,12 @@ function MinusContent() {
           {/* ─── Tab ANTRIAN: render komponen khusus (sembunyikan Summary/Filter/Table) ─── */}
           {activeTab === "ANTRIAN" && <AntrianSparepartTab />}
 
-          {/* Summary Cards — sembunyikan saat tab ANTRIAN (karena content beda) */}
-          <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${activeTab === "ANTRIAN" ? "hidden" : ""}`}>
+          {/* Summary Cards — HANYA tampil di tab UMUM.
+              Di tab DARI_QC & ANTRIAN tidak relevan:
+              - DARI_QC: unit belum masuk fase perbaikan, jadi metrik
+                (Belum Terpegang/Proses/Selesai) belum ada maknanya.
+              - ANTRIAN: komponen sparepart punya metrik sendiri. */}
+          <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${activeTab !== "UMUM" ? "hidden" : ""}`}>
             {[
               { label: "Total Unit", value: units.length, color: "text-gray-800", bar: "bg-gray-600", icon: <Package size={20} /> },
               { label: "Belum Terpegang", value: repairCounts["NOT_STARTED"] || 0, color: "text-gray-600", bar: "bg-gray-400", icon: <Pause size={20} /> },
@@ -670,8 +692,11 @@ function MinusContent() {
             ))}
           </div>
 
-          {/* Filter Panel — sembunyikan saat tab ANTRIAN */}
-          <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 ${activeTab === "ANTRIAN" ? "hidden" : ""}`}>
+          {/* Filter Panel — HANYA tampil di tab UMUM.
+              Filter "Status Perbaikan" (WAITING_PARTS, DEAD, dll) khusus flow
+              teknisi, bukan flow QC. Di tab DARI_QC Pengelola Barang langsung
+              putusin per unit lewat modal, nggak perlu filter dulu. */}
+          <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 ${activeTab !== "UMUM" ? "hidden" : ""}`}>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
               <Wrench size={14} /> Status Perbaikan
             </p>
@@ -760,13 +785,27 @@ function MinusContent() {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Laptop</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Perbaikan</th>
-                      {/* ── BARU: Kolom Analisa ── */}
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[180px]">Analisa</th>
-                      {/* ── BARU: Kolom Progress ── */}
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[180px]">Progress</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Tgl Masuk</th>
+                      {/* Kolom teknisi-flow (Status, Perbaikan, Progress, Tgl Masuk)
+                          HANYA tampil di tab UMUM. Di DARI_QC flow-nya belum masuk
+                          perbaikan — Pengelola Barang langsung putusin
+                          Perbaiki/MSJ/Matot, jadi metrik perbaikan belum relevan.
+                          "Analisa" direname jadi "Keterangan" di DARI_QC karena
+                          konten-nya = alasan MINUS dari Team QC, bukan diagnosa teknisi. */}
+                      {activeTab === "UMUM" && (
+                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                      )}
+                      {activeTab === "UMUM" && (
+                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Perbaikan</th>
+                      )}
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[180px]">
+                        {activeTab === "DARI_QC" ? "Keterangan" : "Analisa"}
+                      </th>
+                      {activeTab === "UMUM" && (
+                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[180px]">Progress</th>
+                      )}
+                      {activeTab === "UMUM" && (
+                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Tgl Masuk</th>
+                      )}
                       <th className="px-4 py-3 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Aksi</th>
                     </tr>
                   </thead>
@@ -797,34 +836,73 @@ function MinusContent() {
                               )}
                             </p>
                           </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            {ust && (
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${ust.badge}`}>
-                                {ust.label}
-                              </span>
-                            )}
-                            {missingAnalisa && (
-                              <span className="flex items-center gap-1 text-[10px] text-amber-600 mt-1 font-medium"><AlertTriangle size={11} className="flex-shrink-0" /> perlu analisa</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            {rs ? (
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${rs.badge}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${rs.dot}`} />
-                                <rs.emoji size={14} /> {rs.label}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-gray-300 italic">Belum diset</span>
-                            )}
-                            <div className="mt-1">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${(unit.minus_status || "BELUM_DIATASI") === "SUDAH_DIATASI" ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-400"}`}>
-                                {(unit.minus_status || "BELUM_DIATASI") === "SUDAH_DIATASI" ? "Sudah Diatasi" : "Belum Diatasi"}
-                              </span>
-                            </div>
-                          </td>
-                          {/* Kolom Analisa */}
-                          <td className="px-4 py-3.5 max-w-[200px]">
-                            {unit.analisa ? (
+                          {activeTab === "UMUM" && (
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              {ust && (
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${ust.badge}`}>
+                                  {ust.label}
+                                </span>
+                              )}
+                              {/* Badge "Dari QC" — defensive, biar kalau ada unit FROM_QC
+                                  bocor ke tab UMUM pun tetap kelihatan asalnya. */}
+                              {unit.qc_status === "FROM_QC" && (
+                                <span className="flex items-center gap-1 text-[10px] text-indigo-600 mt-1 font-semibold">
+                                  <AlertTriangle size={11} className="flex-shrink-0" /> dari Team QC
+                                </span>
+                              )}
+                              {missingAnalisa && (
+                                <span className="flex items-center gap-1 text-[10px] text-amber-600 mt-1 font-medium"><AlertTriangle size={11} className="flex-shrink-0" /> perlu analisa</span>
+                              )}
+                            </td>
+                          )}
+                          {activeTab === "UMUM" && (
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              {rs ? (
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${rs.badge}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${rs.dot}`} />
+                                  <rs.emoji size={14} /> {rs.label}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-300 italic">Belum diset</span>
+                              )}
+                              <div className="mt-1">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${(unit.minus_status || "BELUM_DIATASI") === "SUDAH_DIATASI" ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-400"}`}>
+                                  {(unit.minus_status || "BELUM_DIATASI") === "SUDAH_DIATASI" ? "Sudah Diatasi" : "Belum Diatasi"}
+                                </span>
+                              </div>
+                            </td>
+                          )}
+                          {/* Kolom Analisa — bedakan asal keterangan:
+                              - qc_status === 'FROM_QC' → analisa dari Team QC
+                                (styling ungu + badge + nama & tgl Team QC)
+                              - Lainnya → analisa teknisi atau condition_note lama */}
+                          <td className="px-4 py-3.5 max-w-[220px]">
+                            {unit.qc_status === "FROM_QC" ? (
+                              <div className="bg-indigo-50/60 border-l-2 border-indigo-400 rounded-r-lg px-2 py-1.5 space-y-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                    <AlertTriangle size={9} /> Dari Team QC
+                                  </span>
+                                  {unit.qc_marked_minus_at && (
+                                    <span className="text-[9px] text-indigo-500 font-mono">
+                                      {fmtDate(unit.qc_marked_minus_at)}
+                                    </span>
+                                  )}
+                                </div>
+                                {unit.qc_marked_minus_by_name && (
+                                  <p className="text-[10px] text-indigo-600">
+                                    oleh <span className="font-semibold">{unit.qc_marked_minus_by_name}</span>
+                                  </p>
+                                )}
+                                {unit.analisa ? (
+                                  <p className="text-xs text-gray-800 line-clamp-3" title={unit.analisa}>
+                                    {unit.analisa}
+                                  </p>
+                                ) : (
+                                  <p className="text-[11px] text-amber-600 italic">— alasan tidak tersimpan —</p>
+                                )}
+                              </div>
+                            ) : unit.analisa ? (
                               <p className="text-xs text-gray-700 line-clamp-2" title={unit.analisa}>{unit.analisa}</p>
                             ) : unit.condition_note ? (
                               <p className="text-xs text-gray-400 line-clamp-2 italic" title={unit.condition_note}>{unit.condition_note}</p>
@@ -832,17 +910,24 @@ function MinusContent() {
                               <span className="text-[11px] text-amber-500 font-medium">— belum diisi</span>
                             )}
                           </td>
-                          {/* Kolom Progress */}
-                          <td className="px-4 py-3.5 max-w-[200px]">
-                            {unit.progress_pengerjaan ? (
-                              <p className="text-xs text-gray-600 line-clamp-2" title={unit.progress_pengerjaan}>{unit.progress_pengerjaan}</p>
-                            ) : (
-                              <span className="text-xs text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
-                          </td>
+                          {/* Kolom Progress — teknisi-only */}
+                          {activeTab === "UMUM" && (
+                            <td className="px-4 py-3.5 max-w-[200px]">
+                              {unit.progress_pengerjaan ? (
+                                <p className="text-xs text-gray-600 line-clamp-2" title={unit.progress_pengerjaan}>{unit.progress_pengerjaan}</p>
+                              ) : (
+                                <span className="text-xs text-gray-300">—</span>
+                              )}
+                            </td>
+                          )}
+                          {/* Tgl Masuk — teknisi-only. Di DARI_QC, tanggal
+                              QC-marked sudah tampil dalam badge "DARI TEAM QC"
+                              di kolom Keterangan, jadi tidak perlu duplikasi. */}
+                          {activeTab === "UMUM" && (
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
+                            </td>
+                          )}
                           <td className="px-4 py-3.5 text-right whitespace-nowrap">
                             {canEdit && (
                               <button onClick={(e) => { e.stopPropagation(); setEditTarget(unit); }}

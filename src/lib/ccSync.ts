@@ -6,25 +6,6 @@ import { parsePostUrl, isInstagramStory, type SyncStatus } from "./ccMetrics";
 import { DEFAULT_BRAND } from "./ccReports";
 
 /**
- * Akun TikTok & Instagram yang tersambung sekarang = brand ini (DEFAULT_BRAND = "Solit").
- * IG & TikTok cuma kasih metrik untuk konten AKUN SENDIRI, jadi konten brand lain
- * (Sotech/OnPoint/Zenit/Sultop) tidak bisa auto-sync → diarahkan ke input manual.
- * Override lewat env CC_SYNC_BRAND kalau akun yang tersambung diganti ke brand lain.
- */
-const SYNC_BRAND: string = process.env.CC_SYNC_BRAND || DEFAULT_BRAND;
-
-/**
- * Boleh auto-sync atau tidak? IG & TikTok hanya untuk brand yang akunnya tersambung
- * (SYNC_BRAND). YouTube bebas (API key publik). brand null/undefined → tidak diblok
- * (backward-compatible untuk pemanggil lama yang belum kirim brand).
- */
-export function brandCanAutoSync(_platform: string, _brand?: string | null): boolean {
-  // Fase 2b: TikTok & Instagram keduanya sudah per-brand. Gate lama tidak dipakai lagi —
-  // brand yang belum connect ditangani per-platform (token null → UNSUPPORTED/manual).
-  // Fungsi tetap ada supaya pemanggil lama (bulk sync & route posting) tidak perlu diubah.
-  return true;
-}
-/**
  * null = API TIDAK mengembalikan metrik ini (bukan berarti nol).
  * Nilai lama di DB tidak boleh ditimpa 0 hanya karena field-nya absent.
  */
@@ -45,7 +26,7 @@ export interface SyncOptions {
   force?: boolean;
   /** provider_media_id yang sudah tersimpan → skip scan daftar media */
   mediaId?: string | null;
-  /** brand konten — IG/TikTok hanya auto-sync kalau sama dengan SYNC_BRAND */
+  /** brand konten — dipakai syncTikTok/syncInstagram untuk pilih token per-brand. */
   brand?: string | null;
 }
 
@@ -489,19 +470,6 @@ export async function syncPosting(
         "Instagram Story tidak tersedia di API (konten hilang setelah 24 jam) — isi view/like/komen manual"
       ),
       platform: "Instagram",
-    };
-  }
-
-  // 🏷️ Gate per-brand: IG & TikTok cuma bisa tarik metrik untuk konten akun sendiri.
-  //    Brand selain SYNC_BRAND → langsung manual, TANPA panggil API. YouTube tidak kena.
-  if (!brandCanAutoSync(parsed.platform, opt.brand)) {
-    return {
-      ...fail(
-        "UNSUPPORTED",
-        `Metrik ${parsed.platform} otomatis hanya untuk konten brand ${SYNC_BRAND}. ` +
-          `Konten brand ${opt.brand} → isi View/Like/Komen manual.`
-      ),
-      platform: parsed.platform,
     };
   }
 

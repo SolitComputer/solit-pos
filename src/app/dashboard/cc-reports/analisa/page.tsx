@@ -211,10 +211,14 @@ export default function CCAnalisaPage() {
         alert(j.error ?? "Gagal menghubungkan Instagram");
         return;
       }
+      // Urutan: alert dulu (biar user baca konfirmasi), baru tutup form & reload status.
+      // reloadIgStatus() DIPANGGIL SETELAH alert di-dismiss supaya panel sempat
+      // re-fetch data terbaru dari backend. Kalau dipanggil sebelum alert, kadang
+      // state update ketimpa / fetch belum kelar saat UI render ulang.
+      alert(`Instagram brand ${brand} terhubung${j.accountName ? ` · @${j.accountName}` : ""}`);
       setIgForm(null);
       setIgInput({ token: "", igUserId: "" });
       await reloadIgStatus();
-      alert(`Instagram brand ${brand} terhubung${j.accountName ? ` · @${j.accountName}` : ""}`);
     } finally {
       setIgSaving(false);
     }

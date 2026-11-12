@@ -7,6 +7,7 @@ import {
   Search, X, CheckCircle2, AlertTriangle, Clock, Laptop as LaptopIcon,
   ChevronRight, Ban,
 } from "lucide-react";
+import MinusReasonModal from "@/components/inventory/MinusReasonModal";
 
 interface QcUnit {
   id: string;
@@ -113,6 +114,8 @@ function QcEditModal({
   });
   const [saving, setSaving] = useState(false);
   const [markingMinus, setMarkingMinus] = useState(false);
+  // State untuk buka MinusReasonModal (ganti window.prompt yang jelek UX-nya)
+  const [showMinusReason, setShowMinusReason] = useState(false);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -175,9 +178,10 @@ function QcEditModal({
     } finally { setSaving(false); }
   };
 
-  const handleMarkMinus = async () => {
-    const reason = window.prompt("Alasan ditandai minus (opsional):", "");
-    if (reason === null) return;
+  // Dipanggil oleh MinusReasonModal setelah user isi alasan & klik konfirmasi.
+  // Reason WAJIB (modal sudah validasi min 5 char) — jadi tidak perlu re-check di sini.
+  // Alasan ini jadi analisa awal di Pengelola Barang (QcDecisionModal).
+  const handleMarkMinus = async (reason: string) => {
     setMarkingMinus(true);
     try {
       const res = await fetch("/api/laptops/qc/mark-minus", {
@@ -186,10 +190,16 @@ function QcEditModal({
         body: JSON.stringify({ unit_id: unit.id, reason }),
       });
       const json = await res.json();
-      if (!json.success) { toast.error(json.message || "Gagal"); return; }
+      if (!json.success) {
+        toast.error(json.message || "Gagal");
+        return;
+      }
       toast.success("Unit ditandai MINUS — dilempar ke Pengelola Barang");
+      setShowMinusReason(false);
       onSaved();
-    } finally { setMarkingMinus(false); }
+    } finally {
+      setMarkingMinus(false);
+    }
   };
 
   // Input helper sudah dipindah ke module level (QcInputField) — lihat atas file.
@@ -263,7 +273,7 @@ function QcEditModal({
         <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0 bg-white">
           <button
             type="button"
-            onClick={handleMarkMinus}
+            onClick={() => setShowMinusReason(true)}
             disabled={markingMinus || saving}
             className="h-10 px-4 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-semibold hover:bg-red-100 transition disabled:opacity-40 flex items-center gap-1.5"
           >
@@ -281,6 +291,20 @@ function QcEditModal({
           </button>
         </div>
       </div>
+
+      {/* Modal alasan MINUS — muncul di atas QcEditModal (z-60 vs z-50).
+          Submit di sini langsung call handleMarkMinus dengan reason wajib. */}
+      {showMinusReason && (
+        <MinusReasonModal
+          unit={{
+            id: unit.id,
+            name: unit.laptop.laptop_name || "Laptop tanpa nama",
+            sn: unit.serial_number,
+          }}
+          onClose={() => setShowMinusReason(false)}
+          onConfirm={handleMarkMinus}
+        />
+      )}
     </div>
   );
 }

@@ -25,6 +25,16 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       return NextResponse.json({ success: false, message: "unit_id wajib diisi" }, { status: 400 });
     }
 
+    // Reason WAJIB (frontend MinusReasonModal sudah enforce min 5 char,
+    // tapi API tetap validasi untuk safety — API bisa dipanggil non-UI).
+    const reasonTrimmed = typeof reason === "string" ? reason.trim() : "";
+    if (reasonTrimmed.length < 5) {
+      return NextResponse.json(
+        { success: false, message: "Alasan MINUS wajib diisi minimal 5 karakter" },
+        { status: 400 }
+      );
+    }
+
     const { data: unit, error: fetchErr } = await supabase
       .from("laptop_units").select("*").eq("id", unit_id).single();
 
@@ -49,6 +59,11 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         minus_status: "BELUM_DIATASI",
         qc_marked_minus_at: nowIso,
         qc_marked_minus_by: user.id,
+        // ✅ Simpan alasan Team QC ke analisa — Pengelola Barang baca ini
+        //    di QcDecisionModal untuk memutuskan Perbaiki/MSJ/Aset Matot.
+        //    Kalau analisa sudah ada (edge case: unit pernah minus sebelumnya),
+        //    overwrite dengan alasan baru karena ini alur baru dari Team QC.
+        analisa: reasonTrimmed,
       }).eq("id", unit_id).select().single();
 
     if (updErr) {
@@ -65,7 +80,7 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       to_status: "BELUM_SIAP",
       actor_user_id: user.id,
       actor_name: user.name,
-      reason: reason || "Team QC tandai MINUS → lempar ke Pengelola Barang",
+      reason: reasonTrimmed, // sudah dijamin min 5 char oleh validasi di atas
     });
 
     // Log aktivitas — pakai action "EDIT" (yg sudah ada di LogAction type)
