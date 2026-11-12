@@ -653,3 +653,19 @@ html.dark .group:hover .group-hover\:bg-red-100 { background-color: #451522; }
 html.dark .focus\:bg-white:focus { background-color: #131d2e; }
 html.dark .focus\:bg-slate-50:focus,
 html.dark .focus\:bg-gray-50:focus { background-color: #151f30; }
+
+/* =========================================================
+   DARK MODE v7.2 — judul clip-text navy from-[#1a1a2e]/[#16213e]
+   (mis. judul "Daftar Hadir") belum masuk handler clip-text v6.4,
+   jadi teksnya navy gelap di atas canvas gelap = nyaris ILANG.
+   Plus bg-gray-300 (avatar chip "Belum Tercatat") belum ter-remap.
+   ========================================================= */
+html.dark .bg-clip-text.text-transparent.from-\[\#1a1a2e\],
+html.dark .bg-clip-text.text-transparent.from-\[\#16213e\] {
+  -webkit-text-fill-color: #f1f5f9 !important; color: #f1f5f9 !important;
+}
+html.dark .text-\[\#1a1a2e\], html.dark .text-\[\#16213e\] { color: #f1f5f9; }
+
+/* skala -300 netral (avatar bulat, divider tebal) terang → gelap */
+html.dark .bg-gray-300, html.dark .bg-slate-300,
+html.dark .bg-zinc-300, html.dark .bg-neutral-300 { background-color: #334155; }
