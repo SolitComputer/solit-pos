@@ -23,9 +23,7 @@ export type VehicleBranch = "UTAMA" | "JOGJA";
  * Kalau kosong, tidak ada pembatasan Jogja-only (semua role lihat semua branch).
  */
 export const VEHICLE_JOGJA_ONLY_ROLES: string[] = [
-  // 👇 TAMBAHKAN DI SINI nama role Jogja kamu, mis.:
-  // "SALES_JOGJA",
-  // "KEPALA_JOGJA",
+  "SOLIT_JOGJA",
 ];
 
 /** Role yang boleh pilih/filter branch (Admin + Programmer). */
@@ -36,13 +34,40 @@ export const VEHICLE_BRANCH_FILTER_ROLES: string[] = [
 ];
 
 /**
- * Tentukan scope branch user.
+ * Tentukan scope branch user untuk MELIHAT kendaraan.
  * - Role Jogja → ["JOGJA"] (eksklusif, dikunci backend)
  * - Selain Jogja → null (bisa lihat semua branch)
  */
 export function getVehicleBranchScope(roles: string[]): VehicleBranch[] | null {
   const isJogjaOnly = roles.some((r) => VEHICLE_JOGJA_ONLY_ROLES.includes(r));
   return isJogjaOnly ? ["JOGJA"] : null;
+}
+
+/**
+ * User ID khusus yang boleh ACC pengajuan kendaraan Cabang JOGJA.
+ * Pakai ID (bukan role) karena approver cabang biasanya 1 orang specific
+ * (Kepala Cabang), bukan semua karyawan cabang.
+ *
+ * Contoh: Fadriansyah = a8e2697f-24a0-4a76-9002-141750b5eefd
+ */
+export const VEHICLE_JOGJA_APPROVER_IDS: string[] = [
+  "a8e2697f-24a0-4a76-9002-141750b5eefd", // Fadriansyah
+];
+
+/**
+ * Tentukan scope branch APPROVAL — pengajuan branch mana yang boleh di-ACC user.
+ * - KEPALA_SALES (by role) → ["UTAMA"]
+ * - Fadriansyah (by ID)    → ["JOGJA"]
+ * - Lain                    → []
+ *
+ * Dipakai di /api/vehicles/borrow (queue filter) &
+ * /api/vehicles/borrow/[id] (validasi APPROVE/REJECT).
+ */
+export function getApproverBranchScope(userId: string, roles: string[]): VehicleBranch[] {
+  const scope = new Set<VehicleBranch>();
+  if (roles.includes("KEPALA_SALES")) scope.add("UTAMA");
+  if (VEHICLE_JOGJA_APPROVER_IDS.includes(userId)) scope.add("JOGJA");
+  return Array.from(scope);
 }
 
 export type Requester = {
@@ -89,7 +114,10 @@ export async function getRequester(request: NextRequest): Promise<Requester | nu
   if (!id) return null;
 
   const isAdmin = roles.some((r) => VEHICLE_ADMIN_ROLES.includes(r));
-  const canApprove = roles.some((r) => (VEHICLE_APPROVAL_ROLES as readonly string[]).includes(r));
+  // canApprove = bisa ACC pengajuan apapun (by role KEPALA_SALES ATAU by ID approver Jogja)
+  const canApproveByRole = roles.some((r) => (VEHICLE_APPROVAL_ROLES as readonly string[]).includes(r));
+  const canApproveById = VEHICLE_JOGJA_APPROVER_IDS.includes(id);
+  const canApprove = canApproveByRole || canApproveById;
   const branchScope = getVehicleBranchScope(roles);
   const canFilterBranch = roles.some((r) => VEHICLE_BRANCH_FILTER_ROLES.includes(r));
   return { id, name, roles, isAdmin, canApprove, branchScope, canFilterBranch };
