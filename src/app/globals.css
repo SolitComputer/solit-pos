@@ -826,3 +826,20 @@ html.dark .prose {
   --tw-prose-th-borders: #334155;      /* slate-700  — border header tabel */
   --tw-prose-td-borders: #24344d;      /* border sel tabel */
 }
+
+/* ============================================================================
+   v8.2 SOP MARKDOWN DARK — SopMarkdown pakai arbitrary-variant ([&_strong] dll),
+   bukan .text-gray-900 biasa, jadi LOLOS dari remap teks utama. Tanpa blok ini:
+   heading (h1-h3) dan teks tebal (strong) gelap-di-atas-gelap = hilang. Pola sama
+   dipakai MarkdownMessage, jadi perbaikan ini sekalian berlaku di sana.
+   ========================================================================== */
+html.dark .\[\&_strong\]\:text-gray-900 strong { color: #f1f5f9 !important; }  /* bold → slate-100 */
+html.dark .\[\&_h1\]\:text-gray-900 h1 { color: #f1f5f9 !important; }  /* heading h1 */
+html.dark .\[\&_h2\]\:text-gray-900 h2 { color: #f1f5f9 !important; }  /* heading h2 */
+html.dark .\[\&_h3\]\:text-gray-900 h3 { color: #f1f5f9 !important; }  /* heading h3 */
+html.dark .\[\&_hr\]\:border-gray-200 hr { border-color: #1e293b !important; }  /* garis pemisah */
+html.dark .\[\&_code\]\:bg-gray-100 code { background-color: #1a263a !important; }  /* bg inline code */
+html.dark .\[\&_code\]\:text-violet-700 code { color: #c084fc !important; }  /* teks inline code */
+html.dark .\[\&_blockquote\]\:text-gray-600 blockquote { color: #94a3b8 !important; }  /* teks kutipan */
+html.dark .\[\&_blockquote\]\:border-violet-300 blockquote { border-color: #7c3aed !important; }  /* garis kutipan */
+html.dark .\[\&_a\]\:text-violet-600 a { color: #c084fc !important; }  /* link */
