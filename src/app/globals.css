@@ -669,3 +669,123 @@ html.dark .text-\[\#1a1a2e\], html.dark .text-\[\#16213e\] { color: #f1f5f9; }
 /* skala -300 netral (avatar bulat, divider tebal) terang → gelap */
 html.dark .bg-gray-300, html.dark .bg-slate-300,
 html.dark .bg-zinc-300, html.dark .bg-neutral-300 { background-color: #334155; }
+
+/* =========================================================
+   DARK MODE v7.3 — gradient stop PUTIH & varian opacity yang
+   belum ter-remap: from-white (kartu stat Management Seller
+   from-white to-violet-50 opacity 50), from-slate-50 opacity 80
+   (kartu ProfileView from-slate-50/80 to-white), plus to-violet
+   opacity 50 & from-violet opacity 60. Tanpa ini kartunya tetap
+   terang di dark walau pakai to-white yang sudah gelap.
+   ========================================================= */
+
+/* from-white → gelap (setara to-white) */
+html.dark .from-white { --tw-gradient-from: #101827 var(--tw-gradient-from-position) !important; }
+
+/* from-*-50 varian opacity /80 terang → gelap */
+html.dark .from-slate-50\/80, html.dark .from-gray-50\/80, html.dark .from-zinc-50\/80 { --tw-gradient-from: #151f30 var(--tw-gradient-from-position) !important; }
+
+/* from-violet-50 varian /60,/50 (header dropdown dll) */
+html.dark .from-violet-50\/60, html.dark .from-violet-50\/50,
+html.dark .from-purple-50\/60, html.dark .from-purple-50\/50 { --tw-gradient-from: #1d1236 var(--tw-gradient-from-position) !important; }
+
+/* to-violet/purple-50 varian /50,/60 terang → gelap */
+html.dark .to-violet-50\/50, html.dark .to-violet-50\/60,
+html.dark .to-purple-50\/50, html.dark .to-fuchsia-50\/50 { --tw-gradient-to: #1d1236 var(--tw-gradient-to-position) !important; }
+
+/* =========================================================
+   DARK MODE v8.0 — SAFETY NET gradient stop menyeluruh. Remap
+   from-/via-/to- untuk SEMUA keluarga warna (shade -50 & -100,
+   plus white) ke nilai gelap senada layer di atas. Tujuannya:
+   kartu/banner gradient di halaman MANAPUN otomatis gelap tanpa
+   harus nambal satu-satu. Hanya menambah (selector yang sudah
+   ada di v4-v7.3 dilewati) → nol konflik, light mode aman.
+   ========================================================= */
+/* ---- from-* ---- */
+html.dark .from-neutral-50 { --tw-gradient-from: #151f30 var(--tw-gradient-from-position) !important; }
+html.dark .from-neutral-100 { --tw-gradient-from: #1a263a var(--tw-gradient-from-position) !important; }
+html.dark .from-blue-100 { --tw-gradient-from: #142e50 var(--tw-gradient-from-position) !important; }
+html.dark .from-green-100 { --tw-gradient-from: #0d3824 var(--tw-gradient-from-position) !important; }
+html.dark .from-red-100 { --tw-gradient-from: #451522 var(--tw-gradient-from-position) !important; }
+html.dark .from-orange-100,
+html.dark .from-yellow-100 { --tw-gradient-from: #422a09 var(--tw-gradient-from-position) !important; }
+html.dark .from-fuchsia-100 { --tw-gradient-from: #2e1c55 var(--tw-gradient-from-position) !important; }
+html.dark .from-pink-100 { --tw-gradient-from: #3a1c2c var(--tw-gradient-from-position) !important; }
+/* ---- to-* ---- */
+html.dark .to-slate-50,
+html.dark .to-gray-50,
+html.dark .to-zinc-50,
+html.dark .to-neutral-50 { --tw-gradient-to: #151f30 var(--tw-gradient-to-position) !important; }
+html.dark .to-slate-100,
+html.dark .to-gray-100,
+html.dark .to-zinc-100,
+html.dark .to-neutral-100 { --tw-gradient-to: #1a263a var(--tw-gradient-to-position) !important; }
+html.dark .to-blue-50,
+html.dark .to-sky-50,
+html.dark .to-indigo-50 { --tw-gradient-to: #0c1e36 var(--tw-gradient-to-position) !important; }
+html.dark .to-blue-100,
+html.dark .to-sky-100,
+html.dark .to-indigo-100,
+html.dark .to-cyan-100 { --tw-gradient-to: #142e50 var(--tw-gradient-to-position) !important; }
+html.dark .to-emerald-50 { --tw-gradient-to: #072517 var(--tw-gradient-to-position) !important; }
+html.dark .to-emerald-100,
+html.dark .to-green-100 { --tw-gradient-to: #0d3824 var(--tw-gradient-to-position) !important; }
+html.dark .to-red-50,
+html.dark .to-rose-50 { --tw-gradient-to: #2d0e17 var(--tw-gradient-to-position) !important; }
+html.dark .to-red-100,
+html.dark .to-rose-100 { --tw-gradient-to: #451522 var(--tw-gradient-to-position) !important; }
+html.dark .to-amber-50 { --tw-gradient-to: #2b1b06 var(--tw-gradient-to-position) !important; }
+html.dark .to-amber-100,
+html.dark .to-orange-100,
+html.dark .to-yellow-100 { --tw-gradient-to: #422a09 var(--tw-gradient-to-position) !important; }
+html.dark .to-violet-50,
+html.dark .to-fuchsia-50 { --tw-gradient-to: #1d1236 var(--tw-gradient-to-position) !important; }
+html.dark .to-violet-100,
+html.dark .to-purple-100,
+html.dark .to-fuchsia-100 { --tw-gradient-to: #2e1c55 var(--tw-gradient-to-position) !important; }
+html.dark .to-pink-50,
+html.dark .to-pink-100 { --tw-gradient-to: #3a1c2c var(--tw-gradient-to-position) !important; }
+html.dark .to-teal-50 { --tw-gradient-to: #0a2524 var(--tw-gradient-to-position) !important; }
+html.dark .to-teal-100 { --tw-gradient-to: #123d3b var(--tw-gradient-to-position) !important; }
+/* ---- via-* ---- */
+html.dark .via-slate-50,
+html.dark .via-gray-50,
+html.dark .via-zinc-50,
+html.dark .via-neutral-50 { --tw-gradient-via: #151f30 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-slate-100,
+html.dark .via-gray-100,
+html.dark .via-zinc-100,
+html.dark .via-neutral-100 { --tw-gradient-via: #1a263a var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-blue-50,
+html.dark .via-sky-50,
+html.dark .via-indigo-50,
+html.dark .via-cyan-50 { --tw-gradient-via: #0c1e36 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-blue-100,
+html.dark .via-sky-100,
+html.dark .via-indigo-100,
+html.dark .via-cyan-100 { --tw-gradient-via: #142e50 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-emerald-50,
+html.dark .via-green-50 { --tw-gradient-via: #072517 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-emerald-100,
+html.dark .via-green-100 { --tw-gradient-via: #0d3824 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-red-50,
+html.dark .via-rose-50 { --tw-gradient-via: #2d0e17 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-red-100,
+html.dark .via-rose-100 { --tw-gradient-via: #451522 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-amber-50,
+html.dark .via-orange-50,
+html.dark .via-yellow-50 { --tw-gradient-via: #2b1b06 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-amber-100,
+html.dark .via-orange-100,
+html.dark .via-yellow-100 { --tw-gradient-via: #422a09 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-violet-50,
+html.dark .via-purple-50,
+html.dark .via-fuchsia-50 { --tw-gradient-via: #1d1236 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-violet-100,
+html.dark .via-purple-100,
+html.dark .via-fuchsia-100 { --tw-gradient-via: #2e1c55 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-pink-50,
+html.dark .via-pink-100 { --tw-gradient-via: #3a1c2c var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-teal-50 { --tw-gradient-via: #0a2524 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-teal-100 { --tw-gradient-via: #123d3b var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+html.dark .via-white { --tw-gradient-via: #101827 var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
