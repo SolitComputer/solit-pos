@@ -326,9 +326,19 @@ html.dark select:focus {
 
 /* 9. Native Browser Controls & Autofill */
 html.dark ::-webkit-scrollbar       { width: 10px; height: 10px; }
-html.dark ::-webkit-scrollbar-track { background: #090d16; }
-html.dark ::-webkit-scrollbar-thumb { background: #22324a; border-radius: 8px; }
-html.dark ::-webkit-scrollbar-thumb:hover { background: #2d4160; }
+/* !important: kalahkan plugin tailwind-scrollbar (class scrollbar-track dan scrollbar-thumb)
+   yang set warna lewat var(--scrollbar-track) di tabel Data Barang dll → tadinya putih. */
+html.dark ::-webkit-scrollbar-track { background: #090d16 !important; }
+html.dark ::-webkit-scrollbar-thumb { background: #22324a !important; border-radius: 8px; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #2d4160 !important; }
+/* Override variabel plugin tailwind-scrollbar + Firefox scrollbar-color */
+html.dark [class*="scrollbar-track-"],
+html.dark [class*="scrollbar-thumb-"] {
+  --scrollbar-track: #090d16 !important;
+  --scrollbar-thumb: #22324a !important;
+  --scrollbar-thumb-hover: #2d4160 !important;
+  scrollbar-color: #22324a #090d16 !important;
+}
 
 html.dark ::selection   { background: rgba(6, 182, 212, 0.25); color: #f1f5f9; }
 html.dark ::placeholder { color: #64748b; opacity: 1; }
