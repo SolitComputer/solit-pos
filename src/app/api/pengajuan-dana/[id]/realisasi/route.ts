@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { canExecuteFund } from "@/lib/fundConfig";
-import { isValidCategory, isKasbonCicilanCategory } from "@/lib/cashflow";
+import { isValidCategory, isKasbonCicilanCategory, type CustomCashflowCategory } from "@/lib/cashflow";
 
 // ⬅️ BARU: role yang boleh membatalkan realisasi — Admin + Purchasing (biasanya
 // juga yang mengeksekusi & mengisi realisasi pengajuan dana).
@@ -14,6 +14,19 @@ function db() {
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
         { auth: { persistSession: false } }
     );
+}
+
+// ⬅️ BARU: Helper — ambil daftar kategori custom aktif (array of key) langsung dari DB.
+// Dipakai untuk validasi: isValidCategory() di cashflow.ts sekarang terima arg kedua
+// berupa daftar custom keys, jadi kategori custom gak lagi ditolak sebagai "invalid".
+async function loadActiveCustomCategoryKeys(
+    supabase: ReturnType<typeof db>
+): Promise<CustomCashflowCategory[]> {
+    const { data } = await supabase
+        .from("cashflow_custom_categories")
+        .select("key, label, account_code, direction, is_active")
+        .eq("is_active", true);
+    return (data ?? []) as CustomCashflowCategory[];
 }
 
 // ── POST: isi realisasi pengeluaran untuk pengajuan yang sudah dieksekusi.
@@ -71,6 +84,12 @@ export async function POST(
             ? body.items
             : [{ category: body.category, nominal: body.nominal, target_user_id: body.target_user_id }];
 
+    // ⬅️ BARU: load kategori custom dulu (sekali di awal), supaya validasi di loop
+    // bisa pakai daftar gabungan hardcoded + custom. Taruh di sini supaya gak
+    // di-load berulang kali dalam loop.
+    const supabaseForValidation = db();
+    const activeCustomCategories = await loadActiveCustomCategoryKeys(supabaseForValidation);
+
     // Gabungkan per kategori + karyawan. Kasbon/Cicilan milik karyawan berbeda
     // TIDAK digabung jadi satu baris.
     const merged = new Map<string, RealisasiItem>();
@@ -79,7 +98,9 @@ export async function POST(
         if (!Number.isFinite(nom) || nom <= 0) {
             return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
         }
-        if (!it.category || !isValidCategory("OUT", it.category)) {
+        // ⬅️ UPDATE: pass activeCustomCategories ke isValidCategory supaya kategori
+        // custom (misal "BIAYA_SEWA_RUKO") juga diterima sebagai kategori valid.
+        if (!it.category || !isValidCategory("OUT", it.category, activeCustomCategories)) {
             return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
         }
         // Target hanya relevan utk Kasbon/Cicilan; kategori lain selalu null.
@@ -277,7 +298,10 @@ export async function PATCH(
     if (!Number.isFinite(nom) || nom <= 0) {
         return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
     }
-    if (!body.category || !isValidCategory("OUT", body.category)) {
+    // ⬅️ BARU: load kategori custom aktif dulu untuk validasi yang sama seperti POST.
+    const supabaseForPatchValidation = db();
+    const activeCustomCategoriesForPatch = await loadActiveCustomCategoryKeys(supabaseForPatchValidation);
+    if (!body.category || !isValidCategory("OUT", body.category, activeCustomCategoriesForPatch)) {
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
     }
     const target = isKasbonCicilanCategory(body.category) ? (body.target_user_id ?? null) : null;

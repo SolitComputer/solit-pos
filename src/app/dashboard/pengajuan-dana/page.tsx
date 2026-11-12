@@ -3,7 +3,8 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { toast } from "sonner";import { isKasbonCicilanCategory } from "@/lib/cashflow";
+import { toast } from "sonner";
+import { isKasbonCicilanCategory, type CustomCashflowCategory } from "@/lib/cashflow";
 import { notifyPengajuanDanaResolved } from "@/hooks/usePengajuanDanaNotify";
 import { notifyPengajuanDanaExecuteResolved } from "@/hooks/usePengajuanDanaExecuteNotify";
 import BranchPaymentFields, { type BranchPaymentValue, cashSourceLabel } from "@/components/cashflow/BranchPaymentFields";
@@ -743,11 +744,12 @@ function CancelModal({
  *  sinkron ke Cashflow (Uang Keluar) lewat /api/pengajuan-dana/[id]/realisasi
  * ════════════════════════════════════════════════════════════════════════════ */
 function RealisasiModal({
-  fundRequest, onClose, onSaved,
+  fundRequest, onClose, onSaved, customCategories, // ⬅️ BARU: terima daftar kategori custom dari parent
 }: {
   fundRequest: FundRequest;
   onClose: () => void;
   onSaved: () => void;
+  customCategories: CustomCashflowCategory[]; // ⬅️ BARU
 }) {
   const isEdit = !!fundRequest.realisasi_cashflow_id;
   type RealisasiItem = { category: string; nominal: string; target_user_id: string };
@@ -869,7 +871,14 @@ function RealisasiModal({
                 <div key={idx} className="space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-slate-200 text-[10px] font-bold text-slate-400">{idx + 1}</span>
-                    <CategorySelect direction="OUT" value={it.category} onChange={(cat) => updateItem(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
+                                       <CategorySelect
+                      direction="OUT"
+                      value={it.category}
+                      onChange={(cat) => updateItem(idx, { category: cat })}
+                      customCategories={customCategories}
+                      required
+                      className={`${inputCls} bg-white flex-1 min-w-0`}
+                    />
                     <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} placeholder="0" className={`${inputCls} bg-white w-28 sm:w-32 shrink-0 font-mono text-right`} autoFocus={idx === 0} />
                     <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className={`shrink-0 w-8 h-8 rounded-xl text-slate-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none ${FOCUS_RING}`}>
                       <X className="w-4 h-4" />
@@ -1559,6 +1568,10 @@ export default function PengajuanDanaPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  // ⬅️ BARU: daftar kategori custom cashflow — di-fetch sekali saat mount, dipakai modal Realisasi.
+  // Satu sumber dengan dropdown kategori di halaman /dashboard/cashflow, jadi kategori baru yang
+  // dibuat di "Kelola Kategori" otomatis muncul di sini tanpa perlu refactor besar.
+  const [customCategories, setCustomCategories] = useState<CustomCashflowCategory[]>([]);
   // ⬅️ BARU: target scroll dari tombol "Lihat semua di tabel" di panel lonceng
   const tableRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1573,6 +1586,29 @@ export default function PengajuanDanaPage() {
       })
       .catch(() => { });
   }, []);
+
+  // ⬅️ BARU: fetch daftar kategori custom cashflow — satu sumber dengan halaman Cashflow.
+  // Endpoint /api/cashflow memang berat (bawa semua entry), tapi response-nya include
+  // `custom_categories[]` yang kita butuhkan. Alternatif ringan: GET /api/cashflow-categories
+  // langsung — lebih hemat bandwidth karena gak ikut ambil entries.
+  const fetchCustomCategories = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cashflow-categories", { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        // Filter: cuma kategori aktif + arah OUT atau BOTH (realisasi selalu OUT)
+        const activeOutCategories = (json.data ?? []).filter(
+          (c: CustomCashflowCategory) =>
+            c.is_active && (c.direction === "OUT" || c.direction === "BOTH")
+        );
+        setCustomCategories(activeOutCategories);
+      }
+    } catch {
+      // Silent fail — kalau endpoint belum ready, dropdown tetap jalan pakai kategori bawaan
+    }
+  }, []);
+
+  useEffect(() => { fetchCustomCategories(); }, [fetchCustomCategories]);
 
   // ⬅️ BARU: parameter `silent` — dipakai polling supaya tidak spam toast error
   // kalau koneksi HP lagi jelek.
@@ -2508,7 +2544,8 @@ export default function PengajuanDanaPage() {
         <RealisasiModal
           fundRequest={realisasiTarget}
           onClose={() => setRealisasiTarget(null)}
-          onSaved={fetchData}
+          onSaved={() => { fetchData(); fetchCustomCategories(); }}
+          customCategories={customCategories}
         />
       )}
 
