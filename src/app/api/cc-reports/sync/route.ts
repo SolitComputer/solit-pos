@@ -1,7 +1,7 @@
 // src/app/api/cc-reports/sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { buildPostingPatch, syncPosting, clearIgCache, brandCanAutoSync } from "@/lib/ccSync";
+import { syncPosting, buildPostingPatch, clearIgCache } from "@/lib/ccSync";
 import { isAutoSyncPlatform, isStale } from "@/lib/ccMetrics";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,9 @@ export async function POST(req: NextRequest) {
     (p) =>
       p.auto_sync !== false &&
       isAutoSyncPlatform(p.platform) &&
-      brandCanAutoSync(p.platform, brandOf(p)) &&   // 🏷️ IG/TikTok brand lain → lewati, biar manual
+      // 🏷️ Gate per-brand tidak lagi di-filter di sini — biar 1 tempat di syncTikTok/
+      //    syncInstagram. Brand yang belum connect akan dapat UNSUPPORTED di dalam,
+      //    dan status-nya (sync_status = UNSUPPORTED) dipakai banner "posting manual".
       (force || staleMin === 0 || isStale(p.last_synced_at, staleMin))
   );
 
