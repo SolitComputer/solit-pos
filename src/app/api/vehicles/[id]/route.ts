@@ -32,7 +32,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       body.type === undefined &&
       body.plate_number === undefined &&
       body.fuel_level === undefined &&
-      body.battery_level === undefined;
+      body.battery_level === undefined &&
+      body.branch === undefined; // 👈 branch juga diblok saat DIPAKAI
 
     if (!hanyaMembebaskan)
       return NextResponse.json(
@@ -70,12 +71,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (body.plate_number !== undefined) {
     patch.plate_number = body.plate_number?.trim() || null;
   }
+  if (body.branch !== undefined) {
+    // Guard whitelist — cegah sembarang string masuk DB (konsisten dgn CHECK constraint).
+    if (body.branch !== "UTAMA" && body.branch !== "JOGJA")
+      return NextResponse.json(
+        { success: false, message: "Cabang harus UTAMA atau JOGJA." },
+        { status: 400 }
+      );
+    patch.branch = body.branch;
+  }
 
   const { data, error } = await supabaseVehicles
     .from("vehicles")
     .update(patch)
     .eq("id", id)
-    .select("id, name, type, status, battery_level, fuel_level, plate_number")
+    .select("id, name, type, status, battery_level, fuel_level, plate_number, branch")
     .single();
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });

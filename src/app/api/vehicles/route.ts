@@ -12,11 +12,27 @@ export async function GET(request: NextRequest) {
   const me = await getRequester(request);
   if (!me) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
-  const { data: vehicles, error: vErr } = await supabaseVehicles
+  // Filter branch:
+  // - Role Jogja dikunci di backend (branchScope != null) — nggak bisa di-bypass dari URL.
+  // - Role lain bisa pilih lewat ?branch=UTAMA / JOGJA (filter UI Admin).
+  const url = new URL(request.url);
+  const branchQuery = url.searchParams.get("branch");
+
+  let vQuery = supabaseVehicles
     .from("vehicles")
-    .select("id, name, type, status, battery_level, fuel_level, plate_number")
+    .select("id, name, type, status, battery_level, fuel_level, plate_number, branch")
     .order("type", { ascending: true })
     .order("name", { ascending: true });
+
+  if (me.branchScope) {
+    // Lapisan 1 (SECURITY): role Jogja fix hanya lihat JOGJA
+    vQuery = vQuery.in("branch", me.branchScope);
+  } else if (branchQuery === "UTAMA" || branchQuery === "JOGJA") {
+    // Lapisan 2 (UI): Admin kirim filter dari dropdown
+    vQuery = vQuery.eq("branch", branchQuery);
+  }
+
+  const { data: vehicles, error: vErr } = await vQuery;
 
   if (vErr) return NextResponse.json({ success: false, message: vErr.message }, { status: 500 });
 
@@ -188,6 +204,8 @@ export async function GET(request: NextRequest) {
     myRequests,
     isAdmin: me.isAdmin,
     canApprove: me.canApprove,
+    branchScope: me.branchScope,         // null = semua branch, ["JOGJA"] = Jogja-only
+    canFilterBranch: me.canFilterBranch, // true = tampilkan filter branch di UI
   });
 }
 
@@ -206,6 +224,8 @@ export async function POST(request: NextRequest) {
   const type = body?.type;
   const plate_number = body?.plate_number?.trim() || null;
   const fuel_level = body?.fuel_level?.trim() || null;
+  // Branch: default UTAMA kalau tidak dikirim / nilai nggak valid (backward compat).
+  const branch = body?.branch === "JOGJA" ? "JOGJA" : "UTAMA";
 
   if (!name) return NextResponse.json({ success: false, message: "Nama kendaraan wajib diisi." }, { status: 400 });
   if (type !== "MOTOR" && type !== "MOBIL")
@@ -220,8 +240,9 @@ export async function POST(request: NextRequest) {
       plate_number,
       // fuel_level = level bensin/baterai awal (mobil & motor)
       fuel_level,
+      branch,
     })
-    .select("id, name, type, status, battery_level, fuel_level, plate_number")
+    .select("id, name, type, status, battery_level, fuel_level, plate_number, branch")
     .single();
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });

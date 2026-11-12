@@ -33,8 +33,10 @@ type Vehicle = {
   battery_level: string | null;
   fuel_level: string | null;
   plate_number: string | null;
+  branch: "UTAMA" | "JOGJA";
   lastUsage?: LastUsage | null;
 };
+type BranchFilter = "ALL" | "UTAMA" | "JOGJA";
 type UserLite = { id: string; name: string; role: string };
 type BorrowRequest = {
   id: string;
@@ -62,6 +64,11 @@ export default function KendaraanPage() {
   // Terkunci by default (aman) sampai VehicleSopGate memastikan status SOP.
   const [sopBlocked, setSopBlocked] = useState(true);
 
+  // Multi-cabang: filter UI (Admin) + flag role Jogja-only (dari backend)
+  const [branchFilter, setBranchFilter] = useState<BranchFilter>("ALL");
+  const [canFilterBranch, setCanFilterBranch] = useState(false);
+  const [isJogjaOnly, setIsJogjaOnly] = useState(false);
+
   const [borrowTarget, setBorrowTarget] = useState<Vehicle | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<BorrowRequest | null>(null);
   const [approveTarget, setApproveTarget] = useState<BorrowRequest | null>(null);
@@ -80,6 +87,8 @@ export default function KendaraanPage() {
       setIsAdmin(d.isAdmin);
       setCanApprove(d.canApprove);
       setCurrentUserId(d.currentUserId ?? "");
+      setCanFilterBranch(!!d.canFilterBranch);
+      setIsJogjaOnly(Array.isArray(d.branchScope) && d.branchScope.includes("JOGJA"));
       if (d.canApprove) {
         const qr = await fetch("/api/vehicles/borrow?queue=1", { cache: "no-store" });
         const qd = await qr.json();
@@ -99,11 +108,18 @@ export default function KendaraanPage() {
   const myActiveFor = (vehicleId: string) =>
     myRequests.find((r) => r.vehicle_id === vehicleId && (r.status === "PENDING" || r.status === "APPROVED"));
 
-  const motors = vehicles.filter((v) => v.type === "MOTOR");
-  const mobils = vehicles.filter((v) => v.type === "MOBIL");
-  const availableCount = vehicles.filter((v) => v.status === "TERSEDIA").length;
-  const inUseCount = vehicles.filter((v) => v.status === "DIPAKAI").length;
-  const maintenanceCount = vehicles.filter((v) => v.status === "MAINTENANCE").length;
+  // Role Jogja-only: data sudah di-filter backend, UI tidak perlu filter lagi.
+  // Admin: filter client-side berdasarkan tombol yang dipilih (ALL/UTAMA/JOGJA).
+  const visibleVehicles =
+    canFilterBranch && branchFilter !== "ALL"
+      ? vehicles.filter((v) => v.branch === branchFilter)
+      : vehicles;
+
+  const motors = visibleVehicles.filter((v) => v.type === "MOTOR");
+  const mobils = visibleVehicles.filter((v) => v.type === "MOBIL");
+  const availableCount = visibleVehicles.filter((v) => v.status === "TERSEDIA").length;
+  const inUseCount = visibleVehicles.filter((v) => v.status === "DIPAKAI").length;
+  const maintenanceCount = visibleVehicles.filter((v) => v.status === "MAINTENANCE").length;
 
   return (
     <DashboardLayout>
@@ -142,12 +158,44 @@ export default function KendaraanPage() {
               </div>
               <p className="text-[11px] sm:text-xs lg:text-sm text-zinc-400">
                 Pinjam kendaraan operasional & pantau pemakaian
+                {isJogjaOnly && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 ring-1 ring-amber-500/30">
+                    CABANG JOGJA
+                  </span>
+                )}
               </p>
               <div className="flex flex-wrap items-center gap-1.5 mt-3.5">
                 <StatPill label="Tersedia" count={availableCount} tone="emerald" />
                 <StatPill label="Dipakai" count={inUseCount} tone="red" />
                 <StatPill label="Maintenance" count={maintenanceCount} tone="amber" />
               </div>
+
+              {/* Filter cabang (Admin only) */}
+              {canFilterBranch && (
+                <div className="flex items-center gap-1.5 mt-3">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Cabang:
+                  </span>
+                  {(["ALL", "UTAMA", "JOGJA"] as const).map((b) => {
+                    const active = branchFilter === b;
+                    return (
+                      <button
+                        key={b}
+                        onClick={() => setBranchFilter(b)}
+                        className={`h-7 px-2.5 rounded-lg text-[10.5px] font-bold tracking-wide transition active:scale-95 ${
+                          active
+                            ? b === "JOGJA"
+                              ? "bg-amber-500 text-zinc-900 shadow-md shadow-amber-500/20"
+                              : "bg-white text-zinc-900 shadow-md shadow-white/10"
+                            : "bg-white/5 text-zinc-400 border border-white/10 hover:bg-white/10"
+                        }`}
+                      >
+                        {b === "ALL" ? "Semua" : b === "UTAMA" ? "Utama" : "Jogja"}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             {isAdmin && (
               <button
@@ -493,11 +541,18 @@ function VehicleCard({
             <FuelRing level={v.fuel_level} TypeIcon={TypeIcon} />
             <div className="min-w-0 pt-0.5">
               <p className="text-sm font-black text-gray-900 truncate tracking-tight">{v.name}</p>
-              {v.plate_number && (
-                <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-600 text-[10px] font-mono font-bold tracking-wider">
-                  {v.plate_number}
-                </span>
-              )}
+              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                {v.plate_number && (
+                  <span className="inline-block px-1.5 py-0.5 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-600 text-[10px] font-mono font-bold tracking-wider">
+                    {v.plate_number}
+                  </span>
+                )}
+                {v.branch === "JOGJA" && (
+                  <span className="inline-block px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold tracking-wide">
+                    JOGJA
+                  </span>
+                )}
+              </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
                 <span className="text-[10px] text-gray-500 flex items-center gap-1">
                   <Fuel size={12} className="text-emerald-500" /> {v.fuel_level || "—"}
@@ -836,6 +891,7 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
   const [plate, setPlate] = useState(vehicle?.plate_number ?? "");
   const [fuel, setFuel] = useState(vehicle?.fuel_level ?? "");
   const [status, setStatus] = useState(vehicle?.status ?? "TERSEDIA");
+  const [branch, setBranch] = useState<"UTAMA" | "JOGJA">(vehicle?.branch ?? "UTAMA");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -848,7 +904,7 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
     try {
       const url = isEdit ? `/api/vehicles/${vehicle!.id}` : "/api/vehicles";
       const method = isEdit ? "PUT" : "POST";
-      const payload: any = { name: name.trim(), type, plate_number: plate.trim(), fuel_level: fuel.trim() };
+      const payload: any = { name: name.trim(), type, plate_number: plate.trim(), fuel_level: fuel.trim(), branch };
       if (isEdit) payload.status = status;
       const res = await fetch(url, {
         method,
@@ -890,6 +946,33 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
             <option value="MOTOR">Motor</option>
             <option value="MOBIL">Mobil</option>
           </select>
+        </div>
+        <div>
+          <label className={lbl}>Cabang *</label>
+          <div className="flex gap-2">
+            {(["UTAMA", "JOGJA"] as const).map((b) => {
+              const active = branch === b;
+              return (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setBranch(b)}
+                  className={`flex-1 h-10 rounded-xl text-[12px] font-bold tracking-wide transition active:scale-[0.97] ${
+                    active
+                      ? b === "JOGJA"
+                        ? "bg-amber-500 text-zinc-900 shadow-md shadow-amber-500/20"
+                        : "bg-zinc-900 text-white shadow-md shadow-zinc-900/20"
+                      : "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+                  }`}
+                >
+                  {b === "UTAMA" ? "Utama (Depok)" : "Jogja"}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1.5">
+            Kendaraan {branch === "JOGJA" ? "Jogja hanya terlihat oleh karyawan Cabang Jogja" : "Utama terlihat oleh semua karyawan non-Jogja"}.
+          </p>
         </div>
         <div>
           <label className={lbl}>{type === "MOBIL" ? "Level Bensin (awal)" : "Level Bensin / Baterai (awal)"}</label>

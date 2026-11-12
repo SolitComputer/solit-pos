@@ -116,7 +116,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     }
     const supabaseForAccountCheck = getAdmin();
     const { data: accountFromDB, error: accCheckErr } = await supabaseForAccountCheck
-        .from("accounts")
+        .from("chart_of_accounts")
         .select("code, name, is_active")
         .eq("code", account_code)
         .maybeSingle();
@@ -138,7 +138,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
         return NextResponse.json(
             { success: false, message: `Akun ${accountFromDB.code} — ${accountFromDB.name} sudah diarsipkan — tidak bisa dipakai untuk kategori baru` },
             { status: 400 }
-        );
+    );
     }
 
     // Validasi direction

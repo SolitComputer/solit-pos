@@ -13,12 +13,46 @@ export const supabaseVehicles: SupabaseClient = createClient(
 // "Admin" untuk fitur ini = HANYA role ADMIN literal (CRUD master + approve/reject)
 export const VEHICLE_ADMIN_ROLES: string[] = ["ADMIN"];
 
+// === Multi-cabang (Model A) ===
+export type VehicleBranch = "UTAMA" | "JOGJA";
+
+/**
+ * Role yang HANYA boleh lihat kendaraan Cabang Jogja.
+ * Isi sesuai role karyawan Jogja di sistem kamu.
+ * Contoh: ["SALES_JOGJA", "KEPALA_JOGJA"] — kalau role-nya ada.
+ * Kalau kosong, tidak ada pembatasan Jogja-only (semua role lihat semua branch).
+ */
+export const VEHICLE_JOGJA_ONLY_ROLES: string[] = [
+  // 👇 TAMBAHKAN DI SINI nama role Jogja kamu, mis.:
+  // "SALES_JOGJA",
+  // "KEPALA_JOGJA",
+];
+
+/** Role yang boleh pilih/filter branch (Admin + Programmer). */
+export const VEHICLE_BRANCH_FILTER_ROLES: string[] = [
+  "ADMIN",
+  "PROGRAMMER",
+  "ASISTEN_CEO",
+];
+
+/**
+ * Tentukan scope branch user.
+ * - Role Jogja → ["JOGJA"] (eksklusif, dikunci backend)
+ * - Selain Jogja → null (bisa lihat semua branch)
+ */
+export function getVehicleBranchScope(roles: string[]): VehicleBranch[] | null {
+  const isJogjaOnly = roles.some((r) => VEHICLE_JOGJA_ONLY_ROLES.includes(r));
+  return isJogjaOnly ? ["JOGJA"] : null;
+}
+
 export type Requester = {
   id: string;
   name: string;
   roles: string[];
   isAdmin: boolean;
   canApprove: boolean; // boleh ACC/Tolak pengajuan peminjaman (khusus Kepala Sales)
+  branchScope: VehicleBranch[] | null; // null = akses semua branch, array = eksklusif
+  canFilterBranch: boolean;            // boleh pakai UI filter branch (Admin dkk)
 };
 
 // Ambil identitas pemanggil. Prefer header x-user-* yang di-set middleware,
@@ -56,7 +90,9 @@ export async function getRequester(request: NextRequest): Promise<Requester | nu
 
   const isAdmin = roles.some((r) => VEHICLE_ADMIN_ROLES.includes(r));
   const canApprove = roles.some((r) => (VEHICLE_APPROVAL_ROLES as readonly string[]).includes(r));
-  return { id, name, roles, isAdmin, canApprove };
+  const branchScope = getVehicleBranchScope(roles);
+  const canFilterBranch = roles.some((r) => VEHICLE_BRANCH_FILTER_ROLES.includes(r));
+  return { id, name, roles, isAdmin, canApprove, branchScope, canFilterBranch };
 }
 
 export type VehicleRow = {
@@ -66,6 +102,7 @@ export type VehicleRow = {
   status: "TERSEDIA" | "DIPAKAI" | "MAINTENANCE";
   battery_level: string | null;
   fuel_level: string | null;
+  branch: VehicleBranch; // UTAMA / JOGJA
 };
 
 export type UserLite = { id: string; name: string; role: string };
@@ -112,7 +149,7 @@ export async function enrichRequests(rows: BorrowRequestRow[]): Promise<BorrowRe
     vehicleIds.length
       ? supabaseVehicles
         .from("vehicles")
-        .select("id, name, type, status, battery_level, fuel_level")
+        .select("id, name, type, status, battery_level, fuel_level, branch")
         .in("id", vehicleIds)
       : Promise.resolve({ data: [] as VehicleRow[] }),
   ]);
