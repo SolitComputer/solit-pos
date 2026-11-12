@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { CASHFLOW_CATEGORY_MANAGE_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { ACCOUNT_MAP } from "@/lib/accounting";
+// ⬅️ DIHAPUS: ACCOUNT_MAP (hardcoded) tidak lagi dipakai untuk validasi akun.
+// Validasi sekarang langsung query ke DB table `accounts` — sama dengan POST
+// handler di route.ts parent. Konsisten dengan dropdown CategoryManagerModal.
 
 function getAdmin(): SupabaseClient {
     return createClient(
@@ -65,11 +67,34 @@ export const PUT = withAuth(async (req, ctx, _user) => {
     }
 
     if (account_code !== undefined) {
-        if (!ACCOUNT_MAP[account_code])
+        // ⬅️ UPDATE: validasi akun langsung ke DB (table `accounts`), bukan ACCOUNT_MAP
+        // hardcoded. Alasan sama dengan POST handler di route.ts — supaya akun custom
+        // & akun bawaan apa pun yang tercatat di DB bisa dipakai untuk edit kategori.
+        const { data: accountFromDB, error: accCheckErr } = await supabase
+            .from("accounts")
+            .select("code, name, is_active")
+            .eq("code", account_code)
+            .maybeSingle();
+
+        if (accCheckErr) {
+            console.error("[cashflow-categories PUT account check]", accCheckErr);
             return NextResponse.json(
-                { success: false, message: "Akun akuntansi tidak valid" },
+                { success: false, message: `Gagal verifikasi akun: ${accCheckErr.message}` },
+                { status: 500 }
+            );
+        }
+        if (!accountFromDB) {
+            return NextResponse.json(
+                { success: false, message: `Akun dengan kode ${account_code} tidak ditemukan di sistem` },
                 { status: 400 }
             );
+        }
+        if (accountFromDB.is_active === false) {
+            return NextResponse.json(
+                { success: false, message: `Akun ${accountFromDB.code} — ${accountFromDB.name} sudah diarsipkan — tidak bisa dipakai` },
+                { status: 400 }
+            );
+        }
         updatePayload.account_code = account_code;
     }
 

@@ -13,7 +13,12 @@ import {
     KASBON_CICILAN_CATEGORIES,
     AUTO_INCOME_CATEGORIES,
 } from "@/lib/cashflow";
-import { ACCOUNT_MAP } from "@/lib/accounting";
+// ⬅️ DIHAPUS: ACCOUNT_MAP (hardcoded) tidak lagi dipakai untuk validasi akun.
+// Sekarang validasi langsung query ke DB table `accounts` — satu sumber dengan
+// dropdown di CategoryManagerModal (yang fetch dari /api/akutansi/accounts) dan
+// halaman Kelola Akun. Alasan: akun custom (bikin user di Kelola Akun) & akun
+// bawaan yang nama/tipenya berbeda di DB vs hardcoded tidak ada di ACCOUNT_MAP,
+// jadi validasi hardcoded selalu reject — termasuk kasus akun 301 Modal Owner.
 
 function getAdmin(): SupabaseClient {
     return createClient(
@@ -99,12 +104,42 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
             { status: 400 }
         );
 
-    // Validasi akun akuntansi — harus ada di chart of account (ACCOUNTS)
-    if (!account_code || !ACCOUNT_MAP[account_code])
+    // ⬅️ UPDATE: validasi akun langsung ke DB (table `accounts`), bukan ACCOUNT_MAP
+    // hardcoded. Supaya akun custom & akun bawaan apa pun yang tercatat di DB bisa
+    // dipakai, konsisten dengan dropdown di CategoryManagerModal yang fetch dari
+    // /api/akutansi/accounts (sumber data yang sama).
+    if (!account_code) {
         return NextResponse.json(
-            { success: false, message: "Akun akuntansi tidak valid" },
+            { success: false, message: "Akun akuntansi wajib dipilih" },
             { status: 400 }
         );
+    }
+    const supabaseForAccountCheck = getAdmin();
+    const { data: accountFromDB, error: accCheckErr } = await supabaseForAccountCheck
+        .from("accounts")
+        .select("code, name, is_active")
+        .eq("code", account_code)
+        .maybeSingle();
+
+    if (accCheckErr) {
+        console.error("[cashflow-categories POST account check]", accCheckErr);
+        return NextResponse.json(
+            { success: false, message: `Gagal verifikasi akun: ${accCheckErr.message}` },
+            { status: 500 }
+        );
+    }
+    if (!accountFromDB) {
+        return NextResponse.json(
+            { success: false, message: `Akun dengan kode ${account_code} tidak ditemukan di sistem` },
+            { status: 400 }
+        );
+    }
+    if (accountFromDB.is_active === false) {
+        return NextResponse.json(
+            { success: false, message: `Akun ${accountFromDB.code} — ${accountFromDB.name} sudah diarsipkan — tidak bisa dipakai untuk kategori baru` },
+            { status: 400 }
+        );
+    }
 
     // Validasi direction
     if (!["IN", "OUT", "BOTH"].includes(direction))
