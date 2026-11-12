@@ -55,12 +55,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    // Ambil user info (employees)
+    // Ambil user info (employees) — skip user yang sudah diarsipkan
+    // (Ex Karyawan/PKL Solit). Nama mereka TIDAK muncul lagi di list aktif.
     const userIds = [...new Set(manualData.map((r: any) => r.user_id))];
     const { data: usersData } = await supabase
       .from("users")
       .select("id, name, role, shift")
-      .in("id", userIds);
+      .in("id", userIds)
+      .is("deleted_at", null);   // ← TAMBAH: skip user arsip
 
     const usersMap: Record<string, any> = {};
     (usersData || []).forEach((u: any) => { usersMap[u.id] = u; });
@@ -78,11 +80,18 @@ export async function GET(request: Request) {
       (creatorsData || []).forEach((u: any) => { creatorsMap[u.id] = u.name; });
     }
 
-    const result = manualData.map((r: any) => ({
-      ...r,
-      users: usersMap[r.user_id] ?? null,
-      created_by_name: r.created_by ? (creatorsMap[r.created_by] ?? null) : null,
-    }));
+    // ✅ FIX: skip record manual attendance milik user yang sudah diarsipkan.
+    // Karena users yang di-archive tidak masuk ke usersMap (dipilter di query
+    // di atas), filter di sini bikin record Ex Karyawan/PKL otomatis hilang
+    // dari ringkasan absensi aktif. Data manualnya masih tersimpan aman di DB
+    // untuk audit — cuma nggak ditampilkan ke frontend yang bikin summary row.
+    const result = manualData
+      .filter((r: any) => usersMap[r.user_id])
+      .map((r: any) => ({
+        ...r,
+        users: usersMap[r.user_id],
+        created_by_name: r.created_by ? (creatorsMap[r.created_by] ?? null) : null,
+      }));
 
     return NextResponse.json({ success: true, data: result });
   } catch (err: any) {
