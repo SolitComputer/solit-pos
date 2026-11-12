@@ -20,6 +20,7 @@ import { expandRolesWithParents } from "@/lib/permissions";
 import PengajuanDanaNotifier from "@/components/layout/PengajuanDanaNotifier";
 import PengajuanDanaExecuteNotifier from "@/components/layout/PengajuanDanaExecuteNotifier"; 
 import ItemLoanNotifier from "@/components/layout/ItemLoanNotifier";
+import ItemLoanReminderNotifier from "@/components/layout/ItemLoanReminderNotifier";
 import VehiclePendingNotifier from "@/components/layout/VehiclePendingNotifier";
 
 function ScrollRestorer() {
@@ -107,6 +108,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             karena akses eksekusi di-manage per-akun, bukan per-role. */}
         <PengajuanDanaExecuteNotifier userId={soundUserId} />
         <ItemLoanNotifier userRoles={authUserRoles} userId={soundUserId} />
+        {/* Pengingat 2 hari sekali untuk peminjam yang punya pinjaman APPROVED.
+            Self-gate ke user yg sedang login di dalam endpoint — tidak perlu role filter.
+            Dibungkus !isSilentAdmin karena pengingatnya diam-diam saja (toast). */}
+        <ItemLoanReminderNotifier />
         {/* Notifikasi ACC kendaraan — self-gate ke Kepala Sales di dalam komponen.
             Sengaja TIDAK dibungkus !isSilentAdmin karena Kepala Sales bukan role
             yang dibisukan global. */}
