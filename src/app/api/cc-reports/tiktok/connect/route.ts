@@ -2,17 +2,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildAuthUrl } from "@/lib/ccTikTok";
 import { normalizeBrand } from "@/lib/ccReports";
+import { getCurrentUser } from "@/lib/auth";
+import { hasAnyRole, CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
 import { randomBytes } from "crypto";
 
 export const dynamic = "force-dynamic";
 
+// Halaman tujuan redirect kalau role ditolak / env kurang — bawa flash msg
+// biar user langsung tau alasannya, konsisten sama callback yang pakai ?tiktok=err&msg=
+const ANALISA_URL = "/dashboard/cc-reports/analisa";
+
+function redirectWithError(req: NextRequest, msg: string) {
+  const url = new URL(ANALISA_URL, req.url);
+  url.searchParams.set("tiktok", "err");
+  url.searchParams.set("msg", msg);
+  return NextResponse.redirect(url);
+}
+
 // GET → redirect ke halaman authorize TikTok
 export async function GET(req: NextRequest) {
+  // 🔒 Guard role — konsisten sama /instagram/connect. OAuth flow ini nyimpen
+  //    kredensial brand ke DB, jadi hanya pengelola CC yang boleh mulai.
+  //    Dicek di sini juga (bukan cuma UI) supaya nggak bisa di-bypass dengan
+  //    buka URL /connect langsung di browser.
+  const currentUser = await getCurrentUser();
+  if (!currentUser || !hasAnyRole(currentUser.roles ?? [currentUser.role], CC_REPORT_MANAGE_ROLES)) {
+    return redirectWithError(req, "Kamu tidak punya akses untuk menghubungkan TikTok");
+  }
+
   if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_REDIRECT_URI) {
-    return NextResponse.json(
-      { success: false, error: "TIKTOK_CLIENT_KEY / TIKTOK_REDIRECT_URI belum di-set" },
-      { status: 500 }
-    );
+    // Env kurang → redirect balik dengan pesan, bukan JSON 500 (biar UX sama).
+    return redirectWithError(req, "TIKTOK_CLIENT_KEY / TIKTOK_REDIRECT_URI belum di-set di env");
   }
 
   // Brand mana yang mau dihubungkan (?brand=Sotech). Default → Solit.
