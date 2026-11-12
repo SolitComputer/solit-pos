@@ -25,7 +25,7 @@ export default function SongPickerPanel({ picker }: SongPickerPanelProps) {
         return (
             <button onClick={openSearch}
                 className="w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
-                style={{ background: "#ffffff", color: "#64748b", border: "1px dashed #cbd5e1" }}>
+                style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))", border: "1px dashed rgb(var(--border))" }}>
                 <Music className="w-4 h-4" /> Tambahkan lagu
             </button>
         );
@@ -33,14 +33,14 @@ export default function SongPickerPanel({ picker }: SongPickerPanelProps) {
 
     if (pendingSong) {
         return (
-            <div className="space-y-3 p-3 rounded-2xl border border-slate-100" style={{ background: "#fafafa" }}>
+            <div className="space-y-3 p-3 rounded-2xl border border-slate-100" style={{ background: "rgb(var(--surface-2))" }}>
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
                         {pendingSong.artworkUrl && <img src={pendingSong.artworkUrl} alt={pendingSong.trackName} className="w-full h-full object-cover" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{pendingSong.trackName}</p>
-                        <p className="text-xs truncate" style={{ color: "#94a3b8" }}>{pendingSong.artistName}</p>
+                        <p className="text-sm font-bold truncate" style={{ color: "rgb(var(--fg))" }}>{pendingSong.trackName}</p>
+                        <p className="text-xs truncate" style={{ color: "rgb(var(--fg-subtle))" }}>{pendingSong.artistName}</p>
                     </div>
                     {pendingSong.previewUrl && (
                         <button onClick={toggleCropPlay}
@@ -53,7 +53,7 @@ export default function SongPickerPanel({ picker }: SongPickerPanelProps) {
 
                 {pendingSong.previewUrl ? (
                     <div>
-                        <p className="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "#94a3b8" }}>
+                        <p className="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "rgb(var(--fg-subtle))" }}>
                             Pilih potongan {CLIP_LENGTH} detik yang ditampilkan
                         </p>
                         <SongTrimBar
@@ -62,7 +62,7 @@ export default function SongPickerPanel({ picker }: SongPickerPanelProps) {
                             clipStart={clipStart}
                             onChange={handleCropSliderChange}
                         />
-                        <div className="flex justify-between text-[9px] mt-1" style={{ color: "#cbd5e1" }}>
+                        <div className="flex justify-between text-[9px] mt-1" style={{ color: "rgb(var(--fg-subtle))" }}>
                             <span>{Math.floor(clipStart / 60)}:{String(Math.floor(clipStart % 60)).padStart(2, "0")}</span>
                             <span>{Math.floor(Math.min(clipDuration, clipStart + CLIP_LENGTH) / 60)}:{String(Math.floor(Math.min(clipDuration, clipStart + CLIP_LENGTH) % 60)).padStart(2, "0")}</span>
                         </div>
@@ -75,12 +75,12 @@ export default function SongPickerPanel({ picker }: SongPickerPanelProps) {
                         />
                     </div>
                 ) : (
-                    <p className="text-[10.5px] italic" style={{ color: "#cbd5e1" }}>Preview audio tidak tersedia untuk lagu ini</p>
+                    <p className="text-[10.5px] italic" style={{ color: "rgb(var(--fg-subtle))" }}>Preview audio tidak tersedia untuk lagu ini</p>
                 )}
 
                 <div className="flex gap-2">
                     <button onClick={handleCancelCrop}
-                        className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300" style={{ background: "#f1f5f9", color: "#64748b" }}>
+                        className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300" style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
                         Batal
                     </button>
                     <button onClick={handleConfirmSong} disabled={savingSong}
@@ -96,14 +96,14 @@ export default function SongPickerPanel({ picker }: SongPickerPanelProps) {
     return (
         <div className="space-y-2">
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "rgb(var(--fg-subtle))" }} />
                 <input value={songQuery} onChange={(e) => setSongQuery(e.target.value)} autoFocus
                     placeholder="Cari judul lagu atau artis..."
                     className="w-full h-10 rounded-xl pl-9 pr-8 text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                    style={{ borderColor: "#e2e8f0", background: "#ffffff", color: "#334155" }} />
+                    style={{ borderColor: "rgb(var(--border))", background: "rgb(var(--surface-2))", color: "rgb(var(--fg))" }} />
                 <button onClick={closeSearch}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                    <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+                    <X className="w-3.5 h-3.5" style={{ color: "rgb(var(--fg-subtle))" }} />
                 </button>
             </div>
             {searchingSong && (
@@ -118,8 +118,8 @@ export default function SongPickerPanel({ picker }: SongPickerPanelProps) {
                                 {song.artworkUrl && <img src={song.artworkUrl} alt={song.trackName} className="w-full h-full object-cover" />}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-xs font-semibold truncate" style={{ color: "#0f172a" }}>{song.trackName}</p>
-                                <p className="text-[10.5px] truncate" style={{ color: "#94a3b8" }}>{song.artistName}</p>
+                                <p className="text-xs font-semibold truncate" style={{ color: "rgb(var(--fg))" }}>{song.trackName}</p>
+                                <p className="text-[10.5px] truncate" style={{ color: "rgb(var(--fg-subtle))" }}>{song.artistName}</p>
                             </div>
                         </button>
                     ))}

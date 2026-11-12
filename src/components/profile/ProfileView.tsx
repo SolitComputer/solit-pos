@@ -830,7 +830,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                         {profile.profile_photo_url && (
                             <button onClick={() => { setShowPhotoActions(false); setConfirmDelete(true); }}
                                 className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-red-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200">
-                                <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#fff1f2", color: "#dc2626" }}>
+                                <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgb(var(--surface-2))", color: "#dc2626" }}>
                                     <Trash2 className="w-4 h-4" />
                                 </span>
                                 <span className="text-sm font-semibold text-red-600">Hapus Foto</span>
@@ -887,7 +887,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                         {profile.banner_url && (
                             <button onClick={() => { setShowBannerActions(false); setConfirmDeleteBanner(true); }}
                                 className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-red-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200">
-                                <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#fff1f2", color: "#dc2626" }}>
+                                <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgb(var(--surface-2))", color: "#dc2626" }}>
                                     <Trash2 className="w-4 h-4" />
                                 </span>
                                 <span className="text-sm font-semibold text-red-600">Hapus Foto Banner</span>
@@ -906,7 +906,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setConfirmDeleteBanner(false)} />
                     <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 lg:p-8">
-                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "#fff1f2", border: "1px solid #fecaca" }}>
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "rgb(var(--surface-2))", border: "1px solid rgb(var(--border))" }}>
                             <Trash2 className="w-8 h-8" style={{ color: "#dc2626" }} />
                         </div>
                         <h3 className="font-black text-slate-800 text-center text-base mb-1">Hapus Banner Foto?</h3>
@@ -914,7 +914,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                         <div className="flex gap-2.5">
                             <button onClick={() => setConfirmDeleteBanner(false)} disabled={deletingBanner}
                                 className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                                style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
                                 Batal
                             </button>
                             <button onClick={handleDeleteBanner} disabled={deletingBanner}
@@ -931,7 +931,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setConfirmDelete(false)} />
                     <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 lg:p-8">
-                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "#fff1f2", border: "1px solid #fecaca" }}>
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "rgb(var(--surface-2))", border: "1px solid rgb(var(--border))" }}>
                             <Trash2 className="w-8 h-8" style={{ color: "#dc2626" }} />
                         </div>
                         <h3 className="font-black text-slate-800 text-center text-base mb-1">Hapus Foto {profile.name}?</h3>
@@ -939,7 +939,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                         <div className="flex gap-2.5">
                             <button onClick={() => setConfirmDelete(false)} disabled={deleting}
                                 className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                                style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--fg-muted))" }}>
                                 Batal
                             </button>
                             <button onClick={handleDeletePhoto} disabled={deleting}
@@ -1515,7 +1515,7 @@ function AchievementCard({
 
     return (
         <div className="group rounded-2xl p-4 sm:p-5 lg:p-6 relative overflow-hidden border border-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl h-full"
-            style={{ background: `linear-gradient(160deg, ${accentSoft} 0%, #ffffff 45%)`, boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+            style={{ background: `linear-gradient(160deg, ${accentSoft} 0%, rgb(var(--surface)) 45%)`, boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
             <div className="absolute top-0 left-0 right-0 h-1" style={{ background: accentBar }} />
             <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-[0.14] transition-transform duration-500 group-hover:scale-110" style={{ background: accentSolid }} />
             <div className="relative">
@@ -1526,18 +1526,18 @@ function AchievementCard({
                     </div>
                     {hasAchievement && <RankBadge rank={rank as number} />}
                 </div>
-                <p className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>{title} · {monthLabel}</p>
-                <p className="text-3xl sm:text-4xl font-black mt-1 tabular-nums" style={{ color: "#0f172a" }}>{value}</p>
-                <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{sub}</p>
+                <p className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "rgb(var(--fg-subtle))" }}>{title} · {monthLabel}</p>
+                <p className="text-3xl sm:text-4xl font-black mt-1 tabular-nums" style={{ color: "rgb(var(--fg))" }}>{value}</p>
+                <p className="text-xs mt-0.5" style={{ color: "rgb(var(--fg-subtle))" }}>{sub}</p>
                 {rank && (
                     <p className="inline-block mt-2.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full" style={{ background: accentSoft, color: accentSolid }}>
                         Peringkat #{rank} dari {totalRanked} orang
                     </p>
                 )}
                 {personalBest && (
-                    <div className="mt-3 pt-3 border-t flex items-center gap-1.5" style={{ borderColor: "rgba(15,23,42,0.05)" }}>
+                    <div className="mt-3 pt-3 border-t flex items-center gap-1.5" style={{ borderColor: "rgb(var(--border))" }}>
                         {isRecord ? <Trophy className="w-3.5 h-3.5" style={{ color: "#d97706" }} /> : <Flame className="w-3.5 h-3.5 text-slate-300" />}
-                        <p className="text-[10.5px] font-semibold" style={{ color: isRecord ? "#d97706" : "#94a3b8" }}>
+                        <p className="text-[10.5px] font-semibold" style={{ color: isRecord ? "#d97706" : "rgb(var(--fg-subtle))" }}>
                             {personalBest}{isRecord ? " — Rekor Perusahaan!" : ""}
                         </p>
                     </div>

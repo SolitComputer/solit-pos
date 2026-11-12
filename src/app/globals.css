@@ -599,3 +599,57 @@ html.dark .from-emerald-100 { --tw-gradient-from: #0d3824 var(--tw-gradient-from
 html.dark .bg-clip-text.text-transparent.from-slate-500 {
   -webkit-text-fill-color: #cbd5e1 !important; color: #cbd5e1 !important;
 }
+
+/* =========================================================
+   DARK MODE v6.8 — ambient glow halaman (from-indigo-100 opacity
+   60 + via-indigo-50 opacity 10, fade ke transparent) di Patch
+   Notes dll. Varian opacity ini belum ter-remap, jadi muncul PITA
+   TERANG di atas halaman saat dark. Dibuat jadi glow indigo gelap
+   yang halus biar nyatu sama canvas.
+   ========================================================= */
+html.dark .from-indigo-100\/60 { --tw-gradient-from: rgba(20,46,80,0.5) var(--tw-gradient-from-position) !important; }
+html.dark .via-indigo-50\/10 { --tw-gradient-via: rgba(20,46,80,0.12) var(--tw-gradient-via-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important; }
+
+/* =========================================================
+   DARK MODE v6.9 — zebra stripe baris genap pada tabel (varian
+   even/odd). Dipakai SopMarkdown (tabel SOP Kendaraan) dengan
+   even:bg-gray-50 opacity 50. Varian even/odd itu selector
+   berbeda dari bg-gray-50 biasa, jadi lolos layer di atas dan
+   muncul baris terang di dark. Dibuat overlay putih super tipis.
+   ========================================================= */
+html.dark .even\:bg-gray-50\/50:nth-child(even),
+html.dark .even\:bg-slate-50\/50:nth-child(even),
+html.dark .even\:bg-gray-50:nth-child(even),
+html.dark .even\:bg-slate-50:nth-child(even),
+html.dark .odd\:bg-gray-50\/50:nth-child(odd),
+html.dark .odd\:bg-slate-50\/50:nth-child(odd) { background-color: rgba(255,255,255,0.03) !important; }
+
+/* =========================================================
+   DARK MODE v7.0 — group-hover BERWARNA skala -100/-50 yang
+   belum tercakup v6.3 (v6.3 cuma netral zinc/gray/slate). Dipakai
+   blok PIC di Management Seller (group-hover:bg-violet-100). Tanpa
+   ini, baris/blok kelip jadi pastel terang saat di-hover di dark.
+   ========================================================= */
+html.dark .group:hover .group-hover\:bg-violet-100,
+html.dark .group:hover .group-hover\:bg-purple-100 { background-color: #2e1c55; }
+html.dark .group:hover .group-hover\:bg-violet-50,
+html.dark .group:hover .group-hover\:bg-purple-50 { background-color: #1d1236; }
+html.dark .group:hover .group-hover\:bg-blue-100,
+html.dark .group:hover .group-hover\:bg-indigo-100,
+html.dark .group:hover .group-hover\:bg-sky-100 { background-color: #142e50; }
+html.dark .group:hover .group-hover\:bg-emerald-100,
+html.dark .group:hover .group-hover\:bg-green-100 { background-color: #0d3824; }
+html.dark .group:hover .group-hover\:bg-amber-100 { background-color: #422a09; }
+html.dark .group:hover .group-hover\:bg-rose-100,
+html.dark .group:hover .group-hover\:bg-red-100 { background-color: #451522; }
+
+/* =========================================================
+   DARK MODE v7.1 — focus:bg-white pada input/select/textarea.
+   Banyak field pakai class focus:bg-white (mis. filter di Semua
+   Misi). Variant focus ini lolos dari remap bg-white biasa, jadi
+   kotak input KELIP PUTIH saat di-klik/fokus di dark. Disamakan
+   dengan warna field dark.
+   ========================================================= */
+html.dark .focus\:bg-white:focus { background-color: #131d2e; }
+html.dark .focus\:bg-slate-50:focus,
+html.dark .focus\:bg-gray-50:focus { background-color: #151f30; }
