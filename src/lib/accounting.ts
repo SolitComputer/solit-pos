@@ -268,21 +268,43 @@ export const CASHFLOW_OUT_ACCOUNT = CASHFLOW_ACCOUNT;
 /** @deprecated pakai CASHFLOW_ACCOUNT — nama lama dipertahankan biar import lain tidak pecah */
 export const CASHFLOW_IN_ACCOUNT = CASHFLOW_ACCOUNT;
 
-export function expenseAccountForCashflow(category: string): string {
-  return CASHFLOW_ACCOUNT[category] ?? AKUN.BIAYA_LAIN;
+// ⬅️ UPDATE — tambah parameter opsional `customCategoryMap` (key → account_code)
+// supaya kategori custom bisa di-resolve ke akun akuntansi yang benar. Kalau
+// tidak di-pass, behavior lama tetap: fallback ke BIAYA_LAIN / PEMASUKAN_LAIN.
+export function expenseAccountForCashflow(
+  category: string,
+  customCategoryMap?: Record<string, string>
+): string {
+  return (
+    CASHFLOW_ACCOUNT[category] ??
+    customCategoryMap?.[category] ?? // ⬅️ BARU
+    AKUN.BIAYA_LAIN
+  );
 }
 
-export function incomeAccountForCashflow(category: string): string {
-  return CASHFLOW_ACCOUNT[category] ?? AKUN.PEMASUKAN_LAIN;
+export function incomeAccountForCashflow(
+  category: string,
+  customCategoryMap?: Record<string, string>
+): string {
+  return (
+    CASHFLOW_ACCOUNT[category] ??
+    customCategoryMap?.[category] ?? // ⬅️ BARU
+    AKUN.PEMASUKAN_LAIN
+  );
 }
 
-export function cashflowKeterangan(e: {
-  category: string;
-  keterangan?: string | null;
-  nama?: string | null;
-  direction?: "IN" | "OUT";
-}): string {
-  const label = categoryLabel(e.direction ?? "OUT", e.category);
+// ⬅️ UPDATE — terima optional customCategories supaya keterangan Jurnal Umum
+// pakai label custom kategori yang benar (bukan raw key "BIAYA_SEWA_RUKO").
+export function cashflowKeterangan(
+  e: {
+    category: string;
+    keterangan?: string | null;
+    nama?: string | null;
+    direction?: "IN" | "OUT";
+  },
+  customCategories?: import("@/lib/cashflow").CustomCashflowCategory[] // ⬅️ BARU
+): string {
+  const label = categoryLabel(e.direction ?? "OUT", e.category, customCategories);
   const detail = e.keterangan?.trim() || e.nama?.trim() || "—";
   return `${label} · ${detail}`;
 }

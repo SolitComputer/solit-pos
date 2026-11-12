@@ -95,6 +95,47 @@ export function isKasbonCicilanCategory(category: string): boolean {
   return Object.prototype.hasOwnProperty.call(KASBON_CICILAN_CATEGORIES, category);
 }
 
+// ⬅️ BARU — Tipe kategori custom yang user tambahkan dari halaman web.
+// Di-fetch dari tabel cashflow_custom_categories & disisipkan ke dropdown
+// kategori di Cashflow. Mapping ke akun akuntansi disimpan di account_code.
+export interface CustomCashflowCategory {
+  id: string;
+  key: string;              // e.g. "BIAYA_SEWA_RUKO" — uppercase, underscore only
+  label: string;            // e.g. "Biaya Sewa Ruko" — apa yang user ketik
+  account_code: string;     // e.g. "530" — FK logis ke CASHFLOW_ACCOUNT / ACCOUNTS
+  direction: "IN" | "OUT" | "BOTH";
+  is_active: boolean;
+}
+
+/** Cek apakah key kategori (custom) valid untuk direction tertentu. BOTH = valid untuk IN & OUT. */
+export function isValidCustomCategory(
+  category: string,
+  direction: CashflowDirection,
+  customCategories: CustomCashflowCategory[]
+): boolean {
+  const found = customCategories.find((c) => c.key === category && c.is_active);
+  if (!found) return false;
+  return found.direction === "BOTH" || found.direction === direction;
+}
+
+/** Cari label kategori custom (untuk ditampilkan di tabel/badge). null jika tidak ada. */
+export function findCustomCategoryLabel(
+  category: string,
+  customCategories: CustomCashflowCategory[]
+): string | null {
+  const found = customCategories.find((c) => c.key === category);
+  return found?.label ?? null;
+}
+
+/** Cari account_code kategori custom. null jika tidak ada → fallback ke CASHFLOW_ACCOUNT statis. */
+export function findCustomCategoryAccount(
+  category: string,
+  customCategories: CustomCashflowCategory[]
+): string | null {
+  const found = customCategories.find((c) => c.key === category);
+  return found?.account_code ?? null;
+}
+
 /** Minggu ke-berapa dalam bulan dari tanggal "YYYY-MM-DD".
  *  1–7 = Minggu 1, 8–14 = Minggu 2, …, 29–31 = Minggu 5. */
 export function weekOfMonth(dateStr: string): number {
@@ -107,13 +148,20 @@ export function weekOfMonth(dateStr: string): number {
 export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"] as const;
 
 /** true = kategori ini boleh diinput manual utk Uang Masuk (16 kategori umum
- *  + 3 kategori Penjualan Laptop/Aksesoris/Service manual) */
-export function isManualIncomeCategory(category: string): boolean {
+ *  + 3 kategori Penjualan Laptop/Aksesoris/Service manual + custom IN/BOTH) */
+export function isManualIncomeCategory(
+  category: string,
+  customCategories?: CustomCashflowCategory[] // ⬅️ BARU
+): boolean {
+  // ⬅️ BARU — kategori custom (direction IN atau BOTH) boleh input manual sebagai Uang Masuk
+  if (customCategories && isValidCustomCategory(category, "IN", customCategories)) {
+    return true;
+  }
   return (
     Object.prototype.hasOwnProperty.call(CASHFLOW_CATEGORIES, category) ||
     Object.prototype.hasOwnProperty.call(LEGACY_CATEGORY_LABEL, category) ||
     Object.prototype.hasOwnProperty.call(MANUAL_INCOME_ONLY_CATEGORIES, category) ||
-    isKasbonCicilanCategory(category) // ⬅️ BARU: Kasbon/Cicilan boleh input manual sbg Uang Masuk (pembayaran)
+    isKasbonCicilanCategory(category)
   );
 }
 
@@ -132,30 +180,44 @@ export const EXPENSE_CATEGORIES = { ...CASHFLOW_CATEGORIES, ...MANUAL_EXPENSE_ON
 export type IncomeCategory = keyof typeof INCOME_CATEGORIES;
 export type ExpenseCategory = keyof typeof EXPENSE_CATEGORIES; // ⬅️ UPDATE: dulu keyof typeof CASHFLOW_CATEGORIES
 
-export function categoryLabel(_direction: CashflowDirection, category: string): string {
+// ⬅️ UPDATE — tambah parameter opsional `customCategories` untuk resolve label
+// kategori custom. Kalau tidak di-pass (caller lama tanpa akses DB), behavior
+// lama tetap sama: fallback ke raw key kalau tidak ketemu di manapun.
+export function categoryLabel(
+  _direction: CashflowDirection,
+  category: string,
+  customCategories?: CustomCashflowCategory[]
+): string {
   if (category === "MODAL_AWAL") return "Modal Awal";
   return (
     (CASHFLOW_CATEGORIES as Record<string, string>)[category] ??
     (MANUAL_INCOME_ONLY_CATEGORIES as Record<string, string>)[category] ??
-    (MANUAL_EXPENSE_ONLY_CATEGORIES as Record<string, string>)[category] ?? // ⬅️ BARU
-    (KASBON_CICILAN_CATEGORIES as Record<string, string>)[category] ?? // ⬅️ BARU
+    (MANUAL_EXPENSE_ONLY_CATEGORIES as Record<string, string>)[category] ??
+    (KASBON_CICILAN_CATEGORIES as Record<string, string>)[category] ??
     AUTO_CATEGORY_LABEL[category] ??
     LEGACY_CATEGORY_LABEL[category] ??
+    (customCategories && findCustomCategoryLabel(category, customCategories)) ?? // ⬅️ BARU
     category
   );
 }
 
-export function isValidCategory(direction: CashflowDirection, category: string): boolean {
-  // ⬅️ BARU: Kasbon & Cicilan valid di DUA arah (beri = OUT, bayar = IN).
+// ⬅️ UPDATE — tambah parameter opsional `customCategories` supaya validasi
+// juga mengenali kategori custom yang user buat. Caller (API route) wajib
+// fetch daftar custom dulu lalu pass ke sini.
+export function isValidCategory(
+  direction: CashflowDirection,
+  category: string,
+  customCategories?: CustomCashflowCategory[]
+): boolean {
   if (isKasbonCicilanCategory(category)) return true;
-  // 3 kategori Penjualan Laptop/Aksesoris/Service manual cuma valid utk arah IN —
-  // supaya tidak bisa "nyasar" jadi kategori di Uang Keluar (Beban).
   if (direction === "IN" && Object.prototype.hasOwnProperty.call(MANUAL_INCOME_ONLY_CATEGORIES, category)) {
     return true;
   }
-  // ⬅️ BARU: 3 kategori Penjualan Laptop/Aksesoris/Jasa Servis (sisi keluar) cuma
-  // valid utk arah OUT — supaya tidak bisa "nyasar" jadi kategori di Uang Masuk.
   if (direction === "OUT" && Object.prototype.hasOwnProperty.call(MANUAL_EXPENSE_ONLY_CATEGORIES, category)) {
+    return true;
+  }
+  // ⬅️ BARU — kategori custom dari DB (hanya yang is_active)
+  if (customCategories && isValidCustomCategory(category, direction, customCategories)) {
     return true;
   }
   return (

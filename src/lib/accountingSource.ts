@@ -546,24 +546,47 @@ async function groupCashflowRows(
   return result;
 }
 
-/** Baris jurnal untuk 1 group cashflow (1 baris = persis logic lama). */
-function cashflowGroupLines(group: CashflowRow[]): DraftLine[] {
+// ⬅️ BARU — Helper: load kategori custom aktif dari DB sebagai map
+// { key: account_code }. Dipanggil sekali di awal buildCashflowDrafts /
+// getCashflowSyncDraftsByIds supaya resolve akun custom-nya 1 round-trip.
+async function loadCustomCategoryMap(supabase: SupabaseClient): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from("cashflow_custom_categories")
+    .select("key, account_code")
+    .eq("is_active", true);
+  if (error) {
+    console.error("[akuntansi] load custom categories:", error.message);
+    return {};
+  }
+  const map: Record<string, string> = {};
+  for (const r of (data ?? []) as any[]) {
+    map[r.key as string] = r.account_code as string;
+  }
+  return map;
+}
+
+/** Baris jurnal untuk 1 group cashflow (1 baris = persis logic lama).
+ *  ⬅️ UPDATE — terima customMap supaya kategori custom di-resolve ke akun yang benar.
+ *  Dipanggil dari buildCashflowDrafts & getCashflowSyncDraftsByIds. */
+function cashflowGroupLines(
+  group: CashflowRow[],
+  customMap: Record<string, string> = {} // ⬅️ BARU
+): DraftLine[] {
   const lines: DraftLine[] = [];
   for (const e of group) {
     const nominal = Math.round(Number(e.nominal ?? 0));
     if (nominal <= 0) continue;
 
-    // ⬅️ Akun kas dari cash_location (akun kas fisik); fallback ke branch utk data lama.
     const kasAccount = kasAccountFromCashflow(e.payment_method, e.cash_location ?? e.branch);
     if (e.direction === "OUT") {
-      lines.push({ account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal });
+      lines.push({ account_code: expenseAccountForCashflow(e.category, customMap), side: "DEBIT", nominal });
       lines.push({ account_code: kasAccount, side: "KREDIT", nominal });
     } else {
       lines.push({ account_code: kasAccount, side: "DEBIT", nominal });
-      lines.push({ account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal });
+      lines.push({ account_code: incomeAccountForCashflow(e.category, customMap), side: "KREDIT", nominal });
     }
   }
-  return mergeLines(lines); // Kas ikut digabung jadi 1 baris (mis. Kas Saldo Rp102.500)
+  return mergeLines(lines);
 }
 
 export interface JournalSyncDraft {
@@ -589,6 +612,13 @@ export async function getCashflowSyncDraftsByIds(
 ): Promise<Map<string, JournalSyncDraft>> {
   const result = new Map<string, JournalSyncDraft>();
   if (ids.length === 0) return result;
+
+  // ⬅️ BARU — load custom category map SEKALI di awal (parallel dengan fetch rows)
+  const [customMap, rowsFirstBatch] = await Promise.all([
+    loadCustomCategoryMap(supabase),
+    Promise.resolve([] as CashflowRow[]), // placeholder — rows di-fetch per batch di bawah
+  ]);
+  void rowsFirstBatch; // supaya tidak warning unused — struktur dipertahankan
 
   const rows: CashflowRow[] = [];
   for (const batch of chunkArray(ids, 150)) {
@@ -632,13 +662,13 @@ export async function getCashflowSyncDraftsByIds(
 
   for (const group of groups) {
     const primary = group[group.length - 1];
-    if (!requested.has(primary.id)) continue; // hanya entry jurnal yang memang diminta
+    if (!requested.has(primary.id)) continue;
 
-    const merged = cashflowGroupLines(group);
+    const merged = cashflowGroupLines(group, customMap); // ⬅️ UPDATE: pass customMap
     result.set(String(primary.id), {
       lines: merged,
       total: totalOf(merged),
-      keterangan: cashflowKeterangan(primary),
+      keterangan: cashflowKeterangan(primary), // keterangan tetap pakai raw — label custom tidak kritis di sync
     });
   }
 
@@ -1583,6 +1613,10 @@ async function buildCashflowDrafts(
   startDate: string,
   endDateExclusive: string
 ): Promise<JournalDraft[]> {
+  // ⬅️ BARU — load custom category map SEKALI di awal, dipakai untuk resolve
+  // akun akuntansi kategori custom di cashflowGroupLines di bawah.
+  const customMap = await loadCustomCategoryMap(supabase);
+
   const { data: rows, error } = await supabase
     .from("cashflow_entries")
     .select(CASHFLOW_ROW_SELECT)
@@ -1603,9 +1637,9 @@ async function buildCashflowDrafts(
 
   const groups = await groupCashflowRows(supabase, validRows);
 
-  for (const group of groups) {
-    const primary = group[group.length - 1]; // nominal terbesar = judul & source_id
-    const merged = cashflowGroupLines(group);
+    for (const group of groups) {
+    const primary = group[group.length - 1];
+    const merged = cashflowGroupLines(group, customMap); // ⬅️ UPDATE: pass customMap
     const totalNominal = group.reduce((s, r) => s + Math.round(Number(r.nominal ?? 0)), 0);
     const sortTs = primary.created_at || `${primary.tanggal}T00:00:00+07:00`;
 
@@ -1615,7 +1649,7 @@ async function buildCashflowDrafts(
       source_category: primary.category,
       tanggal: primary.tanggal,
       sort_ts: sortTs,
-      keterangan: cashflowKeterangan(primary),
+      keterangan: cashflowKeterangan(primary), // label custom di-resolve di UI — Jurnal cukup pakai raw category
       ref: null,
       lines: merged,
       total: totalOf(merged),

@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, useSyncExternalStore, memo } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES, humanizeRoleKey, isJogjaBranchLockedRole } from "@/lib/permissions";
+import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES, CASHFLOW_CATEGORY_MANAGE_ROLES, humanizeRoleKey, isJogjaBranchLockedRole } from "@/lib/permissions"; // ⬅️ UPDATE: tambah CASHFLOW_CATEGORY_MANAGE_ROLES
 import type ExcelJS from "exceljs";
 import {
     categoryLabel,
@@ -13,19 +13,21 @@ import {
     type SourceFilter,
     type PaymentMethodFilter,
     type StatusFilter,
-    type IncomeMethodFilter, // ⬅️ BARU
+    type IncomeMethodFilter,
     defaultCashflowFilter,
     isFilterActive,
     activeFilterCount,
     applyFilters,
-    getEntryDisplayNama, // ⬅️ BARU
-    isKasbonCicilanCategory, // ⬅️ BARU
+    getEntryDisplayNama,
+    isKasbonCicilanCategory,
     CASHFLOW_START_DATE,
+    type CustomCashflowCategory, // ⬅️ BARU
 } from "@/lib/cashflow";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import TargetUserSelect from "@/components/kasbon/TargetUserSelect"; // ⬅️ BARU
 import BranchPaymentFields, { type BranchPaymentValue, cashSourceLabel } from "@/components/cashflow/BranchPaymentFields";
 import TesSinkronModal from "@/components/cashflow/TesSinkronModal"; // ⬅️ BARU — modal Tes Sinkron Kas vs Cashflow
+import CategoryManagerModal from "@/components/cashflow/CategoryManagerModal"; // ⬅️ BARU — modal Kelola Kategori Custom
 import CategorySelect, { getCategoryOptions, formatCategoryOptionLabel } from "@/components/cashflow/CategorySelect";
 import { CASHFLOW_ACCOUNT } from "@/lib/accounting"; // ⬅️ BARU: peta kategori → kode akun, dipakai CategoryBadge (ID samar)
 import InlineDateRange from "@/components/common/InlineDateRange"; // dipindah ke komponen bersama (dipakai juga di Laporan Marketing)
@@ -45,6 +47,7 @@ import {
     Search,
     Inbox,
     Shield,
+    Tags, // ⬅️ BARU — icon untuk tombol "Kelola Kategori"
 } from "lucide-react";
 
 const fmtRupiah = (n: number) => `Rp${Number(n || 0).toLocaleString("id-ID")}`;
@@ -159,15 +162,20 @@ function NameAvatar({ name, size = 22 }: { name: string; size?: number }) {
 // ⬅️ BARU: badge kategori + ID akun "samar" — label tegas, angka ID dibuat pudar
 // (text-gray-300) & lebih kecil biar kelihatan tapi tidak menyita perhatian.
 // tone "gray" = badge abu-abu (tabel), "plain" = sedikit lebih besar (detail modal).
-function CategoryBadge({ direction, category, tone = "gray" }: { direction: Entry["direction"]; category: string; tone?: "gray" | "plain" }) {
-    const code = (CASHFLOW_ACCOUNT as Record<string, string>)[category];
+// ⬅️ UPDATE: terima customCategories supaya label kategori custom (termasuk yang
+// sudah diarsipkan) tetap kebaca. account code untuk custom diambil dari customCategories
+// karena CASHFLOW_ACCOUNT cuma punya mapping hardcoded.
+function CategoryBadge({ direction, category, tone = "gray", customCategories = [] }: { direction: Entry["direction"]; category: string; tone?: "gray" | "plain"; customCategories?: CustomCashflowCategory[] }) {
+    const customMatch = customCategories.find((c) => c.key === category);
+    const code = customMatch?.account_code ?? (CASHFLOW_ACCOUNT as Record<string, string>)[category];
     const wrap = tone === "gray"
         ? "inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600"
         : "inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700";
     return (
         <span className={wrap}>
-            {categoryLabel(direction, category)}
+            {categoryLabel(direction, category, customCategories)}
             {code && <span className="text-gray-300 font-mono tabular-nums text-[9px]">{code}</span>}
+            {customMatch && <span className="text-violet-400 text-[8px]">✨</span>}
         </span>
     );
 }
@@ -834,10 +842,11 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
 }
 
 // ── Filter Panel ──────────────────────────────────────────────────────────────
-function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
-    filter: CashflowFilter; onChange: (f: CashflowFilter) => void; onReset: () => void; direction: "IN" | "OUT"; nameOptions: string[]; // ⬅️ BARU
+// ⬅️ UPDATE: terima customCategories supaya dropdown filter kategori juga include custom.
+function FilterPanel({ filter, onChange, onReset, direction, nameOptions, customCategories = [] }: {
+    filter: CashflowFilter; onChange: (f: CashflowFilter) => void; onReset: () => void; direction: "IN" | "OUT"; nameOptions: string[]; customCategories?: CustomCashflowCategory[];
 }) {
-    const catOptions = getCategoryOptions(direction); // terurut A–Z + ID Akun, konsisten dgn form input
+    const catOptions = getCategoryOptions(direction, customCategories); // ⬅️ UPDATE: pass customCategories supaya list filter sinkron dgn form input
     const count = activeFilterCount(filter);
     const selectCls = `h-10 border border-gray-200 rounded-xl px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
     const dateCls = `h-10 border border-gray-200 rounded-xl px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
@@ -1040,8 +1049,9 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 }
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
-function DetailModal({ entry, onClose, onDelete, onEdit }: {
-    entry: Entry; onClose: () => void; onDelete: (e: Entry) => void; onEdit: (e: Entry) => void;
+// ⬅️ UPDATE: terima customCategories supaya CategoryBadge di detail bisa resolve label custom.
+function DetailModal({ entry, onClose, onDelete, onEdit, customCategories = [] }: {
+    entry: Entry; onClose: () => void; onDelete: (e: Entry) => void; onEdit: (e: Entry) => void; customCategories?: CustomCashflowCategory[];
 }) {
     const [zoom, setZoom] = useState(false);
 
@@ -1075,8 +1085,8 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                     <div className="text-center py-3 mb-1">
                         <p className={`text-3xl font-black tabular-nums ${nominalColor}`}>{isOut ? "−" : "+"}{fmtRupiah(entry.nominal)}</p>
                     </div>
-                    <DetailRow label="Kategori">
-                        <CategoryBadge direction={entry.direction} category={entry.category} tone="plain" />
+                                  <DetailRow label="Kategori">
+                        <CategoryBadge direction={entry.direction} category={entry.category} tone="plain" customCategories={customCategories} />
                     </DetailRow>
                     {(entry.source_type === "MANUAL" || entry.source_type === "PENGAJUAN_DANA") && (
                         <>
@@ -1158,7 +1168,9 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
 }
 
 // ── Expense Modal ─────────────────────────────────────────────────────────────
-function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+// ⬅️ UPDATE: terima customCategories supaya dropdown CategorySelect bisa nampilkan
+// kategori custom yang user buat lewat "Kelola Kategori".
+function ExpenseModal({ onClose, onSaved, customCategories = [] }: { onClose: () => void; onSaved: () => void; customCategories?: CustomCashflowCategory[] }) {
     type ExpenseItem = { category: string; nominal: string };
     const [items, setItems] = useState<ExpenseItem[]>([{ category: "", nominal: "" }]); // ⬅️ default KOSONG (poin 5)
     const addItem = () => setItems((prev) => [...prev, { category: "", nominal: "" }]);
@@ -1245,7 +1257,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                             {items.map((it, idx) => (
                                 <div key={idx} className="flex items-center gap-2">
                                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 1}</span>
-                                    <CategorySelect direction="OUT" value={it.category} onChange={(cat) => updateItem(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
+                                    <CategorySelect direction="OUT" value={it.category} onChange={(cat) => updateItem(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} customCategories={customCategories} />
                                     <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls.replace("w-full", "")} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus={idx === 0} />
                                     <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none">
                                         <IconX />
@@ -1284,7 +1296,9 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 }
 
 // ── Edit Entry Modal ──────────────────────────────────────────────────────────
-function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: () => void; onSaved: () => void }) {
+// ⬅️ UPDATE: terima customCategories supaya dropdown CategorySelect bisa nampilkan
+// kategori custom & fallback label kategori diarsip tetap kebaca.
+function EditEntryModal({ entry, onClose, onSaved, customCategories = [] }: { entry: Entry; onClose: () => void; onSaved: () => void; customCategories?: CustomCashflowCategory[] }) {
     const isOut = entry.direction === "OUT";
     const isPengajuanDana = entry.source_type === "PENGAJUAN_DANA";
     const [category, setCategory] = useState(entry.category); // ⬅️ tetap tampilkan kategori lama (poin 5)
@@ -1527,14 +1541,14 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">1</span>
-                                <CategorySelect direction={entry.direction} value={category} onChange={setCategory} required className={`${inputCls} bg-white flex-1 min-w-0`} />
+                                <CategorySelect direction={entry.direction} value={category} onChange={setCategory} required className={`${inputCls} bg-white flex-1 min-w-0`} customCategories={customCategories} />
                                 <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls.replace("w-full", "")} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus />
                                 {extraItems.length > 0 && <span className="w-8 shrink-0" />}
                             </div>
                             {extraItems.map((it, idx) => (
                                 <div key={idx} className="flex items-center gap-2">
                                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 2}</span>
-                                    <CategorySelect direction={entry.direction} value={it.category} onChange={(cat) => updateExtra(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
+                                    <CategorySelect direction={entry.direction} value={it.category} onChange={(cat) => updateExtra(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} customCategories={customCategories} />
                                     <input type="number" min={0} value={it.nominal} onChange={(e) => updateExtra(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls.replace("w-full", "")} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} />
                                     <button type="button" onClick={() => removeExtra(idx)} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition">
                                         <IconX />
@@ -1599,7 +1613,9 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
 }
 
 // ── Income Modal ──────────────────────────────────────────────────────────────
-function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+// ⬅️ UPDATE: terima customCategories supaya dropdown CategorySelect bisa nampilkan
+// kategori custom yang user buat lewat "Kelola Kategori".
+function IncomeModal({ onClose, onSaved, customCategories = [] }: { onClose: () => void; onSaved: () => void; customCategories?: CustomCashflowCategory[] }) {
     type IncomeItem = { category: string; nominal: string };
     const [items, setItems] = useState<IncomeItem[]>([{ category: "", nominal: "" }]); // ⬅️ default KOSONG (poin 5)
     const addItem = () => setItems((prev) => [...prev, { category: "", nominal: "" }]);
@@ -1716,7 +1732,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                             {items.map((it, idx) => (
                                 <div key={idx} className="flex items-center gap-2">
                                     <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-400">{idx + 1}</span>
-                                    <CategorySelect direction="IN" value={it.category} onChange={(cat) => updateItem(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} />
+                                    <CategorySelect direction="IN" value={it.category} onChange={(cat) => updateItem(idx, { category: cat })} required className={`${inputCls} bg-white flex-1 min-w-0`} customCategories={customCategories} />
                                     <input type="number" min={0} value={it.nominal} onChange={(e) => updateItem(idx, { nominal: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="0" className={`${inputCls.replace("w-full", "")} bg-white w-28 sm:w-32 shrink-0 font-mono text-right [-moz-appearance:textfield] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`} autoFocus={idx === 0} />
                                     <button type="button" onClick={() => removeItem(idx)} disabled={items.length === 1} className="shrink-0 w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-0 disabled:pointer-events-none">
                                         <IconX />
@@ -1835,11 +1851,14 @@ function useIsMobile(): boolean {
 // ── Table Row (desktop) — di-memo. Klik audit cuma render ULANG baris yang diklik:
 //    `busy` berubah hanya utk 1 baris, baris lain props-nya sama → memo skip.
 //    `entry` ganti referensi hanya kalau isinya berubah (optimistic update pakai .map). ──
+// ⬅️ UPDATE: terima customCategories supaya CategoryBadge di dalam bisa resolve label
+// kategori custom. Props ini stabil (sama untuk semua baris) → memo tetap efisien.
 const CashflowTableRow = memo(function CashflowTableRow({
-    entry: e, zebra, busy, canAudit, onRowClick, onAudit, onPhoto,
+    entry: e, zebra, busy, canAudit, onRowClick, onAudit, onPhoto, customCategories,
 }: {
     entry: Entry; zebra: string; busy: boolean; canAudit: boolean;
     onRowClick: (e: Entry) => void; onAudit: (e: Entry) => void; onPhoto: (e: Entry) => void;
+    customCategories: CustomCashflowCategory[];
 }) {
     const isClickable = e.source_type !== "MODAL_AWAL";
     return (
@@ -1888,7 +1907,7 @@ const CashflowTableRow = memo(function CashflowTableRow({
                 {e.source_type === "MODAL_AWAL" ? (
                     <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-100"><Wallet size={11} /> Modal Awal</span>
                 ) : (
-                    <CategoryBadge direction={e.direction} category={e.category} />
+                    <CategoryBadge direction={e.direction} category={e.category} customCategories={customCategories} />
                 )}
             </td>
             <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.is_voided ? "text-gray-400 line-through decoration-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
@@ -1931,11 +1950,13 @@ const CashflowTableRow = memo(function CashflowTableRow({
 });
 
 // ── Mobile Card — di-memo dengan alasan yang sama seperti CashflowTableRow. ──
+// ⬅️ UPDATE: terima customCategories, sama seperti CashflowTableRow.
 const CashflowMobileCard = memo(function CashflowMobileCard({
-    entry: e, busy, canAudit, onRowClick, onAudit, onPhoto,
+    entry: e, busy, canAudit, onRowClick, onAudit, onPhoto, customCategories,
 }: {
     entry: Entry; busy: boolean; canAudit: boolean;
     onRowClick: (e: Entry) => void; onAudit: (e: Entry) => void; onPhoto: (e: Entry) => void;
+    customCategories: CustomCashflowCategory[];
 }) {
     const isClickable = e.source_type !== "MODAL_AWAL";
     const displayName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama;
@@ -1962,7 +1983,7 @@ const CashflowMobileCard = memo(function CashflowMobileCard({
                         )}
                     </div>
                     <span className="inline-flex mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                        {e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel(e.direction, e.category)}
+                        {e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel(e.direction, e.category, customCategories)}
                     </span>
                 </div>
                 <div className="text-right shrink-0">
@@ -2000,8 +2021,10 @@ export default function CashflowPage() {
     const [customTo, setCustomTo] = useState("");
     const [showModal, setShowModal] = useState(false);
     const [showModalAwal, setShowModalAwal] = useState(false);
-        const [showIncomeModal, setShowIncomeModal] = useState(false);
+    const [showIncomeModal, setShowIncomeModal] = useState(false);
     const [showTesSinkron, setShowTesSinkron] = useState(false); // ⬅️ BARU — modal Tes Sinkron
+    const [showCategoryManager, setShowCategoryManager] = useState(false); // ⬅️ BARU — modal Kelola Kategori Custom
+    const [customCategories, setCustomCategories] = useState<CustomCashflowCategory[]>([]); // ⬅️ BARU — daftar kategori custom dari API
     const [detailEntry, setDetailEntry] = useState<Entry | null>(null);
     const [editEntry, setEditEntry] = useState<Entry | null>(null);
     const [showFilter, setShowFilter] = useState(false);
@@ -2021,8 +2044,9 @@ export default function CashflowPage() {
     const [allowed, setAllowed] = useState<boolean | null>(null);
     const [canAuditOut, setCanAuditOut] = useState(false);
     const [canManageAuditAccess, setCanManageAuditAccess] = useState(false);
+    const [canManageCategories, setCanManageCategories] = useState(false); // ⬅️ BARU — role check untuk tombol "Kelola Kategori"
     // ── Multi-cabang: "ALL" = Semua Cabang (konsolidasi/Utama), "JOGJA" = eksklusif Jogja ──
-     const [branchView, setBranchView] = useState<"ALL" | "JOGJA">("ALL");
+    const [branchView, setBranchView] = useState<"ALL" | "JOGJA">("ALL");
     const [canSwitchBranch, setCanSwitchBranch] = useState(false); // hanya Admin & Accounting
     const [isJogjaLocked, setIsJogjaLocked] = useState(false); // ⬅️ BARU: role Solit Jogja — dikunci Jogja
     const [showAuditAccessModal, setShowAuditAccessModal] = useState(false);
@@ -2042,6 +2066,8 @@ export default function CashflowPage() {
             setAllowed(isAllowed);
             setCanAuditOut(roles.some((x) => (CASHFLOW_AUDIT_OUT_ROLES as string[]).includes(x)));
             setCanManageAuditAccess(roles.some((x) => (CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES as string[]).includes(x)));
+            // ⬅️ BARU — role check untuk tombol "Kelola Kategori" (ADMIN & ACCOUNTING only)
+            setCanManageCategories(roles.some((x) => (CASHFLOW_CATEGORY_MANAGE_ROLES as string[]).includes(x)));
             // Switcher cabang sementara hanya untuk Admin & Accounting
             setCanSwitchBranch(roles.some((x) => ["ADMIN", "ACCOUNTING"].includes(x)));
 
@@ -2083,6 +2109,12 @@ export default function CashflowPage() {
         setKeluar(next.keluar);
         setSummary(next.summary);
         setLastUpdated(new Date(next.at));
+        // ⬅️ BARU — custom_categories dikirim bareng di response GET /api/cashflow.
+        // Diset di sini supaya satu fetch cover semua: entry + custom categories,
+        // tanpa perlu endpoint tambahan setiap halaman buka.
+        if (Array.isArray(json.custom_categories)) {
+            setCustomCategories(json.custom_categories as CustomCashflowCategory[]);
+        }
     }, []);
 
     // ⬅️ FIX: dulu fetchData(true) (polling/save/audit) SELALU memicu sync penuh di
@@ -2225,7 +2257,7 @@ export default function CashflowPage() {
         try { await fetchData(true, "force"); } finally { setRefreshing(false); }
     };
 
-        const toggleAudit = useCallback(async (entry: Entry) => {
+    const toggleAudit = useCallback(async (entry: Entry) => {
         if (entry.direction === "OUT" && !canAuditOut) return;
         setAuditingId(entry.id);
         try {
@@ -2246,7 +2278,7 @@ export default function CashflowPage() {
                 scheduleRefresh();
             }
             else alert(json.message || "Gagal mengubah status audit");
-               } finally { setAuditingId(null); }
+        } finally { setAuditingId(null); }
     }, [canAuditOut, scheduleRefresh]);
 
     const deleteEntry = async (entry: Entry) => {
@@ -2257,7 +2289,7 @@ export default function CashflowPage() {
         else alert(json.message || "Gagal menghapus");
     };
 
-        const handleRowClick = useCallback((e: Entry) => {
+    const handleRowClick = useCallback((e: Entry) => {
         if (e.source_type === "MODAL_AWAL") return;
         // Refund transaksi batal → langsung buka transaksi sumbernya
         if (e.source_type === "TRANSACTION_REFUND") {
@@ -2275,7 +2307,7 @@ export default function CashflowPage() {
             // ⬅️ FIX: kirim id service order lewat query param, supaya halaman History
             // langsung buka detail modal 1 baris itu saja — bukan daftar penuh.
             if (e.source_id) router.push(`/dashboard/service/history?id=${encodeURIComponent(e.source_id.split("__")[0])}`);
-                       else router.push("/dashboard/service/history");
+            else router.push("/dashboard/service/history");
             return;
         }
     }, [router]);
@@ -2434,17 +2466,27 @@ export default function CashflowPage() {
             ? `Saldo kumulatif (semua transaksi sejak awal) sampai ${fmtTanggal(customTo)}`
             : "Saldo kumulatif (semua transaksi sejak awal) sampai tanggal ini";
 
-       const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 
     return (
         <DashboardLayout>
-            {showModal && <ExpenseModal onClose={() => setShowModal(false)} onSaved={() => fetchData(true)} />}
+            {showModal && <ExpenseModal onClose={() => setShowModal(false)} onSaved={() => fetchData(true)} customCategories={customCategories} />}
             {showModalAwal && <ModalAwalModal onClose={() => setShowModalAwal(false)} onSaved={() => fetchData(true)} />}
-            {showIncomeModal && <IncomeModal onClose={() => setShowIncomeModal(false)} onSaved={() => fetchData(true)} />}
+            {showIncomeModal && <IncomeModal onClose={() => setShowIncomeModal(false)} onSaved={() => fetchData(true)} customCategories={customCategories} />}
             {showTesSinkron && <TesSinkronModal onClose={() => setShowTesSinkron(false)} />}
-            {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} onEdit={(e) => setEditEntry(e)} />}
-            {editEntry && <EditEntryModal entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => fetchData(true)} />}
+                     {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} onEdit={(e) => setEditEntry(e)} customCategories={customCategories} />}
+            {editEntry && <EditEntryModal entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => fetchData(true)} customCategories={customCategories} />}
             {showAuditAccessModal && <AuditAccessModal onClose={() => setShowAuditAccessModal(false)} />}
+            {/* ⬅️ BARU — Modal Kelola Kategori Custom. onChanged memicu refetch supaya
+                customCategories di state ikut ter-update & semua komponen anak (dropdown,
+                badge, filter) langsung dapat data terbaru tanpa reload halaman. */}
+            {showCategoryManager && canManageCategories && (
+                <CategoryManagerModal
+                    open={showCategoryManager}
+                    onClose={() => setShowCategoryManager(false)}
+                    onChanged={() => fetchData(true)}
+                />
+            )}
 
             <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
 
@@ -2474,7 +2516,7 @@ export default function CashflowPage() {
                             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-200 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${BRAND_RING}`}
                             title="Export semua data cashflow ke Excel (2 sheet)">
                             <IconDownload />
-                                                       <span className="hidden sm:inline text-sm">{exporting ? "Mengekspor..." : "Export Excel"}</span>
+                            <span className="hidden sm:inline text-sm">{exporting ? "Mengekspor..." : "Export Excel"}</span>
                         </button>
                         <button onClick={() => setShowTesSinkron(true)} disabled={loading}
                             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-violet-200 text-sm font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${BRAND_RING}`}
@@ -2489,7 +2531,7 @@ export default function CashflowPage() {
                     </div>
                 </div>
 
-                  {/* Switcher Cabang — dipindah ke baris sendiri di bawah header biar jelas
+                {/* Switcher Cabang — dipindah ke baris sendiri di bawah header biar jelas
                     "lagi lihat data cabang mana" & toolbar bawah nggak sesak. Fungsi sama persis.
                     Role Solit Jogja TIDAK dapat switcher (canSwitchBranch false utk role itu),
                     diganti badge statis "Cabang Jogja (terkunci)". */}
@@ -2649,6 +2691,13 @@ export default function CashflowPage() {
                                 <Shield size={14} /> Akses Audit
                             </button>
                         )}
+                        {/* ⬅️ BARU — Tombol "Kelola Kategori" — hanya untuk ADMIN & ACCOUNTING.
+                            Buka modal CategoryManagerModal untuk CRUD kategori custom cashflow. */}
+                        {canManageCategories && (
+                            <button onClick={() => setShowCategoryManager(true)} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold border border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 transition-all shrink-0" title="Kelola kategori custom cashflow (tambah/edit/arsip)">
+                                <Tags size={14} /> Kelola Kategori
+                            </button>
+                        )}
                     </div>
                     {tab === "IN" && (
                         <button onClick={() => setShowIncomeModal(true)} className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm shadow-emerald-500/30 shrink-0 w-full sm:w-auto ${BRAND_RING}`}>
@@ -2662,7 +2711,7 @@ export default function CashflowPage() {
                     )}
                 </div>
 
-                {showFilter && <FilterPanel filter={currentFilter} onChange={handleFilterChange} onReset={handleFilterReset} direction={tab} nameOptions={nameOptions} />}
+                {showFilter && <FilterPanel filter={currentFilter} onChange={handleFilterChange} onReset={handleFilterReset} direction={tab} nameOptions={nameOptions} customCategories={customCategories} />}
 
                 {!loading && voidedCount > 0 && (
                     <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 shadow-sm text-[12px] text-gray-600">
@@ -2748,7 +2797,7 @@ export default function CashflowPage() {
                                     )}
                                 </div>
                             ) : (
-                                                               paginatedRows.map((e) => (
+                                paginatedRows.map((e) => (
                                     <CashflowMobileCard
                                         key={e.id}
                                         entry={e}
@@ -2757,6 +2806,7 @@ export default function CashflowPage() {
                                         onRowClick={handleRowClick}
                                         onAudit={toggleAudit}
                                         onPhoto={setDetailEntry}
+                                        customCategories={customCategories}
                                     />
                                 ))
                             )}
@@ -2810,7 +2860,7 @@ export default function CashflowPage() {
                                             </td>
                                         </tr>
                                     ) : (
-                                                                                paginatedRows.map((e, idx) => (
+                                        paginatedRows.map((e, idx) => (
                                             <CashflowTableRow
                                                 key={e.id}
                                                 entry={e}
@@ -2820,6 +2870,7 @@ export default function CashflowPage() {
                                                 onRowClick={handleRowClick}
                                                 onAudit={toggleAudit}
                                                 onPhoto={setDetailEntry}
+                                                customCategories={customCategories}
                                             />
                                         ))
                                     )}

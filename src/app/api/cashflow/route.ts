@@ -8,8 +8,9 @@ import {
     isValidCategory,
     isModalAwalActive,
     isManualIncomeCategory,
-    isKasbonCicilanCategory, // ⬅️ BARU
+    isKasbonCicilanCategory,
     formatTxPaymentMethod,
+    type CustomCashflowCategory, // ⬅️ BARU
 } from "@/lib/cashflow";
 import { fetchAllRows } from "@/lib/supabaseFetch";
 
@@ -87,6 +88,22 @@ function getAdmin(): SupabaseClient {
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
         { auth: { persistSession: false } }
     );
+}
+
+// ⬅️ BARU — Load semua kategori custom (termasuk yang is_active=false supaya
+// entry cashflow lama yang pakai kategori yang sudah diarsipkan tetap bisa
+// tampil label-nya). Dipakai GET (dikirim ke frontend) & POST (validasi).
+async function loadCustomCategories(
+    supabase: SupabaseClient
+): Promise<CustomCashflowCategory[]> {
+    const { data, error } = await supabase
+        .from("cashflow_custom_categories")
+        .select("id, key, label, account_code, direction, is_active");
+    if (error) {
+        console.error("[cashflow] load custom categories:", error.message);
+        return [];
+    }
+    return (data ?? []) as CustomCashflowCategory[];
 }
 
 const jakartaDate = (iso: string) =>
@@ -997,6 +1014,11 @@ export const GET = withAuth(async (req, _ctx, user: any) => {
 
     const modalAwalEntry = all.find((e: any) => e.source_type === "MODAL_AWAL") ?? null;
 
+    // ⬅️ BARU — load kategori custom (termasuk yang diarsipkan) & kirim bareng
+    // supaya frontend bisa resolve label untuk entry lama yang pakai kategori
+    // custom yang mungkin sudah diarsip, tanpa fetch 2x.
+    const customCategories = await loadCustomCategories(supabase);
+
     return NextResponse.json({
         success: true,
         data: { masuk, keluar },
@@ -1008,6 +1030,7 @@ export const GET = withAuth(async (req, _ctx, user: any) => {
             stale: all.filter((e: any) => e.is_stale).length,
             modal_awal_entry: modalAwalEntry,
         },
+        custom_categories: customCategories, // ⬅️ BARU
     });
 }, CASHFLOW_ROLES);
 
@@ -1097,11 +1120,17 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
         return NextResponse.json({ success: true, data: inserted }, { status: 201 });
     }
 
+      // ⬅️ BARU — Load custom categories SEKALI untuk dipakai di validasi di bawah
+    // (baik untuk Uang Masuk / Uang Keluar). Pengecekan ini sebelumnya hanya
+    // mengenal kategori hardcoded; sekarang kategori custom yang user buat
+    // lewat halaman Kelola Kategori juga diterima.
+    const customCategoriesForValidation = await loadCustomCategories(supabase);
+
     // ── Uang Masuk Manual ──────────────────────────────────────────────────
-    // Boleh: AKSESORIS, UTANG, SEWA, PENJUALAN_ASET, BIAYA_LAIN
+    // Boleh: AKSESORIS, UTANG, SEWA, PENJUALAN_ASET, BIAYA_LAIN, + custom IN/BOTH
     // Tidak boleh: PENJUALAN_LAPTOP, SERVICE (auto-sync dari sistem)
     if (direction === "IN") {
-        if (!isManualIncomeCategory(category))
+        if (!isManualIncomeCategory(category, customCategoriesForValidation))
             return NextResponse.json(
                 { success: false, message: "Kategori ini tidak bisa diinput manual (auto-sync dari sistem)" },
                 { status: 400 }
@@ -1147,7 +1176,8 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     if (direction !== "OUT")
         return NextResponse.json({ success: false, message: "Direction tidak valid" }, { status: 400 });
 
-    if (!isValidCategory(direction, category))
+       // ⬅️ UPDATE — pass customCategoriesForValidation supaya kategori custom OUT/BOTH diterima
+    if (!isValidCategory(direction, category, customCategoriesForValidation))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
 
     const pm = body.payment_method as string | undefined;

@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, isJogjaBranchLockedRole } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { isValidCategory, isKasbonCicilanCategory } from "@/lib/cashflow";
+import {
+    isValidCategory,
+    isKasbonCicilanCategory,
+    type CustomCashflowCategory, // ⬅️ BARU
+} from "@/lib/cashflow";
 
 function getAdmin(): SupabaseClient {
     return createClient(
@@ -11,6 +15,21 @@ function getAdmin(): SupabaseClient {
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
         { auth: { persistSession: false } }
     );
+}
+
+// ⬅️ BARU — Load custom categories buat validasi PUT (saat user ganti kategori
+// entry ke kategori custom). Sama seperti di /api/cashflow/route.ts.
+async function loadCustomCategoriesForValidation(
+    supabase: SupabaseClient
+): Promise<CustomCashflowCategory[]> {
+    const { data, error } = await supabase
+        .from("cashflow_custom_categories")
+        .select("id, key, label, account_code, direction, is_active");
+    if (error) {
+        console.error("[cashflow PUT] load custom categories:", error.message);
+        return [];
+    }
+    return (data ?? []) as CustomCashflowCategory[];
 }
 
 async function isEntryVoided(
@@ -206,7 +225,10 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
     if (entry.is_audited)
         return NextResponse.json({ success: false, message: "Entry yang sudah diaudit tidak bisa diedit. Batalkan status audit terlebih dahulu." }, { status: 400 });
 
-    if (!isValidCategory(entry.direction, category))
+      // ⬅️ UPDATE — load custom categories & pass ke validasi supaya ganti ke
+    // kategori custom (IN/OUT/BOTH) yang masih aktif juga diterima.
+    const customCategoriesForValidation = await loadCustomCategoriesForValidation(supabase);
+    if (!isValidCategory(entry.direction, category, customCategoriesForValidation))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
 
     // ⬅️ BARU: Kasbon/Cicilan wajib menunjuk karyawan

@@ -430,6 +430,12 @@ export const CASHFLOW_AUDIT_OUT_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACC
 
 export const CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 
+// ⬅️ BARU — Role yang boleh buka halaman "Kelola Kategori Cashflow" & CRUD
+// kategori custom. Keputusan: Admin + Accounting (accounting paling paham
+// mapping ke akun akuntansi). Programmer SENGAJA tidak dimasukkan — kalau
+// perlu untuk maintenance, tinggal tambah "PROGRAMMER" di array ini.
+export const CASHFLOW_CATEGORY_MANAGE_ROLES: UserRole[] = ["ADMIN", "ACCOUNTING"];
+
 export const CC_REPORT_ROLES: UserRole[] = [
   ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING", "MARKETING", "KONTEN", "KEPALA_CC",
 ];
@@ -799,6 +805,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/transaction/customer-birthdays": [...ALL_ROLES],
   "/api/cashflow": [...CASHFLOW_ROLES],
   "/api/cashflow/audit-access": [...CASHFLOW_ROLES],
+  // ⬅️ BARU — Endpoint CRUD kategori custom. GET boleh untuk semua CASHFLOW_ROLES
+  // (dropdown butuh baca), sedangkan POST/PUT/DELETE/PATCH digate per-method di
+  // handler pakai CASHFLOW_CATEGORY_MANAGE_ROLES (lebih sempit: ADMIN + ACCOUNTING).
+  "/api/cashflow-categories": [...CASHFLOW_ROLES],
 
   "/dashboard/missions": [...ALL_ROLES],
   "/dashboard/missions/progress": [...ALL_ROLES],
