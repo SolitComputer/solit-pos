@@ -24,7 +24,46 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    return NextResponse.json({ success: true, data: data || [] });
+    // ── Enrich: nama Team QC yang menandai MINUS (untuk unit FROM_QC) ──
+    //  SELECT * sudah include qc_marked_minus_at dan qc_marked_minus_by (UUID),
+    //  tapi frontend butuh nama user untuk ditampilkan di kolom Analisa.
+    //
+    //  Kenapa query terpisah, bukan JOIN FK (users!qc_marked_minus_by)?
+    //    - JOIN FK Supabase bergantung pada nama constraint yg bisa beda per
+    //      environment (self-hosted vs cloud) → pernah bikin bug diam.
+    //    - Query IN(ids) lebih predictable & tetap 1 roundtrip.
+    //    - Dedup dulu via Set → hemat bandwidth untuk banyak unit dari QC
+    //      penandai sama.
+    const units = data || [];
+    const qcMarkerIds = Array.from(
+      new Set(
+        units
+          .map((u: any) => u.qc_marked_minus_by)
+          .filter((id: any): id is string => typeof id === "string" && id.length > 0)
+      )
+    );
+
+    const userNameMap = new Map<string, string>();
+    if (qcMarkerIds.length > 0) {
+      const { data: userRows } = await supabase
+        .from("users")
+        .select("id, name")
+        .in("id", qcMarkerIds);
+      (userRows || []).forEach((u: any) => {
+        if (u.id && u.name) userNameMap.set(u.id, u.name);
+      });
+    }
+
+    const enriched = units.map((u: any) => ({
+      ...u,
+      // Flat field biar frontend tetap sederhana: cuma baca
+      // u.qc_marked_minus_by_name tanpa navigasi nested object.
+      qc_marked_minus_by_name: u.qc_marked_minus_by
+        ? (userNameMap.get(u.qc_marked_minus_by) ?? null)
+        : null,
+    }));
+
+    return NextResponse.json({ success: true, data: enriched });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ success: false }, { status: 500 });
