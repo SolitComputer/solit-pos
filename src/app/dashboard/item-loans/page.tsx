@@ -110,9 +110,19 @@ export default function ItemLoansPage() {
     const fetchLoans = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch("/api/item-loans");
-            const json = await res.json();
-            if (json.success) setLoans(json.data as LoanRow[]);
+            // PostgREST default cuma balikin maks 1000 baris/response.
+            // Fetch tanpa filter udah > 1000 baris → sebagian pinjaman (termasuk
+            // APPROVED lama) kepotong & nggak pernah sampai ke UI.
+            // Fix: ambil per-status (tiap status < 1000), lalu gabung jadi satu array.
+            const STATUSES = ["PENDING", "APPROVED", "DIPESAN", "RETURN_PENDING", "REJECTED", "RETURNED", "SOLD"] as const;
+            const results = await Promise.all(
+                STATUSES.map(async (s) => {
+                    const res = await fetch(`/api/item-loans?status=${s}`);
+                    const json = await res.json();
+                    return json.success ? (json.data as LoanRow[]) : [];
+                })
+            );
+            setLoans(results.flat());
         } catch { /* ignore */ } finally { setLoading(false); }
     }, []);
     useEffect(() => { fetchLoans(); }, [fetchLoans]);

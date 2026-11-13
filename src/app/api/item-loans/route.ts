@@ -26,7 +26,31 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
 
     const { data, error } = await q;
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
-    return NextResponse.json({ success: true, data: data ?? [] });
+
+    // ✅ FIX: backfill serial_number dari unit-nya kalau kolom loan kosong.
+    //  Loan lama (mis. hasil revert transaksi / jalur DIPESAN) kadang tak
+    //  menyimpan serial_number → unit tampil "Di Pinjam" di Kelola Unit tapi
+    //  TAK KETEMU saat dicari-SN di halaman Peminjaman (search cuma cek kolom
+    //  serial_number). Diisi di sini supaya dua halaman konsisten.
+    const loans = data ?? [];
+    const missing = loans.filter((l: any) => !l.serial_number && l.unit_id);
+    if (missing.length > 0) {
+      const lapIds = [...new Set(missing.filter((l: any) => l.item_type === "LAPTOP").map((l: any) => l.unit_id))];
+      const accIds = [...new Set(missing.filter((l: any) => l.item_type === "AKSESORIS").map((l: any) => l.unit_id))];
+      const snMap = new Map<string, string>();
+      if (lapIds.length > 0) {
+        const { data: lu } = await supabaseAdmin.from("laptop_units").select("id, serial_number").in("id", lapIds);
+        for (const u of lu ?? []) if (u.serial_number) snMap.set(u.id, u.serial_number);
+      }
+      if (accIds.length > 0) {
+        const { data: au } = await supabaseAdmin.from("accessory_units").select("id, serial_number").in("id", accIds);
+        for (const u of au ?? []) if (u.serial_number) snMap.set(u.id, u.serial_number);
+      }
+      for (const l of loans) {
+        if (!l.serial_number && l.unit_id && snMap.has(l.unit_id)) l.serial_number = snMap.get(l.unit_id);
+      }
+    }
+    return NextResponse.json({ success: true, data: loans });
   } catch {
     return NextResponse.json({ success: false }, { status: 500 });
   }
