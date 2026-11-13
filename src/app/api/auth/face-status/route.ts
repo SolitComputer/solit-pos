@@ -256,11 +256,14 @@ export async function GET() {
 
    let overtimeOptions: { beforeInMinutes: number; afterOutMinutes: number; holidayMinutes: number } | null = null;
     if (alreadyCheckedOut && inTimestampForOvertime && todayOutRow) {
-      // ✅ FIX: beforeIn (lembur sebelum jam masuk) sengaja TIDAK dihitung
-      // kalau absen masuknya dari input manual admin — jam masuk manual cuma
-      // perkiraan/koreksi, bukan scan real-time, jadi tidak dipakai sebagai
-      // dasar klaim lembur awal otomatis.
-      const beforeInMinutes = (isTodayDayOff || isManualCheckIn) ? 0 : computeBeforeInOvertimeMinutes(inTimestampForOvertime, schedule);
+      // ✅ FIX (poin baru): sebelumnya beforeIn selalu di-nol-kan untuk absen
+      // manual dengan asumsi jam masuk manual cuma perkiraan. Setelah review
+      // kebutuhan operasional, admin yang input manual justru biasanya akurat
+      // (karena face error / user baru enroll / sensor rusak), jadi karyawan
+      // tetap berhak klaim lembur awal. Sekarang beforeIn dihitung normal
+      // dari `inTimestampForOvertime` (yang sudah fallback ke manual check-in
+      // di line 199) — terserah admin untuk input jam masuk yang benar.
+      const beforeInMinutes = isTodayDayOff ? 0 : computeBeforeInOvertimeMinutes(inTimestampForOvertime, schedule);
       const afterOutMinutes = isTodayDayOff ? 0 : computeAfterOutOvertimeMinutes(todayOutRow.created_at, schedule);
       const holidayMinutes = isTodayDayOff ? computeHolidayOvertimeMinutes(inTimestampForOvertime, todayOutRow.created_at) : 0;
 

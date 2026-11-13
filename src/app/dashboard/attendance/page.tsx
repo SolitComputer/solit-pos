@@ -4999,6 +4999,54 @@ export default function AttendanceDashboardPage() {
         return results.sort((a, b) => b.date.localeCompare(a.date));
     }, [currentUser, selectedMonth, calYear, calMonth, attendances, manualMap, checkoutTimes, isDayOffForUser, effectiveShiftFor, myOvertimeDirections, dismissedPastOvertimeDates, todayKey]);
 
+    // ✅ NEW — opsi lembur HARI INI dihitung client-side sebagai fallback
+    // kalau endpoint /api/auth/face-status telat/timeout atau belum sempat
+    // di-refresh setelah admin input manual. Mirror persis dari
+    // myPastOvertimeOpportunities di atas, khusus tanggal hari ini — supaya
+    // card "Kamu Berpotensi Dapat Lembur" tetap responsif walau polling
+    // face-status belum jalan.
+    const myTodayOvertimeOpportunity = useMemo(() => {
+        if (!currentUser?.id || !selectedMonth) return null;
+        const dk = todayKey;
+        if (dismissedPastOvertimeDates.has(dk)) return null;
+
+        const myAtt = attendances.find(a => a.user_id === currentUser.id && toWIBDateKey(a.check_in_time || a.created_at) === dk);
+        const myManual = manualMap[`${currentUser.id}_${dk}`];
+        const checkInISO = myAtt
+            ? (myAtt.check_in_time || myAtt.created_at)
+            : (myManual && (myManual.status === "PRESENT" || myManual.status === "LATE") ? myManual.check_in_time : null);
+        if (!checkInISO) return null;
+
+        const checkoutISO = checkoutTimes[`${currentUser.id}_${dk}`] ?? null;
+        const isOff = isDayOffForUser(currentUser.name, dk);
+        const eff = effectiveShiftFor(currentUser.id, dk);
+        const schedule = {
+            lateFrom: { h: Math.floor(eff.late / 60), m: eff.late % 60 },
+            checkout: { h: Math.floor(eff.checkout / 60), m: eff.checkout % 60 },
+        };
+
+        let beforeInMinutes = 0, afterOutMinutes = 0, holidayMinutes = 0;
+        if (isOff) {
+            if (checkoutISO) holidayMinutes = computeHolidayOvertimeMinutes(checkInISO, checkoutISO);
+        } else {
+            beforeInMinutes = computeBeforeInOvertimeMinutes(checkInISO, schedule);
+            if (checkoutISO) afterOutMinutes = computeAfterOutOvertimeMinutes(checkoutISO, schedule);
+        }
+
+        // Kurangi opsi yang sudah diajukan (biar konsisten dengan server)
+        const already = myOvertimeDirections[dk] ?? new Set<string>();
+        const finalBefore = already.has("BEFORE_IN") || already.has("BOTH") ? 0 : beforeInMinutes;
+        const finalAfter = already.has("AFTER_OUT") || already.has("BOTH") ? 0 : afterOutMinutes;
+        const finalHoliday = already.has("HOLIDAY") ? 0 : holidayMinutes;
+
+        if (finalBefore <= 0 && finalAfter <= 0 && finalHoliday <= 0) return null;
+
+        return {
+            options: { beforeInMinutes: finalBefore, afterOutMinutes: finalAfter, holidayMinutes: finalHoliday },
+            isDayOff: isOff,
+        };
+    }, [currentUser, selectedMonth, attendances, manualMap, checkoutTimes, isDayOffForUser, effectiveShiftFor, myOvertimeDirections, dismissedPastOvertimeDates, todayKey]);
+
     const userSummary = useMemo(() => {
         type UserStat = {
             name: string; present: number; late: number; score: number;
@@ -6177,16 +6225,26 @@ export default function AttendanceDashboardPage() {
 
                 <OvertimeSOPBanner compact />
                 <TodayAttendanceCard status={todayStatus} loading={statusLoading} onRefresh={fetchTodayStatus} onRequestEarlyCheckout={() => setShowEarlyCheckoutModal(true)} />
-                {todayStatus?.overtimeOptions && !dismissedPastOvertimeDates.has(todayKey) && (
-                    <OvertimeChoiceCard
-                        date={todayKey}
-                        options={todayStatus.overtimeOptions}
-                        isDayOff={todayStatus.isDayOff}
-                        alreadyRequested={myOvertimeDirections[todayKey]}
-                        onDismiss={() => markOvertimeDateResolved(todayKey)}
-                        onSubmitted={() => markOvertimeDateResolved(todayKey)}
-                    />
-                )}
+                {(() => {
+                    // ✅ FIX: prioritas tetap pakai overtimeOptions dari server
+                    // (/api/auth/face-status), tapi fallback ke hasil kalkulasi
+                    // client-side kalau server belum sempat re-compute setelah
+                    // admin input manual. Prevents race condition di mana user
+                    // buka dashboard sebelum polling face-status jalan.
+                    const options = todayStatus?.overtimeOptions ?? myTodayOvertimeOpportunity?.options ?? null;
+                    const isOff = todayStatus?.isDayOff ?? myTodayOvertimeOpportunity?.isDayOff ?? false;
+                    if (!options || dismissedPastOvertimeDates.has(todayKey)) return null;
+                    return (
+                        <OvertimeChoiceCard
+                            date={todayKey}
+                            options={options}
+                            isDayOff={isOff}
+                            alreadyRequested={myOvertimeDirections[todayKey]}
+                            onDismiss={() => markOvertimeDateResolved(todayKey)}
+                            onSubmitted={() => markOvertimeDateResolved(todayKey)}
+                        />
+                    );
+                })()}
                 <PastOvertimeOpportunitiesCard
                     items={myPastOvertimeOpportunities}
                     onResolved={(dk) => markOvertimeDateResolved(dk)}
