@@ -404,7 +404,7 @@ export default function OutflowsContent() {
                                                 <span className="text-gray-700">{row.item_name}{row.serial_number ? ` - ${row.serial_number}` : ""}</span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate" title={row.purpose}>
+                                        <td className="px-4 py-3 text-gray-600 max-w-[280px] whitespace-normal break-words align-top" title={row.purpose}>
                                             {row.purpose}
                                         </td>
                                         <td className="px-4 py-3 text-right tabular-nums text-gray-800 font-medium">
