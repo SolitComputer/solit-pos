@@ -363,9 +363,14 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         }
 
         // ── Validasi unit laptop tujuan (harus aktif) — cek dulu sebelum klaim ──
+        // ✅ FIX: tambah sparepart_cost di select karena nanti kita update field INI,
+        // bukan purchase_price. Schema laptop_units punya 2 field terpisah:
+        //   - purchase_price = HARGA MODAL dasar (beli laptop awal) → TIDAK berubah
+        //   - sparepart_cost = BIAYA SPAREPART (upgrade/tambahan)   → NAMBAH DI SINI
+        // TOTAL MODAL di UI = purchase_price + sparepart_cost (computed).
         const { data: lapUnit } = await supabaseAdmin
             .from("laptop_units")
-            .select("id, status, purchase_price")
+            .select("id, status, purchase_price, sparepart_cost")
             .eq("id", laptop_unit_id)
             .single();
         if (!lapUnit || lapUnit.status === "SOLD" || lapUnit.status === "KELUAR") {
@@ -440,12 +445,71 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
             return NextResponse.json({ success: false, message: error.message }, { status: 400 });
         }
 
-        // ── Modal aksesoris PINDAH ke modal laptop tujuan (purchase_price += modal) ──
-        const newPurchase = Math.round(Number(lapUnit.purchase_price ?? 0)) + modal;
-        await supabaseAdmin
+        // ── BIAYA SPAREPART laptop tujuan BERTAMBAH (sparepart_cost += modal) ──
+        // ✅ FIX ULANG (13 Nov 2026): dulu code ini update purchase_price — SALAH TARGET!
+        // Schema laptop_units punya 2 field terpisah:
+        //   - purchase_price = HARGA MODAL dasar (beli laptop awal) → TIDAK berubah
+        //   - sparepart_cost = BIAYA SPAREPART (upgrade/tambahan)   → NAMBAH DI SINI
+        //   - TOTAL MODAL (di UI) = purchase_price + sparepart_cost (computed)
+        // Bug lama: SSD 424rb di-add ke purchase_price (HARGA MODAL berubah tanpa
+        // sebab, ATAU silent fail). Akibatnya sparepart_cost tetap 0 & modal
+        // "hilang" dari laporan. Contoh: SN 0008093 ambil SSD SATA-024 tanggal
+        // 05 Nov 2026 — modal tidak nambah 424rb.
+        const oldSparepartCost = Math.round(Number(lapUnit.sparepart_cost ?? 0));
+        const newSparepartCost = oldSparepartCost + modal;
+
+        console.log("[item-outflows][POST] Update sparepart_cost laptop:", {
+            laptop_unit_id,
+            laptop_sn,
+            purchase_price_tetap: lapUnit.purchase_price,
+            old_sparepart_cost: oldSparepartCost,
+            sparepart_modal: modal,
+            expected_new_sparepart_cost: newSparepartCost,
+            outflow_id: data.id,
+        });
+
+        const { data: updatedUnit, error: updateErr } = await supabaseAdmin
             .from("laptop_units")
-            .update({ purchase_price: newPurchase })
-            .eq("id", laptop_unit_id);
+            .update({ sparepart_cost: newSparepartCost })
+            .eq("id", laptop_unit_id)
+            .select("id, sparepart_cost, purchase_price")
+            .single();
+
+        if (updateErr || !updatedUnit) {
+            console.error("[item-outflows][POST] ❌ GAGAL update sparepart_cost laptop:", {
+                laptop_unit_id,
+                expected_new_sparepart_cost: newSparepartCost,
+                error: updateErr?.message,
+            });
+            // Rollback: hapus outflow + balikin unit aksesoris
+            await supabaseAdmin.from("item_outflows").delete().eq("id", data.id);
+            await supabaseAdmin
+                .from("accessory_units")
+                .update({ status: "TERSEDIA" })
+                .eq("id", accessory_unit_id);
+            await recalcAccessoryParentStock(supabaseAdmin, accessory_id);
+            return NextResponse.json(
+                { success: false, message: `Gagal update biaya sparepart laptop: ${updateErr?.message ?? "unknown"}` },
+                { status: 500 }
+            );
+        }
+
+        const actualNewSparepartCost = Math.round(Number(updatedUnit.sparepart_cost ?? 0));
+        if (actualNewSparepartCost !== newSparepartCost) {
+            console.warn("[item-outflows][POST] ⚠️ sparepart_cost tidak sesuai ekspektasi:", {
+                laptop_unit_id,
+                expected: newSparepartCost,
+                actual: actualNewSparepartCost,
+                diff: actualNewSparepartCost - newSparepartCost,
+            });
+        } else {
+            console.log("[item-outflows][POST] ✅ Biaya sparepart laptop berhasil update:", {
+                laptop_unit_id,
+                from: oldSparepartCost,
+                to: actualNewSparepartCost,
+                total_modal_now: Number(updatedUnit.purchase_price ?? 0) + actualNewSparepartCost,
+            });
+        }
 
         // Jurnal TIDAK dibuat instan di sini — entry Kebutuhan ini muncul sebagai
         // draft PENDING di Jurnal Umum (buildItemOutflowKebutuhanDrafts), baru
