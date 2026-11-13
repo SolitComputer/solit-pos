@@ -199,6 +199,15 @@ const IconGallery = () => (
     <polyline points="21 15 16 10 5 21" />
   </svg>
 );
+//  NEW — ikon trash utk tombol hapus baris sparepart
+const IconTrash = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2" />
+  </svg>
+);
 
 // ── Shared helpers (dipakai tabel & card) ──────────────────────────────────────
 function UserCell({ name, color }: { name?: string; color: "blue" | "violet" | "emerald" }) {
@@ -808,6 +817,32 @@ function EditPaymentModal({
     onSaved(); //  refetch daftar — data sparepart ikut ke-refresh
   };
 
+  //  NEW — hapus 1 baris sparepart: manual → langsung hilang, stok → unit ke-restore ke Data Barang
+  //  Backend bikin jurnal reversal otomatis (D170/K450 utk stok, D171/K460 utk manual).
+  const [deletingLine, setDeletingLine] = useState<string | null>(null); //  line_content yg lagi diproses
+  const handleDeleteSparepart = async (lineContent: string) => {
+    const [label] = lineContent.split("§");
+    if (!confirm(`Hapus sparepart "${label}"?\n\nKalau diambil dari STOK: unit akan dikembalikan ke Data Barang.\nKalau MANUAL: baris langsung hilang.\nJurnal pembatalan akan dibuat otomatis.`)) return;
+    setDeletingLine(lineContent);
+    try {
+      const res = await fetch(`/api/service/${order.id}/sparepart`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ line_content: lineContent }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.message || "Gagal menghapus sparepart");
+        return;
+      }
+      onSaved(); //  refetch — baris langsung ilang dari UI
+    } catch {
+      alert("Koneksi bermasalah, coba lagi");
+    } finally {
+      setDeletingLine(null);
+    }
+  };
+
   //  NEW — daftar sparepart terkini (string "label§harga" per baris)
   const spareLines = (order.sparepart_items ?? "")
     .split("\n")
@@ -1185,10 +1220,13 @@ function EditPaymentModal({
                 {spareLines.map((ln, i) => {
                   const [label, hargaRaw] = ln.split("§");
                   const harga = Number(hargaRaw ?? 0);
+                  const isDeleting = deletingLine === ln; //  NEW
                   return (
                     <div
                       key={i}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/40 px-3 py-2.5"
+                      className={`flex items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/40 px-3 py-2.5 transition ${
+                        isDeleting ? "opacity-50" : ""
+                      }`}
                     >
                       <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-indigo-700">
                         {label}
@@ -1197,6 +1235,18 @@ function EditPaymentModal({
                         <span className="shrink-0 text-[11px] font-black tabular-nums text-gray-500">
                           {fmtRupiah(harga)}
                         </span>
+                      )}
+                      {/*  NEW — tombol hapus (admin/CS only). Backend yg deteksi stok vs manual */}
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSparepart(ln)}
+                          disabled={isDeleting}
+                          title="Hapus sparepart ini (stok otomatis dikembalikan)"
+                          className="shrink-0 grid h-7 w-7 place-items-center rounded-lg border border-rose-200 bg-white text-rose-500 outline-none transition hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40 active:scale-90"
+                        >
+                          <IconTrash />
+                        </button>
                       )}
                     </div>
                   );

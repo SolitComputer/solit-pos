@@ -365,17 +365,36 @@ function PaymentValue({ order, align = "left" }: { order: ServiceOrder; align?: 
 }
 
 //  daftar sparepart yang sudah dimasukkan. Format tiap baris: "label§harga".
-//  Non-admin: hanya keterangan + SN. Admin: + harga/modal per item.
-function SparepartCell({ order, showNominal = false }: { order: ServiceOrder; showNominal?: boolean }) {
+//  Non-admin: hanya keterangan + SN. Admin: + harga/modal per item + tombol hapus.
+//   NEW — canDelete + onDelete utk tombol hapus per baris (admin/CS only).
+function SparepartCell({
+  order,
+  showNominal = false,
+  canDelete = false, //  NEW
+  onDelete, //  NEW
+  deletingLine, //  NEW — line_content yg lagi diproses, biar bisa di-dim
+}: {
+  order: ServiceOrder;
+  showNominal?: boolean;
+  canDelete?: boolean;
+  onDelete?: (lineContent: string) => void;
+  deletingLine?: string | null;
+}) {
   const lines = (order.sparepart_items ?? "").split("\n").map(s => s.trim()).filter(Boolean);
   if (lines.length === 0) return <span className="text-xs font-medium text-gray-300">—</span>;
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
       {lines.map((ln, i) => {
-        const [label, hargaRaw] = ln.split("§"); //  NEW
+        const [label, hargaRaw] = ln.split("§");
         const harga = Number(hargaRaw ?? 0);
+        const isDeleting = deletingLine === ln;
         return (
-          <span key={i} className="inline-flex w-fit items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+          <span
+            key={i}
+            className={`inline-flex w-fit items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 transition ${
+              isDeleting ? "opacity-40" : ""
+            }`}
+          >
             <IconPart />
             <span className="max-w-[220px] truncate">
               {label}
@@ -383,6 +402,21 @@ function SparepartCell({ order, showNominal = false }: { order: ServiceOrder; sh
                 <span className="ml-1 font-bold text-gray-600">· {fmtRupiah(harga)}</span>
               )}
             </span>
+            {/*  NEW — tombol X kecil (admin/CS). Backend deteksi stok vs manual. */}
+            {canDelete && onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(ln)}
+                disabled={isDeleting}
+                title="Hapus sparepart ini"
+                className="ml-0.5 grid h-4 w-4 place-items-center rounded text-indigo-400 outline-none transition hover:bg-rose-100 hover:text-rose-600 disabled:opacity-40 active:scale-90"
+              >
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
           </span>
         );
       })}
@@ -636,6 +670,11 @@ export default function DonePage() {
   const userRoles = user?.roles ?? (user?.role ? [user.role] : []); //  NEW
   const isAdmin = userRoles.some(r => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r)); //  NEW
   const canWarn = userRoles.some(r => (SERVICE_WARNING_ROLES as string[]).includes(r)); //  NEW — boleh beri/hapus penanda
+  //  NEW — role yg boleh hapus sparepart (admin + CS, sejalan dgn backend)
+  const canDeleteSparepart = userRoles.some(r =>
+    ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE"].includes(r)
+  );
+  const [deletingSparepartLine, setDeletingSparepartLine] = useState<string | null>(null); //  NEW
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<ServiceOrder | null>(null);
@@ -794,6 +833,33 @@ export default function DonePage() {
     setSparepartOrder(null);
     showToast(" Sparepart dicatat.");
     refresh();
+  };
+
+  //  NEW — hapus 1 baris sparepart. Backend deteksi stok vs manual:
+  //  STOCK  → unit di-restore ke TERSEDIA + stok +1 + jurnal reversal D170/K450
+  //  MANUAL → biaya_sparepart dikurangi + jurnal reversal D171/K460
+  const handleDeleteSparepartLine = async (orderId: string, lineContent: string) => {
+    const [label] = lineContent.split("§");
+    if (!confirm(`Hapus sparepart "${label}"?\n\nKalau diambil dari STOK: unit akan dikembalikan ke Data Barang.\nKalau MANUAL: baris langsung hilang.\nJurnal pembatalan akan dibuat otomatis.`)) return;
+    setDeletingSparepartLine(lineContent);
+    try {
+      const res = await fetch(`/api/service/${orderId}/sparepart`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ line_content: lineContent }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        showToast(json.message || "Gagal menghapus sparepart", "error");
+        return;
+      }
+      showToast(" Sparepart dihapus & jurnal pembatalan dibuat.");
+      refresh();
+    } catch {
+      showToast("Koneksi bermasalah", "error");
+    } finally {
+      setDeletingSparepartLine(null);
+    }
   };
 
   //  NEW — Estimasi (perkiraan, TIDAK masuk cashflow, tidak ubah status)
@@ -1178,7 +1244,13 @@ export default function DonePage() {
 
                           {/* Sparepart — daftar part yang dimasukkan */}
                           <td className="min-w-[150px] max-w-[220px] px-4 py-4 align-middle">
-                            <SparepartCell order={o} showNominal={isAdmin} />
+                            <SparepartCell
+                              order={o}
+                              showNominal={isAdmin}
+                              canDelete={canDeleteSparepart} //  NEW
+                              onDelete={(ln) => handleDeleteSparepartLine(o.id, ln)} //  NEW
+                              deletingLine={deletingSparepartLine} //  NEW
+                            />
                           </td>
 
                           {/* Payment — kalau belum dibayar, tampilkan ekspektasi (estimasi + sparepart) */}
@@ -1295,7 +1367,15 @@ export default function DonePage() {
                     {(o.sparepart_items ?? "").trim() && (
                       <div className="mt-3 border-t border-gray-50 px-4 pt-3">
                         <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Sparepart</span>
-                        <div className="mt-1.5"><SparepartCell order={o} showNominal={isAdmin} /></div>
+                        <div className="mt-1.5">
+                          <SparepartCell
+                            order={o}
+                            showNominal={isAdmin}
+                            canDelete={canDeleteSparepart} //  NEW
+                            onDelete={(ln) => handleDeleteSparepartLine(o.id, ln)} //  NEW
+                            deletingLine={deletingSparepartLine} //  NEW
+                          />
+                        </div>
                       </div>
                     )}
 
