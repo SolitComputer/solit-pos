@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Search, User, Calendar, UserCog, ArrowLeft, Shield, AlertCircle } from "lucide-react";
+import DashboardLayout from "@/components/layout/DashboardLayout";  
 
 interface ArchivedUser {
     id: string;
@@ -144,15 +145,19 @@ export default function ArsipUserPage() {
     // ── Render — Loading ───────────────────────────────────────────────────
     if (loading && !currentUser) {
         return (
+            <DashboardLayout>           
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-800" />
             </div>
+            </DashboardLayout>
         );
     }
 
     // ── Render — Access Denied ─────────────────────────────────────────────
     if (!hasAccess) {
         return (
+                <DashboardLayout>
+
             <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
                 <div className="max-w-md bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
                     <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
@@ -170,13 +175,15 @@ export default function ArsipUserPage() {
                     </button>
                 </div>
             </div>
+                </DashboardLayout>
         );
     }
 
     // ── Render — Main Content ──────────────────────────────────────────────
     return (
-        <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-            {/* HEADER */}
+        <DashboardLayout>
+            <div className="p-4 md:p-6">
+                {/* HEADER */}
             <div className="max-w-7xl mx-auto mb-6">
                 <button
                     onClick={() => router.push("/dashboard/users")}
@@ -338,6 +345,7 @@ export default function ArsipUserPage() {
                     <b>Info:</b> User yang diarsipkan sudah <b>tidak bisa login</b> ke sistem, dan datanya tidak muncul lagi di Absensi, Laporan, dan modul aktif lainnya. Namun nama mereka <b>tetap muncul</b> di jurnal akuntansi, cashflow, invoice, dan laporan historis untuk keperluan audit. Fitur arsip ini <b>tidak bisa di-undo</b> — kalau ada user yang salah diarsipkan, hubungi programmer untuk restore manual via database.
                 </p>
             </div>
-        </div>
+            </div>
+        </DashboardLayout>
     );
 }

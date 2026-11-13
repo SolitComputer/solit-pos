@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     .from("vehicles")
     .select("id, name, type, status, battery_level, fuel_level, plate_number, branch")
     .order("type", { ascending: true })
-    .order("name", { ascending: true });
+  .order("name", { ascending: true });
 
   if (me.branchScope) {
     // Lapisan 1 (SECURITY): role Jogja fix hanya lihat JOGJA
