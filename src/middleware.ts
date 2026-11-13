@@ -7,6 +7,8 @@ import {
   UserRole,
   verifyAttendanceCookie,
   signAttendanceCookie,
+  toAttendanceDateKey,   // ✅ NEW — cutoff hari absensi 04:00 WIB
+  addDaysToDateStr,      // ✅ NEW
 } from "@/lib/auth";
 import {
   expandRolesWithParents,
@@ -212,9 +214,14 @@ async function hasAttendedTodayInDB(userId: string): Promise<boolean> {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { persistSession: false }, global: { fetch: fetchWithTimeout } }
     );
-    const todayDate = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-    const dayStart = `${todayDate}T00:00:00+07:00`;
-    const dayEnd = `${todayDate}T23:59:59+07:00`;
+    // ✅ FIX: samakan ke cutoff "hari absensi" 04:00 WIB — sebelumnya pakai
+    // tengah malam (00:00), jadi beda sehari dgn face-status &
+    // processAttendanceVerification di jam 00:00–03:59. Akibatnya middleware
+    // bisa nganggep "sudah absen" padahal face-verify masih minta absen
+    // (atau sebaliknya). Sekarang window-nya 04:00 → 04:00 besok, konsisten.
+    const todayDate = toAttendanceDateKey(new Date().toISOString());
+    const dayStart = `${todayDate}T04:00:00+07:00`;
+    const dayEnd = `${addDaysToDateStr(todayDate, 1)}T03:59:59+07:00`;
 
     const TIMED_OUT = Symbol("timed_out");
     type MaybeRow = { data: { id: string } | null; error: unknown };
