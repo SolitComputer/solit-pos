@@ -944,3 +944,17 @@ html.dark .from-emerald-50\/60,
 html.dark .from-green-50\/60   { --tw-gradient-from: #072517 var(--tw-gradient-from-position) !important; }
 html.dark .to-indigo-50\/50,
 html.dark .to-blue-50\/50      { --tw-gradient-to: #0c1e36 var(--tw-gradient-to-position) !important; }
+
+/* ============================================================================
+   v9.1 GAJI SUB-HEADER — tabel Rekap Gaji pakai arbitrary-variant
+   [&>th]:bg-gray-50 di baris sub-header (Gaji Pokok, T.Istri, dll). Class ini
+   beda nama dari .bg-gray-50 jadi lolos remap → sel sub-header tetap terang.
+   Disamakan ke #151f30 (nilai .bg-gray-50 dark) biar senada header.
+   ========================================================================== */
+html.dark .\[\&\>th\]\:bg-gray-50 > th { background-color: #151f30 !important; }
+
+/* ============================================================================
+   v9.2 MISSIONS TABLE HEADER — AdminAllMissionsWorkspace header tabel desktop
+   pakai bg-slate-50/80 yang belum ketutup. Samakan ke #151f30 (bg-slate-50 dark).
+   ========================================================================== */
+html.dark .bg-slate-50\/80 { background-color: #151f30 !important; }
