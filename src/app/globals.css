@@ -922,3 +922,25 @@ html.dark .border-white\/70             { border-color: rgba(255,255,255,.08) !i
 html.dark .from-slate-50\/40 { --tw-gradient-from: #151f30 var(--tw-gradient-from-position) !important; }
 html.dark .to-indigo-50\/30  { --tw-gradient-to: #0c1e36 var(--tw-gradient-to-position) !important; }
 html.dark .hover\:bg-gray-50\/50:hover { background-color: rgba(255,255,255,.02) !important; }
+
+/* ============================================================================
+   v8.9 LEADERBOARD — highlight baris Juara (from-amber-50/80 to-transparent,
+   hover:from-amber-50) & skeleton loading (from-slate-200). Sisanya sudah
+   ketutup. bg-blue-500/70 (bar skor) sengaja dibiarkan (aksen terang).
+   ========================================================================== */
+html.dark .from-amber-50,
+html.dark .from-amber-50\/80,
+html.dark .hover\:from-amber-50:hover { --tw-gradient-from: #2b1b06 var(--tw-gradient-from-position) !important; }
+html.dark .from-slate-200,
+html.dark .from-gray-200,
+html.dark .from-zinc-200 { --tw-gradient-from: #24344d var(--tw-gradient-from-position) !important; }
+
+/* ============================================================================
+   v9.0 PROFILE LAGU FAVORIT — kartu "Pilih Lagu Favorit" pakai gradient 3-stop
+   from-emerald-50/60 via-slate-50 to-indigo-50/50. Tengah (via) sudah gelap,
+   tapi dua UJUNG belum → kartu belang terang. Gelapkan kedua ujungnya.
+   ========================================================================== */
+html.dark .from-emerald-50\/60,
+html.dark .from-green-50\/60   { --tw-gradient-from: #072517 var(--tw-gradient-from-position) !important; }
+html.dark .to-indigo-50\/50,
+html.dark .to-blue-50\/50      { --tw-gradient-to: #0c1e36 var(--tw-gradient-to-position) !important; }
