@@ -22,7 +22,7 @@ interface SoUnitRow {
     so_at: string | null;
     so_by: string | null;
     is_so_active: boolean;
-    created_at: string | null; // Dipakai untuk sort unit lama → baru
+    created_at: string | null;
 }
 
 interface LaptopUnitLite {
@@ -34,13 +34,11 @@ interface LaptopUnitLite {
     created_at?: string | null;
 }
 
-// Tipe entry riwayat SO (per-unit). Shape disamakan dengan yang dipakai
-// HistoryModal di UnifiedBarangContent.tsx supaya konsisten antar halaman.
 interface HistoryEntry {
     id: string;
-    action: string;   // "Ditandai sudah SO" / "SO dibatalkan" / "SO Ulang"
-    by: string;       // nama user yang melakukan aksi (so_by)
-    at: string;       // ISO datetime (so_at)
+    action: string;
+    by: string;
+    at: string;
     notes?: string | null;
 }
 
@@ -52,10 +50,6 @@ interface LaptopRaw {
     laptop_units?: LaptopUnitLite[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// KONSTANTA & HELPERS — disamakan dengan UnifiedBarangContent.tsx supaya
-// kalkulasi "unit aktif" & "SO aktif" konsisten antar halaman.
-// ═══════════════════════════════════════════════════════════════════════════
 const OUT_STATUSES = new Set([
     "SOLD", "TERJUAL", "KELUAR", "RETURNED", "RESERVED", "HELD", "PACKING", "PENDING",
 ]);
@@ -71,46 +65,31 @@ const STATUS_UNIT_LABEL: Record<string, string> = {
 };
 const statusUnitLabel = (s: string) => STATUS_UNIT_LABEL[s] ?? s;
 
-// SO aktif = so_at terisi DAN BUKAN sentinel reset (2000-01-01).
-// Pola persis sama dengan isUnitSoActive() di UnifiedBarangContent.tsx.
 const isUnitSoActive = (soAt?: string | null): boolean => {
     if (!soAt) return false;
     return soAt > "2001-01-01";
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
-// MAIN
-// ═══════════════════════════════════════════════════════════════════════════
 export default function SoLaptopContent() {
     const [rows, setRows] = useState<SoUnitRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
     const [soingUnitId, setSoingUnitId] = useState<string | null>(null);
-    // ⬅️ BARU: modal konfirmasi + catatan SO (muncul sebelum eksekusi). null = tertutup.
     const [soPromptTarget, setSoPromptTarget] = useState<SoUnitRow | null>(null);
     const [soNote, setSoNote] = useState("");
 
-    // Filter state
     const [search, setSearch] = useState("");
     const [soStatusFilter, setSoStatusFilter] = useState<"ALL" | "SO" | "BELUM">("ALL");
     const [unitStatusFilter, setUnitStatusFilter] = useState<string>("ALL");
 
-    // State Riwayat SO:
-    // historyTarget   = unit yang sedang dibuka modal riwayatnya (null = tertutup)
-    // historyEntries  = daftar entry riwayat dari endpoint
-    // historyLoading  = indikator fetch
-    // historySearch   = search box di dalam modal riwayat (filter by nama user / notes)
     const [historyTarget, setHistoryTarget] = useState<SoUnitRow | null>(null);
     const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [historySearch, setHistorySearch] = useState("");
 
-    // Input tetap responsif — proses filter berat pakai nilai yang ditunda.
     const deferredSearch = useDeferredValue(search);
 
-    // Permission GLOBAL: role di SO_ROLES bebas SO apa saja; akun di
-    // SO_LIMITED_USER_IDS juga boleh TAPI terbatas per-unit (lihat canSoRow).
     const isFullSoRole = useMemo(
         () => hasAnyRole(userRoles, SO_ROLES),
         [userRoles],
@@ -121,13 +100,6 @@ export default function SoLaptopContent() {
     );
     const canManageSo = isFullSoRole || isLimitedSoUser;
 
-    // Permission PER-ROW: endpoint /api/units/[id]/so cuma mengizinkan user
-    // SO_LIMITED_USER_IDS menandai SO di unit SIAP_JUAL saja. Kita mirror
-    // aturan itu di client biar tombol "Tandai SO" di baris non-SIAP_JUAL
-    // langsung di-disable — mencegah toast error 403 setelah klik.
-    // Catatan: field `is_price_complete` tidak ikut kita fetch di tab ini
-    // supaya payload tetap ringan. Kalau di masa depan perlu akurat 100%,
-    // tambah `is_price_complete` di SoUnitRow + ikutkan di normalizer.
     const canSoRow = useCallback((row: SoUnitRow) => {
         if (isFullSoRole) return true;
         if (isLimitedSoUser) return row.status === "SIAP_JUAL";
@@ -138,7 +110,9 @@ export default function SoLaptopContent() {
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch("/api/laptops");
+            // Pakai cache: 'no-store' + timestamp cache-buster supaya Chalista/Admin Barang
+            // selalu dapat data terbaru setelah user lain (Diki) SO barang.
+            const res = await fetch(`/api/laptops?_t=${Date.now()}`, { cache: "no-store" });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal memuat");
 
@@ -174,6 +148,21 @@ export default function SoLaptopContent() {
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
+    // Auto-refetch saat tab kembali aktif — supaya Chalista yang tab-nya
+    // sudah terbuka di background langsung sync begitu dia buka tabnya lagi.
+    useEffect(() => {
+        const onFocus = () => fetchAll();
+        const onVisibility = () => {
+            if (document.visibilityState === "visible") fetchAll();
+        };
+        window.addEventListener("focus", onFocus);
+        document.addEventListener("visibilitychange", onVisibility);
+        return () => {
+            window.removeEventListener("focus", onFocus);
+            document.removeEventListener("visibilitychange", onVisibility);
+        };
+    }, [fetchAll]);
+
     useEffect(() => {
         (async () => {
             try {
@@ -186,14 +175,10 @@ export default function SoLaptopContent() {
         })();
     }, []);
 
-    // Fetch riwayat SO per-unit saat modal dibuka.
-    // Pola sama persis dengan HistoryModal di UnifiedBarangContent.tsx —
-    // endpoint return { data: { history: [...] } }, lalu kita map ke shape
-    // HistoryEntry (action, by, at, notes).
     useEffect(() => {
         if (!historyTarget) return;
         setHistoryLoading(true);
-        setHistorySearch(""); // reset search tiap kali buka unit baru
+        setHistorySearch("");
         (async () => {
             try {
                 const res = await fetch(`/api/units/${historyTarget.unit_id}/so`);
@@ -201,8 +186,6 @@ export default function SoLaptopContent() {
                 const raw = json.data?.history ?? [];
                 const mapped: HistoryEntry[] = raw.map((h: any) => ({
                     id: h.id,
-                    // Mirror label dari UnifiedBarangContent — konsisten antar halaman.
-                    // "SO Ulang" dideteksi dari notes (ditulis oleh endpoint /api/laptops/[id]/so).
                     action: h.action === "SO"
                         ? (typeof h.notes === "string" && h.notes.includes("SO Ulang") ? "SO Ulang" : "Ditandai sudah SO")
                         : "SO dibatalkan",
@@ -219,8 +202,6 @@ export default function SoLaptopContent() {
         })();
     }, [historyTarget]);
 
-    // Filter entries berdasarkan search di modal.
-    // Match terhadap nama user (by), action, dan notes.
     const filteredHistory = useMemo(() => {
         if (!historySearch.trim()) return historyEntries;
         const t = historySearch.toLowerCase();
@@ -231,8 +212,6 @@ export default function SoLaptopContent() {
         );
     }, [historyEntries, historySearch]);
 
-    // Opsi status unit yang MUNCUL di dropdown — hanya status yang beneran ada
-    // di data saat ini (bukan hardcoded), biar nggak ada opsi kosong.
     const unitStatusOptions = useMemo(() => {
         const set = new Set<string>();
         rows.forEach(r => set.add(r.status));
@@ -259,49 +238,32 @@ export default function SoLaptopContent() {
             );
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // SORT MURNI: Unit paling LAMA masuk di atas → paling BARU di bawah.
-        // Tidak ada prioritas status SO lagi — semua unit (Belum SO & Sudah
-        // SO) tercampur sesuai urutan tanggal masuk. Ini sesuai requirement
-        // user: "urutan SN lama ke SN baru".
-        //
-        // Pakai created_at (bukan string SN) karena SN tidak selalu urut
-        // sesuai tanggal masuk — kadang SN besar justru barang lama,
-        // tergantung pola penomoran per batch. Fallback ke SN numerik hanya
-        // kalau created_at kosong / sama persis (edge case bulk insert).
-        // ═══════════════════════════════════════════════════════════════════
         return [...list].sort((a, b) => {
             const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
             const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-            if (timeA !== timeB) return timeA - timeB; // lama → baru
+            if (timeA !== timeB) return timeA - timeB;
             return a.serial_number.localeCompare(b.serial_number, "id-ID", { numeric: true });
         });
     }, [rows, soStatusFilter, unitStatusFilter, deferredSearch]);
 
-    // ── Toggle SO per-unit ───────────────────────────────────────────────────
-    // ⬅️ UBAH: klik tombol SO sekarang BUKA modal catatan dulu, bukan langsung
-    //  eksekusi. Proses sebenarnya ada di confirmUnitSo() setelah user konfirmasi.
     const toggleUnitSo = (row: SoUnitRow) => {
         if (!canSoRow(row)) return;
-        setSoNote("");           // reset catatan tiap buka modal baru
-        setSoPromptTarget(row);  // buka modal
+        setSoNote("");
+        setSoPromptTarget(row);
     };
 
-    // ⬅️ BARU: eksekusi SO + kirim catatan ke server (ikut tercatat di riwayat).
     const confirmUnitSo = async (row: SoUnitRow, note: string) => {
-        // Guard final tetap ada di server (canSoUnit), ini cuma mirror client.
         if (!canSoRow(row)) return;
         setSoingUnitId(row.unit_id);
         try {
             const res = await fetch(`/api/units/${row.unit_id}/so`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ notes: note.trim() }), // ⬅️ catatan ikut dikirim
+                body: JSON.stringify({ notes: note.trim() }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal update SO");
 
-            // Update lokal supaya UI langsung refresh tanpa refetch full.
             setRows(prev => prev.map(r =>
                 r.unit_id === row.unit_id
                     ? {
@@ -313,7 +275,7 @@ export default function SoLaptopContent() {
                     : r
             ));
             toast.success(row.is_so_active ? "Status SO diperbarui (SO Ulang)" : "Unit ditandai Sudah SO");
-            setSoPromptTarget(null); // tutup modal setelah sukses
+            setSoPromptTarget(null);
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal update SO");
         } finally {
@@ -452,7 +414,6 @@ export default function SoLaptopContent() {
                                         </div>
                                     )}
 
-                                    {/* Baris tombol aksi — Tandai SO + Riwayat SO side by side */}
                                     <div className="flex items-stretch gap-2">
                                         {canSoRow(row) && (
                                             <button
@@ -532,7 +493,6 @@ export default function SoLaptopContent() {
                                                                     {soingUnitId === row.unit_id ? "..." : row.is_so_active ? "SO Ulang" : "Tandai SO"}
                                                                 </button>
                                                             )}
-                                                            {/* Tombol riwayat SO per-unit */}
                                                             <button
                                                                 onClick={() => setHistoryTarget(row)}
                                                                 title="Lihat riwayat SO unit ini"
@@ -558,7 +518,6 @@ export default function SoLaptopContent() {
                 )}
             </div>
 
-            {/* ⬅️ BARU: Modal konfirmasi + catatan SO (muncul sebelum eksekusi) */}
             {soPromptTarget && (
                 <SoNotePromptModal
                     unit={soPromptTarget}
@@ -570,7 +529,6 @@ export default function SoLaptopContent() {
                 />
             )}
 
-            {/* Modal Riwayat SO per-unit */}
             {historyTarget && (
                 <HistorySoModal
                     unit={historyTarget}
@@ -583,7 +541,6 @@ export default function SoLaptopContent() {
                 />
             )}
 
-            {/* Style modal animations — reuse pattern dari UnifiedBarangContent */}
             <style>{`
                 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
                 @keyframes popIn  { from{opacity:0;transform:scale(0.94) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
@@ -594,10 +551,6 @@ export default function SoLaptopContent() {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Modal Riwayat SO per-unit — pola sama dengan HistoryModal di
-// UnifiedBarangContent.tsx, tapi plus search box di dalam list.
-// ═══════════════════════════════════════════════════════════════════════════
 function HistorySoModal({
     unit, entries, totalEntries, loading, search, onSearchChange, onClose,
 }: {
@@ -609,7 +562,6 @@ function HistorySoModal({
     onSearchChange: (v: string) => void;
     onClose: () => void;
 }) {
-    // ESC → tutup. Pola standar supaya UX konsisten dengan modal lain.
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", h);
@@ -629,7 +581,6 @@ function HistorySoModal({
                     </p>
                 </div>
 
-                {/* Search box — filter by nama user / action / notes */}
                 <div className="px-5 py-3 border-b border-zinc-100 flex-shrink-0">
                     <div className="relative">
                         <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-2.5 pointer-events-none" />
@@ -687,10 +638,6 @@ function HistorySoModal({
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Modal konfirmasi + Catatan SO per-unit — muncul sebelum "Tandai SO".
-// Catatan opsional, ikut tersimpan ke riwayat SO lewat endpoint /api/units/[id]/so.
-// ═══════════════════════════════════════════════════════════════════════════
 function SoNotePromptModal({
     unit, note, onNoteChange, onConfirm, onCancel, loading,
 }: {
@@ -740,9 +687,6 @@ function SoNotePromptModal({
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Sub-komponen ringan
-// ═══════════════════════════════════════════════════════════════════════════
 function StatBox({ label, value, tone }: { label: string; value: number; tone: "emerald" | "red" | "zinc" }) {
     const cls: Record<string, string> = {
         emerald: "bg-emerald-50 border-emerald-200 text-emerald-700",

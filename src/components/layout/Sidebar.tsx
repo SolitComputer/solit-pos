@@ -125,6 +125,16 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href === "/dashboard/kotak-surat/admin") {
     return pathname === "/dashboard/kotak-surat/admin";
   }
+  // Management User vs Arsip User: exact-match guard, pola identik Kotak Surat di atas.
+  // Tanpa ini, "/dashboard/users/arsip" bakal bikin item "Management User"
+  // (parent) ikut ke-highlight karena fallback startsWith menganggap path
+  // arsip diawali path parent (/dashboard/users).
+  if (href === "/dashboard/users") {
+    return pathname === "/dashboard/users";
+  }
+  if (href === "/dashboard/users/arsip") {
+    return pathname === "/dashboard/users/arsip";
+  }
   return pathname.startsWith(href);
 }
 

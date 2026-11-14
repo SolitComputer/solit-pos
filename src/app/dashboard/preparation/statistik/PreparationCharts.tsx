@@ -1,5 +1,5 @@
 "use client";
-
+import { useEffect, useState } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -16,6 +16,19 @@ import {
 } from "recharts";
 
 const ACCENT = "#0d9488"; // teal-600
+const ACCENT_DARK = "#2dd4bf"; // teal-400, lebih kebaca di dark
+
+function useIsDark() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const check = () => setDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return dark;
+}
 
 function CountTooltip({ active, payload, label, unit }: any) {
   if (!active || !payload || !payload.length) return null;
@@ -60,6 +73,10 @@ export default function PreparationCharts({
   statusData: { status: string; label: string; value: number; color: string }[];
   trendData: { label: string; count: number }[];
 }) {
+  const dark = useIsDark();
+  const accent = dark ? ACCENT_DARK : ACCENT;
+  const gridStroke = dark ? "#1f2937" : "#f1f5f9";
+  const cursorFill = dark ? "rgba(255,255,255,0.06)" : "#f0fdfa";
   return (
     <div className="grid lg:grid-cols-3 gap-3">
       {/* Beban kerja */}
@@ -73,7 +90,7 @@ export default function PreparationCharts({
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
             <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} tickLine={false} axisLine={false} interval={0} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} width={32} />
-            <Tooltip cursor={{ fill: "#f0fdfa" }} content={<CountTooltip unit="pengantaran" />} />
+            <Tooltip cursor={{ fill: cursorFill }} content={<CountTooltip unit="pengantaran" />} />
             <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={46}>
               {workloadData.map((_, i) => (
                 <Cell key={i} fill={ACCENT} fillOpacity={1 - i * 0.07} />

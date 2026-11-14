@@ -3,6 +3,13 @@ import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { LAPTOP_VIEW_ROLES, BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
 
+// Paksa Next.js TIDAK cache response endpoint ini sama sekali.
+// Data laptop (termasuk status SO per-unit) harus real-time karena
+// banyak user operate bersamaan — Diki SO di akunnya, Chalista harus
+// langsung lihat update tanpa perlu hard refresh.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     //  purchase_price, source, created_at ditambahkan supaya tabel Data Barang
