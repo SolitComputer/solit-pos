@@ -833,20 +833,34 @@ async function buildTransactionDrafts(
 
   const invoiceNumbersForAccrualCheck = (trxs as any[]).map((t) => t.invoice_number as string);
   const existingAccrualInvoices = new Set<string>();
+  // ⬅️ BARU — track invoice yang sudah punya entry HPP-only (dari fase packing
+  // ecommerce dengan deal=0). Supaya block modal/HPP di bawah TIDAK dobel-posting
+  // saat invoice dilunasi (PAID) — entry baru cukup Kas + Pendapatan saja.
+  const hpOnlyInvoices = new Set<string>();
 
   if (invoiceNumbersForAccrualCheck.length > 0) {
-    for (const batch of chunkArray(invoiceNumbersForAccrualCheck, 150)) {
+    // Scan entry utama (source_id polos) DAN entry HPP-only (source_id = {inv}__HPP_PENDING)
+    for (const batch of chunkArray(invoiceNumbersForAccrualCheck, 75)) {
+      const orFilter = batch
+        .map((inv) => `source_id.eq.${inv},source_id.eq.${inv}__HPP_PENDING`)
+        .join(",");
       const { data: existingEntries } = await supabase
         .from("journal_entries")
         .select("source_id, lines:journal_lines(account_code, side)")
         .eq("source_type", "TRANSACTION")
-        .in("source_id", batch);
+        .or(orFilter);
 
       for (const e of (existingEntries ?? []) as any[]) {
+        const sourceId = e.source_id as string;
         const hasPiutangDebit = (e.lines ?? []).some(
           (l: any) => l.account_code === AKUN.PIUTANG && l.side === "DEBIT"
         );
-        if (hasPiutangDebit) existingAccrualInvoices.add(e.source_id as string);
+        if (hasPiutangDebit) existingAccrualInvoices.add(sourceId);
+
+        // ⬅️ BARU — entry HPP-only dikenali dari suffix __HPP_PENDING
+        if (sourceId.endsWith("__HPP_PENDING")) {
+          hpOnlyInvoices.add(sourceId.replace(/__HPP_PENDING$/, ""));
+        }
       }
     }
   }
@@ -945,7 +959,12 @@ async function buildTransactionDrafts(
     // laptop+aksesoris ter-flag "Nominal Berubah" palsu padahal nominal sama persis.
     const accSns = accMap.get(t.invoice_number as string)?.sns ?? [];
     const accSuffix = accSns.length > 0 ? ` · Aksesoris: ${accSns.join(", ")}` : "";
-    const keterangan = `${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}${accSuffix}`;
+    // ⬅️ FIX — Untuk accessory-only, laptop_name biasanya null → fallback ke
+    // "Aksesoris" biar keterangan jurnal lebih enak dibaca di Buku Besar.
+    const itemLabel = t.laptop_name?.trim()
+      ? t.laptop_name
+      : (effectiveItemKind === "accessory" ? "Aksesoris" : "Laptop");
+    const keterangan = `${itemLabel} - ${snText} - ${t.customer_name ?? "—"}${accSuffix}`;
 
     if (existingAccrualInvoices.has(t.invoice_number as string)) {
       continue;
@@ -992,13 +1011,18 @@ async function buildTransactionDrafts(
         ? Math.round(accMap.get(t.invoice_number as string)?.modal ?? 0)
         : 0;
 
+    // ⬅️ BARU — Skip modal/HPP kalau invoice ini sudah punya entry HPP-only
+    // (dari fase packing ecommerce dengan deal=0). HPP sudah tercatat di sana,
+    // jadi entry PAID ini cukup Kas + Pendapatan saja.
+    const skipModalHpp = hpOnlyInvoices.has(t.invoice_number as string);
+
     // Modal LAPTOP (D440 Modal Keluar / K130 HPP) — hanya kalau ada unit laptop.
-    if (modal > 0 && effectiveItemKind !== "accessory") {
+    if (modal > 0 && effectiveItemKind !== "accessory" && !skipModalHpp) {
       lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
       lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
     }
     // Modal AKSESORIS (D450 Biaya Printilan / K170 Aksesoris).
-    if (accessoryModal > 0) {
+    if (accessoryModal > 0 && !skipModalHpp) {
       lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: accessoryModal });
       lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: accessoryModal });
     }
@@ -1058,6 +1082,29 @@ async function buildTransactionAccrualDrafts(
     return [];
   }
   if (!trxs || trxs.length === 0) return [];
+
+  // ⬅️ BARU — scan invoice yang SUDAH punya entry __HPP_PENDING ter-posting.
+  // Dipakai supaya saat deal_price diubah dari 0 → nominal (user edit via
+  // Edit Pending), entry utama cuma push Piutang+Pendapatan tanpa dobel HPP.
+  const invoiceNumbersForHppCheck = (trxs as any[]).map((t) => t.invoice_number as string);
+  const hpOnlyInvoices = new Set<string>();
+
+  if (invoiceNumbersForHppCheck.length > 0) {
+    for (const batch of chunkArray(invoiceNumbersForHppCheck, 150)) {
+      const { data: existingEntries } = await supabase
+        .from("journal_entries")
+        .select("source_id")
+        .eq("source_type", "TRANSACTION")
+        .in("source_id", batch.map((inv) => `${inv}__HPP_PENDING`));
+
+      for (const e of (existingEntries ?? []) as any[]) {
+        const sourceId = e.source_id as string;
+        if (sourceId.endsWith("__HPP_PENDING")) {
+          hpOnlyInvoices.add(sourceId.replace(/__HPP_PENDING$/, ""));
+        }
+      }
+    }
+  }
 
   const mixedInvoiceNumbers = (trxs as any[])
     .filter((t) => t.item_kind === "mixed")
@@ -1136,7 +1183,9 @@ async function buildTransactionAccrualDrafts(
 
   for (const t of trxs as any[]) {
     const deal = Math.round(Number(t.deal_price ?? t.amount ?? 0));
-    if (deal <= 0) continue;
+    // ⬅️ FIX: deal=0 TETAP diproses selama modal>0 — kasus payment pending
+    // ecommerce (Shopee/Tokopedia) yang harga dealnya belum pasti saat packing.
+    // HPP (barang keluar) wajib tercatat; Pendapatan nyusul saat deal diisi/Lunas.
 
     const ids: string[] =
       Array.isArray(t.unit_ids) && t.unit_ids.length > 0
@@ -1163,62 +1212,104 @@ async function buildTransactionAccrualDrafts(
           ? "laptop"
           : "accessory";
 
+    // ⬅️ BARU — hitung modal aksesoris (untuk kasus HPP-only mixed/accessory)
+    const accessoryModalAccrual =
+      effectiveItemKind === "accessory" || effectiveItemKind === "mixed"
+        ? Math.round(accMapAccrual.get(t.invoice_number as string)?.modal ?? 0)
+        : 0;
+    const totalModal = modal + accessoryModalAccrual;
+
+    // ⬅️ BARU — skip total kalau deal=0 DAN tidak ada modal apapun (nothing to post)
+    if (deal <= 0 && totalModal <= 0) continue;
+
+    // ⬅️ BARU — Mode HPP-only: deal=0 & ada modal → cuma post HPP (tanpa Piutang/Pendapatan)
+    const isHppOnly = deal <= 0 && totalModal > 0;
+    // ⬅️ BARU — skipModal: invoice sudah punya entry __HPP_PENDING, jangan dobel modal
+    const skipModal = hpOnlyInvoices.has(t.invoice_number as string);
+
     const specs = resolvedLaptopId ? laptopSpecMap.get(resolvedLaptopId) : undefined;
     const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
-    // ⬅️ FIX: Pakai accMapAccrual yang sudah di-batch-fetch di atas (line 1009) —
-    // jangan fetch ulang per-invoice di loop (N+1 query). Konsisten dengan
-    // buildTransactionDrafts & getTransactionSyncDraftsByInvoices.
     const accSnsAccrual = accMapAccrual.get(t.invoice_number as string)?.sns ?? [];
     const accSuffixAccrual = accSnsAccrual.length > 0 ? ` · Aksesoris: ${accSnsAccrual.join(", ")}` : "";
-    const keterangan = `DP/Reservasi · ${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}${accSuffixAccrual}`;
+    // ⬅️ BARU — prefix beda antara HPP-only vs DP/Reservasi biasa
+    const keteranganPrefix = isHppOnly ? "HPP Pending · " : "DP/Reservasi · ";
+    // ⬅️ FIX — Untuk accessory-only, laptop_name biasanya null → fallback ke
+    // "Aksesoris" biar keterangan jurnal lebih enak dibaca di Buku Besar
+    // (bukan "Laptop - — - customer" yang misleading).
+    const itemLabel = t.laptop_name?.trim()
+      ? t.laptop_name
+      : (effectiveItemKind === "accessory" ? "Aksesoris" : "Laptop");
+    const keterangan = `${keteranganPrefix}${itemLabel} - ${snText} - ${t.customer_name ?? "—"}${accSuffixAccrual}`;
 
-    const lines: DraftLine[] = [{ account_code: AKUN.PIUTANG, side: "DEBIT", nominal: deal }];
+    const lines: DraftLine[] = [];
 
-    if (effectiveItemKind === "accessory") {
-      lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
-    } else if (effectiveItemKind === "mixed") {
-      const accessoryDeal = Math.max(0, Math.min(deal, accessoryDealByInvoice.get(t.invoice_number as string) ?? 0));
-      const laptopDeal = deal - accessoryDeal;
-      if (laptopDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: laptopDeal });
-      if (accessoryDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: accessoryDeal });
-    } else {
-      lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
+    // ⬅️ FIX — Piutang + Pendapatan HANYA kalau deal > 0
+    if (deal > 0) {
+      lines.push({ account_code: AKUN.PIUTANG, side: "DEBIT", nominal: deal });
+
+      if (effectiveItemKind === "accessory") {
+        lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
+      } else if (effectiveItemKind === "mixed") {
+        const accessoryDeal = Math.max(0, Math.min(deal, accessoryDealByInvoice.get(t.invoice_number as string) ?? 0));
+        const laptopDeal = deal - accessoryDeal;
+        if (laptopDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: laptopDeal });
+        if (accessoryDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: accessoryDeal });
+      } else {
+        lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
+      }
     }
 
-    if (modal > 0) {
-      if (effectiveItemKind === "accessory") {
-        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal });
-        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal });
-      } else {
+    // ⬅️ FIX — Modal HANYA kalau belum ada entry HPP-only (biar nggak dobel)
+    if (!skipModal) {
+      // ⬅️ FIX — Pattern di-align dengan buildTransactionDrafts (2 branch terpisah,
+      // bukan nested). Juga hapus dead code sub-branch dan filter yang salah exclude
+      // accessory-only. Sekarang laptop & aksesoris di-treat EQUAL.
+
+      // Modal LAPTOP (D440 Modal Keluar / K130 HPP) — hanya kalau ada unit laptop.
+      // Guard `!== "accessory"` jaga data corrupt: kalau item_kind=accessory tapi
+      // ada unit laptop (anomali), modal laptop tidak salah push ke akun laptop.
+      if (modal > 0 && effectiveItemKind !== "accessory") {
         lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
         lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
       }
+      // Modal AKSESORIS (D450 Biaya Printilan / K170 Aksesoris) — untuk SEMUA tipe
+      // yang punya aksesoris: accessory-only & mixed. Filter exclude di-hapus.
+      if (accessoryModalAccrual > 0) {
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: accessoryModalAccrual });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: accessoryModalAccrual });
+      }
     }
+
+    // ⬅️ BARU — Kalau akhirnya lines kosong (deal=0 & skipModal=true), skip entry
+    if (lines.length === 0) continue;
 
     const merged = mergeLines(lines);
 
     drafts.push({
       source_type: "TRANSACTION",
-      source_id: t.invoice_number as string,
-      source_category: "DP_RESERVASI",
+      // ⬅️ FIX — Entry HPP-only pakai suffix __HPP_PENDING supaya tidak bentrok
+      // dengan entry utama (invoice_number polos) yang muncul saat transaksi dilunasi.
+      source_id: isHppOnly ? `${t.invoice_number}__HPP_PENDING` : (t.invoice_number as string),
+      source_category: isHppOnly ? "HPP_PENDING_ECOMMERCE" : "DP_RESERVASI",
       tanggal: jakartaDate(t.created_at as string),
       sort_ts: t.created_at as string,
       keterangan,
       ref: null,
       lines: merged,
       total: totalOf(merged),
-      branch: asBranch(t.branch), // ⬅️ BARU
+      branch: asBranch(t.branch),
       meta: {
         status: t.status,
         invoice: t.invoice_number,
         deal,
-        modal,
-        modal_missing: modal === 0,
+        modal: totalModal,
+        modal_missing: totalModal === 0,
         company_name: t.company_name ?? null,
         cpu: specs?.cpu ?? null,
         ram: specs?.ram ?? null,
         storage: specs?.storage ?? null,
-        is_accrual: true,
+        is_accrual: !isHppOnly,
+        is_hpp_only: isHppOnly, // ⬅️ BARU — penanda entry HPP-only untuk UI
       },
     });
   }

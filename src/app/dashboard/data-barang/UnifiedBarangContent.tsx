@@ -1007,9 +1007,14 @@ export default function UnifiedBarangContent() {
     const fetchAll = useCallback(async (opts?: { silent?: boolean }) => {
         if (!opts?.silent) setLoading(true);
         try {
+            // cache: 'no-store' + cache-buster _t=${Date.now()} — paksa setiap
+            // fetch selalu hit endpoint, tidak pakai HTTP cache browser maupun
+            // Next.js route cache. Wajib untuk data yang diubah banyak user
+            // bersamaan (SO barang, audit, pedagang listing, dll).
+            const _t = Date.now();
             const [lapRes, accRes] = await Promise.all([
-                fetch("/api/laptops"),
-                fetch("/api/accessories?page=1&limit=9999"),
+                fetch(`/api/laptops?_t=${_t}`, { cache: "no-store" }),
+                fetch(`/api/accessories?page=1&limit=9999&_t=${_t}`, { cache: "no-store" }),
             ]);
             const lapJson = await lapRes.json();
             const accJson = await accRes.json();
@@ -1071,7 +1076,23 @@ export default function UnifiedBarangContent() {
         })();
     }, []);
 
-
+    // Auto-refetch saat tab/window kembali aktif. Scenario nyata: Chalista
+    // buka Data Barang di tab A, lalu pindah tab/halaman. Sementara itu
+    // Diki SO barang. Saat Chalista balik ke tab Data Barang, tanpa effect
+    // ini dia akan tetap lihat data snapshot sessionStorage yang stale.
+    // Visibility/focus → fetchAll non-silent supaya user tahu data lagi di-sync.
+    useEffect(() => {
+        const refresh = () => fetchAll({ silent: true });
+        const onVisibility = () => {
+            if (document.visibilityState === "visible") refresh();
+        };
+        window.addEventListener("focus", refresh);
+        document.addEventListener("visibilitychange", onVisibility);
+        return () => {
+            window.removeEventListener("focus", refresh);
+            document.removeEventListener("visibilitychange", onVisibility);
+        };
+    }, [fetchAll]);
 
     useEffect(() => {
         writeBarangFilter({

@@ -5,6 +5,14 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { ACCESSORY_VIEW_ROLES, ACCESSORY_CREATE_ROLES, expandRolesWithParents, BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
+// Paksa Next.js TIDAK cache response endpoint ini di server/edge.
+// Data aksesoris (termasuk status SO per-unit, stock, SN) berubah real-time
+// dari multi-user. Tanpa deklarasi ini, Next.js App Router bisa serve
+// cached response — bikin user lain lihat snapshot lama. Wajib untuk endpoint
+// list data collaborative seperti ini.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // ── Sanitasi term sebelum ditaruh mentah di string filter PostgREST (.or()) ──
 // Karakter koma/kurung punya arti khusus di syntax filter Supabase — kalau
 // tidak dibuang, user bisa menyisipkan kondisi filter tambahan lewat kotak
@@ -22,7 +30,7 @@ export const GET = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthUs
     const limit = Math.min(10000, parseInt(searchParams.get("limit") ?? "20", 10));
     const offset = (page - 1) * limit;
 
-        let query = supabaseAdmin
+    let query = supabaseAdmin
         .from("accessories")
         .select("*, accessory_units(*)", { count: "exact" })
         .order("created_at", { ascending: false })
@@ -41,7 +49,7 @@ export const GET = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthUs
     // ✅ SECURITY FIX: ACCESSORY_VIEW_ROLES mencakup role sales (CREW_SALES,
     // CUSTOMER_SERVICE) yang tidak boleh lihat buy_price — dulu select("*")
     // dikirim mentah tanpa masking sama sekali.
-       const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
+    const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
     const enriched = (data ?? []).map(acc => {
         const units = (acc as any).accessory_units ?? [];
         // Aksesori yang SUDAH punya unit ber-SN: stock dihitung dari jumlah unit
