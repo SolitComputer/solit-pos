@@ -98,13 +98,22 @@ export async function POST(request: Request) {
                                  // TIDAK bergantung angka ini — itu dijaga cross-check (2).
     // ✅ FIX (false-positive "akun lain"): margin dinaikkan 0.05 → 0.10 supaya
     // beda tipis karena cahaya/sudut tidak lagi langsung dicap "tukar wajah".
-    const SWAP_MARGIN = 0.10;
+    // ✅ FIX: 0.10 terlalu tipis utk model lemah ini — dinaikkan ke 0.22.
+    // Dari 130 data asli, margin (self-other) median cuma 0.136, jadi margin
+    // 0.22 menyaring hampir semua false-positive tapi swap asli (gap ~0.30) tetap kena.
+    const SWAP_MARGIN = 0.22;
     // ✅ NEW: gate swap HANYA aktif kalau wajah benar-benar match ke akun lain.
     // Tanpa ini, "tetangga terdekat" yang jaraknya masih jauh (mis. 0.44 — bukan
     // match) ikut memblokir hanya karena distanceSelf membengkak akibat cahaya.
     // Match asli antar-orang-sama biasanya < 0.30; 0.42 sudah sangat longgar
     // untuk memastikan ini beneran orang yang sama, bukan sekadar mirip.
-    const SWAP_CONFIDENT_MATCH = 0.42;
+    // ✅ FIX: 0.42 terlalu longgar — diturunkan ke 0.30. "Akun lain" baru
+    // dianggap match beneran kalau jaraknya < 0.30 (bukan sekadar tetangga).
+    const SWAP_CONFIDENT_MATCH = 0.30;
+    // ✅ NEW: confident-self — kalau wajah sudah cukup cocok ke akun SENDIRI
+    // (< 0.45), langsung terima, SKIP cek tukar-wajah. Dari data, ini nutup
+    // ~69% false-positive. Swap asli tetap kejaring (jaraknya ke akun korban jauh).
+    const CONFIDENT_SELF = 0.45;
 
      const normInput = normalizeEmbedding(embedding);
     const normStored = normalizeEmbedding(userFullData.face_embedding);
@@ -147,7 +156,14 @@ export async function POST(request: Request) {
 
     let closestOther: { id: string; name: string; distance: number } | null = null;
     for (const other of otherFaces ?? []) {
-      if (!Array.isArray(other.face_embedding) || other.face_embedding.length !== 128) continue;
+        // ✅ FIX: samakan ketat dgn face-enroll — embedding LAIN juga wajib 128
+      // angka FINITE. Tanpa ini, embedding corrupt (NaN/0) bisa jadi "tetangga
+      // palsu" berjarak kecil yang salah memblokir orang lain.
+      if (
+        !Array.isArray(other.face_embedding) ||
+        other.face_embedding.length !== 128 ||
+        !other.face_embedding.every((n: unknown) => typeof n === "number" && Number.isFinite(n))
+      ) continue;
       const d = euclideanDistance(normInput, normalizeEmbedding(other.face_embedding));
       if (!closestOther || d < closestOther.distance) {
         closestOther = { id: other.id, name: other.name, distance: d };
@@ -167,8 +183,12 @@ export async function POST(request: Request) {
     //      match, bukan cuma "tetangga terdekat" yang kebetulan agak mirip.
     // Dengan (b), kasus cahaya-jelek (distanceSelf membengkak tapi tidak ada akun
     // lain yang BENERAN match) tidak lagi salah-tolak jadi "wajah akun lain".
+    // ✅ NEW: confident-self bypass — wajah yg sudah jelas cocok ke akun sendiri
+    // langsung lolos, JANGAN dicek tukar-wajah. Swap asli (orang lain pakai akun
+    // ini) jaraknya ke akun ini jauh (>= 0.45), jadi tidak ikut ter-bypass.
+    const selfIsConfident = distanceSelf < CONFIDENT_SELF;
     const otherIsConfidentMatch = !!closestOther && closestOther.distance < SWAP_CONFIDENT_MATCH;
-    if (closestOther && otherIsConfidentMatch && closestOther.distance + SWAP_MARGIN < distanceSelf) {
+    if (!selfIsConfident && closestOther && otherIsConfidentMatch && closestOther.distance + SWAP_MARGIN < distanceSelf) {
       console.warn(
         `[face-verify] DITOLAK (swap) — wajah jauh lebih cocok ke ${closestOther.name} (${closestOther.distance.toFixed(3)}) daripada pemilik akun (${distanceSelf.toFixed(3)}). userId=${user.id}`
       );
