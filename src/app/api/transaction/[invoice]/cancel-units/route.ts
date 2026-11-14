@@ -3,6 +3,7 @@ import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { revertLoansOnCancel } from "@/lib/itemLoanSync";
+import { syncJournalAfterPartialCancel } from "@/lib/accountingSource"; // ⬅️ BARU
 
 interface Props {
     params: Promise<{ invoice: string }>;
@@ -169,6 +170,27 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
         // ✅ Peminjaman: pinjaman "DIPESAN" untuk unit yang dibatalkan balik "Dipinjam".
         try { await revertLoansOnCancel(supabase, invoice, cancelledUnitIds); } catch { /* best-effort */ }
 
+        // ⬅️ BARU — Sync jurnal setelah partial cancel.
+        // Logic: bulan SAMA → sync entry existing in-place. Bulan BEDA → bikin
+        // entry koreksi baru di bulan berjalan (refund via Kas Saldo 110).
+        // Skip jika invoice belum dikonfirmasi ke jurnal (masih di Pending Draft).
+        let journalSyncResult: Awaited<ReturnType<typeof syncJournalAfterPartialCancel>> | null = null;
+        try {
+            journalSyncResult = await syncJournalAfterPartialCancel(supabase, invoice, {
+                modal: costCancelled,           // total modal unit yang di-cancel
+                deal: priceCancelled,           // total deal_price unit yang di-cancel
+                userId: user.id,
+                cancelledSNs: itemsToCancel.map((it) => it.serial_number).filter(Boolean) as string[],
+                customerName: transaction.customer_name ?? "—",
+                laptopName: primaryItem.laptop_name ?? "Laptop",
+            });
+            console.log(`[cancel-units] jurnal sync result for ${invoice}:`, journalSyncResult);
+        } catch (err) {
+            // Best-effort: partial cancel sukses, jurnal sync gagal → log & continue.
+            // Rayhan bisa sync manual via tombol "Sinkronkan Nominal" di Jurnal Umum.
+            console.error(`[cancel-units] jurnal sync FAILED for ${invoice}:`, err);
+        }
+
         // 8. Log aktivitas
         await logActivity({
             userId: user.id,
@@ -187,6 +209,7 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
             message: `${cancelledUnitIds.length} unit dibatalkan & dikembalikan ke stok. Sisa ${itemsRemaining.length} unit tetap berjalan di transaksi ini.`,
             unitCancelled: cancelledUnitIds.length,
             unitsRemaining: itemsRemaining.length,
+            journalSync: journalSyncResult, // ⬅️ BARU — info sync jurnal untuk debugging di frontend
         });
     } catch (err: any) {
         console.error("[cancel-units]", err);

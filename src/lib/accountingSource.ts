@@ -6,17 +6,20 @@ import {
   DraftLine,
   accountName,
   cashflowKeterangan,
+  diffJournalLines,           // ⬅️ BARU — diff per-baris untuk sync in-place
   expenseAccountForCashflow,
   incomeAccountForCashflow,
   jakartaDate,
   kasAccountFromCashflow,
   kasAccountFromPaymentMethod,
+  linesEqual,                 // ⬅️ BARU — compare 2 set baris jurnal
   mergeLines,
   periodFromDate,
   periodLabel,
   periodRange,
   totalOf,
 } from "@/lib/accounting";
+
 import {
   buildSalaryJournalLines,
   isSalaryAccountingEligible,
@@ -411,6 +414,651 @@ export async function getTransactionSyncDraftsByInvoices(
   }
 
   return result;
+}
+
+/**
+ * Sinkronisasi Nominal untuk entry HPP PENDING (Shopee/ecommerce pending deal=0).
+ * Beda dengan getTransactionSyncDraftsByInvoices: fungsi ini target entry HPP-only
+ * yang source_id-nya bersuffix __HPP_PENDING — dibangun dari transactions dengan
+ * status RESERVED/HELD/PACKING (BUKAN PAID), isinya CUMA baris HPP/Modal (tanpa
+ * Kas & Pendapatan). Dipanggil dari POST /api/akutansi/jurnal/[id]/sync saat
+ * Rayhan pencet "Sinkronkan Nominal" di entry HPP Pending.
+ */
+export async function getHppPendingSyncDraftByInvoice(
+  supabase: SupabaseClient,
+  baseInvoiceNumber: string
+): Promise<JournalSyncDraft | undefined> {
+  const { data: trx, error } = await supabase
+    .from("transactions")
+    .select("invoice_number, status, customer_name, laptop_name, serial_number, unit_id, unit_ids, item_kind, branch")
+    .eq("invoice_number", baseInvoiceNumber)
+    .in("status", ["RESERVED", "HELD", "PACKING"])
+    .maybeSingle();
+
+  if (error) {
+    console.error("[akuntansi] fetch transaction (hpp pending sync):", error.message);
+    return undefined;
+  }
+  if (!trx) return undefined;
+
+  const t: any = trx;
+  const ids: string[] =
+    Array.isArray(t.unit_ids) && t.unit_ids.length > 0 ? t.unit_ids : t.unit_id ? [t.unit_id] : [];
+
+  // Ambil modal laptop dari unit yang masih terikat transaksi
+  let modal = 0;
+  const sns: string[] = [];
+  if (ids.length > 0) {
+    const { data: units } = await supabase
+      .from("laptop_units")
+      .select("id, purchase_price, sparepart_cost, serial_number")
+      .in("id", ids);
+    for (const u of units ?? []) {
+      modal += Math.round(Number(u.purchase_price ?? 0)) + Math.round(Number(u.sparepart_cost ?? 0));
+      if (u.serial_number) sns.push(u.serial_number as string);
+    }
+  }
+
+  // Ambil modal aksesoris (kalau transaksi mixed/accessory)
+  const effectiveItemKind: "laptop" | "accessory" | "mixed" =
+    t.item_kind === "mixed" || t.item_kind === "accessory" || t.item_kind === "laptop"
+      ? t.item_kind
+      : ids.length > 0
+        ? "laptop"
+        : "accessory";
+
+  let accessoryModal = 0;
+  const accSns: string[] = [];
+  if (effectiveItemKind === "accessory" || effectiveItemKind === "mixed") {
+    const accMap = await getAccessoryDealModalByInvoices(supabase, [baseInvoiceNumber]);
+    accessoryModal = Math.round(accMap.get(baseInvoiceNumber)?.modal ?? 0);
+    accSns.push(...(accMap.get(baseInvoiceNumber)?.sns ?? []));
+  }
+
+  const totalModal = modal + accessoryModal;
+  if (totalModal <= 0) return undefined;
+
+  const lines: DraftLine[] = [];
+  // Modal LAPTOP (D440 Modal Keluar / K130 HPP)
+  if (modal > 0 && effectiveItemKind !== "accessory") {
+    lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+    lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+  }
+  // Modal AKSESORIS (D450 Biaya Printilan / K170 Aksesoris)
+  if (accessoryModal > 0) {
+    lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: accessoryModal });
+    lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: accessoryModal });
+  }
+
+  const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
+  const accSuffix = accSns.length > 0 ? ` · Aksesoris: ${accSns.join(", ")}` : "";
+  const itemLabel = t.laptop_name?.trim()
+    ? t.laptop_name
+    : (effectiveItemKind === "accessory" ? "Aksesoris" : "Laptop");
+  const keterangan = `HPP Pending · ${itemLabel} - ${snText} - ${t.customer_name ?? "—"}${accSuffix}`;
+
+  const merged = mergeLines(lines);
+  return {
+    lines: merged,
+    total: totalOf(merged),
+    keterangan,
+  };
+}
+
+/**
+ * Sinkronisasi Nominal untuk entry ACCRUAL (DP/Reservasi dengan Piutang Debit).
+ * Rebuild draft dari transactions + laptop_units + transaction_items TERBARU.
+ * Dipakai setelah partial cancel atau edit SN di transaksi status
+ * RESERVED/HELD/PACKING (belum PAID — jadi masih accrual, bukan Kas).
+ */
+export async function getAccrualSyncDraftByInvoice(
+  supabase: SupabaseClient,
+  baseInvoiceNumber: string
+): Promise<JournalSyncDraft | undefined> {
+  const { data: trx } = await supabase
+    .from("transactions")
+    .select("invoice_number, status, deal_price, amount, customer_name, laptop_name, serial_number, unit_id, unit_ids, item_kind, branch")
+    .eq("invoice_number", baseInvoiceNumber)
+    .in("status", ["RESERVED", "HELD", "PACKING"])
+    .maybeSingle();
+
+  if (!trx) return undefined;
+
+  const t: any = trx;
+  const deal = Math.round(Number(t.deal_price ?? t.amount ?? 0));
+  if (deal <= 0) return undefined; // deal=0 → HPP-only, pakai getHppPendingSyncDraftByInvoice
+
+  const ids: string[] =
+    Array.isArray(t.unit_ids) && t.unit_ids.length > 0 ? t.unit_ids : t.unit_id ? [t.unit_id] : [];
+
+  let modal = 0;
+  const sns: string[] = [];
+  if (ids.length > 0) {
+    const { data: units } = await supabase
+      .from("laptop_units")
+      .select("id, purchase_price, sparepart_cost, serial_number")
+      .in("id", ids);
+    for (const u of units ?? []) {
+      modal += Math.round(Number(u.purchase_price ?? 0)) + Math.round(Number(u.sparepart_cost ?? 0));
+      if (u.serial_number) sns.push(u.serial_number as string);
+    }
+  }
+
+  const effectiveItemKind: "laptop" | "accessory" | "mixed" =
+    t.item_kind === "mixed" || t.item_kind === "accessory" || t.item_kind === "laptop"
+      ? t.item_kind
+      : ids.length > 0 ? "laptop" : "accessory";
+
+  let accessoryModal = 0;
+  let accessoryDeal = 0;
+  const accSns: string[] = [];
+  if (effectiveItemKind === "accessory" || effectiveItemKind === "mixed") {
+    const accMap = await getAccessoryDealModalByInvoices(supabase, [baseInvoiceNumber]);
+    const info = accMap.get(baseInvoiceNumber);
+    if (info) {
+      accessoryModal = Math.round(info.modal);
+      accessoryDeal = Math.round(info.deal);
+      accSns.push(...info.sns);
+    }
+  }
+
+  const lines: DraftLine[] = [];
+  lines.push({ account_code: AKUN.PIUTANG, side: "DEBIT", nominal: deal });
+
+  if (effectiveItemKind === "accessory") {
+    lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
+  } else if (effectiveItemKind === "mixed") {
+    const acDeal = Math.max(0, Math.min(deal, accessoryDeal));
+    const lpDeal = deal - acDeal;
+    if (lpDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: lpDeal });
+    if (acDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: acDeal });
+  } else {
+    lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
+  }
+
+  if (modal > 0 && effectiveItemKind !== "accessory") {
+    lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+    lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+  }
+  if (accessoryModal > 0) {
+    lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: accessoryModal });
+    lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: accessoryModal });
+  }
+
+  const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
+  const accSuffix = accSns.length > 0 ? ` · Aksesoris: ${accSns.join(", ")}` : "";
+  const itemLabel = t.laptop_name?.trim()
+    ? t.laptop_name
+    : (effectiveItemKind === "accessory" ? "Aksesoris" : "Laptop");
+  const keterangan = `DP/Reservasi · ${itemLabel} - ${snText} - ${t.customer_name ?? "—"}${accSuffix}`;
+
+  const merged = mergeLines(lines);
+  return { lines: merged, total: totalOf(merged), keterangan };
+}
+
+/**
+ * Sinkronisasi jurnal setelah PARTIAL CANCEL (hapus SN dari multi-unit).
+ * Dipanggil dari POST /api/transaction/[invoice]/cancel-units setelah
+ * transactions ter-update dengan unit SISA.
+ *
+ * Strategi:
+ * - Entry accrual polos (source_id = invoice): rebuild via getAccrualSyncDraftByInvoice
+ * - Entry HPP-only (source_id = invoice__HPP_PENDING): rebuild via getHppPendingSyncDraftByInvoice
+ * - Tidak ada entry jurnal → skip (masih di Pending Draft, auto-rebuild dari transactions)
+ *
+ * SAMA BULAN → update entry in-place (via diffJournalLines, ceklis per-baris aman)
+ * BEDA BULAN → bikin entry koreksi 4-baris di bulan berjalan dengan refund via
+ *              Kas Saldo (110), sesuai preferensi Rayhan.
+ */
+export async function syncJournalAfterPartialCancel(
+  supabase: SupabaseClient,
+  invoiceNumber: string,
+  cancelledInfo: {
+    modal: number;         // total modal LAPTOP yang di-cancel
+    deal: number;          // total deal_price LAPTOP yang di-cancel
+    userId: string;
+    cancelledSNs: string[];
+    customerName: string;
+    laptopName: string;
+  }
+): Promise<{
+  action: "synced" | "reversed" | "skipped_no_entry" | "skipped_identical";
+  entryId?: string;
+  message: string;
+}> {
+  // 1. Find entry jurnal utama untuk invoice (polos ATAU __HPP_PENDING)
+  const { data: entries } = await supabase
+    .from("journal_entries")
+    .select("id, source_id, period, keterangan, lines:journal_lines(id, account_code, account_name, side, nominal, line_order, keterangan)")
+    .eq("source_type", "TRANSACTION")
+    .or(`source_id.eq.${invoiceNumber},source_id.eq.${invoiceNumber}__HPP_PENDING`);
+
+  if (!entries || entries.length === 0) {
+    return {
+      action: "skipped_no_entry",
+      message: `Invoice ${invoiceNumber} belum dikonfirmasi ke jurnal (masih di Pending Draft) — auto-rebuild akan pakai nominal baru.`,
+    };
+  }
+
+  // 2. Pilih entry utama: polos > __HPP_PENDING
+  const primaryEntry: any =
+    entries.find((e: any) => e.source_id === invoiceNumber) ??
+    entries.find((e: any) => e.source_id === `${invoiceNumber}__HPP_PENDING`);
+
+  if (!primaryEntry) {
+    return { action: "skipped_no_entry", message: "Entry utama tidak ditemukan." };
+  }
+
+  // 3. Rebuild draft dari data TERBARU
+  const isHppOnly = (primaryEntry.source_id as string).endsWith("__HPP_PENDING");
+  const newDraft: JournalSyncDraft | undefined = isHppOnly
+    ? await getHppPendingSyncDraftByInvoice(supabase, invoiceNumber)
+    : await getAccrualSyncDraftByInvoice(supabase, invoiceNumber);
+
+  if (!newDraft) {
+    return {
+      action: "skipped_no_entry",
+      message: "Gagal rebuild draft (transaksi mungkin sudah tidak eligible accrual).",
+    };
+  }
+
+  // 4. Compare period (Jakarta time)
+  const todayJakarta = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+  const todayPeriod = todayJakarta.slice(0, 7);
+  const entryPeriod = primaryEntry.period as string;
+  const sameMonth = entryPeriod === todayPeriod;
+
+  // 5a. SAMA BULAN → update in-place
+  if (sameMonth) {
+    const linesChanged = !linesEqual(primaryEntry.lines ?? [], newDraft.lines);
+    const ketChanged = primaryEntry.keterangan !== newDraft.keterangan;
+
+    if (!linesChanged && !ketChanged) {
+      return {
+        action: "skipped_identical",
+        message: "Jurnal sudah sama dengan data terbaru (tidak ada perubahan).",
+      };
+    }
+
+    if (linesChanged) {
+      const { toUpdate, toInsert, deleteIds } = diffJournalLines(primaryEntry.lines ?? [], newDraft.lines);
+      if (toInsert.length > 0) {
+        await supabase
+          .from("journal_lines")
+          .insert(draftToLineRowsWithOrder(primaryEntry.id as string, toInsert));
+      }
+      for (const u of toUpdate) {
+        await supabase.from("journal_lines").update({ keterangan: u.keterangan }).eq("id", u.id);
+      }
+      if (deleteIds.length > 0) {
+        await supabase.from("journal_umum_line_checks").delete().in("line_id", deleteIds);
+        await supabase.from("journal_line_checks").delete().in("line_id", deleteIds);
+        await supabase.from("journal_lines").delete().in("id", deleteIds);
+      }
+    }
+
+    await supabase
+      .from("journal_entries")
+      .update({
+        keterangan: newDraft.keterangan,
+        total: newDraft.total,
+        is_edited: true,
+        updated_by: cancelledInfo.userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", primaryEntry.id as string);
+
+    await supabase.from("journal_audit_logs").insert({
+      entry_id: primaryEntry.id,
+      period: entryPeriod,
+      action: "SYNC",
+      before_data: { keterangan: primaryEntry.keterangan, lines: primaryEntry.lines },
+      after_data: { keterangan: newDraft.keterangan, lines: newDraft.lines, trigger: "PARTIAL_CANCEL" },
+      changed_by: cancelledInfo.userId,
+    });
+
+    return {
+      action: "synced",
+      entryId: primaryEntry.id as string,
+      message: `Jurnal INV ${invoiceNumber} ter-sync (SN ${cancelledInfo.cancelledSNs.join(", ")} dibatalkan).`,
+    };
+  }
+
+  // 5b. BEDA BULAN → bikin entry koreksi di bulan berjalan
+  // Format 4-baris (preferensi Rayhan): refund via Kas Saldo (110)
+  const correctionLines: DraftLine[] = [];
+  if (cancelledInfo.deal > 0) {
+    correctionLines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "DEBIT", nominal: cancelledInfo.deal });
+    correctionLines.push({ account_code: AKUN.KAS_SALDO, side: "KREDIT", nominal: cancelledInfo.deal });
+  }
+  if (cancelledInfo.modal > 0) {
+    correctionLines.push({ account_code: AKUN.HPP, side: "DEBIT", nominal: cancelledInfo.modal });
+    correctionLines.push({ account_code: AKUN.MODAL_KELUAR, side: "KREDIT", nominal: cancelledInfo.modal });
+  }
+
+  if (correctionLines.length === 0) {
+    return { action: "skipped_identical", message: "Tidak ada perubahan nominal." };
+  }
+
+  const merged = mergeLines(correctionLines);
+  const total = totalOf(merged);
+  const snLabel = cancelledInfo.cancelledSNs.join(", ");
+  const correctionKet = `Koreksi Partial Cancel · ${cancelledInfo.laptopName} - ${snLabel} - ${cancelledInfo.customerName} (INV ${invoiceNumber})`;
+
+  const maxSeq = await getMaxJournalSeqByDate(supabase, [todayJakarta]);
+  const seq = (maxSeq.get(todayJakarta) ?? 0) + 1;
+  const journalNo = `GJ-${todayJakarta.replace(/-/g, "")}-${String(seq).padStart(3, "0")}`;
+
+  const { data: newEntry, error: insertErr } = await supabase
+    .from("journal_entries")
+    .insert({
+      period: todayPeriod,
+      tanggal: todayJakarta,
+      keterangan: correctionKet,
+      ref: invoiceNumber,
+      journal_no: journalNo,
+      source_type: "MANUAL",
+      source_id: null,
+      source_category: "KOREKSI_PARTIAL_CANCEL",
+      total,
+      created_by: cancelledInfo.userId,
+    })
+    .select("id")
+    .single();
+
+  if (insertErr || !newEntry) {
+    return {
+      action: "skipped_no_entry",
+      message: `Gagal bikin entry koreksi: ${insertErr?.message ?? "unknown"}`,
+    };
+  }
+
+  await supabase.from("journal_lines").insert(draftToLineRows(newEntry.id as string, merged));
+
+  await supabase.from("journal_audit_logs").insert({
+    entry_id: newEntry.id,
+    period: todayPeriod,
+    action: "CREATE",
+    before_data: null,
+    after_data: { keterangan: correctionKet, lines: merged, trigger: "PARTIAL_CANCEL_DIFFERENT_MONTH" },
+    changed_by: cancelledInfo.userId,
+  });
+
+  return {
+    action: "reversed",
+    entryId: newEntry.id as string,
+    message: `Entry koreksi dibuat di ${todayPeriod} (bulan lama ${entryPeriod} tidak diutak-atik).`,
+  };
+}
+
+/**
+ * Sinkronisasi jurnal setelah EDIT TRANSAKSI (edit SN, edit aksesoris, edit deal_price,
+ * edit modal unit). Dipanggil dari PUT /api/transaction/[invoice] & PATCH /api/units/[id].
+ *
+ * Beda dengan syncJournalAfterPartialCancel:
+ * - Scope lebih luas: handle transaksi non-PAID (accrual/HPP-only) DAN PAID.
+ * - Different-month behavior: 2 entry reversal + ulang (pasangan 170⇄450 / 130⇄440)
+ *   sesuai preferensi Rayhan — supaya full nominal modal lama & baru keliatan di
+ *   bulan berjalan tanpa harus buka bulan sebelumnya. BUKAN 4-baris refund.
+ * - Pendapatan (410/420) TIDAK disentuh di koreksi beda bulan — deal_price customer
+ *   tetap sama walau SN atau modal diganti.
+ *
+ * SAMA BULAN: Update entry in-place via diffJournalLines (ceklis per-baris aman).
+ */
+export async function syncJournalAfterEditTransaction(
+  supabase: SupabaseClient,
+  invoiceNumber: string,
+  editInfo: {
+    userId: string;
+    customerName: string;
+    laptopName: string;
+    changeLabel?: string; // optional: untuk keterangan koreksi (misal "SN 0007800→0007801")
+  }
+): Promise<{
+  action: "synced" | "reversed" | "skipped_no_entry" | "skipped_identical";
+  entryId?: string;
+  message: string;
+}> {
+  // 1. Find entry utama (polos ATAU __HPP_PENDING)
+  const { data: entries } = await supabase
+    .from("journal_entries")
+    .select("id, source_id, period, keterangan, lines:journal_lines(id, account_code, account_name, side, nominal, line_order, keterangan)")
+    .eq("source_type", "TRANSACTION")
+    .or(`source_id.eq.${invoiceNumber},source_id.eq.${invoiceNumber}__HPP_PENDING`);
+
+  if (!entries || entries.length === 0) {
+    return {
+      action: "skipped_no_entry",
+      message: `Invoice ${invoiceNumber} belum di jurnal (masih Pending Draft) — auto-rebuild akan pakai nominal baru.`,
+    };
+  }
+
+  const primaryEntry: any =
+    entries.find((e: any) => e.source_id === invoiceNumber) ??
+    entries.find((e: any) => e.source_id === `${invoiceNumber}__HPP_PENDING`);
+
+  if (!primaryEntry) {
+    return { action: "skipped_no_entry", message: "Entry utama tidak ditemukan." };
+  }
+
+  // 2. Rebuild draft TERBARU — detect status via source_id + fallback
+  const isHppOnly = (primaryEntry.source_id as string).endsWith("__HPP_PENDING");
+  let newDraft: JournalSyncDraft | undefined;
+
+  if (isHppOnly) {
+    newDraft = await getHppPendingSyncDraftByInvoice(supabase, invoiceNumber);
+  } else {
+    // Coba accrual dulu (status RESERVED/HELD/PACKING)
+    newDraft = await getAccrualSyncDraftByInvoice(supabase, invoiceNumber);
+    // Fallback ke PAID (transaksi sudah lunas)
+    if (!newDraft) {
+      const paidMap = await getTransactionSyncDraftsByInvoices(supabase, [invoiceNumber]);
+      const paidDraft = paidMap.get(invoiceNumber);
+      if (paidDraft) {
+        newDraft = {
+          lines: paidDraft.lines,
+          total: paidDraft.total,
+          keterangan: paidDraft.keterangan,
+        };
+      }
+    }
+  }
+
+  if (!newDraft) {
+    return {
+      action: "skipped_no_entry",
+      message: "Gagal rebuild draft (transaksi tidak eligible untuk sync).",
+    };
+  }
+
+  // 3. Compare period
+  const todayJakarta = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+  const todayPeriod = todayJakarta.slice(0, 7);
+  const entryPeriod = primaryEntry.period as string;
+  const sameMonth = entryPeriod === todayPeriod;
+
+  // 4a. SAMA BULAN → update in-place (sama pola seperti syncJournalAfterPartialCancel)
+  if (sameMonth) {
+    const linesChanged = !linesEqual(primaryEntry.lines ?? [], newDraft.lines);
+    const ketChanged = primaryEntry.keterangan !== newDraft.keterangan;
+
+    if (!linesChanged && !ketChanged) {
+      return { action: "skipped_identical", message: "Jurnal sudah sama dengan data terbaru." };
+    }
+
+    if (linesChanged) {
+      const { toUpdate, toInsert, deleteIds } = diffJournalLines(primaryEntry.lines ?? [], newDraft.lines);
+      if (toInsert.length > 0) {
+        await supabase.from("journal_lines").insert(draftToLineRowsWithOrder(primaryEntry.id as string, toInsert));
+      }
+      for (const u of toUpdate) {
+        await supabase.from("journal_lines").update({ keterangan: u.keterangan }).eq("id", u.id);
+      }
+      if (deleteIds.length > 0) {
+        await supabase.from("journal_umum_line_checks").delete().in("line_id", deleteIds);
+        await supabase.from("journal_line_checks").delete().in("line_id", deleteIds);
+        await supabase.from("journal_lines").delete().in("id", deleteIds);
+      }
+    }
+
+    await supabase
+      .from("journal_entries")
+      .update({
+        keterangan: newDraft.keterangan,
+        total: newDraft.total,
+        is_edited: true,
+        updated_by: editInfo.userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", primaryEntry.id as string);
+
+    await supabase.from("journal_audit_logs").insert({
+      entry_id: primaryEntry.id,
+      period: entryPeriod,
+      action: "SYNC",
+      before_data: { keterangan: primaryEntry.keterangan, lines: primaryEntry.lines },
+      after_data: { keterangan: newDraft.keterangan, lines: newDraft.lines, trigger: "EDIT_TRANSACTION" },
+      changed_by: editInfo.userId,
+    });
+
+    return {
+      action: "synced",
+      entryId: primaryEntry.id as string,
+      message: `Jurnal INV ${invoiceNumber} ter-sync (edit transaksi).`,
+    };
+  }
+
+  // 4b. BEDA BULAN → 2 entry reversal + ulang (preferensi Rayhan: full nominal, pasangan 130⇄440 / 170⇄450)
+  // Ambil modal LAMA dari entry existing (sum sisi KREDIT akun 130 & 170)
+  const oldLines = (primaryEntry.lines ?? []) as any[];
+  const oldLaptopModal = oldLines
+    .filter((l) => l.account_code === AKUN.HPP && l.side === "KREDIT")
+    .reduce((s, l) => s + Math.round(Number(l.nominal || 0)), 0);
+  const oldAccessoryModal = oldLines
+    .filter((l) => l.account_code === AKUN.AKSESORIS && l.side === "KREDIT")
+    .reduce((s, l) => s + Math.round(Number(l.nominal || 0)), 0);
+
+  // Ambil modal BARU dari draft terbaru (sum sisi KREDIT akun 130 & 170)
+  const newLaptopModal = newDraft.lines
+    .filter((l) => l.account_code === AKUN.HPP && l.side === "KREDIT")
+    .reduce((s, l) => s + Math.round(Number(l.nominal || 0)), 0);
+  const newAccessoryModal = newDraft.lines
+    .filter((l) => l.account_code === AKUN.AKSESORIS && l.side === "KREDIT")
+    .reduce((s, l) => s + Math.round(Number(l.nominal || 0)), 0);
+
+  const laptopModalChanged = oldLaptopModal !== newLaptopModal;
+  const accessoryModalChanged = oldAccessoryModal !== newAccessoryModal;
+
+  if (!laptopModalChanged && !accessoryModalChanged) {
+    return { action: "skipped_identical", message: "Modal tidak berubah, tidak perlu entry koreksi." };
+  }
+
+  const changeLabel = editInfo.changeLabel ?? "edit transaksi";
+  const maxSeq = await getMaxJournalSeqByDate(supabase, [todayJakarta]);
+  let seqCounter = (maxSeq.get(todayJakarta) ?? 0) + 1;
+  const createdEntryIds: string[] = [];
+
+  // Helper internal: buat 1 entry koreksi
+  const createCorrectionEntry = async (
+    lines: DraftLine[],
+    keterangan: string
+  ): Promise<string | null> => {
+    const merged = mergeLines(lines);
+    const total = totalOf(merged);
+    const journalNo = `GJ-${todayJakarta.replace(/-/g, "")}-${String(seqCounter++).padStart(3, "0")}`;
+
+    const { data: newEntry, error } = await supabase
+      .from("journal_entries")
+      .insert({
+        period: todayPeriod,
+        tanggal: todayJakarta,
+        keterangan,
+        ref: invoiceNumber,
+        journal_no: journalNo,
+        source_type: "MANUAL",
+        source_id: null,
+        source_category: "KOREKSI_EDIT_TRANSAKSI",
+        total,
+        created_by: editInfo.userId,
+      })
+      .select("id")
+      .single();
+
+    if (error || !newEntry) {
+      console.error("[syncJournalAfterEditTransaction] insert entry failed:", error?.message);
+      return null;
+    }
+
+    await supabase.from("journal_lines").insert(draftToLineRows(newEntry.id as string, merged));
+    await supabase.from("journal_audit_logs").insert({
+      entry_id: newEntry.id,
+      period: todayPeriod,
+      action: "CREATE",
+      before_data: null,
+      after_data: { keterangan, lines: merged, trigger: "EDIT_TRANSACTION_DIFFERENT_MONTH" },
+      changed_by: editInfo.userId,
+    });
+
+    return newEntry.id as string;
+  };
+
+  // LAPTOP: 2 entry — modal lama masuk stok + modal baru keluar stok (pasangan 130⇄440)
+  if (laptopModalChanged) {
+    if (oldLaptopModal > 0) {
+      const id1 = await createCorrectionEntry(
+        [
+          { account_code: AKUN.HPP, side: "DEBIT", nominal: oldLaptopModal },
+          { account_code: AKUN.MODAL_KELUAR, side: "KREDIT", nominal: oldLaptopModal },
+        ],
+        `Koreksi ${changeLabel} · Modal LAMA laptop masuk balik stok · ${editInfo.laptopName} - ${editInfo.customerName} (INV ${invoiceNumber})`
+      );
+      if (id1) createdEntryIds.push(id1);
+    }
+    if (newLaptopModal > 0) {
+      const id2 = await createCorrectionEntry(
+        [
+          { account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: newLaptopModal },
+          { account_code: AKUN.HPP, side: "KREDIT", nominal: newLaptopModal },
+        ],
+        `Koreksi ${changeLabel} · Modal BARU laptop keluar stok · ${editInfo.laptopName} - ${editInfo.customerName} (INV ${invoiceNumber})`
+      );
+      if (id2) createdEntryIds.push(id2);
+    }
+  }
+
+  // AKSESORIS: 2 entry — modal lama masuk stok + modal baru keluar stok (pasangan 170⇄450)
+  if (accessoryModalChanged) {
+    if (oldAccessoryModal > 0) {
+      const id3 = await createCorrectionEntry(
+        [
+          { account_code: AKUN.AKSESORIS, side: "DEBIT", nominal: oldAccessoryModal },
+          { account_code: AKUN.BIAYA_PRINTILAN, side: "KREDIT", nominal: oldAccessoryModal },
+        ],
+        `Koreksi ${changeLabel} · Modal LAMA aksesoris masuk balik stok · ${editInfo.laptopName} - ${editInfo.customerName} (INV ${invoiceNumber})`
+      );
+      if (id3) createdEntryIds.push(id3);
+    }
+    if (newAccessoryModal > 0) {
+      const id4 = await createCorrectionEntry(
+        [
+          { account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: newAccessoryModal },
+          { account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: newAccessoryModal },
+        ],
+        `Koreksi ${changeLabel} · Modal BARU aksesoris keluar stok · ${editInfo.laptopName} - ${editInfo.customerName} (INV ${invoiceNumber})`
+      );
+      if (id4) createdEntryIds.push(id4);
+    }
+  }
+
+  if (createdEntryIds.length === 0) {
+    return { action: "skipped_identical", message: "Tidak ada entry koreksi yang perlu dibuat." };
+  }
+
+  return {
+    action: "reversed",
+    entryId: createdEntryIds[0],
+    message: `${createdEntryIds.length} entry koreksi dibuat di ${todayPeriod} (bulan lama ${entryPeriod} tidak diutak-atik).`,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

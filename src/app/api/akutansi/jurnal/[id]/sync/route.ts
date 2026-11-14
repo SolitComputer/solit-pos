@@ -7,6 +7,7 @@ import { diffJournalLines, linesEqual } from "@/lib/accounting";
 import {
   draftToLineRowsWithOrder,
   getTransactionSyncDraftsByInvoices,
+  getHppPendingSyncDraftByInvoice, // ⬅️ BARU
   getCashflowSyncDraftsByIds,
   getServiceSyncDraftsByIds,
   JournalSyncDraft,
@@ -58,27 +59,47 @@ export const POST = withAuth(async (_req, ctx, user: any) => {
 
   if (before.source_type === "TRANSACTION") {
     const invoiceNumber = before.source_id as string;
-    if (invoiceNumber.includes("__")) {
+    // ⬅️ UPDATE: Suffix __HPP_PENDING (dari Shopee pending deal=0) sekarang BOLEH di-sync
+    // supaya tombol "Sinkronkan Nominal" bisa dipakai saat modal SN di edit di Barang Terjual.
+    // Suffix lain (__PAY_, __DP, __PELUNASAN, __REVERSAL) tetap diblok — itu entry turunan
+    // bukan entry utama yang bisa dihitung ulang dari transactions.
+    if (invoiceNumber.includes("__") && !invoiceNumber.endsWith("__HPP_PENDING")) {
       return NextResponse.json(
         { success: false, message: "Sinkronisasi cuma berlaku untuk entry utama transaksi (bukan cicilan/DP)" },
         { status: 400 }
       );
     }
-    const beforeLines = ((before as any).lines ?? []) as { account_code: string; side: string }[];
-    const isKasShaped = beforeLines.some((l) => l.side === "DEBIT" && (l.account_code === "110" || l.account_code === "120"));
-    if (!isKasShaped) {
-      return NextResponse.json(
-        { success: false, message: "Sinkronisasi cuma berlaku untuk entry penjualan langsung (debit Kas)" },
-        { status: 400 }
-      );
-    }
-    const draftMap = await getTransactionSyncDraftsByInvoices(supabase, [invoiceNumber]);
-    draft = draftMap.get(invoiceNumber);
-    if (!draft) {
-      return NextResponse.json(
-        { success: false, message: "Data transaksi sumber tidak ditemukan / status transaksi bukan PAID" },
-        { status: 404 }
-      );
+
+    // ⬅️ BARU — Jalur khusus HPP Pending: entry ini TIDAK punya Kas Debit (barang
+    // keluar tapi uang belum masuk), jadi skip guard isKasShaped dan pakai helper
+    // getHppPendingSyncDraftByInvoice yang target transaksi non-PAID.
+    if (invoiceNumber.endsWith("__HPP_PENDING")) {
+      const baseInvoice = invoiceNumber.replace(/__HPP_PENDING$/, "");
+      draft = await getHppPendingSyncDraftByInvoice(supabase, baseInvoice);
+      if (!draft) {
+        return NextResponse.json(
+          { success: false, message: "Data transaksi HPP Pending tidak ditemukan / statusnya sudah bukan pending" },
+          { status: 404 }
+        );
+      }
+    } else {
+      // Jalur normal — entry penjualan langsung (debit Kas) status PAID
+      const beforeLines = ((before as any).lines ?? []) as { account_code: string; side: string }[];
+      const isKasShaped = beforeLines.some((l) => l.side === "DEBIT" && (l.account_code === "110" || l.account_code === "120"));
+      if (!isKasShaped) {
+        return NextResponse.json(
+          { success: false, message: "Sinkronisasi cuma berlaku untuk entry penjualan langsung (debit Kas)" },
+          { status: 400 }
+        );
+      }
+      const draftMap = await getTransactionSyncDraftsByInvoices(supabase, [invoiceNumber]);
+      draft = draftMap.get(invoiceNumber);
+      if (!draft) {
+        return NextResponse.json(
+          { success: false, message: "Data transaksi sumber tidak ditemukan / status transaksi bukan PAID" },
+          { status: 404 }
+        );
+      }
     }
   } else if (before.source_type === "CASHFLOW") {
     const draftMap = await getCashflowSyncDraftsByIds(supabase, [before.source_id as string]);

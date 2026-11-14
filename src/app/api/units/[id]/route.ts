@@ -6,6 +6,7 @@ import { recalcLaptopParentQty } from "@/lib/laptopStock";
 import { BARANG_FULL_ACCESS_ROLES, LAPTOP_DELETE_ROLES, hasAnyRole, expandRolesWithParents, canEditConditionChecks, type UserRole } from "@/lib/permissions";
 import { isUnitQcComplete } from "@/lib/qcCriteria";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
+import { syncJournalAfterEditTransaction } from "@/lib/accountingSource"; // ⬅️ BARU
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -273,10 +274,13 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
 
       // Sync transactions.inventory_price & transactions.other
       // Diperlukan agar gross profit di dashboard tetap akurat setelah koreksi modal
+      // ⬅️ BARU: tambah customer_name + laptop_name + status untuk sync jurnal.
+      // Status CANCELLED di-skip karena tidak perlu update jurnal (sudah di-reverse).
       const { data: txList } = await supabase
         .from("transactions")
-        .select("invoice_number, unit_id, unit_ids, deal_price, amount")
-        .or(`unit_id.eq.${unitId},unit_ids.cs.{${unitId}}`);
+        .select("invoice_number, unit_id, unit_ids, deal_price, amount, customer_name, laptop_name, status")
+        .or(`unit_id.eq.${unitId},unit_ids.cs.{${unitId}}`)
+        .neq("status", "CANCELLED");
 
       if (txList && txList.length > 0) {
         await Promise.allSettled(
@@ -312,6 +316,30 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
               .eq("invoice_number", tx.invoice_number);
           })
         );
+
+        // ⬅️ BARU — Sync jurnal untuk SETIAP invoice yang kena edit modal.
+        // Scope:
+        //   - Unit SOLD (transaksi PAID)  → helper rebuild entry PAID via getTransactionSyncDraftsByInvoices
+        //   - Unit RESERVED/HELD/PACKING  → helper rebuild entry accrual via getAccrualSyncDraftByInvoice
+        //   - Unit HPP Pending (__HPP_PENDING) → helper rebuild via getHppPendingSyncDraftByInvoice
+        // Helper auto-detect dari source_id entry jurnal yang ada.
+        // Done in sequence (bukan Promise.allSettled) biar urutan journal_no konsisten
+        // kalau beberapa invoice masuk kasus beda-bulan sekaligus.
+        for (const tx of txList) {
+          try {
+            const syncResult = await syncJournalAfterEditTransaction(supabase, tx.invoice_number as string, {
+              userId: user.id,
+              customerName: (tx.customer_name as string) ?? "—",
+              laptopName: (tx.laptop_name as string) ?? "Laptop",
+              changeLabel: `edit modal unit SN ${before.serial_number}`,
+            });
+            console.log(`[PATCH units/${unitId}] jurnal sync for ${tx.invoice_number}:`, syncResult);
+          } catch (err) {
+            // Best-effort: update modal sukses, sync jurnal gagal → log & continue.
+            // Rayhan bisa sync manual via tombol "Sinkronkan Nominal" di Jurnal Umum.
+            console.error(`[PATCH units/${unitId}] jurnal sync FAILED for ${tx.invoice_number}:`, err);
+          }
+        }
       }
 
       await logActivity({

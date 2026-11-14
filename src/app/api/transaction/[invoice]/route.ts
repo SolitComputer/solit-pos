@@ -3,6 +3,7 @@ import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { recordOutflow, cancelOutflowByInvoice } from "@/lib/accessoryOutflow";
+import { syncJournalAfterEditTransaction } from "@/lib/accountingSource"; // ⬅️ BARU
 
 const STATUS_TO_UNIT_STATUS: Record<string, string> = {
   RESERVED: "RESERVED",
@@ -1222,6 +1223,43 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
     }
 
+    // ⬅️ BARU — Sync jurnal setelah edit transaksi (Edit SN, Edit Aksesoris, Edit Deal/Modal).
+    // Helper auto-detect perubahan via linesEqual — kalau nominal tidak berubah, skip.
+    // Skip juga kalau transaksi di-cancel (releaseTransactionUnits sudah handle reversal).
+    let journalSyncResult: Awaited<ReturnType<typeof syncJournalAfterEditTransaction>> | null = null;
+    if (!isCancelling) {
+      try {
+        // Build changeLabel otomatis dari field yang berubah untuk keterangan koreksi beda-bulan
+        const changeParts: string[] = [];
+        if (unitFieldsProvided && (finalToRelease.length > 0 || finalToMark.length > 0)) changeParts.push("ganti SN");
+        if (Array.isArray(body.purchase_prices_per_unit) && body.purchase_prices_per_unit.length > 0) changeParts.push("edit modal");
+        if (Array.isArray(body.accessories)) changeParts.push("edit aksesoris");
+        if (body.deal_price !== undefined || Array.isArray(body.deal_prices_per_unit)) changeParts.push("edit harga jual");
+        const changeLabel = changeParts.length > 0 ? changeParts.join(" + ") : "edit transaksi";
+
+        const primaryLaptopName =
+          (data as any)?.laptop_name ||
+          before?.laptop_name ||
+          "Laptop";
+        const primaryCustomerName =
+          (data as any)?.customer_name ||
+          before?.customer_name ||
+          "—";
+
+        journalSyncResult = await syncJournalAfterEditTransaction(supabase, invoice, {
+          userId: user.id,
+          customerName: primaryCustomerName,
+          laptopName: primaryLaptopName,
+          changeLabel,
+        });
+        console.log(`[PUT transaction] jurnal sync result for ${invoice}:`, journalSyncResult);
+      } catch (err) {
+        // Best-effort — update transaksi sukses, sync jurnal gagal → log & continue.
+        // Rayhan bisa sync manual via tombol "Sinkronkan Nominal" di Jurnal Umum.
+        console.error(`[PUT transaction] jurnal sync FAILED for ${invoice}:`, err);
+      }
+    }
+
     // ── Activity log ─────────────────────────────────────────────────
     await logActivity({
       userId: user.id,
@@ -1236,7 +1274,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       afterData: data,
     });
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data, journalSync: journalSyncResult });
   } catch (error) {
     console.error("[PUT /api/transaction/[invoice]]", error);
     return NextResponse.json(
