@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -21,6 +22,20 @@ import {
 } from "lucide-react";
 
 const ACCENT = "#52525b"; // zinc-600
+const ACCENT_DARK = "#8b8b93"; // zinc lebih terang untuk kontras di dark mode
+
+// Deteksi dark mode (html.dark) reaktif — warna chart inline tak bisa dijangkau globals.
+function useIsDark() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const check = () => setDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return dark;
+}
 
 function CountTooltip({ active, payload, label, unit }: any) {
   if (!active || !payload || !payload.length) return null;
@@ -74,6 +89,10 @@ export default function ServiceCharts({
   statusData: { status: string; label: string; value: number; color: string }[];
   trendData: { label: string; count: number }[];
 }) {
+  const dark = useIsDark();
+  const accent = dark ? ACCENT_DARK : ACCENT;
+  const gridStroke = dark ? "#1f2937" : "#f1f5f9";
+  const cursorFill = dark ? "rgba(255,255,255,0.06)" : "#f4f4f5";
   return (
     <div className="grid lg:grid-cols-3 gap-3">
       {/* Beban kerja */}
@@ -85,10 +104,10 @@ export default function ServiceCharts({
       >
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={workloadData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke}/>
             <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} tickLine={false} axisLine={false} interval={0} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} width={32} />
-            <Tooltip cursor={{ fill: "#f4f4f5" }} content={<CountTooltip unit="servis" />} />
+            <Tooltip cursor={{ fill: cursorFill }} content={<CountTooltip unit="servis" />} />
             <Bar dataKey="total" radius={[8, 8, 0, 0]} maxBarSize={46}>
               {workloadData.map((_, i) => (
                 <Cell key={i} fill={ACCENT} fillOpacity={1 - i * 0.07} />
@@ -156,7 +175,7 @@ export default function ServiceCharts({
                 <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false}stroke={gridStroke} />
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={20} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} width={32} />
             <Tooltip content={<CountTooltip unit="servis" />} />
