@@ -109,11 +109,12 @@ export async function DELETE(
   const user = await getAuthUser(req);
   if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
-  // Hanya ADMIN & CS yg boleh hapus — konsisten dgn penanda service ([[solit-pos-service-penanda]])
+  //  CHANGED (2026-11-14) — Hapus sparepart kini HANYA admin. CS dikeluarkan
+  //  di semua konteks (Data Services + Riwayat), biar pembatalan sparepart &
+  //  jurnal reversal (D170/K450 atau D171/K460) sepenuhnya dikontrol admin.
   if (
     !hasAnyRole(getEffectiveRoles(user), [
       "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-      "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
     ])
   ) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });

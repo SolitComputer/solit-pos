@@ -670,10 +670,15 @@ export default function DonePage() {
   const userRoles = user?.roles ?? (user?.role ? [user.role] : []); //  NEW
   const isAdmin = userRoles.some(r => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r)); //  NEW
   const canWarn = userRoles.some(r => (SERVICE_WARNING_ROLES as string[]).includes(r)); //  NEW — boleh beri/hapus penanda
-  //  NEW — role yg boleh hapus sparepart (admin + CS, sejalan dgn backend)
-  const canDeleteSparepart = userRoles.some(r =>
-    ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE"].includes(r)
-  );
+  //  CHANGED (2026-11-14) — Hapus sparepart kini HANYA admin. CS dikeluarkan
+  //  biar pembatalan sparepart & jurnal reversal sepenuhnya dikontrol admin.
+  //  Pakai isAdmin langsung (sudah di-compute di atas) — jangan dobel-list role.
+  const canDeleteSparepart = isAdmin;
+  //  NEW (2026-11-14) — KEPALA_TEKNISI: read-only murni. Boleh buka halaman &
+  //  lihat semua data (termasuk nominal via isAdmin fallback jika perlu), tapi
+  //  SEMUA tombol aksi disembunyikan. Admin yg kebetulan juga KEPALA_TEKNISI
+  //  tidak kena blok ini — isAdmin menang.
+  const isReadOnlyViewer = userRoles.includes("KEPALA_TEKNISI") && !isAdmin;
   const [deletingSparepartLine, setDeletingSparepartLine] = useState<string | null>(null); //  NEW
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -944,6 +949,11 @@ export default function DonePage() {
    * Tools (Sparepart/Estimasi) selalu ada; lifecycle pembayaran & pengambilan menyesuaikan state.
    */
   const getActions = (o: ServiceOrder): ActionItem[] => {
+    //  NEW (2026-11-14) — KEPALA_TEKNISI read-only: tidak ada tombol aksi sama sekali.
+    //  Harus di paling atas (sebelum branch DIBATALKAN) biar order dibatalkan juga
+    //  tidak munculin tombol Diambil.
+    if (isReadOnlyViewer) return [];
+
     // Order dibatalkan → tinggal konfirmasi diambil
     if (o.status === "DIBATALKAN") {
       return [

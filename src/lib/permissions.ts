@@ -404,8 +404,13 @@ export const SERVICE_VIEW_ROLES: UserRole[] = [
 export const SERVICE_CREATE_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_TEKNISI", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE", "TEKNISI", "PKL_TEKNISI",
 ];
+//  CHANGED (2026-11-14) — KEPALA_TEKNISI SENGAJA DIKELUARKAN dari sini.
+//  Dia tetap bisa LIHAT Data Services (ada di SERVICE_VIEW_ROLES &
+//  SERVICE_DONE_VIEW_ROLES), tapi TIDAK boleh klik aksi apa pun
+//  (Sparepart/Mulai/Done/Gagal/Batal/Estimasi/Garansi). Read-only murni.
+//  Kalau nanti dikasih akses aksi lagi, tinggal tambah "KEPALA_TEKNISI" di sini.
 export const SERVICE_TEKNISI_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI",
+  ...FULL_ACCESS, "TEKNISI", "PKL_TEKNISI",
 ];
 // ── Data Services (halaman /dashboard/service/done) ──────────────────────────
 // SENGAJA dipisah dari SERVICE_VIEW_ROLES: halaman "done" (Data Services) lebih
@@ -1017,7 +1022,8 @@ export const PERMISSIONS = {
   CREATE_SERVICE: [...SERVICE_CREATE_ROLES] as UserRole[],
   UPDATE_SERVICE_STATUS: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
-  CONFIRM_SERVICE_PICKUP: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "PKL_TEKNISI", "CUSTOMER_SERVICE"] as UserRole[],
+   //  CHANGED (2026-11-14) — KEPALA_TEKNISI dikeluarkan: read-only di Data Services.
+  CONFIRM_SERVICE_PICKUP: [...FULL_ACCESS, "TEKNISI", "PKL_TEKNISI", "CUSTOMER_SERVICE"] as UserRole[],
 
   // ── Management Seller ──────────────────────────────────────────────────────
   VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
