@@ -19,24 +19,24 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
       return NextResponse.json({ success: false, message: "Data penyiapan tidak ditemukan" }, { status: 404 });
     }
 
-    // ── Resolve laptop_id untuk item yang TIDAK punya laptop_id ──
-    // Sama seperti alasan di GET /api/preparation (list) — SN manual/scan
-    // barcode gak punya laptop_id, jadi cocokkan dulu ke laptop_units lewat
-    // serial_number supaya spek+merk tetap bisa tampil.
-    const missingSns = [
+    // ── Resolve laptop_id SELALU dari laptop_units lewat serial_number ──
+    // Bukan cuma item yang laptop_id-nya kosong. Pas user edit spek unit di
+    // Data Barang, unit bisa pindah ke laptops parent lain (grup spek baru),
+    // sementara preparation_items.laptop_id masih nunjuk parent LAMA → spek basi.
+    const laptopSns = [
       ...new Set(
         (data.preparation_items ?? [])
-          .filter((it: any) => !it.laptop_id && it.serial_number)
+          .filter((it: any) => it.item_type !== "accessory" && it.serial_number)
           .map((it: any) => it.serial_number)
       ),
     ] as string[];
 
     let snToLaptop = new Map<string, string>();
-    if (missingSns.length > 0) {
+    if (laptopSns.length > 0) {
       const { data: matchedUnits } = await supabase
         .from("laptop_units")
         .select("serial_number, laptop_id")
-        .in("serial_number", missingSns);
+        .in("serial_number", laptopSns);
       snToLaptop = new Map(
         (matchedUnits ?? [])
           .filter((u: any) => u.laptop_id)
@@ -48,7 +48,7 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
     // Sama seperti GET /api/preparation (list) — lihat komentar di sana.
     const specLaptopIds = [...new Set(
       (data.preparation_items ?? [])
-        .map((it: any) => it.laptop_id ?? snToLaptop.get(it.serial_number))
+        .map((it: any) => snToLaptop.get(it.serial_number) ?? it.laptop_id)
         .filter(Boolean)
     )] as string[];
 
@@ -70,10 +70,10 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
         .in("id", specLaptopIds);
       const specMap = new Map((laptopSpecs ?? []).map((l: any) => [l.id, l]));
       data.preparation_items = (data.preparation_items ?? []).map((it: any) => {
-        const resolvedLaptopId = it.laptop_id ?? snToLaptop.get(it.serial_number) ?? null;
+        const resolvedLaptopId = snToLaptop.get(it.serial_number) ?? it.laptop_id ?? null;
         return {
           ...it,
-          laptop_name: it.laptop_name ?? (resolvedLaptopId ? laptopNameMap.get(resolvedLaptopId) ?? null : null),
+          laptop_name: (resolvedLaptopId ? laptopNameMap.get(resolvedLaptopId) : null) ?? it.laptop_name ?? null,
           laptop_spec: resolvedLaptopId ? specMap.get(resolvedLaptopId) ?? null : null,
         };
       });
@@ -110,7 +110,7 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
         const acc = resolvedAccId ? accMap.get(resolvedAccId) : null;
         return {
           ...it,
-          laptop_name: it.laptop_name ?? acc?.name ?? null,
+          laptop_name: acc?.name ?? it.laptop_name ?? null,
           accessory_spec: acc ? { brand: acc.brand, spec: acc.spec, category: acc.category } : null,
         };
       });

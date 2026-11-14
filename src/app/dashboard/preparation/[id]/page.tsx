@@ -624,14 +624,56 @@ function AddAccessoryModal({ orderId, onClose, onAdded }: {
     );
 }
 
-// ── EditItemModal: Penyedia ubah SN/nama item yang SUDAH tersimpan ──
+// ── EditItemModal: Penyedia ganti unit (pilih SN dari stok) / ubah nama ──
+// SN sebaiknya dipilih dari hasil search stok supaya laptop_id/unit_id (atau
+// accessory_id/accessory_unit_id) ikut tersimpan — biar spek & merk ketarik
+// dari Data Barang dan unit valid saat ditarik ke pembayaran. Ketik manual
+// tetap boleh (fallback), tapi dikasih peringatan kalau belum nyambung stok.
 function EditItemModal({ orderId, item, onClose, onSaved }: {
     orderId: string; item: PrepItem; onClose: () => void; onSaved: () => void;
 }) {
     const [serial, setSerial] = useState(item.serial_number);
     const [name, setName] = useState(item.laptop_name ?? "");
+    const [itemType, setItemType] = useState<"laptop" | "accessory">(item.item_type === "accessory" ? "accessory" : "laptop");
+    const [laptopId, setLaptopId] = useState<string | undefined>(item.laptop_id ?? undefined);
+    const [unitId, setUnitId] = useState<string | undefined>(undefined);
+    const [accessoryId, setAccessoryId] = useState<string | undefined>(item.accessory_id ?? undefined);
+    const [accessoryUnitId, setAccessoryUnitId] = useState<string | undefined>(undefined);
+
+    const [snSearch, setSnSearch] = useState("");
+    const [snResults, setSnResults] = useState<any[]>([]);
+    const [searching, setSearching] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+
+    const search = useCallback(async (q: string) => {
+        if (q.trim().length < 2) { setSnResults([]); return; }
+        setSearching(true);
+        try {
+            const res = await fetch(`/api/units/search-sn?q=${encodeURIComponent(q)}`);
+            const result = await res.json();
+            setSnResults(result.data || []);
+        } catch { setSnResults([]); } finally { setSearching(false); }
+    }, []);
+
+    // Pilih unit dari stok → tangkap SN + nama + id-nya (pola sama spt Buat Penyiapan)
+    const pickUnit = (u: any) => {
+        const isAcc = u.unit_type === "accessory" || !!u.accessory_id;
+        setSerial(u.serial_number);
+        setName(u.laptop_name ?? u.accessory_name ?? "");
+        if (isAcc) {
+            setItemType("accessory");
+            setAccessoryId(u.accessory_id ?? u.laptop_id ?? undefined);
+            setAccessoryUnitId(u.id ?? undefined);
+            setLaptopId(undefined); setUnitId(undefined);
+        } else {
+            setItemType("laptop");
+            setLaptopId(u.laptop_id ?? undefined);
+            setUnitId(u.id ?? undefined);
+            setAccessoryId(undefined); setAccessoryUnitId(undefined);
+        }
+        setSnSearch(""); setSnResults([]);
+    };
 
     const submit = async () => {
         setError("");
@@ -640,7 +682,16 @@ function EditItemModal({ orderId, item, onClose, onSaved }: {
         try {
             const res = await fetch(`/api/preparation/${orderId}/edit-item`, {
                 method: "PATCH", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ item_id: item.id, serial_number: serial.trim(), laptop_name: name.trim() || null }),
+                body: JSON.stringify({
+                    item_id: item.id,
+                    serial_number: serial.trim(),
+                    laptop_name: name.trim() || null,
+                    item_type: itemType,
+                    laptop_id: laptopId ?? null,
+                    unit_id: unitId ?? null,
+                    accessory_id: accessoryId ?? null,
+                    accessory_unit_id: accessoryUnitId ?? null,
+                }),
             });
             const result = await res.json();
             if (!result.success) { setError(result.message || "Gagal menyimpan"); return; }
@@ -649,6 +700,7 @@ function EditItemModal({ orderId, item, onClose, onSaved }: {
     };
 
     const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition";
+    const linked = !!laptopId || !!accessoryId;
 
     return (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -656,17 +708,59 @@ function EditItemModal({ orderId, item, onClose, onSaved }: {
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-blue-600 px-5 py-4">
                     <p className="font-bold text-white text-sm">Edit Unit</p>
-                    <p className="text-xs text-blue-100 mt-0.5">Ubah serial number atau nama item</p>
+                    <p className="text-xs text-blue-100 mt-0.5">Cari SN dari stok untuk ganti unit, atau ubah nama item</p>
                 </div>
                 <div className="px-5 py-4 space-y-3">
+                    {/* Cari & ganti SN dari stok (biar id produk ikut tersimpan) */}
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Ganti SN dari stok</label>
+                        <div className="relative">
+                            <input
+                                value={snSearch}
+                                onChange={e => { setSnSearch(e.target.value); search(e.target.value); }}
+                                placeholder="Cari SN / nama barang dari stok..."
+                                className={inputCls}
+                            />
+                            {searching && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin" />}
+                        </div>
+                        {snResults.length > 0 && (
+                            <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden bg-white max-h-44 overflow-y-auto shadow-sm">
+                                {snResults.map((u: any) => (
+                                    <button key={u.id} type="button" onClick={() => pickUnit(u)}
+                                        className="w-full px-3 py-2.5 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0 transition">
+                                        <p className="font-mono text-sm font-bold text-gray-800">{u.serial_number}</p>
+                                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${u.unit_type === "accessory" ? "text-emerald-700 bg-emerald-50 border border-emerald-200" : "text-gray-600 bg-gray-100 border border-gray-200"}`}>
+                                                {u.unit_type === "accessory" ? "AKSESORIS" : "LAPTOP"}
+                                            </span>
+                                            <span className="truncate">{u.laptop_name}{u.grade ? ` · Grade ${u.grade}` : ""}</span>
+                                        </p>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {snSearch.trim().length >= 2 && !searching && snResults.length === 0 && (
+                            <p className="text-[11px] text-gray-400 mt-1.5 px-1">SN tidak ditemukan di stok.</p>
+                        )}
+                    </div>
+
                     <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Serial Number *</label>
-                        <input value={serial} onChange={e => setSerial(e.target.value)} className={`${inputCls} font-mono`} />
+                        <input
+                            value={serial}
+                            onChange={e => {
+                                setSerial(e.target.value);
+                                // SN diketik manual → putus dari stok, id dikosongkan
+                                setLaptopId(undefined); setUnitId(undefined);
+                                setAccessoryId(undefined); setAccessoryUnitId(undefined);
+                            }}
+                            className={`${inputCls} font-mono`}
+                        />
+                        {!linked && (
+                            <p className="text-[11px] text-amber-600 mt-1.5 px-1">⚠ SN belum terhubung ke stok — cari & pilih dari daftar di atas biar spek ketarik otomatis.</p>
+                        )}
                     </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Nama Item (opsional)</label>
-                        <input value={name} onChange={e => setName(e.target.value)} placeholder="Nama laptop / aksesoris" className={inputCls} />
-                    </div>
+
                     {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3">

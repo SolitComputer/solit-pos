@@ -76,20 +76,20 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
 
     // ── Resolve laptop_id untuk item yang TIDAK punya laptop_id ──
     const allItemsFlat = (data ?? []).flatMap((o: any) => o.preparation_items ?? []);
-    const missingSns = [
+      const laptopSns = [
       ...new Set(
         allItemsFlat
-          .filter((it: any) => !it.laptop_id && it.serial_number)
+          .filter((it: any) => it.item_type !== "accessory" && it.serial_number)
           .map((it: any) => it.serial_number)
       ),
     ] as string[];
 
     let snToLaptop = new Map<string, string>();
-    if (missingSns.length > 0) {
+    if (laptopSns.length > 0) {
       const { data: matchedUnits } = await supabase
         .from("laptop_units")
         .select("serial_number, laptop_id")
-        .in("serial_number", missingSns);
+        .in("serial_number", laptopSns);
       snToLaptop = new Map(
         (matchedUnits ?? [])
           .filter((u: any) => u.laptop_id)
@@ -101,7 +101,7 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     const laptopIds = [
       ...new Set(
         allItemsFlat
-          .map((it: any) => it.laptop_id ?? snToLaptop.get(it.serial_number))
+          .map((it: any) => snToLaptop.get(it.serial_number) ?? it.laptop_id)
           .filter(Boolean)
       ),
     ] as string[];
@@ -118,7 +118,7 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
 
         (data ?? []).forEach((o: any) => {
           o.preparation_items = (o.preparation_items ?? []).map((it: any) => {
-            const resolvedLaptopId = it.laptop_id ?? snToLaptop.get(it.serial_number) ?? null;
+                  const resolvedLaptopId = snToLaptop.get(it.serial_number) ?? it.laptop_id ?? null;
             return {
               ...it,
               laptop_name: it.laptop_name ?? (resolvedLaptopId ? laptopNameMap.get(resolvedLaptopId) ?? null : null),
