@@ -40,10 +40,9 @@ interface Conversation {
     unreadCount: number;
 }
 
-// ─── Design tokens (tema terang) ───────────────────────────────────────────────
-// Disentralisasi supaya warna konsisten di semua sub-komponen dan gampang
-// diubah lagi nanti tanpa cari-cari satu-satu.
-const THEME = {
+// ─── Design tokens (light + dark) ───────────────────────────────────────────────
+// Disentralisasi; THEME dibaca saat render, otomatis ikut mode terang/gelap.
+const THEME_LIGHT = {
     bg: "#ffffff",
     bgSoft: "#f7f7f8",
     bgHover: "#f4f4f5",
@@ -56,7 +55,43 @@ const THEME = {
     accentSoft: "rgba(99,102,241,0.08)",
     accentSoftBorder: "rgba(99,102,241,0.18)",
     accentText: "#4f46e5",
+    skeletonAlt: "#d4d4d8",
+    headerGradient: "linear-gradient(140deg,#ffffff 0%,#fafafa 45%,#f2f3ff 80%,#eceeff 100%)",
+    messagesBg: "linear-gradient(180deg,#fafafa 0%,#f7f7f8 100%)",
 };
+const THEME_DARK: typeof THEME_LIGHT = {
+    bg: "#101827",
+    bgSoft: "#0e1727",
+    bgHover: "#1b2740",
+    border: "#1e293b",
+    borderSoft: "#18212f",
+    textPrimary: "#f1f5f9",
+    textSecondary: "#94a3b8",
+    textMuted: "#64748b",
+    accent: "#818cf8",
+    accentSoft: "rgba(129,140,248,0.12)",
+    accentSoftBorder: "rgba(129,140,248,0.25)",
+    accentText: "#a5b4fc",
+    skeletonAlt: "#24324a",
+    headerGradient: "linear-gradient(140deg,#101827 0%,#0f1830 45%,#141a3a 80%,#161d44 100%)",
+    messagesBg: "linear-gradient(180deg,#0b1220 0%,#0d1526 100%)",
+};
+function isDarkMode() {
+    return typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+}
+// Proxy: setiap akses THEME.xxx dibaca ulang sesuai mode saat itu.
+const THEME = new Proxy({} as typeof THEME_LIGHT, {
+    get: (_t, key: string) => (isDarkMode() ? THEME_DARK : THEME_LIGHT)[key as keyof typeof THEME_LIGHT],
+});
+// Paksa re-render saat user toggle tema (class .dark di <html> berubah).
+function useDarkMode() {
+    const [, force] = useState(0);
+    useEffect(() => {
+        const obs = new MutationObserver(() => force(n => n + 1));
+        obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+        return () => obs.disconnect();
+    }, []);
+}
 
 // ─── Responsive hook ──────────────────────────────────────────────────────────
 function useIsMobile() {
@@ -215,7 +250,7 @@ function SkeletonRow() {
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 20px" }}>
             <div style={{ position: "relative", width: 46, height: 46, flexShrink: 0 }}>
                 <div style={{ position: "absolute", top: 0, left: 0, width: 32, height: 32, borderRadius: 10, background: THEME.border }} />
-                <div style={{ position: "absolute", bottom: 0, right: 0, width: 32, height: 32, borderRadius: 10, background: "#d4d4d8" }} />
+                <div style={{ position: "absolute", bottom: 0, right: 0, width: 32, height: 32, borderRadius: 10, background: THEME.skeletonAlt }} />
             </div>
             <div style={{ flex: 1 }}>
                 <div style={{ height: 13, width: 170, borderRadius: 6, background: THEME.border, marginBottom: 8 }} />
@@ -236,6 +271,7 @@ export function AdminChatMonitor() {
     const [msgLoading, setMsgLoading] = useState(false);
     const [search, setSearch] = useState("");
     const isMobile = useIsMobile();
+    useDarkMode();
     const listScrollTopRef = useRef(0);
 
     useEffect(() => {
@@ -287,7 +323,7 @@ export function AdminChatMonitor() {
             {/* ── HEADER ── */}
             <div style={{
                 padding: isMobile ? "16px 14px 14px" : "20px 22px 16px",
-                background: "linear-gradient(140deg,#ffffff 0%,#fafafa 45%,#f2f3ff 80%,#eceeff 100%)",
+                background: THEME.headerGradient,
                 borderBottom: `1px solid ${THEME.accentSoftBorder}`,
                 flexShrink: 0,
                 position: "relative",
@@ -654,7 +690,7 @@ function MessageView({
                 <div style={{
                     flex: 1, overflowY: "auto",
                     padding: isMobile ? "14px 10px" : "18px 18px",
-                    background: "linear-gradient(180deg,#fafafa 0%,#f7f7f8 100%)",
+                    background: THEME.messagesBg,
                 }}>
                     {loading ? (
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "56px 0", gap: 16 }}>
