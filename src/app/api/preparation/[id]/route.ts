@@ -221,11 +221,6 @@ async function patchHandler(req: NextRequest, props: Props, _user: AuthUser) {
       .from("preparation_orders").select("id, customer_name").eq("id", id).single();
     if (!order) return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
 
-    // ✅ SECURITY FIX: dulu invoice diterima apa adanya tanpa verifikasi
-    // benar-benar ada, dan role yang diizinkan (PREPARATION_VIEW_ROLES) jauh
-    // lebih luas dari yang seharusnya bisa mengelola link ini. Sekarang
-    // dicek invoice-nya benar ada & customer-nya cocok sebelum di-link, dan
-    // role dipersempit ke PREPARATION_CREATE_ROLES (lihat export di bawah).
     const { data: trx } = await supabase
       .from("transactions")
       .select("invoice_number, customer_name")
