@@ -1024,7 +1024,7 @@ function ActionBtn({ onClick, title, bg, color, children }: {
 }) {
   return (
     <button onClick={onClick} title={title}
-      className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 active:scale-95 flex-shrink-0"
+      className="action-btn w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 active:scale-95 flex-shrink-0"
       style={{ background: bg, color }}>
       {children}
     </button>
@@ -1977,18 +1977,16 @@ export default function UsersPage() {
                 {showOnlinePanel && (
                   <div className="hidden lg:flex flex-col gap-3 w-72 flex-shrink-0 sticky top-6 self-start">
                     {isAdmin && (
-                      <div className="px-4 py-3.5 rounded-2xl flex items-start gap-3"
-                        style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
-                        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: "#dbeafe" }}>
-                          <svg className="w-4 h-4" style={{ color: "#1d4ed8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="px-4 py-3.5 rounded-2xl flex items-start gap-3 bg-blue-50 border border-blue-200">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-100">
+                          <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
                         <div>
-                          <p className="text-xs font-bold" style={{ color: "#1d4ed8" }}>Auto-logout 03:00 WIB</p>
-                          <p className="text-[10.5px] mt-0.5 leading-relaxed" style={{ color: "#3b82f6" }}>
+                          <p className="text-xs font-bold text-blue-700">Auto-logout 03:00 WIB</p>
+                          <p className="text-[10.5px] mt-0.5 leading-relaxed text-blue-500">
                             Session diakhiri otomatis. Gunakan <DoorOpen className="w-2.5 h-2.5 inline" /> untuk paksa logout manual.
                           </p>
                         </div>
