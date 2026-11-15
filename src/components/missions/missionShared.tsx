@@ -233,12 +233,28 @@ export function WorkspaceHeader({ icon, title, subtitle }: { icon: React.ReactNo
   );
 }
 
+// ── Dark mode detect (reaktif) ────────────────────────────────────────────────
+function useIsDark() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const check = () => setDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return dark;
+}
+
 // ── Atom UI ───────────────────────────────────────────────────────────────────
 export function StatusBadge({ status }: { status: MissionStatus }) {
   const s = STATUS_META[status];
+  const dark = useIsDark();
+  const style = dark
+    ? { color: s.dot, background: `color-mix(in srgb, ${s.dot} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${s.dot} 34%, transparent)` }
+    : { color: s.text, background: s.bg, border: `1px solid ${s.border}` };
   return (
-    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-md"
-      style={{ color: s.text, background: s.bg, border: `1px solid ${s.border}` }}>
+    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-md" style={style}>
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.dot }} />
       {s.label}
     </span>
@@ -247,9 +263,12 @@ export function StatusBadge({ status }: { status: MissionStatus }) {
 
 export function PriorityPill({ priority }: { priority: MissionPriority }) {
   const p = PRIORITY_META[priority];
+  const dark = useIsDark();
+  const style = dark
+    ? { color: p.color, background: `color-mix(in srgb, ${p.color} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${p.color} 34%, transparent)` }
+    : { color: p.color, background: p.bg, border: `1px solid ${p.border}` };
   return (
-    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md"
-      style={{ color: p.color, background: p.bg, border: `1px solid ${p.border}` }}>
+    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md" style={style}>
       {p.label}
     </span>
   );
