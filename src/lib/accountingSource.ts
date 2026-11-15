@@ -717,6 +717,15 @@ export async function syncJournalAfterPartialCancel(
       changed_by: cancelledInfo.userId,
     });
 
+    // ⬅️ BARU — Event notif untuk Rayhan (Bug 4)
+    await createJournalChangeNotification(supabase, {
+      entry_id: primaryEntry.id as string,
+      trigger_type: "NOMINAL_CHANGED",
+      detail_message: `Entry jurnal INV ${invoiceNumber} ter-sync karena partial cancel · SN ${cancelledInfo.cancelledSNs.join(", ")} dibatalkan · ${cancelledInfo.laptopName} - ${cancelledInfo.customerName}`,
+      invoice_number: invoiceNumber,
+      created_by: cancelledInfo.userId,
+    });
+
     return {
       action: "synced",
       entryId: primaryEntry.id as string,
@@ -782,6 +791,15 @@ export async function syncJournalAfterPartialCancel(
     before_data: null,
     after_data: { keterangan: correctionKet, lines: merged, trigger: "PARTIAL_CANCEL_DIFFERENT_MONTH" },
     changed_by: cancelledInfo.userId,
+  });
+
+  // ⬅️ BARU — Event notif untuk Rayhan (Bug 4)
+  await createJournalChangeNotification(supabase, {
+    entry_id: newEntry.id as string,
+    trigger_type: "PARTIAL_CANCEL_CORRECTION",
+    detail_message: `Entry koreksi partial cancel bulan ${todayPeriod} dibuat (bulan lama ${entryPeriod} tidak diutak-atik) · SN ${cancelledInfo.cancelledSNs.join(", ")} · ${cancelledInfo.laptopName} - ${cancelledInfo.customerName} (INV ${invoiceNumber})`,
+    invoice_number: invoiceNumber,
+    created_by: cancelledInfo.userId,
   });
 
   return {
@@ -921,6 +939,15 @@ export async function syncJournalAfterEditTransaction(
       changed_by: editInfo.userId,
     });
 
+    // ⬅️ BARU — Event notif untuk Rayhan (Bug 4)
+    await createJournalChangeNotification(supabase, {
+      entry_id: primaryEntry.id as string,
+      trigger_type: "NOMINAL_CHANGED",
+      detail_message: `Entry jurnal INV ${invoiceNumber} ter-sync karena ${editInfo.changeLabel ?? "edit transaksi"} · ${editInfo.laptopName} - ${editInfo.customerName}`,
+      invoice_number: invoiceNumber,
+      created_by: editInfo.userId,
+    });
+
     return {
       action: "synced",
       entryId: primaryEntry.id as string,
@@ -1054,11 +1081,60 @@ export async function syncJournalAfterEditTransaction(
     return { action: "skipped_identical", message: "Tidak ada entry koreksi yang perlu dibuat." };
   }
 
+  // ⬅️ BARU — Event notif untuk Rayhan (Bug 4) — 1 notif per entry koreksi yang dibuat
+  for (const correctionEntryId of createdEntryIds) {
+    await createJournalChangeNotification(supabase, {
+      entry_id: correctionEntryId,
+      trigger_type: "EDIT_TRANSACTION_CORRECTION",
+      detail_message: `Entry koreksi ${changeLabel} bulan ${todayPeriod} dibuat (bulan lama ${entryPeriod} tidak diutak-atik) · ${editInfo.laptopName} - ${editInfo.customerName} (INV ${invoiceNumber})`,
+      invoice_number: invoiceNumber,
+      created_by: editInfo.userId,
+    });
+  }
+
   return {
     action: "reversed",
     entryId: createdEntryIds[0],
     message: `${createdEntryIds.length} entry koreksi dibuat di ${todayPeriod} (bulan lama ${entryPeriod} tidak diutak-atik).`,
   };
+}
+
+/**
+ * Insert event notif perubahan jurnal ke tabel journal_change_notifications.
+ * Di-trigger oleh syncJournalAfterPartialCancel & syncJournalAfterEditTransaction
+ * setiap kali ada entry jurnal yang ter-update (same-month) atau entry koreksi
+ * baru dibuat (different-month).
+ *
+ * Konsumen notif (user eligible via journal_notif_recipients) akan polling via
+ * /api/akutansi/jurnal/notifications dan dapat bubble + popup di pojok layar.
+ *
+ * Best-effort: kalau insert gagal, tidak throw error (jurnal tetap tersimpan).
+ */
+export async function createJournalChangeNotification(
+  supabase: SupabaseClient,
+  params: {
+    entry_id: string;
+    trigger_type: "NOMINAL_CHANGED" | "PARTIAL_CANCEL_CORRECTION" | "EDIT_TRANSACTION_CORRECTION";
+    detail_message: string;
+    invoice_number?: string | null;
+    created_by: string;
+  }
+): Promise<void> {
+  try {
+    const { error } = await supabase.from("journal_change_notifications").insert({
+      entry_id: params.entry_id,
+      trigger_type: params.trigger_type,
+      detail_message: params.detail_message,
+      invoice_number: params.invoice_number ?? null,
+      created_by: params.created_by,
+    });
+    if (error) {
+      console.error("[createJournalChangeNotification] insert failed:", error.message);
+    }
+  } catch (err) {
+    console.error("[createJournalChangeNotification] unexpected error:", err);
+    // Best-effort — notif gagal, jurnal tetap tersimpan
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

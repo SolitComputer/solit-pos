@@ -22,6 +22,7 @@ import PengajuanDanaExecuteNotifier from "@/components/layout/PengajuanDanaExecu
 import ItemLoanNotifier from "@/components/layout/ItemLoanNotifier";
 import ItemLoanReminderNotifier from "@/components/layout/ItemLoanReminderNotifier";
 import VehiclePendingNotifier from "@/components/layout/VehiclePendingNotifier";
+import JurnalChangedNotifier from "@/components/layout/JurnalChangedNotifier";
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -116,6 +117,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Sengaja TIDAK dibungkus !isSilentAdmin karena Kepala Sales bukan role
             yang dibisukan global. */}
         <VehiclePendingNotifier userRoles={authUserRoles} />
+            {/* Notif perubahan jurnal — self-gate ke user yang di-whitelist di
+                journal_notif_recipients.enabled (dikelola dari modal "Kelola Notif"
+                di Jurnal Umum). Tidak perlu userRoles — API filter per-akun.
+                Tidak dibungkus !isSilentAdmin karena tidak bersuara (silent popup). */}
+            <JurnalChangedNotifier userId={soundUserId} />
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}
           <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0 sticky top-0 z-30">
