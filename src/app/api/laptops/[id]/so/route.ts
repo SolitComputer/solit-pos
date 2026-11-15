@@ -87,6 +87,50 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
+    // ✅ FIX: PROPAGATE ke SEMUA unit aktif — supaya tab SO Laptop (per-unit)
+    // juga sync. Dulu endpoint ini cuma update laptops.so_at, jadi kalau user
+    // "SO" dari Data Barang → di SO Laptop semua unit masih "Belum SO".
+    // Filter aktif = OUT_STATUSES (sama dengan rollup di /api/units/[id]/so
+    // & dengan UnifiedBarangContent.tsx) + bukan anggota Kelompok MSJ.
+    const OUT_STATUSES_PROPAGATE = new Set([
+      "SOLD", "TERJUAL", "KELUAR", "RETURNED", "RESERVED", "HELD", "PACKING", "PENDING",
+    ]);
+    try {
+      const { data: unitsBefore } = await supabase
+        .from("laptop_units")
+        .select("id, serial_number, status, msj_group_id")
+        .eq("laptop_id", id);
+
+      const unitAktif = (unitsBefore ?? []).filter(
+        (u) => !OUT_STATUSES_PROPAGATE.has(u.status) && !u.msj_group_id
+      );
+
+      if (unitAktif.length > 0) {
+        const unitIds = unitAktif.map((u) => u.id);
+        // Update semua unit aktif sekaligus — 1 query, atomic.
+        await supabase
+          .from("laptop_units")
+          .update({ so_at: nowIso, so_by: user.name })
+          .in("id", unitIds);
+
+        // Log tiap unit ke laptop_unit_so_logs supaya riwayat SO per-unit
+        // di tab SO Laptop juga nyata, bukan "tiba-tiba sudah SO".
+        const unitLogs = unitAktif.map((u) => ({
+          unit_id: u.id,
+          action: "SO" as const,
+          so_by: user.name,
+          so_at: nowIso,
+          notes: wasAlreadySo
+            ? (notes ? `${notes} (SO Ulang — dari SO Model)` : "SO Ulang (dari SO Model)")
+            : (notes ? `${notes} (dari SO Model)` : "Dari SO Model"),
+        }));
+        await supabase.from("laptop_unit_so_logs").insert(unitLogs);
+      }
+    } catch {
+      // Propagate gagal TIDAK membatalkan SO model yang sudah sukses.
+      // Admin bisa tutup celah sinkronisasi secara manual lewat tab SO Laptop.
+    }
+
     // History "siapa yang SO" tercatat permanen di activity log — action
     // selalu "SO", niat "SO Ulang" dicatat di reason kalau sebelumnya
     // sudah pernah di-SO.

@@ -154,6 +154,21 @@ function isStockEmpty(row: UnifiedRow): boolean {
     return stok === 0;
 }
 
+// ✅ FIX: Status SO level model = agregasi dari UNIT, BUKAN dari laptops.so_at.
+// Alasan: backend rollup bisa gagal/mismatch filter → laptops.so_at stale.
+// Single source of truth = laptop_units.so_at. Semua tempat yang mau jawab
+// pertanyaan "model ini sudah SO atau belum?" pakai helper ini, BUKAN
+// isSoActive(row.so_at) langsung.
+//
+//  • Model punya ≥1 unit: "Sudah SO" iff SEMUA unit aktif sudah SO.
+//  • Model tanpa unit (aksesoris legacy stok manual): fallback ke so_at model.
+function isModelSoActive(row: UnifiedRow): boolean {
+    if (row.unit_count > 0) {
+        return row.so_done >= row.unit_count;
+    }
+    return isSoActive(row.so_at);
+}
+
 //  Aksesoris: tentukan aksi Unit berdasarkan STOK EFEKTIF (row.stok — sudah
 //  fallback ke kolom stock manual kalau belum ada SN sama sekali), BUKAN
 //  row.unit_count saja. Aksesori lama (stok manual tanpa SN) unit_count-nya
@@ -531,7 +546,7 @@ function SoConfirmModal({
         return () => window.removeEventListener("keydown", h);
     }, [onCancel, loading]);
 
-    const isActive = isSoActive(row.so_at);
+    const isActive = isModelSoActive(row);
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
@@ -1245,8 +1260,9 @@ export default function UnifiedBarangContent() {
 
         if (statusAuditSoFilter !== "ALL") {
             list = list.filter(r => {
-                if (statusAuditSoFilter === "SO_TODAY") return isSoActive(r.so_at);
-                if (statusAuditSoFilter === "SO_NEED") return !isSoActive(r.so_at);
+                // ✅ FIX: pakai isModelSoActive (agregasi unit), bukan flag level model
+                if (statusAuditSoFilter === "SO_TODAY") return isModelSoActive(r);
+                if (statusAuditSoFilter === "SO_NEED") return !isModelSoActive(r);
                 if (statusAuditSoFilter === "AUDIT_ACTIVE") return isAuditActive(r);
                 return true;
             });
@@ -1328,7 +1344,7 @@ export default function UnifiedBarangContent() {
 
             filteredRows.forEach((row) => {
                 const auditLabel = isAuditActive(row) ? "Sudah" : "Belum";
-                const soLabel = isSoActive(row.so_at) ? "Sudah" : "Belum";
+                const soLabel = isModelSoActive(row) ? "Sudah" : "Belum";
 
                 if (row.tipe === "LAPTOP") {
                     // Total Modal = jumlah modal unit aktif (basis OUT_STATUSES, sama
@@ -2224,7 +2240,7 @@ export default function UnifiedBarangContent() {
                                     {visibleRows.map((row) => {
                                         const rowKey = `${row.tipe}-${row.id}`;
                                         const auditActive = isAuditActive(row);
-                                        const soActive = isSoActive(row.so_at);
+                                        const soActive = isModelSoActive(row); // ✅ FIX
                                         const expanded = expandedIds.has(rowKey);
                                         const canEditThis = row.tipe === "LAPTOP" ? canEditLaptop : canEditAcc;
                                         const canDeleteThis = row.tipe === "LAPTOP" ? canDeleteLaptop : canDeleteAcc;
@@ -2486,7 +2502,7 @@ export default function UnifiedBarangContent() {
                                             <tbody>
                                                 {visibleRows.map((row, idx) => {
                                                     const auditActive = isAuditActive(row);
-                                                    const soActive = isSoActive(row.so_at);
+                                                    const soActive = isModelSoActive(row); // ✅ FIX
                                                     const zebra = idx % 2 === 1;
                                                     const rowBg = zebra ? "bg-zinc-50" : "bg-white";
                                                     const accAction = getAccessoryUnitAction(row);

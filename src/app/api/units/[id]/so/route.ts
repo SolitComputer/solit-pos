@@ -93,11 +93,16 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     });
 
     // ── ROLLUP ke parent laptops.so_at ──────────────────────────────────
-    // Begitu SEMUA unit aktif (bukan SOLD/KELUAR, bukan anggota Kelompok MSJ)
-    // sudah di-SO HARI INI, baris model di Data Barang otomatis ditandai
-    // "Sudah SO". Kalau ada 1 unit saja yang belum / di-batalkan, tanda di
-    // baris model ikut dicabut. Inilah yang menaikkan status SO per-unit
-    // (dari Kelola Unit) ke level model — tanpa perlu tombol SO di baris luar.
+    // ✅ FIX: filter "aktif" DISAMAKAN dengan OUT_STATUSES di frontend
+    // (UnifiedBarangContent.tsx). Dulu di sini cuma exclude SOLD/KELUAR —
+    // unit RESERVED/HELD/PACKING/PENDING masih ikut dihitung "aktif" padahal
+    // di Data Barang mereka sudah exclude dari unit_count. Akibatnya: model
+    // dengan 1 unit SIAP_JUAL + 1 unit RESERVED → user SO unit SIAP_JUAL →
+    // rollup backend hitung aktif = 2 → allSo false → parent tidak update →
+    // Data Barang (yang baca laptops.so_at) tampil "Belum SO" ❌.
+    const OUT_STATUSES_ROLLUP = new Set([
+      "SOLD", "TERJUAL", "KELUAR", "RETURNED", "RESERVED", "HELD", "PACKING", "PENDING",
+    ]);
     try {
       const { data: siblings } = await supabase
         .from("laptop_units")
@@ -105,14 +110,8 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         .eq("laptop_id", current.laptop_id);
 
       const aktif = (siblings ?? []).filter(
-        (u) => u.status !== "SOLD" && u.status !== "KELUAR" && !u.msj_group_id
+        (u) => !OUT_STATUSES_ROLLUP.has(u.status) && !u.msj_group_id
       );
-      // Semua unit aktif sudah di-SO (so_at terisi) → naikkan status ke parent.
-      // Karena PATCH ini hanya SET (tidak pernah clear), kondisi allSo yang
-      // terpenuhi hanya PERLU update timestamp parent — JANGAN clear so_at
-      // parent walaupun allSo = false di sini (bisa saja kondisi "false"
-      // muncul karena ada unit baru masuk yang belum di-SO). Pembersihan
-      // so_at parent sekarang eksklusif lewat tombol Reset SO manual.
       const allSo = aktif.length > 0 && aktif.every((u) => u.so_at != null);
 
       if (allSo) {
@@ -121,12 +120,8 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
           .update({ so_at: nowIso, so_by: user.name })
           .eq("id", current.laptop_id);
       }
-      // kalau TIDAK semua unit di-SO → jangan sentuh parent sama sekali.
-      // Status parent akan otomatis reflect "belum semua SO" via hitungan
-      // X/Y di UI, bukan via flag so_at parent.
     } catch {
-      // Rollup gagal TIDAK membatalkan SO unit yang sudah sukses — unit tetap
-      // tersimpan, cuma tanda di baris model yang mungkin telat ter-update.
+      // Rollup gagal TIDAK membatalkan SO unit yang sudah sukses.
     }
 
     return NextResponse.json({ success: true, data });
