@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, ChevronsUpDown, Plus, Calendar, Layers, MoreVertical, Undo2, Sparkles, RefreshCw, Bookmark, BookmarkCheck, Users } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, ChevronsUpDown, Plus, Calendar, Layers, MoreVertical, Undo2, Sparkles, RefreshCw, Bookmark, BookmarkCheck } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -18,7 +18,8 @@ import {
     jakartaDate,
     sumSide,
 } from "@/lib/accounting";
-import NotifRecipientsModal from "@/components/akutansi/NotifRecipientsModal";
+// NotifRecipientsModal dipindah ke AkuntansiTabs (lihat Perubahan #5-8) —
+// tombol "Kelola Notif" sekarang hidup di header sejajar Export Excel.
 
 interface JournalLine {
     id: string;
@@ -355,7 +356,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     const [logEntry, setLogEntry] = useState<JournalEntry | null>(null);
     const [toast, setToast] = useState<string | null>(null);
     const [showPending, setShowPending] = useState(false);
-    const [notifRecipientsOpen, setNotifRecipientsOpen] = useState(false);
+    // notifRecipientsOpen di-lift ke AkuntansiTabs (lihat Perubahan #6)
     const hasHydratedPending = useRef(false);
 
     // ── Penanda Baca (bookmark baris terakhir dibaca) ──
@@ -1493,14 +1494,6 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                             </button>
                         )}
                         <button
-                            onClick={() => setNotifRecipientsOpen(true)}
-                            title="Kelola siapa yang menerima notif perubahan jurnal"
-                            className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-white border border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-amber-700 text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap inline-flex items-center justify-center gap-1.5"
-                        >
-                            <Users className="w-3.5 h-3.5" />
-                            Kelola Notif
-                        </button>
-                        <button
                             onClick={() => setShowManual(true)}
                             className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
                         >
@@ -1899,10 +1892,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                     onSyncMany={handleSyncMany}
                 />
             )}
-            <NotifRecipientsModal
-                open={notifRecipientsOpen}
-                onClose={() => setNotifRecipientsOpen(false)}
-            />
+            {/* NotifRecipientsModal dipindah ke AkuntansiTabs (Perubahan #8) */}
 
             <style jsx global>{`
                 @keyframes toastIn {

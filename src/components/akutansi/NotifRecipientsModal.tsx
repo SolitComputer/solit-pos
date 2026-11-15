@@ -6,7 +6,7 @@ import { AlertCircle, CheckCircle2, Loader2, Save, Users, X } from "lucide-react
 
 interface EligibleUser {
   user_id: string;
-  full_name: string;
+  name: string;  // ← FIX: samakan dengan API yang return `name`, bukan `full_name`
   role: string;
   enabled: boolean;
 }
@@ -104,7 +104,9 @@ export default function NotifRecipientsModal({ open, onClose }: Props) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipients: users.map((u) => ({
+          // FIX: API expect key `items`, bukan `recipients` — kalau tidak,
+          // backend reject dengan "items array wajib diisi" (lihat route.ts line 78-83)
+          items: users.map((u) => ({
             user_id: u.user_id,
             enabled: u.enabled,
           })),
@@ -246,7 +248,7 @@ export default function NotifRecipientsModal({ open, onClose }: Props) {
                         />
                         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-slate-700 truncate">
-                            {user.full_name}
+                            {user.name}
                           </span>
                           <span
                             className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${
