@@ -288,6 +288,12 @@ export default function CreatePaymentPage() {
     const isJogjaLocked = isJogjaBranchLockedRole(userRoles);
     useEffect(() => { if (isJogjaLocked) setBranch("JOGJA"); }, [isJogjaLocked]);
 
+    // Nama Perusahaan OTOMATIS ikut cabang — Utama = "Solit 03", Jogja = "Solit Jogja".
+    // (tidak diisi manual lagi oleh user)
+    useEffect(() => {
+        setValue("company_name", branch === "JOGJA" ? "Solit Jogja" : "Solit 03");
+    }, [branch, setValue]);
+
     // ── Fetch price list pedagang saat sellerType = PEDAGANG ──────────────────
     useEffect(() => {
         if (sellerType !== "PEDAGANG") return;
@@ -1138,7 +1144,8 @@ export default function CreatePaymentPage() {
                                 )}
                             </div>
 
-                            <input type="text" placeholder="Nama Perusahaan" className={inputClass} {...register("company_name")} />
+                                                     {/* Nama Perusahaan tidak diisi manual — otomatis ikut Cabang (lihat useEffect) */}
+                            <input type="hidden" {...register("company_name")} />
                             <input
                                 type="tel"
                                 placeholder={isEcommerce ? "No. WhatsApp (opsional untuk E-Commerce)" : "No. WhatsApp *"}

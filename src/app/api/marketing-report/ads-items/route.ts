@@ -23,6 +23,7 @@ interface AdsItemRow {
   customer_name: string;
   sales_name: string | null;
   barang: string;
+  deal_price: number | null;
   sumber: string | null;
   nama_toko: string | null;
 }
@@ -46,7 +47,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     let query = supabaseAdmin
       .from(TABLE)
-      .select("invoice_number, created_at, customer_name, sales_name, laptop_name, laptop_id, company_name, source_platform, status, from_ads")
+           .select("invoice_number, created_at, customer_name, sales_name, laptop_name, laptop_id, company_name, source_platform, status, from_ads, deal_price, amount")
       // ✅ Dianggap "dari Ads" kalau from_ads = true (penanda baru dari form
       //    payment, berlaku sejak fitur ini di-deploy) ATAU source_platform
       //    mengandung "ADS" (perilaku lama — mis. "Ads Facebook" — dibiarkan
@@ -156,6 +157,8 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       customer_name: trx.customer_name ?? "—",
       sales_name: trx.sales_name ?? null,
       barang: describeBarang(trx),
+      // Harga deal saat transaksi (sebagian transaksi lama simpan nilainya di `amount`).
+      deal_price: Number(trx.deal_price ?? trx.amount ?? 0) || null,
       sumber: formatSumber(trx),
       nama_toko: trx.company_name ?? null,
     }));

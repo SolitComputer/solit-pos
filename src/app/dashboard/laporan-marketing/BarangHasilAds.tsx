@@ -11,6 +11,7 @@ interface AdsItemRow {
   customer_name: string;
   sales_name: string | null;
   barang: string;
+  deal_price: number | null;
   sumber: string | null;
   nama_toko: string | null;
 }
@@ -126,7 +127,8 @@ export default function BarangHasilAds() {
                   <th className="border border-violet-700 px-3 py-2 text-left font-bold whitespace-nowrap">Tanggal</th>
                   <th className="border border-violet-700 px-3 py-2 text-left font-bold min-w-[140px]">Nama Customer</th>
                   <th className="border border-violet-700 px-3 py-2 text-left font-bold min-w-[120px]">Nama Sales</th>
-                  <th className="border border-violet-700 px-3 py-2 text-left font-bold min-w-[220px]">Nama Barang + Spesifikasi</th>
+                                <th className="border border-violet-700 px-3 py-2 text-left font-bold min-w-[220px]">Nama Barang + Spesifikasi</th>
+                  <th className="border border-violet-700 px-3 py-2 text-right font-bold min-w-[120px]">Harga Deal</th>
                   <th className="border border-violet-700 px-3 py-2 text-left font-bold min-w-[110px]">Sumber</th>
                   <th className="border border-violet-700 px-3 py-2 text-left font-bold min-w-[110px]">Nama Toko</th>
                 </tr>
@@ -140,7 +142,10 @@ export default function BarangHasilAds() {
                     </td>
                     <td className="border border-gray-200 px-3 py-1.5 font-semibold text-gray-800">{row.customer_name}</td>
                     <td className="border border-gray-200 px-3 py-1.5 text-gray-700">{row.sales_name ?? "—"}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-gray-700">{row.barang}</td>
+                                     <td className="border border-gray-200 px-3 py-1.5 text-gray-700">{row.barang}</td>
+                    <td className="border border-gray-200 px-3 py-1.5 text-right tabular-nums font-semibold text-gray-800 whitespace-nowrap">
+                      {row.deal_price ? `Rp${Number(row.deal_price).toLocaleString("id-ID")}` : "—"}
+                    </td>
                     <td className="border border-gray-200 px-3 py-1.5 text-gray-700">{row.sumber ?? "—"}</td>
                     <td className="border border-gray-200 px-3 py-1.5 text-gray-700">{row.nama_toko ?? "—"}</td>
                   </tr>
