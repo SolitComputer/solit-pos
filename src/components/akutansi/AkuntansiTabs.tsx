@@ -11,7 +11,8 @@ import Neraca from "./Neraca";
 import LabaRugi from "./LabaRugi";
 import AkunManager from "./AkunManager";
 import BluePrint from "./BluePrint";
-import { Inbox, FileSpreadsheet, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import NotifRecipientsModal from "./NotifRecipientsModal";
+import { Inbox, FileSpreadsheet, ChevronLeft, ChevronRight, ArrowLeft, Users } from "lucide-react";
 
 type TabKey = "jurnal" | "buku-besar" | "neraca" | "laba-rugi" | "akun" | "blueprint";
 const TABS: { key: TabKey; label: string }[] = [
@@ -30,6 +31,9 @@ export default function AkuntansiTabs({ period }: { period: string }) {
   // Multi-cabang: "ALL" = gabungan semua cabang, "JOGJA" = eksklusif Jogja.
   const [branch, setBranch] = useState<"ALL" | "JOGJA">("ALL");
   const [canSwitchBranch, setCanSwitchBranch] = useState(false); // hanya Admin & Accounting
+  // State modal "Kelola Notif Jurnal" — di-lift ke sini biar tombolnya bisa duduk
+  // sejajar Export Excel di header, bukan jejal di toolbar filter JurnalUmum.
+  const [notifRecipientsOpen, setNotifRecipientsOpen] = useState(false);
 
   useEffect(() => {
     getAuthUser()
@@ -150,6 +154,23 @@ export default function AkuntansiTabs({ period }: { period: string }) {
             </label>
           )}
 
+          {/* Kelola Notif Jurnal — hanya muncul saat tab Jurnal Umum aktif,
+              karena setting notif ini scope-nya spesifik untuk perubahan jurnal.
+              Konsisten dengan pattern conditional di tombol lain (branch filter &
+              export excel juga di-hide per tab). API sendiri enforce role
+              AKUNTANSI_MANAGE_ROLES saat Save — jadi button bisa di-show luas,
+              non-manager hanya bisa lihat list tanpa bisa simpan. */}
+          {tab === "jurnal" && (
+            <button
+              onClick={() => setNotifRecipientsOpen(true)}
+              title="Kelola siapa yang menerima notif perubahan jurnal"
+              className="h-10 px-4 flex items-center justify-center gap-2 rounded-xl bg-white border border-amber-200 hover:bg-amber-50 hover:border-amber-300 active:scale-[0.97] text-amber-700 text-xs font-semibold shadow-xs hover:shadow transition-all whitespace-nowrap"
+            >
+              <Users className="w-4 h-4" />
+              Kelola Notif
+            </button>
+          )}
+
           {/* Export Excel Button — tidak relevan di tab Blue Print */}
           {tab !== "blueprint" && (
             <button
@@ -218,6 +239,15 @@ export default function AkuntansiTabs({ period }: { period: string }) {
           </div>
         )}
       </div>
+
+      {/* Modal "Kelola Penerima Notif Jurnal" — di-render di level AkuntansiTabs
+          karena state open/close-nya di-lift ke sini (lihat Perubahan #6-7).
+          Tetap di-mount walau tab aktif bukan jurnal — biar gak flicker saat
+          user buka modal dari tab jurnal lalu pindah tab (edge case). */}
+      <NotifRecipientsModal
+        open={notifRecipientsOpen}
+        onClose={() => setNotifRecipientsOpen(false)}
+      />
     </div>
   );
 }
