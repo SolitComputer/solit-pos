@@ -68,5 +68,48 @@ export const PATCH = withAuth(async (req: NextRequest, ctx: { params: Promise<{ 
         console.error("[PATCH /api/accessory-units/[id]/so] history insert", histErr);
     }
 
+    // ✅ FIX: ROLLUP ke parent accessories.so_at — mirror pola laptop di
+    // /api/units/[id]/so. Begitu SEMUA unit aktif sudah di-SO, baris model
+    // di Data Barang otomatis ditandai "Sudah SO".
+    // Filter "aktif" DISAMAKAN dengan OUT_STATUSES di frontend
+    // (UnifiedBarangContent.tsx) + bukan anggota Kelompok MSJ — biar tidak
+    // ada mismatch antara backend rollup dgn hitungan unit_count di UI.
+    const OUT_STATUSES_ROLLUP = new Set([
+        "SOLD", "TERJUAL", "KELUAR", "RETURNED", "RESERVED", "HELD", "PACKING", "PENDING",
+    ]);
+    try {
+        // Ambil accessory_id dari unit yang baru di-update.
+        const { data: thisUnit } = await supabaseAdmin
+            .from("accessory_units")
+            .select("accessory_id")
+            .eq("id", id)
+            .single();
+
+        if (thisUnit?.accessory_id) {
+            const { data: siblings } = await supabaseAdmin
+                .from("accessory_units")
+                .select("status, so_at, msj_group_id")
+                .eq("accessory_id", thisUnit.accessory_id);
+
+            const aktif = (siblings ?? []).filter(
+                (u) => !OUT_STATUSES_ROLLUP.has(u.status) && !u.msj_group_id
+            );
+            // Semua unit aktif sudah SO → naikkan status ke parent model.
+            // Kalau belum semua → jangan sentuh parent (angka progress X/Y di
+            // Data Barang sudah reflect kondisi parsial).
+            const allSo = aktif.length > 0 && aktif.every((u) => u.so_at != null);
+
+            if (allSo) {
+                await supabaseAdmin
+                    .from("accessories")
+                    .update({ so_at: soAt, so_by: soBy })
+                    .eq("id", thisUnit.accessory_id);
+            }
+        }
+    } catch (e) {
+        // Rollup gagal TIDAK membatalkan SO unit yang sudah sukses.
+        console.error("[PATCH /api/accessory-units/[id]/so] rollup", e);
+    }
+
     return NextResponse.json({ success: true, data: updated });
 });
