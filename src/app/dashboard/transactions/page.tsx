@@ -2501,6 +2501,11 @@ function EditTransactionModal({
   const [customerPhone, setCustomerPhone] = useState(item.customer_phone || "");
   // Cabang — prefill dari transaksi (data lama tanpa branch → UTAMA)
   const [branch, setBranch] = useState<"UTAMA" | "JOGJA">(item.branch === "JOGJA" ? "JOGJA" : "UTAMA");
+  // Sumber referral & flag Ads — prefill dari transaksi (data lama → default "Instagram" + null)
+  const [sourcePlatform, setSourcePlatform] = useState<string>(item.source_platform || "Instagram");
+  const [fromAds, setFromAds] = useState<boolean | null>(
+    item.from_ads === true || item.from_ads === false ? item.from_ads : null
+  );
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -2803,6 +2808,10 @@ function EditTransactionModal({
         customer_name: customerName.trim() || item.customer_name,
         customer_phone: customerPhone.trim() || null,
         branch, // ← cabang (koreksi kalau salah input saat payment)
+        source_platform: sourcePlatform, // ← sumber referral (Tahu Solit dari mana?)
+        // from_ads: null sengaja dikirim apa adanya biar data lama tetap bisa dibiarkan kosong.
+        // Backend sudah dijaga: null → null, true/false → Boolean.
+        from_ads: fromAds,
         edit_reason: reason.trim(),
         accessories: accessories.map((a) => ({
           accessory_id: a.accessory_id,
@@ -3225,6 +3234,62 @@ function EditTransactionModal({
                 className="w-full h-9 border border-gray-300 rounded-xl px-3 text-xs text-gray-800 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition"
               />
             </div>
+          </div>
+
+          {/* Tahu Solit dari mana? — koreksi sumber referral kalau salah pilih saat payment */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+              Tahu Solit dari mana?
+            </label>
+            <select
+              value={sourcePlatform}
+              onChange={(e) => setSourcePlatform(e.target.value)}
+              className="w-full h-10 border border-gray-300 rounded-xl px-3 text-xs text-gray-800 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition"
+            >
+              {[
+                "Instagram", "TikTok", "Facebook", "WhatsApp", "Google",
+                "Shopee", "Tokopedia", "Teman", "Sosmed", "OLX",
+                "Carousell", "E-commerce", "Threads", "Mitra", "Reseller", "Lainnya",
+              ].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tahu Solit dari Ads? — koreksi flag ads kalau salah pilih saat payment */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+              Tahu Solit dari Ads?
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFromAds(true)}
+                className={`flex-1 h-10 rounded-xl text-xs font-semibold border transition ${
+                  fromAds === true
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                Dari Ads
+              </button>
+              <button
+                type="button"
+                onClick={() => setFromAds(false)}
+                className={`flex-1 h-10 rounded-xl text-xs font-semibold border transition ${
+                  fromAds === false
+                    ? "bg-[#0f0c29] text-white border-[#0f0c29] shadow-sm"
+                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                Tidak
+              </button>
+            </div>
+            {fromAds === null && (
+              <p className="text-[10px] text-amber-600">
+                ⚠️ Data lama — belum pernah diisi. Pilih salah satu kalau mau dikoreksi.
+              </p>
+            )}
           </div>
 
           {/* Cabang — koreksi kalau salah input saat payment */}

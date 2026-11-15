@@ -788,6 +788,12 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.pickup_location !== undefined) allowedFields.pickup_location = body.pickup_location;
     if (body.software_request !== undefined) allowedFields.software_request = body.software_request;
     if (body.source_platform !== undefined) allowedFields.source_platform = body.source_platform;
+    // from_ads — terima true/false/null. Null = user belum pilih (data lama),
+    // jangan di-coerce Boolean(null) yang bakal jadi false (salah tag "Tidak").
+    if (body.from_ads !== undefined) {
+      allowedFields.from_ads =
+        body.from_ads === null ? null : Boolean(body.from_ads);
+    }
     if (body.status !== undefined) allowedFields.status = body.status;
     if (body.notes !== undefined) allowedFields.notes = body.notes;
     // Ganti bukti pembayaran (kasus sales salah foto saat payment). Hanya
