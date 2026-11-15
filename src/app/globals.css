@@ -1743,3 +1743,16 @@ html.dark .to-white\/60 { --tw-gradient-to: #101827 var(--tw-gradient-to-positio
 html.dark .to-white\/70 { --tw-gradient-to: #101827 var(--tw-gradient-to-position) !important; }
 html.dark .to-white\/80 { --tw-gradient-to: #101827 var(--tw-gradient-to-position) !important; }
 html.dark .to-white\/90 { --tw-gradient-to: #101827 var(--tw-gradient-to-position) !important; }
+
+/* ============================================================================
+   v9.5 SAFETY NET FIX — base opacity-variant yang ke-skip keliru di v9.4
+   (dedup-nya kesasar karena ada varian hover:/group-hover:/even: dgn nama
+   sama). Contoh: bg-zinc-50/60 (footer Data Barang). Dicek presisi dari
+   'html.dark .<class>' sekarang.
+   ========================================================================== */
+html.dark .bg-slate-50\/40 { background-color: #151f30 !important; }
+html.dark .bg-zinc-50\/60 { background-color: #151f30 !important; }
+html.dark .bg-slate-100\/60,
+html.dark .bg-gray-100\/60 { background-color: #1a263a !important; }
+html.dark .bg-sky-50\/40 { background-color: #0c1e36 !important; }
+html.dark .bg-amber-100\/40 { background-color: #422a09 !important; }
