@@ -48,11 +48,12 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
   if (!id) return NextResponse.json({ success: false, message: "ID tidak valid" }, { status: 400 });
 
   const body = await req.json();
-  const { tanggal, keterangan, ref, is_closing, lines } = body as {
+  const { tanggal, keterangan, ref, is_closing, is_adjusting, lines } = body as {
     tanggal: string;
     keterangan: string;
     ref?: string | null;
     is_closing?: boolean;
+    is_adjusting?: boolean; // ⬅️ BARU — penanda jurnal penyesuaian
     lines: DraftLine[];
   };
 
@@ -99,6 +100,8 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
       // Pertahankan/ubah flag jurnal penutup saat edit. Kalau field tidak dikirim
       // (undefined), biarkan nilai lama di DB apa adanya — tidak di-reset.
       ...(is_closing === undefined ? {} : { is_closing: is_closing === true }),
+      // Idem untuk flag jurnal penyesuaian — pola sama persis.
+      ...(is_adjusting === undefined ? {} : { is_adjusting: is_adjusting === true }),
       updated_by: user.id,
       updated_at: new Date().toISOString(),
     })

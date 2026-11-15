@@ -53,6 +53,8 @@ interface JournalEntry {
     branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU — tag cabang dari journal_entries
     total: number;
     is_edited: boolean;
+    is_closing?: boolean; // flag jurnal penutup (dari API; sinkron sama field DB)
+    is_adjusting?: boolean; // ⬅️ BARU — flag jurnal penyesuaian; TETAP masuk Laba Rugi
     sync_available?: boolean;
     sync_preview?: { keterangan: string; lines: SyncSnapshotLine[] } | null;
     lines: JournalLine[];
@@ -340,8 +342,9 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     const [bulkBusy, setBulkBusy] = useState(false);
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
     const [expandAll, setExpandAll] = useState(false); // buka/tutup SEMUA detail akun sekaligus
-    const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
+      const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
     const [showOnlyOutOfSync, setShowOnlyOutOfSync] = useState(false);
+    const [showOnlyAdjusting, setShowOnlyAdjusting] = useState(false); // ⬅️ BARU — filter tab Penyesuaian
     const [showSortSourceModal, setShowSortSourceModal] = useState(false);
     const [showSyncAllModal, setShowSyncAllModal] = useState(false);
     const [syncAllBusy, setSyncAllBusy] = useState(false);
@@ -532,13 +535,13 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     // Reset display limit saat period/filter berubah.
     // Dikecualikan saat sedang melompat ke bookmark (scrollToBookmark mengosongkan filter
     // dengan sengaja — jangan ikut mengecilkan tampilan balik ke 50).
-    useEffect(() => {
+      useEffect(() => {
         if (isJumpingToBookmark.current) {
             isJumpingToBookmark.current = false;
             return;
         }
         setDisplayLimit(50);
-    }, [period, search, searchNominal, accountCodeFilter, showOnlyWarnings, showOnlyOutOfSync, sortOrder]);
+    }, [period, search, searchNominal, accountCodeFilter, showOnlyWarnings, showOnlyOutOfSync, showOnlyAdjusting, sortOrder]);
 
     const toggleEntrySelected = useCallback((id: string) => {
         setSelectedEntryIds((prev) => {
@@ -962,6 +965,11 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     const outOfSyncCount = useMemo(() => entries.filter(isOutOfSync).length, [entries, isOutOfSync]);
     const outOfSyncEntries = useMemo(() => entries.filter(isOutOfSync), [entries, isOutOfSync]);
 
+    // ⬅️ BARU — jurnal penyesuaian (end-of-month adjustments: sewa dibayar di muka,
+    // beban accrual, penyusutan, dll). Flagnya tetap ikut ke Laba Rugi periode berjalan.
+    const isAdjusting = useCallback((e: JournalEntry) => Boolean(e.is_adjusting), []);
+    const adjustingCount = useMemo(() => entries.filter(isAdjusting).length, [entries, isAdjusting]);
+
     // Sinkronkan BANYAK entry sekaligus (dipakai modal "Sinkronisasi Jurnal").
     // Pakai ulang endpoint sync per-entry yang sudah ada (/[id]/sync) — dibatasi
     // 4 request paralel sekaligus biar tidak membanjiri Supabase saat entry banyak.
@@ -1007,6 +1015,10 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
             result = result.filter(isOutOfSync);
         }
 
+        if (showOnlyAdjusting) {
+            result = result.filter(isAdjusting);
+        }
+
         if (q || qNom) {
             const qNomDigits = qNom.replace(/[^0-9]/g, "");
             result = result.filter((e) => {
@@ -1040,7 +1052,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         }
 
         return result;
-    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, showOnlyOutOfSync, isOutOfSync]);
+     }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, showOnlyOutOfSync, isOutOfSync, showOnlyAdjusting, isAdjusting]);
 
     const visibleEntries = useMemo(() => {
         return filtered.slice(0, displayLimit);
@@ -1186,7 +1198,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         }, 0);
     }, [filtered, accountCodeFilter]);
 
-    const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || showOnlyWarnings || showOnlyOutOfSync;
+      const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || showOnlyWarnings || showOnlyOutOfSync || showOnlyAdjusting;
 
     useEffect(() => {
         if (!toast) return;
@@ -1402,6 +1414,20 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                     </span>
                                 )}
                             </button>
+                            {/* ⬅️ BARU — tab filter jurnal penyesuaian */}
+                            <button
+                                onClick={() => setShowOnlyAdjusting((v) => !v)}
+                                title={showOnlyAdjusting ? "Tampilkan semua data" : "Filter hanya jurnal penyesuaian (sewa dibayar di muka, accrual, penyusutan, dll)"}
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyAdjusting ? "bg-violet-600 text-white shadow-2xs font-bold ring-2 ring-violet-300" : adjustingCount > 0 ? "bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100" : "text-slate-500 hover:text-slate-800 hover:bg-white/50"}`}
+                            >
+                                <Sparkles className={`w-3.5 h-3.5 ${showOnlyAdjusting ? "text-white" : adjustingCount > 0 ? "text-violet-600" : "text-slate-400"}`} />
+                                <span>Penyesuaian</span>
+                                {adjustingCount > 0 && (
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${showOnlyAdjusting ? "bg-white/20 text-white" : "bg-violet-600 text-white"}`}>
+                                        {adjustingCount}
+                                    </span>
+                                )}
+                            </button>
                             <div ref={accountFilterRef} className="inline-block">
                                 <button
                                     ref={accountFilterButtonRef}
@@ -1579,7 +1605,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                     </div>
                 )}
 
-                {(accountCodeFilter.size > 0 || showOnlyWarnings || showOnlyOutOfSync) && (
+                {(accountCodeFilter.size > 0 || showOnlyWarnings || showOnlyOutOfSync || showOnlyAdjusting) && (
                     <div className="flex flex-wrap items-center justify-between gap-2 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2">
                         <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Filter aktif:</span>
@@ -1599,6 +1625,15 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                     <RefreshCw className="w-3 h-3 text-white" /> Nominal Berubah Only ({outOfSyncCount}) <X className="w-3 h-3" />
                                 </button>
                             )}
+                            {/* ⬅️ BARU — chip filter Penyesuaian aktif */}
+                            {showOnlyAdjusting && (
+                                <button
+                                    onClick={() => setShowOnlyAdjusting(false)}
+                                    className="inline-flex items-center gap-1 text-[11px] font-bold bg-violet-600 text-white px-2.5 py-0.5 rounded-full hover:bg-violet-700 active:scale-95 transition-all duration-150 shadow-sm"
+                                >
+                                    <Sparkles className="w-3 h-3 text-white" /> Penyesuaian Only ({adjustingCount}) <X className="w-3 h-3" />
+                                </button>
+                            )}
                             {Array.from(accountCodeFilter).map((code) => (
                                 <button
                                     key={code}
@@ -1609,7 +1644,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                 </button>
                             ))}
                             <button
-                                onClick={() => { setAccountCodeFilter(new Set()); setShowOnlyWarnings(false); setShowOnlyOutOfSync(false); }}
+                                onClick={() => { setAccountCodeFilter(new Set()); setShowOnlyWarnings(false); setShowOnlyOutOfSync(false); setShowOnlyAdjusting(false); }}
                                 className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline ml-1"
                             >
                                 Hapus semua
@@ -2721,7 +2756,8 @@ function EntryFormModal({
     const [keterangan, setKeterangan] = useState(entry?.keterangan ?? "");
     const [ref, setRef] = useState(entry?.ref ?? "");
     const [template, setTemplate] = useState("CUSTOM");
-       const [isClosing, setIsClosing] = useState<boolean>((entry as any)?.is_closing === true); // ⬅️ tandai jurnal penutup; saat edit ambil nilai dari entry
+       const [isClosing, setIsClosing] = useState<boolean>(entry?.is_closing === true); // ⬅️ tandai jurnal penutup; saat edit ambil nilai dari entry
+    const [isAdjusting, setIsAdjusting] = useState<boolean>(entry?.is_adjusting === true); // ⬅️ BARU — tandai jurnal penyesuaian
     const [autoFilling, setAutoFilling] = useState(false); // ⬅️ BARU — proses tarik saldo jurnal penutup otomatis
 
     const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
@@ -2912,6 +2948,7 @@ function EntryFormModal({
                     ref: ref.trim() || null,
                     source_category: isEdit ? undefined : template,
                     is_closing: isClosing, // ⬅️ kirim selalu — route edit kini juga baca flag ini
+                    is_adjusting: isAdjusting, // ⬅️ BARU — sama pola, biar sync saat edit
                     lines: lines.map(({ _id, ...rest }) => rest),
                 }),
             });
@@ -3070,7 +3107,10 @@ function EntryFormModal({
                         <input
                             type="checkbox"
                             checked={isClosing}
-                            onChange={(e) => setIsClosing(e.target.checked)}
+                            onChange={(e) => {
+                                setIsClosing(e.target.checked);
+                                if (e.target.checked) setIsAdjusting(false); // mutually exclusive
+                            }}
                             className="w-4 h-4 mt-0.5 rounded border-amber-300 accent-amber-600 shrink-0"
                         />
                         <span className="text-[11.5px] leading-snug">
@@ -3079,6 +3119,31 @@ function EntryFormModal({
                                 Dipakai saat tutup buku (biasanya akhir tahun) untuk me-nol-kan akun
                                 Pendapatan &amp; Beban ke akun Laba. Baris penutup tidak mengurangi Laba
                                 Rugi periode berjalan.
+                            </span>
+                        </span>
+                    </label>
+
+                    {/* ⬅️ BARU — checkbox jurnal penyesuaian. Mutually exclusive dgn Jurnal Penutup
+                        (satu entry nggak mungkin jadi dua-duanya). Beda perlakuan di Laba Rugi:
+                        - is_closing = EXCLUDED dari L/R periode berjalan
+                        - is_adjusting = TETAP ikut L/R (karena memang beban/pendapatan asli) */}
+                    <label className="flex items-start gap-2.5 p-3 rounded-xl border border-violet-200 bg-violet-50/60 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={isAdjusting}
+                            onChange={(e) => {
+                                setIsAdjusting(e.target.checked);
+                                if (e.target.checked) setIsClosing(false); // mutually exclusive
+                            }}
+                            className="w-4 h-4 mt-0.5 rounded border-violet-300 accent-violet-600 shrink-0"
+                        />
+                        <span className="text-[11.5px] leading-snug">
+                            <b className="text-violet-800">Tandai sebagai Jurnal Penyesuaian</b>
+                            <span className="block text-violet-700/80 mt-0.5">
+                                Dipakai akhir periode untuk mencatat yang jalan karena waktu
+                                (bukan karena transaksi) — contoh: sewa dibayar di muka yang dicicil
+                                jadi beban, listrik terpakai yang belum dibayar, penyusutan aset.
+                                <b> Tetap</b> dihitung di Laba Rugi periode berjalan.
                             </span>
                         </span>
                     </label>
@@ -3764,8 +3829,10 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                 <span className="text-[10px] font-semibold text-slate-500 inline-flex items-center gap-1.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Approved
                                 </span>
-                                {entry.has_warning && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-red-600" />Penanda</span>}
+                                                           {entry.has_warning && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-red-600" />Penanda</span>}
                                 {entry.sync_available && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 inline-flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5 text-blue-600" />Nominal Berubah</span>}
+                                {entry.is_adjusting && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-violet-200 bg-violet-50 text-violet-700 inline-flex items-center gap-1"><Sparkles className="w-2.5 h-2.5 text-violet-600" />Penyesuaian</span>}
+                                {entry.is_closing && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1">Tutup Buku</span>}
                                 {isEntryChecked && <span className="text-[9px] font-semibold text-emerald-600 inline-flex items-center gap-1"><Check className="w-2.5 h-2.5" />dicek</span>}
                             </div>
                         </td>
@@ -4118,6 +4185,16 @@ const JournalEntryCardMobile = React.memo(function JournalEntryCardMobile({
                         {entry.sync_available && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 inline-flex items-center gap-1" title="Nominal berbeda dari data sumber terbaru">
                                 <RefreshCw className="w-2.5 h-2.5 text-blue-600" /> Nominal Berubah
+                            </span>
+                        )}
+                        {entry.is_adjusting && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-violet-200 bg-violet-50 text-violet-700 inline-flex items-center gap-1" title="Jurnal penyesuaian akhir periode">
+                                <Sparkles className="w-2.5 h-2.5 text-violet-600" /> Penyesuaian
+                            </span>
+                        )}
+                        {entry.is_closing && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1" title="Jurnal penutup tutup buku">
+                                Tutup Buku
                             </span>
                         )}
                         {modalMissing && (
