@@ -297,7 +297,7 @@ function ProgressBar({ percent, thin }: { percent: number; thin?: boolean }) {
 function StatusBadge({ status }: { status: Mission["status"] }) {
     const s = MISSION_STATUS_META[status];
     const Icon = s.icon === "clock" ? Clock : s.icon === "settings" ? Settings : s.icon === "search" ? Search : s.icon === "check" ? Check : s.icon === "x" ? X : AlertCircle;
-    return <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+    return <span className="mission-badge inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
         style={{ background: s.bg, color: s.text, border: `1px solid ${s.border}` }}><Icon className="w-3 h-3" /> {s.label}</span>;
 }
 function PriorityBadge({ priority }: { priority: MissionPriority }) {
