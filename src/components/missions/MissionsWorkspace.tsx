@@ -297,7 +297,7 @@ function ProgressBar({ percent, thin }: { percent: number; thin?: boolean }) {
 function StatusBadge({ status }: { status: Mission["status"] }) {
     const s = MISSION_STATUS_META[status];
     const Icon = s.icon === "clock" ? Clock : s.icon === "settings" ? Settings : s.icon === "search" ? Search : s.icon === "check" ? Check : s.icon === "x" ? X : AlertCircle;
-    return <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+    return <span className="mission-badge inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
         style={{ background: s.bg, color: s.text, border: `1px solid ${s.border}` }}><Icon className="w-3 h-3" /> {s.label}</span>;
 }
 function PriorityBadge({ priority }: { priority: MissionPriority }) {
@@ -559,6 +559,7 @@ function MissionCalendar({
     onBasisChange: (b: DateBasis) => void;
 }) {
     const today = ymdLocal(new Date());
+    const isDark = useIsDark();
     const [cursor, setCursor] = useState(() => {
         const base = selectedDate ? new Date(`${selectedDate}T00:00:00`) : new Date();
         return { y: base.getFullYear(), m: base.getMonth() };
@@ -603,8 +604,8 @@ function MissionCalendar({
     const navBtn = "w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-90 transition flex-shrink-0";
 
     return (
-        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-            <div className="px-3 sm:px-4 py-3 flex items-center justify-between gap-2" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${isDark ? "#1e293b" : "#f0f0f8"}`, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+            <div className="px-3 sm:px-4 py-3 flex items-center justify-between gap-2" style={{ borderBottom: `1px solid ${isDark ? "#1e293b" : "#f5f5fb"}`, background: isDark ? "#151f30" : "#fafbff" }}>
                 <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                     <button onClick={prevMonth} className={navBtn} aria-label="Bulan sebelumnya"><ChevronLeft className="w-4 h-4" /></button>
                     <div className="flex items-center gap-1.5 text-center min-w-0 px-1">
@@ -629,8 +630,8 @@ function MissionCalendar({
                     return (
                         <button key={b.k} onClick={() => onBasisChange(b.k)}
                             className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap"
-                            style={active ? { background: "#eef2ff", color: "#4f46e5", border: "1px solid #c7d2fe" }
-                                : { background: "#f8fafc", color: "#94a3b8", border: "1px solid #eef2f7" }}>
+                            style={active ? (isDark ? { background: "rgba(99,102,241,0.18)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,0.35)" } : { background: "#eef2ff", color: "#4f46e5", border: "1px solid #c7d2fe" })
+                                : (isDark ? { background: "rgba(255,255,255,0.04)", color: "#94a3b8", border: "1px solid #1e293b" } : { background: "#f8fafc", color: "#94a3b8", border: "1px solid #eef2f7" })}>
                             {b.label}
                         </button>
                     );
@@ -638,7 +639,7 @@ function MissionCalendar({
                 {selectedDate && (
                     <button onClick={() => onSelectDate(null)}
                         className="ml-auto text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap"
-                        style={{ background: "#fff1f2", color: "#e11d48", border: "1px solid #fecdd3" }}>
+                        style={isDark ? { background: "rgba(244,63,94,0.15)", color: "#fb7185", border: "1px solid rgba(244,63,94,0.3)" } : { background: "#fff1f2", color: "#e11d48", border: "1px solid #fecdd3" }}>
                         Semua Tanggal
                     </button>
                 )}
@@ -664,16 +665,16 @@ function MissionCalendar({
                                     isSelected
                                         ? { background: "linear-gradient(135deg,#0f0c29,#1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
                                         : isToday
-                                            ? { background: "#f5f3ff", border: "1.5px solid #c4b5fd", color: "#5b21b6" }
-                                            : { background: info ? "#fafbff" : "transparent", border: "1px solid #f1f5f9", color: "#475569" }
+                                            ? (isDark ? { background: "rgba(124,58,237,0.15)", border: "1.5px solid rgba(167,139,250,0.5)", color: "#c4b5fd" } : { background: "#f5f3ff", border: "1.5px solid #c4b5fd", color: "#5b21b6" })
+                                            : (isDark ? { background: info ? "rgba(255,255,255,0.03)" : "transparent", border: "1px solid #1e293b", color: "#cbd5e1" } : { background: info ? "#fafbff" : "transparent", border: "1px solid #f1f5f9", color: "#475569" })
                                 }>
                                 <span className="text-sm font-bold leading-none">{cell.day}</span>
                                 {info && (
                                     <span className="text-[9px] font-black leading-none px-1 py-px rounded-full"
                                         style={
                                             isSelected ? { background: "rgba(255,255,255,0.25)", color: "#fff" }
-                                                : hasOverdue ? { background: "#fee2e2", color: "#dc2626" }
-                                                    : { background: "#ede9fe", color: "#7c3aed" }
+                                                : hasOverdue ? (isDark ? { background: "rgba(239,68,68,0.2)", color: "#f87171" } : { background: "#fee2e2", color: "#dc2626" })
+                                                    : (isDark ? { background: "rgba(124,58,237,0.22)", color: "#c4b5fd" } : { background: "#ede9fe", color: "#7c3aed" })
                                         }>
                                         {info.total}
                                     </span>
@@ -1277,9 +1278,23 @@ function RankBadge({ rank }: { rank: number }) {
     return <Award className="w-4 h-4" style={{ color: "#d97706" }} />;
 }
 
+function useIsDark() {
+    const [isDark, setIsDark] = useState(false);
+    useEffect(() => {
+        const el = document.documentElement;
+        const update = () => setIsDark(el.classList.contains("dark"));
+        update();
+        const obs = new MutationObserver(update);
+        obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+        return () => obs.disconnect();
+    }, []);
+    return isDark;
+}
+
 function MissionStatsPanel() {
     const [data, setData] = useState<MissionStatsData | null>(null);
     const [loading, setLoading] = useState(true);
+    const isDark = useIsDark();
 
     useEffect(() => {
         (async () => {
@@ -1394,8 +1409,8 @@ function MissionStatsPanel() {
             {/* Leaderboard + Top Assigner */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {/* Leaderboard: Tercepat Selesai */}
-                <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                    <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "linear-gradient(135deg,#fafbff,#f5f3ff)" }}>
+                <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${isDark ? "#1e293b" : "#f0f0f8"}`, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: `1px solid ${isDark ? "#1e293b" : "#f5f5fb"}`, background: isDark ? "linear-gradient(135deg,#151f30,#1d1236)" : "linear-gradient(135deg,#fafbff,#f5f3ff)" }}>
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                                 style={{ background: "linear-gradient(135deg,#fbbf24,#f59e0b)", boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>
@@ -1418,7 +1433,7 @@ function MissionStatsPanel() {
                             const pct = maxAvg > 0 ? Math.max(8, Math.round(((maxAvg - u.avgMs) / maxAvg) * 100)) : 50;
                             return (
                                 <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 group hover:bg-slate-50/50 transition-colors"
-                                    style={i === 0 ? { background: "linear-gradient(90deg,#fffbeb 0%,transparent 100%)" } : undefined}>
+                                    style={i === 0 ? { background: isDark ? "linear-gradient(90deg,rgba(43,27,6,0.6) 0%,transparent 100%)" : "linear-gradient(90deg,#fffbeb 0%,transparent 100%)" } : undefined}>
                                     {/* Rank */}
                                     <div className="w-7 flex items-center justify-center flex-shrink-0">
                                         {i < 3 ? (
@@ -1479,8 +1494,8 @@ function MissionStatsPanel() {
                 </div>
 
                 {/* Top Pemberi Misi */}
-                <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                    <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "linear-gradient(135deg,#fafbff,#eff6ff)" }}>
+                <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${isDark ? "#1e293b" : "#f0f0f8"}`, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: `1px solid ${isDark ? "#1e293b" : "#f5f5fb"}`, background: isDark ? "linear-gradient(135deg,#151f30,#0c1e36)" : "linear-gradient(135deg,#fafbff,#eff6ff)" }}>
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                                 style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}>
@@ -1539,8 +1554,8 @@ function MissionStatsPanel() {
 
             {/* Leaderboard Purchasing — 1 poin per data cashflow yang diinput (edit tidak dihitung) */}
             {data.purchasingLeaderboard.length > 0 && (
-                <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                    <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "linear-gradient(135deg,#fafbff,#ecfdf5)" }}>
+                <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${isDark ? "#1e293b" : "#f0f0f8"}`, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: `1px solid ${isDark ? "#1e293b" : "#f5f5fb"}`, background: isDark ? "linear-gradient(135deg,#151f30,#072517)" : "linear-gradient(135deg,#fafbff,#ecfdf5)" }}>
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                                 style={{ background: "linear-gradient(135deg,#34d399,#059669)", boxShadow: "0 2px 8px rgba(5,150,105,0.3)" }}>
@@ -1576,7 +1591,7 @@ function MissionStatsPanel() {
                                         <div className="flex items-center gap-1.5">
                                             <p className="text-xs font-bold text-slate-800 truncate">{u.name}</p>
                                             <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0"
-                                                style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                                style={{ background: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9", color: isDark ? "#94a3b8" : "#64748b" }}>
                                                 {u.role.replace(/_/g, " ")}
                                             </span>
                                         </div>

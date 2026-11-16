@@ -2501,6 +2501,8 @@ function EditTransactionModal({
   const [customerPhone, setCustomerPhone] = useState(item.customer_phone || "");
   // Cabang — prefill dari transaksi (data lama tanpa branch → UTAMA)
   const [branch, setBranch] = useState<"UTAMA" | "JOGJA">(item.branch === "JOGJA" ? "JOGJA" : "UTAMA");
+  // Nama Toko — prefill dari transaksi (koreksi kalau sales salah pilih toko saat payment)
+  const [companyName, setCompanyName] = useState(item.company_name || "Solit 03");
   // Sumber referral & flag Ads — prefill dari transaksi (data lama → default "Instagram" + null)
   const [sourcePlatform, setSourcePlatform] = useState<string>(item.source_platform || "Instagram");
   const [fromAds, setFromAds] = useState<boolean | null>(
@@ -2807,7 +2809,8 @@ function EditTransactionModal({
       const payload: any = {
         customer_name: customerName.trim() || item.customer_name,
         customer_phone: customerPhone.trim() || null,
-        branch, // ← cabang (koreksi kalau salah input saat payment)
+              branch, // ← cabang (koreksi kalau salah input saat payment)
+        company_name: companyName, // ← Nama Toko (koreksi kalau salah pilih toko saat payment)
         source_platform: sourcePlatform, // ← sumber referral (Tahu Solit dari mana?)
         // from_ads: null sengaja dikirim apa adanya biar data lama tetap bisa dibiarkan kosong.
         // Backend sudah dijaga: null → null, true/false → Boolean.
@@ -3308,6 +3311,24 @@ function EditTransactionModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Nama Toko — koreksi kalau sales salah pilih toko saat payment */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+              Nama Toko
+            </label>
+            <select
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0f0c29]/20 focus:border-[#0f0c29]"
+            >
+              <option value="Solit 03">Solit 03</option>
+              <option value="Sotech">Sotech</option>
+              <option value="Sultop">Sultop</option>
+              <option value="On Point">On Point</option>
+              <option value="Solit Jogja">Solit Jogja</option>
+            </select>
           </div>
 
           {/* Bukti Pembayaran — ganti kalau sales salah foto saat payment */}

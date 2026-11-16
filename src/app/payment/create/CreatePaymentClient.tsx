@@ -1144,8 +1144,18 @@ export default function CreatePaymentPage() {
                                 )}
                             </div>
 
-                                                     {/* Nama Perusahaan tidak diisi manual — otomatis ikut Cabang (lihat useEffect) */}
-                            <input type="hidden" {...register("company_name")} />
+                            {/* Nama Toko — dropdown. Default otomatis ikut Cabang (lihat useEffect),
+                                tapi tetap bisa diganti ke toko lain (Sotech/Sultop/dll). */}
+                            <div>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Nama Toko *</label>
+                                <select className={selectClass} {...register("company_name")}>
+                                    <option value="Solit 03">Solit 03</option>
+                                    <option value="Sotech">Sotech</option>
+                                    <option value="Sultop">Sultop</option>
+                                    <option value="On Point">On Point</option>
+                                    <option value="Solit Jogja">Solit Jogja</option>
+                                </select>
+                            </div>
                             <input
                                 type="tel"
                                 placeholder={isEcommerce ? "No. WhatsApp (opsional untuk E-Commerce)" : "No. WhatsApp *"}
