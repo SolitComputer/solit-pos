@@ -419,8 +419,12 @@ export function TransactionDetailModal({
   useRegisterOverlay(isOpen);
 
   useEffect(() => {
-    if (isOpen) setTimeout(() => setVisible(true), 10);
-    else setVisible(false);
+    if (isOpen) {
+      // requestAnimationFrame lebih reliable daripada setTimeout 10ms
+      const raf = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setVisible(false);
   }, [isOpen]);
 
   useEffect(() => {
