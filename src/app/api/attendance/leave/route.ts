@@ -69,6 +69,7 @@ export async function GET(request: Request) {
       const { data: allUsers } = await supabase
         .from("users")
         .select("id, name, role")
+        .is("deleted_at", null)   // ← TAMBAH: skip user arsip (Ex Karyawan/PKL)
         .order("name");
 
       const balances = await Promise.all(
