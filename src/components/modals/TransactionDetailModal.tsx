@@ -59,6 +59,12 @@ const PLATFORM_COLOR: Record<string, { bg: string; color: string; border: string
 
 type TabKey = "daily" | "monthly" | "yearly";
 
+// ── Module-level cache (persist across open/close) ────────────────────────────
+let cachedData: TransactionDetail | null = null;
+let cacheTimestamp = 0;
+let inflightPromise: Promise<void> | null = null;
+const CACHE_TTL = 60_000; // 1 menit — data dianggap fresh selama 1 menit
+
 // ── Mini bar ──────────────────────────────────────────────────────────────────
 function MiniBar({ value, max, color = "linear-gradient(90deg,#6366f1,#818cf8)" }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.max(4, (value / max) * 100) : 4;
@@ -406,32 +412,58 @@ export function TransactionDetailModal({
   onClose: () => void;
   canSeeFinancials?: boolean;
 }) {
-  const [data, setData] = useState<TransactionDetail | null>(null);
+  const [data, setData] = useState<TransactionDetail | null>(cachedData);
   const [isMemuat, setIsMemuat] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("daily");
   const [visible, setVisible] = useState(false);
   useRegisterOverlay(isOpen);
 
   useEffect(() => {
-    if (isOpen) setTimeout(() => setVisible(true), 10);
-    else setVisible(false);
+    if (isOpen) {
+      // requestAnimationFrame lebih reliable daripada setTimeout 10ms
+      const raf = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setVisible(false);
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const load = async () => {
-      setIsMemuat(true);
+
+    const now = Date.now();
+    const hasFreshCache = cachedData && now - cacheTimestamp < CACHE_TTL;
+
+    // Kalau ada cache fresh → tampil instant, gak perlu fetch
+    if (hasFreshCache) {
+      setData(cachedData);
+      return;
+    }
+
+    // Skeleton HANYA kalau belum ada cache sama sekali
+    if (!cachedData) setIsMemuat(true);
+    else setData(cachedData); // tampilkan stale dulu sambil fetch baru
+
+    // De-dupe concurrent requests
+    if (inflightPromise) return;
+
+    inflightPromise = (async () => {
       try {
-        const res = await fetch("/api/dashboard/transaction-detail");
+        const res = await fetch("/api/dashboard/transaction-detail", {
+          cache: "no-store",
+        });
         const result = await res.json();
-        if (result.success) setData(result.data);
+        if (result.success) {
+          cachedData = result.data;
+          cacheTimestamp = Date.now();
+          setData(result.data);
+        }
       } catch (e) {
         console.error(e);
       } finally {
         setIsMemuat(false);
+        inflightPromise = null;
       }
-    };
-    load();
+    })();
   }, [isOpen]);
 
   useEffect(() => {
