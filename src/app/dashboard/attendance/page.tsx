@@ -4131,6 +4131,15 @@ export default function AttendanceDashboardPage() {
     const [allUsers, setAllUsers] = useState<UserInfo[]>([]);
     const [salaries, setSalaries] = useState<UserSalary[]>([]);
     const [leaveData, setLeaveData] = useState<UserLeaveData[]>([]);
+
+    // ✅ NEW — State buat sub-tab "Riwayat Cuti" di dalam tab Cuti
+    const [leaveSubTab, setLeaveSubTab] = useState<"current" | "history">("current");
+    const [leaveHistory, setLeaveHistory] = useState<Array<{
+        user: { id: string; name: string; role: string };
+        leaveDates: string[];
+    }>>([]);
+    const [leaveHistoryYear, setLeaveHistoryYear] = useState<number>(new Date().getFullYear());
+    const [leaveHistoryLoading, setLeaveHistoryLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [filterUser, setFilterUser] = useState("Semua");
@@ -4358,6 +4367,20 @@ export default function AttendanceDashboardPage() {
             setSalaries(d.data?.map((s: any) => s) || []);
         }
     }, []);
+    // ✅ NEW — Fetch riwayat semua cuti sepanjang 1 tahun (untuk sub-tab Riwayat Cuti)
+    const fetchLeaveHistory = useCallback(async (year: number) => {
+        setLeaveHistoryLoading(true);
+        try {
+            const r = await fetch(`/api/attendance/leave/history?year=${year}`);
+            const d = await r.json();
+            if (d.success) setLeaveHistory(d.data || []);
+        } catch (e) {
+            console.error("[fetchLeaveHistory]", e);
+        } finally {
+            setLeaveHistoryLoading(false);
+        }
+    }, []);
+
     const fetchLeaveData = useCallback(async (y: number, m: number) => {
         const r = await fetch(`/api/attendance/leave?year=${y}&month=${m + 1}`);
         const d = await r.json();
@@ -8033,67 +8056,177 @@ export default function AttendanceDashboardPage() {
                 )}
 
                 {/* ════ TAB CUTI ════ */}
-                {activeTab === "leave" && isAdminRole(currentUser?.role)
-                    && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
-                                <div>
-                                    <p className="text-base font-bold text-gray-800">Saldo & Pengajuan Cuti — {MONTH_NAMES[calMonth]} {calYear}</p>
-                                    <p className="text-[10px] text-gray-400 mt-1">1 hari cuti per bulan · Sisa carry-over ke bulan berikutnya</p>
+                {activeTab === "leave" && isAdminRole(currentUser?.role) && (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        {/* ✅ NEW — Sub-tab switcher */}
+                        <div className="px-6 pt-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center gap-1">
+                            <button
+                                onClick={() => setLeaveSubTab("current")}
+                                className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all ${leaveSubTab === "current"
+                                    ? "bg-white text-cyan-700 border-x border-t border-cyan-200 -mb-px"
+                                    : "text-gray-400 hover:text-gray-600"
+                                    }`}
+                            >
+                                Cuti Bulan Ini
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setLeaveSubTab("history");
+                                    if (leaveHistory.length === 0) fetchLeaveHistory(leaveHistoryYear);
+                                }}
+                                className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all ${leaveSubTab === "history"
+                                    ? "bg-white text-cyan-700 border-x border-t border-cyan-200 -mb-px"
+                                    : "text-gray-400 hover:text-gray-600"
+                                    }`}
+                            >
+                                Riwayat Cuti
+                            </button>
+                        </div>
+
+                        {leaveSubTab === "current" ? (
+                            // ───── Sub-tab: Cuti Bulan Ini (existing content) ─────
+                            <>
+                                <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                                    <div>
+                                        <p className="text-base font-bold text-gray-800">Saldo & Pengajuan Cuti — {MONTH_NAMES[calMonth]} {calYear}</p>
+                                        <p className="text-[10px] text-gray-400 mt-1">1 hari cuti per bulan · Sisa carry-over ke bulan berikutnya</p>
+                                    </div>
+                                    <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all">Kelola Cuti</button>
                                 </div>
-                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all">Kelola Cuti</button>
-                            </div>
-                            {loading ? (
-                                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
-                            ) : leaveData.length === 0 ? (
-                                <div className="py-16 text-center"><div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><Umbrella className="w-8 h-8 text-gray-400" /></div><p className="text-sm text-gray-400 font-medium">Belum ada data cuti</p></div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b border-gray-100 bg-gray-50/60">
-                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kuota Lembur</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Carry-over</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terpakai</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tersedia</th>
-                                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Cuti</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {leaveData
-                                                .filter(ld => !isPKLRole(ld.user.role))
-                                                .map(ld => (
-                                                    <tr key={ld.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
-                                                        <td className="px-6 py-4">
+                                {loading ? (
+                                    <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+                                ) : leaveData.length === 0 ? (
+                                    <div className="py-16 text-center"><div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><Umbrella className="w-8 h-8 text-gray-400" /></div><p className="text-sm text-gray-400 font-medium">Belum ada data cuti</p></div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b border-gray-100 bg-gray-50/60">
+                                                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kuota Lembur</th>
+                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Carry-over</th>
+                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terpakai</th>
+                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tersedia</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Cuti</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {leaveData
+                                                    .filter(ld => !isPKLRole(ld.user.role))
+                                                    .map(ld => (
+                                                        <tr key={ld.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
+                                                            <td className="px-6 py-4">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(ld.user.name)}</div>
+                                                                    <div><span className="font-bold text-gray-800 block">{ld.user.name}</span><span className="text-[10px] text-gray-400">{ld.user.role.replace(/_/g, " ")}</span></div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100 text-teal-700 text-sm font-black border border-teal-200">{ld.balance.quota}</span></td>
+                                                            <td className="px-4 py-4 text-center">{ld.balance.carried_over > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 text-blue-700 text-sm font-black border border-blue-200">+{ld.balance.carried_over}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                            <td className="px-4 py-4 text-center">{ld.balance.used > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-orange-100 text-orange-700 text-sm font-black border border-orange-200">{ld.balance.used}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                            <td className="px-4 py-4 text-center"><span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-black border ${ld.available > 0 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>{ld.available}</span></td>
+                                                            <td className="px-4 py-4">
+                                                                {ld.requests.length > 0 ? (
+                                                                    <div className="flex flex-wrap gap-1.5">
+                                                                        {ld.requests.map(r => (
+                                                                            <span key={r.id} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
+                                                                                {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : <span className="text-[10px] text-gray-300 font-bold">Tidak ada cuti bulan ini</span>}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            // ✅ NEW — Sub-tab: Riwayat Cuti
+                            <>
+                                <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                                    <div>
+                                        <p className="text-base font-bold text-gray-800">Riwayat Cuti — Tahun {leaveHistoryYear}</p>
+                                        <p className="text-[10px] text-gray-400 mt-1">Semua karyawan yang pernah mengambil cuti di tahun ini (user arsip tidak ditampilkan)</p>
+                                    </div>
+                                    <select
+                                        value={leaveHistoryYear}
+                                        onChange={(e) => {
+                                            const y = parseInt(e.target.value);
+                                            setLeaveHistoryYear(y);
+                                            fetchLeaveHistory(y);
+                                        }}
+                                        className="px-4 py-2 text-xs font-bold bg-cyan-50 text-cyan-700 border border-cyan-200 rounded-xl cursor-pointer hover:bg-cyan-100 transition-all"
+                                    >
+                                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                                            <option key={y} value={y}>Tahun {y}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {leaveHistoryLoading ? (
+                                    <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+                                ) : leaveHistory.length === 0 ? (
+                                    <div className="py-16 text-center">
+                                        <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><Umbrella className="w-8 h-8 text-gray-400" /></div>
+                                        <p className="text-sm text-gray-400 font-medium">Belum ada karyawan aktif</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <div className="px-6 py-3 bg-cyan-50/50 border-b border-cyan-100 text-xs font-bold text-cyan-700 flex items-center gap-3 flex-wrap">
+                                            <span>Total: {leaveHistory.length} karyawan</span>
+                                            <span className="text-gray-400">·</span>
+                                            <span>{leaveHistory.filter(u => u.leaveDates.length > 0).length} pernah cuti</span>
+                                            <span className="text-gray-400">·</span>
+                                            <span>{leaveHistory.reduce((sum, u) => sum + u.leaveDates.length, 0)} total hari cuti</span>
+                                        </div>
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b border-gray-100 bg-gray-50/60">
+                                                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-12">#</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Cuti</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {leaveHistory.map((u, i) => (
+                                                    <tr key={u.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
+                                                        <td className="px-6 py-4 text-[11px] text-gray-400 font-black">{i + 1}</td>
+                                                        <td className="px-4 py-4">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(ld.user.name)}</div>
-                                                                <div><span className="font-bold text-gray-800 block">{ld.user.name}</span><span className="text-[10px] text-gray-400">{ld.user.role.replace(/_/g, " ")}</span></div>
+                                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
+                                                                    {initials(u.user.name)}
+                                                                </div>
+                                                                <div>
+                                                                    <span className="font-bold text-gray-800 block">{u.user.name}</span>
+                                                                    <span className="text-[10px] text-gray-400">{u.user.role?.replace(/_/g, " ") || "—"}</span>
+                                                                </div>
                                                             </div>
                                                         </td>
-                                                        <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100 text-teal-700 text-sm font-black border border-teal-200">{ld.balance.quota}</span></td>
-                                                        <td className="px-4 py-4 text-center">{ld.balance.carried_over > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 text-blue-700 text-sm font-black border border-blue-200">+{ld.balance.carried_over}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                        <td className="px-4 py-4 text-center">{ld.balance.used > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-orange-100 text-orange-700 text-sm font-black border border-orange-200">{ld.balance.used}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                        <td className="px-4 py-4 text-center"><span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-black border ${ld.available > 0 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>{ld.available}</span></td>
                                                         <td className="px-4 py-4">
-                                                            {ld.requests.length > 0 ? (
+                                                            {u.leaveDates.length === 0 ? (
+                                                                <span className="text-gray-200 text-sm font-black">—</span>
+                                                            ) : (
                                                                 <div className="flex flex-wrap gap-1.5">
-                                                                    {ld.requests.map(r => (
-                                                                        <span key={r.id} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
-                                                                            {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                                                    {u.leaveDates.map(d => (
+                                                                        <span key={d} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
+                                                                            {new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}
                                                                         </span>
                                                                     ))}
                                                                 </div>
-                                                            ) : <span className="text-[10px] text-gray-300 font-bold">Tidak ada cuti bulan ini</span>}
+                                                            )}
                                                         </td>
                                                     </tr>
                                                 ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* ════ TAB RIWAYAT GAJI (admin only) ════ */}
