@@ -113,7 +113,7 @@ function TopListItem({ rank, name, total, maxTotal, extra, unit = "x" }: {
   const pct = Math.round((total / Math.max(maxTotal, 1)) * 100);
 
   return (
-    <div className="group/item py-2 px-2.5 -mx-2 rounded-2xl hover:bg-slate-50/80 transition-all duration-200">
+    <div className="group/item py-2 px-2.5 -mx-2 rounded-2xl hover:bg-slate-50/70 transition-all duration-200">
       <div className="flex items-center gap-3 mb-1.5">
         <div className="w-6 flex-shrink-0 flex items-center justify-center font-bold text-xs">
           {rank <= 3 ? medals[rank - 1] : (
@@ -174,7 +174,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
   const bgGradient = avatarColors[Math.abs(item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) % avatarColors.length];
 
   return (
-     <div className="py-2 px-2 rounded-2xl hover:bg-slate-50/80 transition-all duration-200 group">
+     <div className="py-2 px-2 rounded-2xl hover:bg-slate-50/70 transition-all duration-200 group">
       <div className="flex items-center gap-3">
         {/* Rounded Avatar */}
         <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${bgGradient} text-white font-bold flex items-center justify-center text-xs flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform`}>

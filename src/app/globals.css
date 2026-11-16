@@ -912,6 +912,7 @@ html.dark .action-btn        { background-color: rgba(255,255,255,.06) !importan
 html.dark .action-btn:hover  { background-color: rgba(255,255,255,.12) !important; }
 /* hover baris kartu user + border stat card (opacity-variant) */
 html.dark .hover\:bg-slate-50\/70:hover { background-color: rgba(255,255,255,.04) !important; }
+html.dark .hover\:bg-slate-50\/80:hover { background-color: rgba(255,255,255,.05) !important; }
 html.dark .border-white\/70             { border-color: rgba(255,255,255,.08) !important; }
 
 /* ============================================================================

@@ -49,12 +49,12 @@ const fmtShort = (n: number): string => {
 };
 
 const PLATFORM_COLOR: Record<string, { bg: string; color: string; border: string }> = {
-  shopee: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
-  tokopedia: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
-  facebook: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
-  olx: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
-  carousell: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
-  cod: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
+  shopee: { bg: "var(--c-chip)", color: "var(--c-ink2)", border: "var(--c-line)" },
+  tokopedia: { bg: "var(--c-chip)", color: "var(--c-ink2)", border: "var(--c-line)" },
+  facebook: { bg: "var(--c-chip)", color: "var(--c-ink2)", border: "var(--c-line)" },
+  olx: { bg: "var(--c-chip)", color: "var(--c-ink2)", border: "var(--c-line)" },
+  carousell: { bg: "var(--c-chip)", color: "var(--c-ink2)", border: "var(--c-line)" },
+  cod: { bg: "var(--c-chip)", color: "var(--c-ink2)", border: "var(--c-line)" },
 };
 
 type TabKey = "daily" | "monthly" | "yearly";
@@ -63,7 +63,7 @@ type TabKey = "daily" | "monthly" | "yearly";
 function MiniBar({ value, max, color = "linear-gradient(90deg,#6366f1,#818cf8)" }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.max(4, (value / max) * 100) : 4;
   return (
-    <div className="w-full h-1.5 rounded-full mt-2 overflow-hidden" style={{ background: "#F4F4F5" }}>
+    <div className="w-full h-1.5 rounded-full mt-2 overflow-hidden" style={{ background: "var(--c-chip)" }}>
       <div
         className="h-full rounded-full transition-all duration-700 ease-out"
         style={{ width: `${pct}%`, background: color }}
@@ -89,19 +89,19 @@ function LaptopRow({
 
   const rankStyle =
     rank === 1
-      ? { bg: "#F4F4F5", color: "#0f172a", border: "#E4E4E7", bar: "linear-gradient(90deg,#6366f1,#818cf8)" }
+      ? { bg: "var(--c-chip)", color: "var(--c-ink)", border: "var(--c-line)", bar: "linear-gradient(90deg,#6366f1,#818cf8)" }
       : rank === 2
-        ? { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7", bar: "linear-gradient(90deg,#71717A,#A1A1AA)" }
+        ? { bg: "var(--c-chip)", color: "var(--c-ink2)", border: "var(--c-line)", bar: "linear-gradient(90deg,#71717A,#A1A1AA)" }
         : rank === 3
-          ? { bg: "#F4F4F5", color: "#71717A", border: "#E4E4E7", bar: "linear-gradient(90deg,#A1A1AA,#D4D4D8)" }
-          : { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7", bar: "linear-gradient(90deg,#52525B,#71717A)" };
+          ? { bg: "var(--c-chip)", color: "#71717A", border: "var(--c-line)", bar: "linear-gradient(90deg,#A1A1AA,#D4D4D8)" }
+          : { bg: "var(--c-chip)", color: "var(--c-ink2)", border: "var(--c-line)", bar: "linear-gradient(90deg,#52525B,#71717A)" };
 
   return (
     <div
       className="rounded-xl overflow-hidden transition-all duration-200"
       style={{
-        background: "#FFFFFF",
-        border: `1px solid ${expanded ? "#A1A1AA" : "#E4E4E7"}`,
+        background: "var(--c-card)",
+        border: `1px solid ${expanded ? "#A1A1AA" : "var(--c-line)"}`,
         boxShadow: expanded
           ? "0 4px 16px rgba(0,0,0,0.10)"
           : "0 1px 3px rgba(0,0,0,0.05)",
@@ -111,12 +111,12 @@ function LaptopRow({
       <button
         onClick={() => setExpanded((p) => !p)}
         className="w-full flex items-center gap-3 px-3.5 py-3 text-left transition-all duration-200"
-        style={{ background: expanded ? "#FAFAFA" : "#FFFFFF" }}
+        style={{ background: expanded ? "var(--c-body)" : "var(--c-card)" }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "#FAFAFA";
+          (e.currentTarget as HTMLButtonElement).style.background = "var(--c-body)";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = expanded ? "#FAFAFA" : "#FFFFFF";
+          (e.currentTarget as HTMLButtonElement).style.background = expanded ? "var(--c-body)" : "var(--c-card)";
         }}
       >
         {/* Rank badge */}
@@ -130,7 +130,7 @@ function LaptopRow({
         {/* Laptop icon */}
         <div
           className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: "#F4F4F5" }}
+          style={{ background: "var(--c-chip)" }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.75">
             <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -141,11 +141,11 @@ function LaptopRow({
 
         {/* Name + bar */}
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold truncate leading-tight" style={{ color: "#0f172a" }}>
+          <p className="text-[13px] font-semibold truncate leading-tight" style={{ color: "var(--c-ink)" }}>
             {entry.laptop_name}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
-            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#F4F4F5" }}>
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--c-chip)" }}>
               <div
                 className="h-full rounded-full transition-all duration-700"
                 style={{ width: `${pct}%`, background: rankStyle.bar }}
@@ -161,12 +161,12 @@ function LaptopRow({
         <div className="text-right flex-shrink-0 space-y-0.5">
           <span
             className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full"
-            style={{ background: "#6366f1", color: "#FFFFFF" }}
+            style={{ background: "#6366f1", color: "var(--c-card)" }}
           >
             {entry.count}x
           </span>
           {canSeeFinancials && (
-            <p className="text-[11px] font-semibold" style={{ color: "#0f172a" }}>
+            <p className="text-[11px] font-semibold" style={{ color: "var(--c-ink)" }}>
               {fmtShort(entry.revenue)}
             </p>
           )}
@@ -184,7 +184,7 @@ function LaptopRow({
 
       {/* Expanded transactions */}
       {expanded && (
-        <div style={{ borderTop: "1px solid #E4E4E7" }}>
+        <div style={{ borderTop: "1px solid var(--c-line)" }}>
           {entry.transactions.length === 0 ? (
             <p className="text-xs text-center py-5" style={{ color: "#A1A1AA" }}>
               Tidak ada detail transaksi
@@ -196,25 +196,25 @@ function LaptopRow({
               const dateStr = txDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
               const timeStr = txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
               const plat = tx.source_platform?.toLowerCase() ?? "";
-              const platStyle = PLATFORM_COLOR[plat] ?? { bg: "#FAFAFA", color: "#475569", border: "#E4E4E7" };
+              const platStyle = PLATFORM_COLOR[plat] ?? { bg: "var(--c-body)", color: "var(--c-ink2)", border: "var(--c-line)" };
 
               return (
                 <div
                   key={tx.id}
                   className="px-3.5 py-2.5 flex items-start justify-between gap-3 transition-colors duration-150"
                   style={{
-                    borderBottom: "1px solid #F4F4F5",
-                    background: "#FAFAFA",
+                    borderBottom: "1px solid var(--c-chip)",
+                    background: "var(--c-body)",
                   }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.background = "#F4F4F5";
+                    (e.currentTarget as HTMLDivElement).style.background = "var(--c-chip)";
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.background = "#FAFAFA";
+                    (e.currentTarget as HTMLDivElement).style.background = "var(--c-body)";
                   }}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-semibold truncate" style={{ color: "#0f172a" }}>
+                    <p className="text-[12px] font-semibold truncate" style={{ color: "var(--c-ink)" }}>
                       {tx.customer_name}
                     </p>
                     <p className="text-[10px] font-mono tracking-wide mt-0.5" style={{ color: "#A1A1AA" }}>
@@ -224,7 +224,7 @@ function LaptopRow({
                       {tx.sales_name && (
                         <span
                           className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md"
-                          style={{ background: "#F4F4F5", color: "#475569", border: "1px solid #E4E4E7" }}
+                          style={{ background: "var(--c-chip)", color: "var(--c-ink2)", border: "1px solid var(--c-line)" }}
                         >
                           <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
@@ -261,7 +261,7 @@ function LaptopRow({
                   </div>
                   <div className="text-right flex-shrink-0">
                     {canSeeFinancials && (
-                      <p className="text-[12px] font-bold" style={{ color: "#0f172a" }}>
+                      <p className="text-[12px] font-bold" style={{ color: "var(--c-ink)" }}>
                         {fmtRupiah(rev)}
                       </p>
                     )}
@@ -292,30 +292,30 @@ function PeriodSection({
   return (
     <div
       className="rounded-xl overflow-hidden"
-      style={{ border: "1px solid #E4E4E7", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}
+      style={{ border: "1px solid var(--c-line)", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}
     >
       {/* Period header */}
       <button
         onClick={() => setCollapsed((p) => !p)}
         className="w-full flex items-center justify-between px-4 py-3 text-left transition-all duration-150"
-        style={{ background: "linear-gradient(135deg,#FAFAFA 0%,#F4F4F5 100%)" }}
+        style={{ background: "linear-gradient(135deg,var(--c-body) 0%,var(--c-chip) 100%)" }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background =
-            "linear-gradient(135deg,#F4F4F5 0%,#E4E4E7 100%)";
+            "linear-gradient(135deg,var(--c-chip) 0%,var(--c-line) 100%)";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background =
-            "linear-gradient(135deg,#FAFAFA 0%,#F4F4F5 100%)";
+            "linear-gradient(135deg,var(--c-body) 0%,var(--c-chip) 100%)";
         }}
       >
         <div className="flex items-center gap-3">
           <div className="w-1 h-7 rounded-full" style={{ background: "linear-gradient(180deg,#6366f1,#4f46e5)" }} />
           <div>
-            <p className="text-[13px] font-bold" style={{ color: "#0f172a" }}>{period.label}</p>
+            <p className="text-[13px] font-bold" style={{ color: "var(--c-ink)" }}>{period.label}</p>
             <p className="text-[11px] mt-0.5" style={{ color: "#71717A" }}>
               {period.count} transaksi
               {canSeeFinancials && (
-                <span style={{ color: "#0f172a" }}> · {fmtShort(period.revenue)}</span>
+                <span style={{ color: "var(--c-ink)" }}> · {fmtShort(period.revenue)}</span>
               )}
             </p>
           </div>
@@ -345,12 +345,12 @@ function PeriodSection({
 
       {/* Laptop list */}
       {!collapsed && (
-        <div className="p-3 space-y-2" style={{ background: "#FAFAFA" }}>
+        <div className="p-3 space-y-2" style={{ background: "var(--c-body)" }}>
           {period.laptops.length === 0 ? (
             <div className="text-center py-8">
               <div
                 className="w-10 h-10 rounded-2xl flex items-center justify-center mx-auto mb-2"
-                style={{ background: "#F4F4F5" }}
+                style={{ background: "var(--c-chip)" }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4D4D8" strokeWidth="1.8">
                   <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -462,19 +462,19 @@ export function TransactionDetailModal({
         .tdm-overlay { font-family: 'Inter', sans-serif; }
 
         .tdm-shell {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
+          background: var(--c-card);
+          border: 1px solid var(--c-line2);
           box-shadow: 0 4px 20px -4px rgba(0,0,0,0.05);
         }
 
         .tdm-header {
-          background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%);
-          border-bottom: 1px solid #E4E4E7;
+          background: linear-gradient(135deg, var(--c-body) 0%, var(--c-chip) 100%);
+          border-bottom: 1px solid var(--c-line);
         }
 
         .tdm-stat {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
+          background: var(--c-card);
+          border: 1px solid var(--c-line2);
           box-shadow: 0 2px 10px rgba(0,0,0,0.02);
           transition: box-shadow 0.2s, transform 0.2s;
         }
@@ -484,7 +484,7 @@ export function TransactionDetailModal({
         }
 
         .tdm-tabs-wrap {
-          background: #F4F4F5;
+          background: var(--c-chip);
           border-radius: 14px;
           padding: 4px;
         }
@@ -508,7 +508,7 @@ export function TransactionDetailModal({
         .tdm-scroll::-webkit-scrollbar-thumb { background: #D4D4D8; border-radius: 4px; }
 
         .tdm-shimmer {
-          background: linear-gradient(90deg, #FAFAFA 25%, #F4F4F5 50%, #FAFAFA 75%);
+          background: linear-gradient(90deg, var(--c-body) 25%, var(--c-chip) 50%, var(--c-body) 75%);
           background-size: 200% 100%;
           animation: tdm-shimmer 1.5s infinite;
         }
@@ -525,7 +525,7 @@ export function TransactionDetailModal({
         }
 
         .tdm-close {
-          background: #F4F4F5;
+          background: var(--c-chip);
           color: #A1A1AA;
           transition: background 0.2s, color 0.2s;
         }
@@ -534,9 +534,21 @@ export function TransactionDetailModal({
         .tdm-handle { background: #D4D4D8; }
 
         .tdm-tabs-section {
-          background: #FFFFFF;
-          border-bottom: 1px solid #E4E4E7;
+          background: var(--c-card);
+          border-bottom: 1px solid var(--c-line);
         }
+      
+        /* ── DARK MODE TOKENS (light values = original, so light mode unchanged) ── */
+        .tdm-overlay { --c-card: #FFFFFF; --c-body: #FAFAFA; --c-chip: #F4F4F5; --c-line: #E4E4E7; --c-line2: #F1F5F9; --c-ink: #0f172a; --c-ink2: #475569; }
+        html.dark .tdm-overlay { --c-card: #141d30; --c-body: #0c1322; --c-chip: rgba(255,255,255,0.05); --c-line: #24314a; --c-line2: #1e2a40; --c-ink: #f1f5f9; --c-ink2: #cbd5e1; }
+        /* badge margin: dark text on chip -> lighten in dark */
+        html.dark .tdm-overlay .badge-margin { color: #cbd5e1 !important; }
+        /* icon strokes that were mid/dark grey -> lighten for contrast on dark */
+        html.dark .tdm-overlay svg[stroke="#52525B"] { stroke: #9aa4b2 !important; }
+        html.dark .tdm-overlay svg[stroke="#71717A"] { stroke: #9aa4b2 !important; }
+        html.dark .tdm-overlay svg[stroke="#475569"] { stroke: #cbd5e1 !important; }
+        html.dark .tdm-overlay svg[stroke="#A1A1AA"] { stroke: #94a3b8 !important; }
+        html.dark .tdm-overlay svg[stroke="#D4D4D8"] { stroke: #64748b !important; }
       `}</style>
 
       {/* ── Overlay ── */}
@@ -573,7 +585,7 @@ export function TransactionDetailModal({
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0f172a" }}>Detail Transaksi</h2>
+                  <h2 className="text-base sm:text-lg font-bold" style={{ color: "var(--c-ink)" }}>Detail Transaksi</h2>
                   <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Laptop terjual per hari, bulan &amp; tahun</p>
                 </div>
               </div>
@@ -592,15 +604,15 @@ export function TransactionDetailModal({
                 <div className="tdm-stat rounded-2xl overflow-hidden">
                   <div className="h-1" style={{ background: "linear-gradient(90deg,#6366f1,#818cf8)" }} />
                   <div className="px-3 py-2.5">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "var(--c-chip)" }}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" />
                         <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                       </svg>
                     </div>
                     <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Hari Ini</p>
-                    <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{data.today.count}</p>
-                    <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>transaksi</p>
+                    <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "var(--c-ink)" }}>{data.today.count}</p>
+                    <p className="text-[9px] mt-1.5 font-medium" style={{ color: "var(--c-ink2)" }}>transaksi</p>
                   </div>
                 </div>
 
@@ -609,14 +621,14 @@ export function TransactionDetailModal({
                   <div className="tdm-stat rounded-2xl overflow-hidden">
                     <div className="h-1" style={{ background: "linear-gradient(90deg,#52525B,#71717A)" }} />
                     <div className="px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "var(--c-chip)" }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
                           <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Omzet</p>
-                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{fmtShort(data.today.revenue)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>hari ini</p>
+                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "var(--c-ink)" }}>{fmtShort(data.today.revenue)}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "var(--c-ink2)" }}>hari ini</p>
                     </div>
                   </div>
                 ) : (
@@ -624,15 +636,15 @@ export function TransactionDetailModal({
                   <div className="tdm-stat rounded-2xl overflow-hidden">
                     <div className="h-1" style={{ background: "linear-gradient(90deg,#52525B,#71717A)" }} />
                     <div className="px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "var(--c-chip)" }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
                           <rect x="3" y="4" width="18" height="18" rx="2" />
                           <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Bulan Ini</p>
-                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{data.monthly[0]?.count ?? 0}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>transaksi</p>
+                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "var(--c-ink)" }}>{data.monthly[0]?.count ?? 0}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "var(--c-ink2)" }}>transaksi</p>
                     </div>
                   </div>
                 )}
@@ -642,13 +654,13 @@ export function TransactionDetailModal({
                   <div className="tdm-stat rounded-2xl overflow-hidden">
                     <div className="h-1" style={{ background: "linear-gradient(90deg,#A1A1AA,#D4D4D8)" }} />
                     <div className="px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "var(--c-chip)" }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#71717A" strokeWidth="2.5" strokeLinecap="round">
                           <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Profit</p>
-                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{fmtShort(data.today.profit)}</p>
+                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "var(--c-ink)" }}>{fmtShort(data.today.profit)}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#71717A" }}>hari ini</p>
                     </div>
                   </div>
@@ -657,14 +669,14 @@ export function TransactionDetailModal({
                   <div className="tdm-stat rounded-2xl overflow-hidden">
                     <div className="h-1" style={{ background: "linear-gradient(90deg,#A1A1AA,#D4D4D8)" }} />
                     <div className="px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "var(--c-chip)" }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#71717A" strokeWidth="2.5" strokeLinecap="round">
                           <rect x="3" y="4" width="18" height="18" rx="2" />
                           <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Tahun Ini</p>
-                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{data.yearly[0]?.count ?? 0}</p>
+                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "var(--c-ink)" }}>{data.yearly[0]?.count ?? 0}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#71717A" }}>transaksi</p>
                     </div>
                   </div>
@@ -690,7 +702,7 @@ export function TransactionDetailModal({
           </div>
 
           {/* ── Content ── */}
-          <div className="tdm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
+          <div className="tdm-scroll flex-1 overflow-y-auto" style={{ background: "var(--c-body)" }}>
             {isMemuat ? (
               <Skeleton />
             ) : data ? (
@@ -699,7 +711,7 @@ export function TransactionDetailModal({
                   <div className="flex flex-col items-center justify-center py-16 gap-3">
                     <div
                       className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                      style={{ background: "#F4F4F5" }}
+                      style={{ background: "var(--c-chip)" }}
                     >
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4D4D8" strokeWidth="1.8">
                         <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -721,12 +733,12 @@ export function TransactionDetailModal({
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "var(--c-chip)" }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2">
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
+                <p className="text-sm font-semibold" style={{ color: "var(--c-ink2)" }}>Gagal memuat data</p>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Coba tutup dan buka kembali</p>
               </div>
             )}

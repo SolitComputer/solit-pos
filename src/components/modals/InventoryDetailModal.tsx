@@ -15,30 +15,30 @@ interface InventoryDetail {
 
 const GRADE_CONFIG = {
   A: {
-    color: "#0f172a",
-    bg: "#F4F4F5",
-    border: "#E4E4E7",
+    color: "var(--c-ink)",
+    bg: "var(--c-chip)",
+    border: "var(--c-line)",
     bar: "linear-gradient(90deg, #6366f1, #818cf8)",
     stripColor: "linear-gradient(90deg, #6366f1, #818cf8)",
-    iconBg: "#F4F4F5",
+    iconBg: "var(--c-chip)",
     label: "Kondisi terbaik",
   },
   B: {
-    color: "#475569",
-    bg: "#F4F4F5",
-    border: "#E4E4E7",
+    color: "var(--c-ink2)",
+    bg: "var(--c-chip)",
+    border: "var(--c-line)",
     bar: "linear-gradient(90deg, #6366f1, #818cf8)",
     stripColor: "linear-gradient(90deg, #6366f1, #818cf8)",
-    iconBg: "#F4F4F5",
+    iconBg: "var(--c-chip)",
     label: "Kondisi baik",
   },
   C: {
     color: "#71717A",
-    bg: "#F4F4F5",
-    border: "#E4E4E7",
+    bg: "var(--c-chip)",
+    border: "var(--c-line)",
     bar: "linear-gradient(90deg, #A1A1AA, #D4D4D8)",
     stripColor: "linear-gradient(90deg, #A1A1AA, #D4D4D8)",
-    iconBg: "#F4F4F5",
+    iconBg: "var(--c-chip)",
     label: "Kondisi standar",
   },
 } as const;
@@ -81,33 +81,33 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
         .idm-overlay { font-family: 'Inter', sans-serif; }
 
         .idm-shell {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
+          background: var(--c-card);
+          border: 1px solid var(--c-line2);
           box-shadow: 0 4px 20px -4px rgba(0,0,0,0.05);
         }
         .idm-header {
-          background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%);
-          border-bottom: 1px solid #E4E4E7;
+          background: linear-gradient(135deg, var(--c-body) 0%, var(--c-chip) 100%);
+          border-bottom: 1px solid var(--c-line);
         }
         .idm-stat {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
+          background: var(--c-card);
+          border: 1px solid var(--c-line2);
           box-shadow: 0 2px 10px rgba(0,0,0,0.02);
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .idm-stat:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.10); transform: translateY(-2px); }
 
         .idm-grade-card {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
+          background: var(--c-card);
+          border: 1px solid var(--c-line2);
           box-shadow: 0 1px 3px rgba(0,0,0,0.05);
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .idm-grade-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10); transform: translateY(-2px); }
 
         .idm-row-card {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
+          background: var(--c-card);
+          border: 1px solid var(--c-line2);
           box-shadow: 0 1px 3px rgba(0,0,0,0.05);
           transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
         }
@@ -126,7 +126,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
         .idm-scroll::-webkit-scrollbar-thumb { background: #D4D4D8; border-radius: 4px; }
 
         .idm-shimmer {
-          background: linear-gradient(90deg, #FAFAFA 25%, #F4F4F5 50%, #FAFAFA 75%);
+          background: linear-gradient(90deg, var(--c-body) 25%, var(--c-chip) 50%, var(--c-body) 75%);
           background-size: 200% 100%;
           animation: idm-shimmer 1.5s infinite;
           border-radius: 12px;
@@ -138,14 +138,26 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
           opacity: 1; transform: scale(1) translateY(0);
           transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.25,0.64,1);
         }
-        .idm-close { background: #F4F4F5; color: #A1A1AA; transition: background 0.2s, color 0.2s; }
+        .idm-close { background: var(--c-chip); color: #A1A1AA; transition: background 0.2s, color 0.2s; }
         .idm-close:hover { background: #6366f1; color: #FFFFFF; }
         .idm-handle { background: #D4D4D8; }
 
         .idm-footer {
-          background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%);
-          border-top: 1px solid #E4E4E7;
+          background: linear-gradient(135deg, var(--c-body) 0%, var(--c-chip) 100%);
+          border-top: 1px solid var(--c-line);
         }
+      
+        /* ── DARK MODE TOKENS (light values = original, so light mode unchanged) ── */
+        .idm-overlay { --c-card: #FFFFFF; --c-body: #FAFAFA; --c-chip: #F4F4F5; --c-line: #E4E4E7; --c-line2: #F1F5F9; --c-ink: #0f172a; --c-ink2: #475569; }
+        html.dark .idm-overlay { --c-card: #141d30; --c-body: #0c1322; --c-chip: rgba(255,255,255,0.05); --c-line: #24314a; --c-line2: #1e2a40; --c-ink: #f1f5f9; --c-ink2: #cbd5e1; }
+        /* badge margin: dark text on chip -> lighten in dark */
+        html.dark .idm-overlay .badge-margin { color: #cbd5e1 !important; }
+        /* icon strokes that were mid/dark grey -> lighten for contrast on dark */
+        html.dark .idm-overlay svg[stroke="#52525B"] { stroke: #9aa4b2 !important; }
+        html.dark .idm-overlay svg[stroke="#71717A"] { stroke: #9aa4b2 !important; }
+        html.dark .idm-overlay svg[stroke="#475569"] { stroke: #cbd5e1 !important; }
+        html.dark .idm-overlay svg[stroke="#A1A1AA"] { stroke: #94a3b8 !important; }
+        html.dark .idm-overlay svg[stroke="#D4D4D8"] { stroke: #64748b !important; }
       `}</style>
 
       <div
@@ -172,7 +184,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                 </svg>
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0f172a" }}>Detail Inventory</h2>
+                <h2 className="text-base sm:text-lg font-bold" style={{ color: "var(--c-ink)" }}>Detail Inventory</h2>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Breakdown stok per grade dan brand</p>
               </div>
             </div>
@@ -184,7 +196,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
           </div>
 
           {/* Scrollable body */}
-          <div className="idm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
+          <div className="idm-scroll flex-1 overflow-y-auto" style={{ background: "var(--c-body)" }}>
             {isMemuat ? (
               <div className="p-5 space-y-3">
                 <div className="grid grid-cols-2 gap-3">{[1,2].map(i=><div key={i} className="idm-shimmer h-24"/>)}</div>
@@ -199,26 +211,26 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                   <div className="idm-stat rounded-2xl overflow-hidden">
                     <div className="h-1" style={{ background: "linear-gradient(90deg, #6366f1, #818cf8)" }} />
                     <div className="p-4">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "var(--c-chip)" }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
                           <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
                       </div>
                       <p className="idm-section-label">Total Unit</p>
-                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.total}</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "var(--c-ink)" }}>{data.total}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>stok tersedia</p>
                     </div>
                   </div>
                   <div className="idm-stat rounded-2xl overflow-hidden">
                     <div className="h-1" style={{ background: "linear-gradient(90deg, #6366f1, #818cf8)" }} />
                     <div className="p-4">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "var(--c-chip)" }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
                           <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                         </svg>
                       </div>
                       <p className="idm-section-label">Total Model</p>
-                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.totalModels}</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "var(--c-ink)" }}>{data.totalModels}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>variasi unik</p>
                     </div>
                   </div>
@@ -243,10 +255,10 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                               {grade}
                             </div>
                             <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Grade {grade}</p>
-                            <p className="text-xl font-extrabold mt-0.5" style={{ color: "#0f172a" }}>
+                            <p className="text-xl font-extrabold mt-0.5" style={{ color: "var(--c-ink)" }}>
                               {gradeData.qty} <span className="text-xs font-normal" style={{ color: "#A1A1AA" }}>unit</span>
                             </p>
-                            <div className="w-full h-1.5 rounded-full mt-2.5 overflow-hidden" style={{ background: "#F4F4F5" }}>
+                            <div className="w-full h-1.5 rounded-full mt-2.5 overflow-hidden" style={{ background: "var(--c-chip)" }}>
                               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${gradeData.pct}%`, background: cfg.bar }} />
                             </div>
                             <p className="text-[10px] mt-1.5 font-bold" style={{ color: cfg.color }}>{gradeData.pct}%</p>
@@ -265,8 +277,8 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                     <p className="text-[10px] font-medium" style={{ color: "#D4D4D8" }}>Berdasarkan jumlah unit</p>
                   </div>
                   {data.byBrand.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-2xl border border-dashed" style={{ borderColor: "#E4E4E7" }}>
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#F4F4F5" }}>
+                    <div className="text-center py-12 bg-white rounded-2xl border border-dashed" style={{ borderColor: "var(--c-line)" }}>
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "var(--c-chip)" }}>
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4D4D8" strokeWidth="1.8">
                           <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
@@ -286,26 +298,26 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                                   className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-[11px] font-bold"
                                   style={isTop
                                     ? { background: "linear-gradient(135deg, #18181B, #3F3F46)", color: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.30)" }
-                                    : { background: "#F4F4F5", color: "#71717A" }
+                                    : { background: "var(--c-chip)", color: "#71717A" }
                                   }
                                 >
                                   #{idx + 1}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-sm font-semibold truncate" style={{ color: "#0f172a" }}>{brand.name}</p>
+                                  <p className="text-sm font-semibold truncate" style={{ color: "var(--c-ink)" }}>{brand.name}</p>
                                   {isTop && (
-                                    <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Paling banyak</p>
+                                    <p className="text-[9px] font-bold mt-0.5" style={{ color: "var(--c-ink)" }}>Paling banyak</p>
                                   )}
                                 </div>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <p className="text-sm font-bold" style={{ color: "#0f172a" }}>{brand.total}</p>
+                                <p className="text-sm font-bold" style={{ color: "var(--c-ink)" }}>{brand.total}</p>
                                 <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>unit</p>
                               </div>
                             </div>
-                            <div className="w-full h-1.5 rounded-full mt-3 overflow-hidden" style={{ background: "#F4F4F5" }}>
+                            <div className="w-full h-1.5 rounded-full mt-3 overflow-hidden" style={{ background: "var(--c-chip)" }}>
                               <div className="h-full rounded-full transition-all duration-700"
-                                style={{ width: `${pct}%`, background: isTop ? "linear-gradient(90deg, #6366f1, #818cf8)" : "linear-gradient(90deg, #D4D4D8, #E4E4E7)" }} />
+                                style={{ width: `${pct}%`, background: isTop ? "linear-gradient(90deg, #6366f1, #818cf8)" : "linear-gradient(90deg, #D4D4D8, var(--c-line))" }} />
                             </div>
                           </div>
                         );
@@ -316,8 +328,8 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
 
                 {/* Footer Info */}
                 <div className="rounded-2xl p-4 flex items-start gap-3"
-                  style={{ background: "linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%)", border: "1px solid #E4E4E7" }}>
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "#F4F4F5" }}>
+                  style={{ background: "linear-gradient(135deg, var(--c-body) 0%, var(--c-chip) 100%)", border: "1px solid var(--c-line)" }}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "var(--c-chip)" }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.2">
                       <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
@@ -330,12 +342,12 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "var(--c-chip)" }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2">
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                   </svg>
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
+                <p className="text-sm font-semibold" style={{ color: "var(--c-ink2)" }}>Gagal memuat data</p>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Coba tutup dan buka kembali</p>
               </div>
             )}
