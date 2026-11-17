@@ -4007,11 +4007,11 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
                         {filteredData.length > 0 && (
                             <tfoot>
                                 <tr>
-                                    <td className={`sticky left-0 z-10 font-black text-gray-800 bg-gray-100 ${tf} ${freezeShadow}`}>TOTAL</td>
+                                                                  <td className={`sticky left-0 z-10 font-black text-white bg-emerald-600 ${tf} ${freezeShadow}`}>TOTAL</td>
                                     {monthTotals.map((v, i) => (
-                                        <td key={i} className={`${tf} text-right bg-gray-100 font-mono font-bold text-gray-700 text-xs`}>{v ? formatRupiah(v) : "—"}</td>
+                                        <td key={i} className={`${tf} text-right bg-emerald-50 font-mono font-bold text-emerald-800 text-xs`}>{v ? formatRupiah(v) : "—"}</td>
                                     ))}
-                                    <td className={`${tf} text-right bg-gray-200 font-mono font-black text-gray-900 text-xs`}>{formatRupiah(grandTotal)}</td>
+                                    <td className={`${tf} text-right bg-emerald-600 font-mono font-black text-white text-xs`}>{formatRupiah(grandTotal)}</td>
                                 </tr>
                             </tfoot>
                         )}

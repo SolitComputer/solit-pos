@@ -14,13 +14,17 @@ export interface BranchLocation {
   radius: number;  // meter
 }
 
+// Radius geofence absensi (meter). Satu angka untuk semua cabang —
+// dipakai server (penolakan) & client (teks/bar jarak di face-verify).
+export const ATTENDANCE_RADIUS_METERS = 50;
+
 export const BRANCH_LOCATIONS: BranchLocation[] = [
   {
     branch: "UTAMA",
     label: "Cabang Utama (Depok)",
     lat: -6.402123,
     lng: 106.787296,
-    radius: 80,
+    radius: ATTENDANCE_RADIUS_METERS,
   },
   {
     branch: "JOGJA",
@@ -28,7 +32,7 @@ export const BRANCH_LOCATIONS: BranchLocation[] = [
     // Titik toko Solit Jogja (Sinduadi, Sleman) — dari Google Maps.
     lat: -7.762592,
     lng: 110.367726,
-    radius: 80,
+    radius: ATTENDANCE_RADIUS_METERS,
   },
 ];
 

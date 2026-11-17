@@ -5,7 +5,7 @@ import type { ReactNode, CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import * as faceapi from "face-api.js";
 import { startAuthentication, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from "@simplewebauthn/browser";
-import { resolveBranchByLocation } from "@/lib/attendanceLocations"; // ✅ NEW — geofence multi-cabang
+import { resolveBranchByLocation, ATTENDANCE_RADIUS_METERS } from "@/lib/attendanceLocations"; // ✅ NEW — geofence multi-cabang
 
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
@@ -31,9 +31,9 @@ const MIN_SHARPNESS = 12;
 const QUALITY_HOLD_FRAMES = 2;
 
 // ✅ Koordinat per cabang pindah ke src/lib/attendanceLocations.ts (UTAMA/Depok & JOGJA).
-// MAX_DISTANCE_METERS di sini dipakai untuk TAMPILAN saja (teks "radius 80m",
-// bar jarak di layar out-of-range). Radius asli per cabang ada di lib itu.
-const MAX_DISTANCE_METERS = 80;
+// MAX_DISTANCE_METERS di sini dipakai untuk TAMPILAN saja (teks "radius 50m",
+// bar jarak di layar out-of-range). Nilainya ikut lib supaya tidak bisa beda.
+const MAX_DISTANCE_METERS = ATTENDANCE_RADIUS_METERS;
 const GPS_ACCEPT_ACCURACY_METERS = 100;
 const GPS_ACCURACY_FALLBACK_METERS = 200;
 const GPS_MAX_WAIT_MS = 12000;
