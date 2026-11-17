@@ -1826,7 +1826,7 @@ export default function PengajuanDanaPage() {
             </div>
           </div>
           {/* ⬅️ BARU: lonceng notifikasi + tombol Ajukan Dana dalam satu baris */}
-          <div className="flex items-center gap-2 self-end md:self-auto">
+          <div className="flex items-center gap-2 flex-wrap justify-end self-end md:self-auto">
             {showBell && (
               <NotificationBell
                 items={pendingApprovalData}
@@ -1919,7 +1919,7 @@ export default function PengajuanDanaPage() {
             </div>
 
             {/* Stat Cards inside banner */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               <SummaryCard
                 icon={<ClipboardList className="w-4 h-4" />}
                 label="Total Pengajuan"
@@ -2390,7 +2390,7 @@ export default function PengajuanDanaPage() {
                       <p className="text-slate-600 text-sm line-clamp-2 leading-relaxed">{row.purpose}</p>
                     </button>
 
-                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
                       <span className="font-extrabold text-slate-900 tabular-nums text-sm">{formatRupiah(row.amount)}</span>
                       <div className="flex items-center gap-1.5">
                         {row.payment_method === "CASH" && <LocationBadge branch={row.branch} />}

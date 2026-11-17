@@ -2633,7 +2633,7 @@ export default function CashflowPage() {
                 </div>
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                     <SummaryCard label={`Masuk · ${periodLabel}`} value={fmtRupiah(incomeValue)} color="emerald" icon={<IconTrendUp />} loading={loading} />
                     <SummaryCard label={`Keluar · ${periodLabel}`} value={fmtRupiah(expenseValue)} color="red" icon={<IconTrendDown />} loading={loading} />
                 </div>

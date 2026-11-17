@@ -105,7 +105,7 @@ export default function CashflowPribadiClient() {
 
     return (
     <div className="bg-slate-50 pb-20 lg:pb-8">
-      <div className="max-w-6xl mx-auto px-4 py-6 lg:py-8 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 py-4 lg:py-8 space-y-4 lg:space-y-6">
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -115,16 +115,16 @@ export default function CashflowPribadiClient() {
               Kelola keuangan pribadi Anda — <span className="font-semibold text-indigo-600">100% privat</span>, hanya Anda yang bisa lihat.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowCategoryMgr(true)}
-              className="px-3 py-2 text-sm font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition"
+              className="flex-1 sm:flex-none px-3 py-2 text-sm font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition whitespace-nowrap"
             >
               Kelola Kategori
             </button>
             <button
               onClick={openCreate}
-              className="px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm shadow-indigo-500/20"
+              className="flex-1 sm:flex-none px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm shadow-indigo-500/20 whitespace-nowrap"
             >
               + Tambah Transaksi
             </button>
@@ -132,8 +132,8 @@ export default function CashflowPribadiClient() {
         </div>
 
         {/* ── Summary Cards ────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white p-5 shadow-lg shadow-indigo-500/20">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+          <div className="col-span-2 md:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white p-5 shadow-lg shadow-indigo-500/20">
             <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl" />
             <p className="text-xs uppercase tracking-wider text-indigo-100/80 font-semibold">Saldo Periode Ini</p>
             <p className={`text-3xl font-bold mt-2 ${balance < 0 ? "text-rose-200" : "text-white"}`}>
@@ -142,7 +142,7 @@ export default function CashflowPribadiClient() {
             <p className="text-xs text-indigo-100/70 mt-2">{periodStart} → {periodEnd}</p>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -151,10 +151,10 @@ export default function CashflowPribadiClient() {
               </div>
               <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Pemasukan</p>
             </div>
-            <p className="text-2xl font-bold text-emerald-600">{formatIDR(income)}</p>
+            <p className="text-lg md:text-2xl font-bold text-emerald-600 truncate">{formatIDR(income)}</p>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -163,21 +163,21 @@ export default function CashflowPribadiClient() {
               </div>
               <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Pengeluaran</p>
             </div>
-            <p className="text-2xl font-bold text-rose-600">{formatIDR(expense)}</p>
+            <p className="text-lg md:text-2xl font-bold text-rose-600 truncate">{formatIDR(expense)}</p>
           </div>
         </div>
 
         {/* ── Period & Filter ──────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center">
             <button onClick={setLast7Days} className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">7 Hari</button>
             <button onClick={setThisMonth} className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">Bulan Ini</button>
             <button onClick={setLastMonth} className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">Bulan Lalu</button>
-            <div className="ml-auto flex items-center gap-2 flex-wrap">
-              <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+            <div className="sm:ml-auto flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="flex-1 sm:flex-none min-w-0 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
               <span className="text-slate-400 text-sm">→</span>
-              <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
-              <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none">
+              <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="flex-1 sm:flex-none min-w-0 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+              <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-full sm:w-auto px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none">
                 <option value="all">Semua</option>
                 <option value="income">Pemasukan</option>
                 <option value="expense">Pengeluaran</option>
@@ -226,7 +226,7 @@ export default function CashflowPribadiClient() {
           {loading ? (
             <div className="p-8 text-center text-sm text-slate-500">Memuat data...</div>
           ) : transactions.length === 0 ? (
-            <div className="p-12 text-center">
+            <div className="p-8 sm:p-12 text-center">
               <div className="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center mb-3">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.8">
                   <path d="M12 2v20M5 9h14M3 15h18" />
@@ -238,9 +238,9 @@ export default function CashflowPribadiClient() {
           ) : (
             <ul className="divide-y divide-slate-100">
               {transactions.map((tx) => (
-                <li key={tx.id} className="p-4 hover:bg-slate-50 transition group">
+                <li key={tx.id} className="p-3 sm:p-4 lg:hover:bg-slate-50 transition group">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${tx.type === "income" ? "bg-emerald-50" : "bg-rose-50"}`}>
+                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${tx.type === "income" ? "bg-emerald-50" : "bg-rose-50"}`}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={tx.type === "income" ? "#10b981" : "#ef4444"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                         {tx.type === "income"
                           ? <><path d="M12 19V5" /><path d="M5 12l7-7 7 7" /></>
@@ -265,11 +265,11 @@ export default function CashflowPribadiClient() {
                       <span className={`text-sm font-bold ${tx.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
                         {tx.type === "income" ? "+" : "-"}{formatIDR(tx.amount)}
                       </span>
-                      <div className="opacity-0 group-hover:opacity-100 transition flex gap-1">
-                        <button onClick={() => openEdit(tx)} title="Edit" className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded">
+                      <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition flex gap-1">
+                        <button onClick={() => openEdit(tx)} title="Edit" className="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                         </button>
-                        <button onClick={() => handleDelete(tx.id)} title="Hapus" className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded">
+                        <button onClick={() => handleDelete(tx.id)} title="Hapus" className="p-2 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></svg>
                         </button>
                       </div>
