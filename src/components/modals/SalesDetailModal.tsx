@@ -79,34 +79,34 @@ export function SalesDetailModal({
         .sdm-overlay { font-family: 'Inter', sans-serif; }
 
         .sdm-shell {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
+          background: var(--c-card);
+          border: 1px solid var(--c-line2);
           box-shadow: 0 4px 20px -4px rgba(0,0,0,0.05);
         }
         .sdm-header {
-          background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%);
-          border-bottom: 1px solid #E4E4E7;
+          background: linear-gradient(135deg, var(--c-body) 0%, var(--c-chip) 100%);
+          border-bottom: 1px solid var(--c-line);
         }
         .sdm-stat {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
+          background: var(--c-card);
+          border: 1px solid var(--c-line2);
           box-shadow: 0 2px 10px rgba(0,0,0,0.02);
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .sdm-stat:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.10); transform: translateY(-2px); }
 
         .sdm-sales-card {
-          background: #FFFFFF;
-          border: 1px solid #F1F5F9;
+          background: var(--c-card);
+          border: 1px solid var(--c-line2);
           box-shadow: 0 1px 3px rgba(0,0,0,0.05);
           transition: box-shadow 0.2s;
         }
         .sdm-sales-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.09); }
-        .sdm-expand-btn:hover { background: #FAFAFA; }
+        .sdm-expand-btn:hover { background: var(--c-body); }
 
         .sdm-daily-item {
-          background: #FFFFFF;
-          border: 1px solid #F4F4F5;
+          background: var(--c-card);
+          border: 1px solid var(--c-chip);
           border-radius: 10px;
           transition: border-color 0.15s, box-shadow 0.15s;
         }
@@ -118,10 +118,10 @@ export function SalesDetailModal({
 
         .sdm-inner-scroll::-webkit-scrollbar { width: 3px; }
         .sdm-inner-scroll::-webkit-scrollbar-track { background: transparent; }
-        .sdm-inner-scroll::-webkit-scrollbar-thumb { background: #E4E4E7; border-radius: 3px; }
+        .sdm-inner-scroll::-webkit-scrollbar-thumb { background: var(--c-line); border-radius: 3px; }
 
         .sdm-shimmer {
-          background: linear-gradient(90deg, #FAFAFA 25%, #F4F4F5 50%, #FAFAFA 75%);
+          background: linear-gradient(90deg, var(--c-body) 25%, var(--c-chip) 50%, var(--c-body) 75%);
           background-size: 200% 100%;
           animation: sdm-shimmer 1.5s infinite; border-radius: 12px;
         }
@@ -132,11 +132,23 @@ export function SalesDetailModal({
           opacity: 1; transform: scale(1) translateY(0);
           transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.25,0.64,1);
         }
-        .sdm-close { background: #F4F4F5; color: #A1A1AA; transition: background 0.2s, color 0.2s; }
+        .sdm-close { background: var(--c-chip); color: #A1A1AA; transition: background 0.2s, color 0.2s; }
         .sdm-close:hover { background: #6366f1; color: #FFFFFF; }
         .sdm-handle { background: #D4D4D8; }
         .sdm-section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #A1A1AA; }
-        .sdm-footer { background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%); border-top: 1px solid #E4E4E7; }
+        .sdm-footer { background: linear-gradient(135deg, var(--c-body) 0%, var(--c-chip) 100%); border-top: 1px solid var(--c-line); }
+      
+        /* ── DARK MODE TOKENS (light values = original, so light mode unchanged) ── */
+        .sdm-overlay { --c-card: #FFFFFF; --c-body: #FAFAFA; --c-chip: #F4F4F5; --c-line: #E4E4E7; --c-line2: #F1F5F9; --c-ink: #0f172a; --c-ink2: #475569; }
+        html.dark .sdm-overlay { --c-card: #141d30; --c-body: #0c1322; --c-chip: rgba(255,255,255,0.05); --c-line: #24314a; --c-line2: #1e2a40; --c-ink: #f1f5f9; --c-ink2: #cbd5e1; }
+        /* badge margin: dark text on chip -> lighten in dark */
+        html.dark .sdm-overlay .badge-margin { color: #cbd5e1 !important; }
+        /* icon strokes that were mid/dark grey -> lighten for contrast on dark */
+        html.dark .sdm-overlay svg[stroke="#52525B"] { stroke: #9aa4b2 !important; }
+        html.dark .sdm-overlay svg[stroke="#71717A"] { stroke: #9aa4b2 !important; }
+        html.dark .sdm-overlay svg[stroke="#475569"] { stroke: #cbd5e1 !important; }
+        html.dark .sdm-overlay svg[stroke="#A1A1AA"] { stroke: #94a3b8 !important; }
+        html.dark .sdm-overlay svg[stroke="#D4D4D8"] { stroke: #64748b !important; }
       `}</style>
 
       <div
@@ -163,7 +175,7 @@ export function SalesDetailModal({
                 </svg>
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0f172a" }}>Detail Top Sales</h2>
+                <h2 className="text-base sm:text-lg font-bold" style={{ color: "var(--c-ink)" }}>Detail Top Sales</h2>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Performa penjual dan breakdown harian</p>
               </div>
             </div>
@@ -175,7 +187,7 @@ export function SalesDetailModal({
           </div>
 
           {/* Body */}
-          <div className="sdm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
+          <div className="sdm-scroll flex-1 overflow-y-auto" style={{ background: "var(--c-body)" }}>
             {isMemuat ? (
               <div className="p-5 space-y-3">
                 <div className="grid grid-cols-2 gap-3">{[1, 2].map(i => <div key={i} className="sdm-shimmer h-28" />)}</div>
@@ -189,18 +201,18 @@ export function SalesDetailModal({
                   <div className="sdm-stat rounded-2xl overflow-hidden">
                     <div className="h-1" style={{ background: "linear-gradient(90deg, #6366f1, #818cf8)" }} />
                     <div className="p-4">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "var(--c-chip)" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
                           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                         </svg>
                       </div>
                       <p className="sdm-section-label">Hari Ini</p>
-                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.today.count}</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "var(--c-ink)" }}>{data.today.count}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>transaksi</p>
                       {!hideRevenue && (
-                        <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #F4F4F5" }}>
+                        <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid var(--c-chip)" }}>
                           <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>Revenue: {fmtShort(data.today.revenue)}</p>
-                          <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Profit: +{fmtShort(data.today.profit)}</p>
+                          <p className="text-[9px] font-bold mt-0.5" style={{ color: "var(--c-ink)" }}>Profit: +{fmtShort(data.today.profit)}</p>
                         </div>
                       )}
                     </div>
@@ -208,18 +220,18 @@ export function SalesDetailModal({
                   <div className="sdm-stat rounded-2xl overflow-hidden">
                     <div className="h-1" style={{ background: "linear-gradient(90deg, #6366f1, #818cf8)" }} />
                     <div className="p-4">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "var(--c-chip)" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
                           <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                       </div>
                       <p className="sdm-section-label">Bulan Ini</p>
-                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.monthly.count}</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "var(--c-ink)" }}>{data.monthly.count}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>transaksi</p>
                       {!hideRevenue && (
-                        <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #F4F4F5" }}>
+                        <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid var(--c-chip)" }}>
                           <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>Revenue: {fmtShort(data.monthly.revenue)}</p>
-                          <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Profit: +{fmtShort(data.monthly.profit)}</p>
+                          <p className="text-[9px] font-bold mt-0.5" style={{ color: "var(--c-ink)" }}>Profit: +{fmtShort(data.monthly.profit)}</p>
                         </div>
                       )}
                     </div>
@@ -230,14 +242,14 @@ export function SalesDetailModal({
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <p className="sdm-section-label">Top Performers (30 Hari)</p>
-                    <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: "#F4F4F5", color: "#475569" }}>
+                    <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: "var(--c-chip)", color: "var(--c-ink2)" }}>
                       {data.salesPerformance.length} sales
                     </span>
                   </div>
 
                   {data.salesPerformance.length === 0 ? (
-                    <div className="text-center py-14 bg-white rounded-2xl border border-dashed" style={{ borderColor: "#E4E4E7" }}>
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#F4F4F5" }}>
+                    <div className="text-center py-14 bg-white rounded-2xl border border-dashed" style={{ borderColor: "var(--c-line)" }}>
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "var(--c-chip)" }}>
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4D4D8" strokeWidth="1.8">
                           <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
@@ -264,19 +276,19 @@ export function SalesDetailModal({
                                   className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold"
                                   style={rankStyle
                                     ? { background: rankStyle.bg, boxShadow: rankStyle.shadow, color: rankStyle.color }
-                                    : { background: "#F4F4F5", color: "#71717A" }
+                                    : { background: "var(--c-chip)", color: "#71717A" }
                                   }
                                 >
                                   {idx + 1}
                                 </div>
                                 <div className="flex-1 min-w-0 text-left">
-                                  <p className="text-sm font-semibold truncate" style={{ color: "#0f172a" }}>{sales.name}</p>
+                                  <p className="text-sm font-semibold truncate" style={{ color: "var(--c-ink)" }}>{sales.name}</p>
                                   <div className="flex items-center gap-2 mt-0.5">
                                     <span className="text-[10px] font-medium" style={{ color: "#A1A1AA" }}>{sales.total} transaksi</span>
                                     {!hideRevenue && (
                                       <>
-                                        <span className="w-1 h-1 rounded-full" style={{ background: "#E4E4E7" }} />
-                                        <span className="text-[10px] font-semibold" style={{ color: "#0f172a" }}>{fmtShort(sales.revenue)}</span>
+                                        <span className="w-1 h-1 rounded-full" style={{ background: "var(--c-line)" }} />
+                                        <span className="text-[10px] font-semibold" style={{ color: "var(--c-ink)" }}>{fmtShort(sales.revenue)}</span>
                                       </>
                                     )}
                                   </div>
@@ -286,7 +298,7 @@ export function SalesDetailModal({
                                 {!hideRevenue && (
                                   <div className="hidden sm:block text-right">
                                     <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>profit</p>
-                                    <p className="text-xs font-bold" style={{ color: "#0f172a" }}>+{fmtShort(sales.profit)}</p>
+                                    <p className="text-xs font-bold" style={{ color: "var(--c-ink)" }}>+{fmtShort(sales.profit)}</p>
                                   </div>
                                 )}
                                 {!hideRevenue && (
@@ -299,10 +311,10 @@ export function SalesDetailModal({
                             </button>
 
                             {isExpanded && !hideRevenue && (
-                              <div className="border-t" style={{ borderColor: "#F4F4F5", background: "#FAFAFA" }}>
+                              <div className="border-t" style={{ borderColor: "var(--c-chip)", background: "var(--c-body)" }}>
                                 <div className="px-4 py-3">
                                   <div className="flex items-center gap-2 mb-3">
-                                    <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "#F4F4F5" }}>
+                                    <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "var(--c-chip)" }}>
                                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5">
                                         <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                                       </svg>
@@ -318,18 +330,18 @@ export function SalesDetailModal({
                                           <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-2.5">
                                               <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-                                                style={{ background: "#F4F4F5", color: "#0f172a" }}>
+                                                style={{ background: "var(--c-chip)", color: "var(--c-ink)" }}>
                                                 {i + 1}
                                               </div>
                                               <div>
-                                                <p className="text-xs font-semibold" style={{ color: "#0f172a" }}>{day.label}</p>
+                                                <p className="text-xs font-semibold" style={{ color: "var(--c-ink)" }}>{day.label}</p>
                                                 <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>{day.total} transaksi</p>
                                               </div>
                                             </div>
                                             <div className="text-right">
-                                              <p className="text-xs font-bold" style={{ color: "#0f172a" }}>{fmtRupiah(day.revenue)}</p>
-                                              <p className="text-[9px] font-semibold" style={{ color: "#475569" }}>+{fmtRupiah(day.profit)}</p>
-                                              <div className="w-16 h-1 rounded-full mt-1 overflow-hidden" style={{ background: "#F4F4F5" }}>
+                                              <p className="text-xs font-bold" style={{ color: "var(--c-ink)" }}>{fmtRupiah(day.revenue)}</p>
+                                              <p className="text-[9px] font-semibold" style={{ color: "var(--c-ink2)" }}>+{fmtRupiah(day.profit)}</p>
+                                              <div className="w-16 h-1 rounded-full mt-1 overflow-hidden" style={{ background: "var(--c-chip)" }}>
                                                 <div className="h-full rounded-full" style={{
                                                   width: `${(day.revenue / sales.revenue) * 100}%`,
                                                   background: "linear-gradient(90deg, #6366f1, #818cf8)"
@@ -353,12 +365,12 @@ export function SalesDetailModal({
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "var(--c-chip)" }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2">
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
+                <p className="text-sm font-semibold" style={{ color: "var(--c-ink2)" }}>Gagal memuat data</p>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Coba tutup dan buka kembali</p>
               </div>
             )}
