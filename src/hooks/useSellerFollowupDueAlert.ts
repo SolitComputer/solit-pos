@@ -78,6 +78,9 @@ export function useSellerFollowupDueAlert(userId: string | null | undefined) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const isInitialLoadRef = useRef(true);
+  // ID unik per instance hook, supaya bubble & kartu dashboard tidak
+  // berebut channel realtime dengan nama yang sama.
+  const instanceId = useRef(Math.random().toString(36).slice(2, 10)).current;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -155,7 +158,7 @@ export function useSellerFollowupDueAlert(userId: string | null | undefined) {
     };
 
     const channel = supabase
-      .channel(`seller-due-${userId}`)
+      .channel(`seller-due-${userId}-${instanceId}`)
       .on(
         "postgres_changes",
         {

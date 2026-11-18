@@ -2196,7 +2196,9 @@ export default function ManagementSellerPage() {
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await fetch(`/api/seller-followups?type=ALL&scope=${scope}`);
+      const res = await fetch(`/api/seller-followups?type=ALL&scope=${scope}`, {
+        cache: "no-store",
+      });
       const result = await res.json();
       setItems(result.success ? (result.data as Followup[]) : []);
     } catch {
