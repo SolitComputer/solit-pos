@@ -8,6 +8,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import { isSellerArchiveManager } from "@/lib/sellerArchiveAccess";
 import {
   Hand,
   Archive,
@@ -1189,10 +1190,8 @@ function DeleteConfirmModal({
 
 // ── Alasan arsip: preset ─────────────────────────────────────────────────────
 const ARCHIVE_PRESETS = [
-  "Customer tidak merespon",
   "Nomor tidak aktif",
   "Customer minta tidak dihubungi lagi",
-  "Customer sudah tidak relevan (pindah / ganti usaha)",
   "Data duplikat",
   "Lainnya",
 ] as const;
@@ -1721,6 +1720,7 @@ function FollowupCard({
   scope,
   processing,
   canManage,
+  canArchiveManage,
   canDelete,
   onFollowup,
   onArchive,
@@ -1734,6 +1734,7 @@ function FollowupCard({
   scope: Scope;
   processing: boolean;
   canManage: boolean;
+  canArchiveManage: boolean;
   canDelete: boolean;
   onFollowup: (id: string) => void;
   onArchive: (id: string) => void;
@@ -1907,7 +1908,7 @@ function FollowupCard({
               </div>
             )}
 
-            {canManage && (
+            {canArchiveManage && (
               <button
                 onClick={() => onArchive(f.id)}
                 disabled={processing}
@@ -1939,8 +1940,8 @@ function FollowupCard({
           </>
         ) : (
           <>
-            <WaChatButton f={f} fullWidth={!canManage} />
-            {canManage && (
+            <WaChatButton f={f} fullWidth={!(canManage || canArchiveManage)} />
+            {canArchiveManage && (
             <button
               onClick={() => onEditArchiveReason?.(f.id)}
               title="Lihat / ubah alasan diarsipkan"
@@ -2191,6 +2192,14 @@ export default function ManagementSellerPage() {
   //  Visibilitas tombol checklist ditentukan dari ROLE user (client-side),
   //    bukan dari hasil API. Enforcement asli tetap di server (PUT /api/seller-pics).
   const canManagePic = hasAnyRole(userRoles, PERMISSIONS.MANAGE_SELLER_PIC);
+
+  //  Akses arsip & edit alasan arsip Management Seller DIBATASI KHUSUS:
+  //    hanya role ADMIN, ATAU ID akun tertentu (whitelist terpisah dari
+  //    sistem role biasa). Enforcement ASLI wajib juga ada di server
+  //    (PATCH /api/seller-followups/[id]) — ini cuma gating UI.
+  const canArchiveManage =
+    userRoles.some((r) => String(r).toUpperCase() === "ADMIN") ||
+    isSellerArchiveManager(authUser?.id);
 
   // ── Load followups ──
   const loadData = async (silent = false) => {
@@ -2782,6 +2791,7 @@ export default function ManagementSellerPage() {
                   scope={scope}
                   processing={processingId === f.id}
                   canManage={canManage}
+                  canArchiveManage={canArchiveManage}
                   canDelete={canDelete}
                   onFollowup={onFollowup}
                   onArchive={onArchive}

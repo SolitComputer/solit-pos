@@ -625,7 +625,7 @@ export async function middleware(request: NextRequest) {
   // Akun di TRANSACTION_VIEW_EXTRA_USER_IDS (mis. Fikri — MARKETING) boleh
   // buka /dashboard/transactions + /api/transaction walau role-nya tidak ada
   // di ROUTE_PERMISSIONS. Hanya menambah akses (OR), tidak pernah mencabut.
-  if (
+   if (
     !hasRouteAccess &&
     TRANSACTION_VIEW_EXTRA_USER_IDS.includes(user.id) &&
     (pathname === "/dashboard/transactions" ||
