@@ -611,6 +611,10 @@ export default function UnitsPage() {
     // endpoint /api/units/[id]/audit (yang sifatnya toggle) tidak malah
     // MEMBATALKAN audit unit yang sudah benar. Unit teraudit di-skip.
     const [bulkAuditing, setBulkAuditing] = useState(false);
+    const [bulkPerluQcing, setBulkPerluQcing] = useState(false);
+    // Target modal konfirmasi bulk "Perlu di QC" — berisi daftar unit yang
+    // mau dikirim ke antrian Team QC (sudah pre-filter dari SOLD).
+    const [bulkPerluQcTarget, setBulkPerluQcTarget] = useState<LaptopUnit[] | null>(null);
     // Klik "Audit N Unit" → buka modal catatan dulu (1 catatan untuk semua).
     const handleBulkAudit = () => {
         if (selectedIds.size === 0) return;
@@ -669,6 +673,58 @@ export default function UnitsPage() {
             setAlertModal("Gagal mengaudit beberapa unit");
         } finally {
             setBulkAuditing(false);
+        }
+    };
+
+    // ── Bulk "Perlu di QC" unit tercentang ─────────────────────────────────
+    // Kirim unit terpilih ke antrian Team QC dalam 1 request ke
+    // POST /api/laptops/[id]/perlu-qc dengan body { unit_ids }. Status unit
+    // jadi BELUM_SIAP + qc_status NEEDS_QC di sana. Validasi BLOCKED
+    // (RESERVED/HELD/PACKING/PENDING) juga dilakukan di sisi server.
+    const handleBulkPerluQc = () => {
+        if (selectedIds.size === 0) return;
+        // Pre-check client: unit SOLD disaring di sini biar user tidak perlu
+        // menunggu server tolak. Validasi final tetap di endpoint.
+        const targets = units.filter(u => selectedIds.has(u.id) && u.status !== "SOLD");
+        if (targets.length === 0) {
+            setToast("Tidak ada unit aktif untuk dikirim ke QC");
+            return;
+        }
+        setBulkPerluQcTarget(targets);
+    };
+
+    const runBulkPerluQc = async () => {
+        if (!bulkPerluQcTarget) return;
+        setBulkPerluQcing(true);
+        try {
+            const res = await fetch(`/api/laptops/${laptopId}/perlu-qc`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ unit_ids: bulkPerluQcTarget.map(u => u.id) }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal mengirim ke Team QC");
+
+            // Refetch — unit yang berhasil di-reset hilang dari antrian Siap Jual
+            // dan statusnya jadi BELUM_SIAP. Normalisasi angka sama persis kayak
+            // di fetchData() biar harga tidak kelihatan berubah karena casting.
+            const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
+            const freshData = await freshRes.json();
+            const freshUnits: LaptopUnit[] = (freshData.data || []).map((u: LaptopUnit) => ({
+                ...u,
+                purchase_price: Math.round(Number(u.purchase_price) || 0),
+                sparepart_cost: Math.round(Number(u.sparepart_cost) || 0),
+                selling_price: Math.round(Number(u.selling_price) || 0),
+                official_price: Math.round(Number(u.official_price) || 0),
+            }));
+            setUnits(freshUnits);
+            setSelectedIds(new Set());
+            setBulkPerluQcTarget(null);
+            setToast(`${json.data?.count ?? bulkPerluQcTarget.length} unit dikirim ke Team QC`);
+        } catch (e) {
+            setAlertModal(e instanceof Error ? e.message : "Gagal mengirim ke Team QC");
+        } finally {
+            setBulkPerluQcing(false);
         }
     };
 
@@ -1041,24 +1097,12 @@ export default function UnitsPage() {
                                 </>
                             )}
 
-                            {canManageUnits && activeUnits.length > 0 && (
-                                <button onClick={openSourceModal}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5a2 2 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-                                    </svg>
-                                    Set Sumber
-                                </button>
-                            )}
-                            {canManageUnits && activeUnits.length > 0 && (
-                                <button onClick={openPriceModal}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m-6 4h6m-6 4h4M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                    </svg>
-                                    Set Harga
-                                </button>
-                            )}
+                            {/* Tombol "Set Sumber" dihapus — field `source` termasuk
+                                data QC. Edit source sekarang HANYA lewat Team QC:
+                                pencet "Perlu di QC" dulu, lalu edit di halaman Team QC. */}    
+                            {/* Tombol "Set Harga" dihapus — harga (selling/purchase/sparepart/
+                                official) termasuk data QC. Edit harga sekarang HANYA lewat
+                                Team QC: pencet "Perlu di QC" dulu, lalu edit di halaman Team QC. */}
                         </div>
                     </div>
 
@@ -1221,22 +1265,10 @@ export default function UnitsPage() {
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 active:opacity-60 transition">Batal pilih</button>
-                                {/* Edit massal unit tercentang — form sama persis dgn Edit Unit
-                                    tunggal (BulkEditUnitsModal). Hanya unit aktif (bukan SOLD)
-                                    yang ikut; Harga Modal cuma bisa diubah role full-access.
-                                    Gate = canFullAccessBarang, DISAMAKAN dgn endpoint PUT
-                                    /api/units/[id] (BARANG_FULL_ACCESS_ROLES) & edit unit tunggal
-                                    (UnitDetailModal canEdit). Pakai canManageUnits malah bikin
-                                    role EDIT_UNITS non-full-access kena 403 di tiap unit. */}
-                                {canFullAccessBarang && (
-                                    <button onClick={() => setShowBulkEditModal(true)}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a2e] text-white rounded-lg text-xs font-semibold hover:bg-[#16213e] transition">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                        Edit {selectedIds.size} Unit
-                                    </button>
-                                )}
+                                {/* Tombol bulk "Edit {N} Unit" dihapus — edit spek unit
+                                    sekarang HANYA lewat Team QC. User pakai tombol
+                                    "Perlu di QC {N} Unit" di sebelah, baru edit di
+                                    halaman Team QC. */}
                                 {canAuditUnits && (
                                     <button onClick={handleBulkAudit} disabled={bulkAuditing}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
@@ -1246,6 +1278,22 @@ export default function UnitsPage() {
                                             <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                             </svg>Audit {selectedIds.size} Unit</>
+                                        )}
+                                    </button>
+                                )}
+                                {/* Kirim unit terpilih ke antrian Team QC. Tema indigo sejajar
+                                    dengan tombol "Perlu di QC" di Data Barang. Gate pakai
+                                    canFullAccessBarang sesuai spec Rayhan (Admin, Kepala
+                                    Admin Barang, Admin Barang). */}
+                                {canFullAccessBarang && (
+                                    <button onClick={handleBulkPerluQc} disabled={bulkPerluQcing}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50">
+                                        {bulkPerluQcing ? (
+                                            <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengirim...</>
+                                        ) : (
+                                            <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                            </svg>Perlu di QC {selectedIds.size} Unit</>
                                         )}
                                     </button>
                                 )}
@@ -1401,13 +1449,10 @@ export default function UnitsPage() {
                                                     Barcode
                                                 </button>
                                             )}
-                                            {canQuickCondition && (
-                                                <button onClick={() => openCondition(u)}
-                                                    className="h-8 px-2 rounded-lg text-[11px] font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 transition flex items-center justify-center whitespace-nowrap"
-                                                    title="Edit tes kondisi unit ini tanpa buka mode Edit">
-                                                    Tes Kondisi
-                                                </button>
-                                            )}
+                                            {/* Tombol "Tes Kondisi" per-row dihapus — condition_checks
+                                                termasuk data QC. Edit checklist sekarang HANYA lewat
+                                                Team QC: pencet "Perlu di QC" dulu, lalu edit di
+                                                halaman Team QC. */}
                                             {canDelete && (
                                                 <button onClick={() => handleDelete(u)}
                                                     className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
@@ -1487,8 +1532,11 @@ export default function UnitsPage() {
                     unit={detailUnit as UnitDetailData}
                     laptopName={laptop?.laptop_name}
                     laptopMeta={[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage].filter(Boolean).join(" · ")}
-                    canEdit={canFullAccessBarang}
-                    canEditChecklist={!!canEditChecklist}
+                    // canEdit & canEditChecklist sengaja false — edit spek + tes kondisi
+                    // sekarang HANYA lewat Team QC. Modal detail cuma untuk VIEW.
+                    // Kalau mau ubah, user pencet "Perlu di QC" dulu di bulk action.
+                    canEdit={false}
+                    canEditChecklist={false}
                     canSeePrivate={canSeePriceInfo}
                     onClose={() => setDetailUnit(null)}
                     onSaved={(updated) => {
@@ -1564,6 +1612,52 @@ export default function UnitsPage() {
                     }}
                 />
             )}
+
+            {/* Modal konfirmasi bulk "Perlu di QC" — tema indigo biar beda dari
+                ConfirmModal default (merah = Hapus). Teks menjelaskan konsekuensi
+                reset status + behavior server-side skip unit yang transaksi. */}
+            {bulkPerluQcTarget && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+                    <div
+                        className="absolute inset-0 bg-black/50 backdrop-blur-md"
+                        onClick={() => !bulkPerluQcing && setBulkPerluQcTarget(null)}
+                    />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                        <div className="h-1 w-full bg-gradient-to-r from-indigo-400 via-indigo-600 to-indigo-800" />
+                        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-5">
+                            <p className="font-bold text-white text-sm">Kirim ke Team QC</p>
+                            <p className="text-xs text-white/70 mt-0.5">{bulkPerluQcTarget.length} unit terpilih</p>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-sm text-gray-600 text-center mb-3">
+                                {bulkPerluQcTarget.length} unit ini akan dikirim ke antrian Team QC.
+                            </p>
+                            <p className="text-xs text-indigo-700 text-center mb-4 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 leading-relaxed">
+                                Status unit akan diubah jadi <b>Belum Siap Jual</b>, field terisi dipertahankan sebagai default. Team QC isi ulang di halaman Team QC.
+                                Unit yang sedang transaksi (Reserved/Held/Packing/Pending) tidak akan diikutkan.
+                            </p>
+                            <div className="flex gap-3 mt-4">
+                                <button
+                                    onClick={() => setBulkPerluQcTarget(null)}
+                                    disabled={bulkPerluQcing}
+                                    className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={runBulkPerluQc}
+                                    disabled={bulkPerluQcing}
+                                    className="flex-1 h-11 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {bulkPerluQcing && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                    {bulkPerluQcing ? "Mengirim..." : "Kirim ke QC"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {toast && <Toast message={toast} onDone={() => setToast("")} />}
             {showSourceModal && (
                 <SourceBulkModal

@@ -14,7 +14,13 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
           id, laptop_name, brand, cpu, ram, storage, selling_price
         )
       `)
+      // Barang Minus HANYA unit yang masuk lewat "Tandai MINUS" dari Team QC
+      // (qc_status = FROM_QC). Unit yang qc_status = NEEDS_QC adalah hasil
+      // Perlu di QC → masuk antrian Team QC, BUKAN Barang Minus.
+      // Tanpa filter ini, unit Perlu di QC nyasar ke halaman ini karena
+      // status-nya juga BELUM_SIAP.
       .in("status", ["SERVICE", "BELUM_SIAP"])
+      .eq("qc_status", "FROM_QC")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -146,5 +152,9 @@ async function putHandler(req: NextRequest, ctx: any, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(handler, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG"]);
-export const PUT = withAuth(putHandler, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "KEPALA_PENGELOLA_BARANG"]);
+// TEKNISI biasa dihapus dari permission — mereka hanya service laptop customer.
+// Halaman ini murni Pengelola Barang (stok Solit). KEPALA_TEKNISI tetap karena
+// real-life-nya rangkap dengan KEPALA_PENGELOLA_BARANG (satu orang).
+export const GET = withAuth(handler, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_TEKNISI", "KEPALA_PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG"]);
+// TEKNISI dihapus — perbaikan stok Solit = urusan Pengelola Barang.
+export const PUT = withAuth(putHandler, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_TEKNISI", "KEPALA_PENGELOLA_BARANG"]);

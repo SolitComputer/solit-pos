@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import QcDecisionModal from "./QcDecisionModal";
 import AntrianSparepartTab from "./AntrianSparepartTab";
+// ConditionChecklist sama yang dipakai di units/page.tsx & Data Barang.
+// Di sini dipaksa readOnly buat view-only kepala.
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MinusUnit {
@@ -24,6 +27,9 @@ interface MinusUnit {
   notes: string;
   repair_status: string | null;
   repair_notes: string | null;
+  // Riwayat cek kondisi (JSON) — dipakai di kolom tambahan khusus kepala
+  // untuk taksir biaya sparepart sebelum ambil keputusan.
+  condition_checks: Record<string, unknown> | null;
   // ── BARU ──
   analisa: string | null;
   progress_pengerjaan: string | null;
@@ -423,20 +429,28 @@ function MinusContent() {
   const [filterRepair, setFilterRepair] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterMinusStatus, setFilterMinusStatus] = useState<"ALL" | "BELUM_DIATASI" | "SUDAH_DIATASI">("ALL");
-  // ── Tab pemisah: "UMUM" = unit minus lama (existing flow),
-  //                "DARI_QC" = unit yang ditandai MINUS dari Team QC (alur baru)
-  // Tab: UMUM = unit minus lama (teknisi flow) | DARI_QC = unit ditandai Team QC |
-  //      ANTRIAN = daftar sparepart menunggu dibeli.
-  const [activeTab, setActiveTab] = useState<"UMUM" | "DARI_QC" | "ANTRIAN">("UMUM");
+  // Tab: BARANG_MINUS = unit yang ditandai MINUS oleh Team QC (satu-satunya
+  // pintu masuk) | ANTRIAN = daftar sparepart menunggu dibeli.
+  // Tab lama "UMUM" (Perbaikan Umum, flow teknisi) sudah dihapus — data
+  // existing dibiarkan di DB sesuai keputusan Rayhan.
+  const [activeTab, setActiveTab] = useState<"BARANG_MINUS" | "ANTRIAN">("BARANG_MINUS");
 
   // Modals
   const [editTarget, setEditTarget] = useState<MinusUnit | null>(null);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
+  // Modal view-only buat Riwayat Cek Kondisi — khusus role kepala.
+  const [conditionViewTarget, setConditionViewTarget] = useState<MinusUnit | null>(null);
 
+  // canEdit: role yang boleh buka QcDecisionModal (keputusan Perbaiki/MSJ/Matot).
+  // TEKNISI dihapus — teknisi hanya tangani laptop customer, bukan stok Solit.
   const canEdit = userRole
-    ? hasPermission(userRole, (PERMISSIONS.EDIT_MINUS_LAPTOPS ?? ["ADMIN", "PENGELOLA_BARANG", "TEKNISI"]) as UserRole[])
+    ? hasPermission(userRole, (PERMISSIONS.EDIT_MINUS_LAPTOPS ?? ["ADMIN", "PENGELOLA_BARANG"]) as UserRole[])
     : false;
   const canReview = hasAnyRole(userRoles, MINUS_REVIEW_ROLES);
+  // canSeeHeadColumns: role kepala (+ Admin super-user) yang boleh lihat
+  // kolom sensitif (Harga Modal, Harga Jual, Riwayat Cek Kondisi) untuk
+  // taksir kelayakan perbaikan secara ekonomi.
+  const canSeeHeadColumns = hasAnyRole(userRoles, ["ADMIN", "KEPALA_TEKNISI", "KEPALA_PENGELOLA_BARANG"] as UserRole[]);
 
   useEffect(() => {
     getAuthUser().then(u => ({ success: true, user: u }))
@@ -472,66 +486,36 @@ function MinusContent() {
 
   useEffect(() => { fetchUnits(); }, []);
 
-  const handleDecision = async (unitId: string, decision: "OKE" | "NO_OKE", keterangan: string) => {
-    try {
-      const res = await fetch("/api/laptops/minus/decision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unit_id: unitId, decision, keterangan }),
-      });
-      const result = await res.json();
-      if (!result.success) { setAlertMsg(result.message || "Gagal memproses keputusan"); return; }
-      setUnits(prev => prev.filter(u => u.id !== unitId));
-      setAlertMsg(decision === "OKE" ? "Unit dipindahkan ke Siap Jual" : "Unit dipindahkan ke Aset Matot");
-    } catch {
-      setAlertMsg("Terjadi kesalahan koneksi");
-    }
-  };
+  // handleDecision + endpoint /api/laptops/minus/decision dihapus — keputusan
+  // sekarang HANYA lewat QcDecisionModal yang panggil
+  // /api/laptops/pengelola/decision (Perbaiki/MSJ/Matot).
 
   const filtered = useMemo(() => {
+    // API /api/laptops/minus sudah filter server-side ke qc_status=FROM_QC,
+    // jadi client cuma perlu handle pencarian + sort.
     let list = [...units];
-    // ── Filter tab: pisahkan unit dari alur QC baru vs unit minus lama ──
-    // DARI_QC: cuma unit yang qc_status === 'FROM_QC' (dilempar Team QC)
-    // UMUM: HANYA unit legacy (pre-QC flow) — semua qc_status dari flow baru
-    //       (FROM_QC, IN_SPAREPART, NEEDS_QC, QC_DONE) harus EXCLUDED supaya
-    //       tidak crossover ke halaman perbaikan umum teknisi.
-    //       + exclude unit yang repair_status='DONE' (sudah selesai perbaikan)
-    //         supaya tidak nyampah di list Perbaikan Umum.
-    if (activeTab === "DARI_QC") {
-      list = list.filter(u => u.qc_status === "FROM_QC");
-    } else {
-      // UMUM: strict — hanya unit tanpa qc_status (legacy) DAN belum selesai perbaikan
-      list = list.filter(u =>
-        (u.qc_status === null || u.qc_status === undefined)
-        && u.repair_status !== "DONE"
-      );
-    }
-    if (filterStatus !== "ALL") list = list.filter(u => u.status === filterStatus);
-    if (filterMinusStatus !== "ALL") list = list.filter(u => (u.minus_status || "BELUM_DIATASI") === filterMinusStatus);
-    if (filterRepair !== "ALL") {
-      if (filterRepair === "NONE") list = list.filter(u => !u.repair_status);
-      else list = list.filter(u => u.repair_status === filterRepair);
-    }
     if (search.trim()) {
       const t = search.toLowerCase();
       list = list.filter(u =>
         u.laptop?.laptop_name?.toLowerCase().includes(t) ||
         u.serial_number?.toLowerCase().includes(t) ||
         u.laptop?.brand?.toLowerCase().includes(t) ||
-        u.repair_notes?.toLowerCase().includes(t) ||
-        u.analisa?.toLowerCase().includes(t) ||
-        u.progress_pengerjaan?.toLowerCase().includes(t)
+        u.laptop?.cpu?.toLowerCase().includes(t) ||
+        u.analisa?.toLowerCase().includes(t)
       );
     }
-    // Urutkan dari tanggal MASUK terbaru → paling lama (created_at DESC).
-    // Unit tanpa created_at (edge case) ditaruh paling bawah.
+    // Urutkan dari tanggal MARK MINUS terbaru → paling lama.
+    // qc_marked_minus_at lebih relevan dari created_at karena ini menandai
+    // kapan unit masuk antrian keputusan Pengelola Barang.
     list.sort((a, b) => {
-      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return dateB - dateA; // DESC: besar (baru) dulu
+      const dateA = a.qc_marked_minus_at ? new Date(a.qc_marked_minus_at).getTime()
+        : (a.created_at ? new Date(a.created_at).getTime() : 0);
+      const dateB = b.qc_marked_minus_at ? new Date(b.qc_marked_minus_at).getTime()
+        : (b.created_at ? new Date(b.created_at).getTime() : 0);
+      return dateB - dateA;
     });
     return list;
-  }, [units, filterStatus, filterMinusStatus, filterRepair, search, activeTab]);
+  }, [units, search]);
 
   // Counts
   const repairCounts = useMemo(() => {
@@ -549,8 +533,7 @@ function MinusContent() {
     BELUM_SIAP: units.filter(u => u.status === "BELUM_SIAP").length,
   };
 
-  // Unit yg BELUM_SIAP tapi belum ada analisa — highlight sebagai perhatian
-  const needsAttention = units.filter(u => u.status === "BELUM_SIAP" && !u.analisa && !u.condition_note).length;
+  // (needsAttention dihapus — alert "perlu analisa" khusus flow teknisi lama)
 
   const fmtDate = (iso: string) => {
     if (!iso) return "—";
@@ -579,7 +562,7 @@ function MinusContent() {
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">
                     Barang Minus
                   </h1>
-                  <p className="text-xs text-gray-400 mt-0.5">Unit dalam perbaikan atau belum siap</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Keputusan Pengelola Barang untuk unit yang ditandai MINUS oleh Team QC</p>
                 </div>
               </div>
             </div>
@@ -592,74 +575,37 @@ function MinusContent() {
             </button>
           </div>
 
-          {/* Alert — unit belum ada analisa */}
-          {needsAttention > 0 && (
-            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              <p className="text-xs font-medium text-amber-800">
-                <span className="font-bold">{needsAttention} unit</span> dengan status Belum Siap belum memiliki analisa masalah — klik Update untuk mengisi.
-              </p>
-            </div>
-          )}
+          {/* Alert needsAttention dihapus — alert khusus flow teknisi lama */}
 
-          {/* ── Tab Strip: Pemisah "Perbaikan Umum" vs "Dari QC" ─────── */}
-          {/* UMUM = unit minus existing (alur lama teknisi).
-              DARI_QC = unit yang di-tandai MINUS oleh Team QC → butuh keputusan
-                       Pengelola Barang (Perbaiki / MSJ / Aset Matot).
-              Angka badge dihitung dari seluruh `units` (bukan hasil filter),
-              supaya counter tetap akurat walau filter lain aktif. */}
+          {/* ── Tab Strip: Barang Minus (dari Team QC) + Antrian Sparepart ──
+              Tab lama "Perbaikan Umum" dihapus — sesuai keputusan Rayhan,
+              satu-satunya pintu masuk ke Barang Minus = "Tandai MINUS" dari
+              Team QC. Data lama (219 unit) dibiarkan di DB & di-handle manual. */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex">
               <button
-                onClick={() => setActiveTab("UMUM")}
-                className={`flex-1 h-12 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold transition-all border-b-2 ${
-                  activeTab === "UMUM"
-                    ? "text-gray-800 border-gray-700 bg-gray-50"
-                    : "text-gray-400 border-transparent hover:text-gray-600 hover:bg-gray-50/60"
-                }`}
-              >
-                <Wrench size={16} />
-                <span className="hidden sm:inline">Perbaikan Umum</span>
-                <span className="sm:hidden">Umum</span>
-                <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold ${
-                  activeTab === "UMUM" ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-500"
-                }`}>
-                  {units.filter(u =>
-                    (u.qc_status === null || u.qc_status === undefined)
-                    && u.repair_status !== "DONE"
-                  ).length}
-                </span>
-              </button>
-              <button
-                onClick={() => setActiveTab("DARI_QC")}
-                className={`flex-1 h-12 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold transition-all border-b-2 ${
-                  activeTab === "DARI_QC"
+                onClick={() => setActiveTab("BARANG_MINUS")}
+                className={`flex-1 h-12 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold transition-all border-b-2 ${activeTab === "BARANG_MINUS"
                     ? "text-indigo-700 border-indigo-600 bg-indigo-50/60"
                     : "text-gray-400 border-transparent hover:text-indigo-600 hover:bg-indigo-50/30"
-                }`}
+                  }`}
               >
                 <AlertTriangle size={16} />
-                <span className="hidden sm:inline">Dari Team QC</span>
-                <span className="sm:hidden">QC</span>
-                <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold ${
-                  activeTab === "DARI_QC" ? "bg-indigo-600 text-white" : "bg-indigo-100 text-indigo-600"
-                }`}>
-                  {units.filter(u => u.qc_status === "FROM_QC").length}
+                <span>Barang Minus</span>
+                <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold ${activeTab === "BARANG_MINUS" ? "bg-indigo-600 text-white" : "bg-indigo-100 text-indigo-600"
+                  }`}>
+                  {units.length}
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab("ANTRIAN")}
-                className={`flex-1 h-12 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold transition-all border-b-2 ${
-                  activeTab === "ANTRIAN"
+                className={`flex-1 h-12 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold transition-all border-b-2 ${activeTab === "ANTRIAN"
                     ? "text-emerald-700 border-emerald-600 bg-emerald-50/60"
                     : "text-gray-400 border-transparent hover:text-emerald-600 hover:bg-emerald-50/30"
-                }`}
+                  }`}
               >
                 <Package size={16} />
-                <span className="hidden sm:inline">Antrian Sparepart</span>
-                <span className="sm:hidden">Sparepart</span>
+                <span>Antrian Sparepart</span>
               </button>
             </div>
           </div>
@@ -667,107 +613,38 @@ function MinusContent() {
           {/* ─── Tab ANTRIAN: render komponen khusus (sembunyikan Summary/Filter/Table) ─── */}
           {activeTab === "ANTRIAN" && <AntrianSparepartTab />}
 
-          {/* Summary Cards — HANYA tampil di tab UMUM.
-              Di tab DARI_QC & ANTRIAN tidak relevan:
-              - DARI_QC: unit belum masuk fase perbaikan, jadi metrik
-                (Belum Terpegang/Proses/Selesai) belum ada maknanya.
-              - ANTRIAN: komponen sparepart punya metrik sendiri. */}
-          <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${activeTab !== "UMUM" ? "hidden" : ""}`}>
-            {[
-              { label: "Total Unit", value: units.length, color: "text-gray-800", bar: "bg-gray-600", icon: <Package size={20} /> },
-              { label: "Belum Terpegang", value: repairCounts["NOT_STARTED"] || 0, color: "text-gray-600", bar: "bg-gray-400", icon: <Pause size={20} /> },
-              { label: "Proses", value: (repairCounts["WAITING_PARTS"] || 0) + (repairCounts["HARD_PARTS"] || 0), color: "text-gray-700", bar: "bg-gray-500", icon: <RefreshCw size={20} /> },
-              { label: "Selesai", value: repairCounts["DONE"] || 0, color: "text-gray-700", bar: "bg-gray-500", icon: <CheckCircle2 size={20} /> },
-            ].map((s) => (
-              <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${s.bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{s.label}</p>
-                    <p className={`text-2xl font-extrabold mt-1 ${s.color}`}>{s.value}</p>
-                  </div>
-                  <div className="text-xl opacity-60">{s.icon}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* Summary Cards (metrik teknisi: Belum Terpegang/Proses/Selesai)
+              dihapus — tidak relevan untuk flow Barang Minus dari Team QC.
+              Pengelola Barang langsung putusin per unit via QcDecisionModal. */}
 
-          {/* Filter Panel — HANYA tampil di tab UMUM.
-              Filter "Status Perbaikan" (WAITING_PARTS, DEAD, dll) khusus flow
-              teknisi, bukan flow QC. Di tab DARI_QC Pengelola Barang langsung
-              putusin per unit lewat modal, nggak perlu filter dulu. */}
-          <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 ${activeTab !== "UMUM" ? "hidden" : ""}`}>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-              <Wrench size={14} /> Status Perbaikan
-            </p>
-            <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              <button onClick={() => setFilterRepair("ALL")}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterRepair === "ALL" ? "bg-gray-700 text-white border-gray-700 shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-                Semua ({repairCounts["ALL"] || 0})
-              </button>
-              <button onClick={() => setFilterRepair("NONE")}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterRepair === "NONE" ? "bg-gray-700 text-white border-gray-700 shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-                Belum diset ({repairCounts["NONE"] || 0})
-              </button>
-              {Object.entries(REPAIR_STATUS).map(([key, val]) => (
-                <button key={key} onClick={() => setFilterRepair(key)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterRepair === key ? `${val.badge} shadow-sm` : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-                  <val.emoji size={14} /> {val.label}
-                  {repairCounts[key] > 0 && (
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${filterRepair === key ? "bg-white/30" : "bg-gray-100 text-gray-500"}`}>
-                      {repairCounts[key]}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-2 flex-wrap">
-              {[
-                { value: "ALL", label: "Semua Kategori" },
-                { value: "BELUM_DIATASI", label: "Belum Diatasi" },
-                { value: "SUDAH_DIATASI", label: "Sudah Diatasi" },
-              ].map(opt => (
-                <button key={opt.value} onClick={() => setFilterMinusStatus(opt.value as typeof filterMinusStatus)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterMinusStatus === opt.value ? "bg-blue-600 text-white border-blue-600 shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-2 flex-wrap">
-              {[
-                { value: "ALL", label: "Semua Status", count: statusCounts.ALL, icon: <ClipboardList size={14} /> },
-                { value: "SERVICE", label: "Service", count: statusCounts.SERVICE, icon: <Wrench size={14} /> },
-                { value: "BELUM_SIAP", label: "Belum Siap", count: statusCounts.BELUM_SIAP, icon: <Clock size={14} /> },
-              ].map((opt) => (
-                <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border flex items-center gap-1 ${filterStatus === opt.value ? "bg-gray-700 text-white border-gray-700 shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-                  <span>{opt.icon}</span>
-                  {opt.label}
-                  <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${filterStatus === opt.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
-                    {opt.count}
-                  </span>
-                </button>
-              ))}
+          {/* Search bar — HANYA tampil di tab BARANG_MINUS. Filter kompleks
+              teknisi-flow (Status Perbaikan, Belum/Sudah Diatasi, Status Unit)
+              sudah dihapus karena tidak relevan untuk flow baru — Pengelola
+              Barang langsung putusin per unit via QcDecisionModal. */}
+          <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 ${activeTab !== "BARANG_MINUS" ? "hidden" : ""}`}>
+            <div className="flex gap-2 flex-wrap items-center">
               <div className="relative flex-1 min-w-[180px] group">
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 group-focus-within:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                <input type="text" placeholder="Cari nama, SN, analisa..." value={search} onChange={(e) => setSearch(e.target.value)}
+                <input type="text" placeholder="Cari nama laptop, SN, brand, CPU, analisa..." value={search} onChange={(e) => setSearch(e.target.value)}
                   className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition-all" />
               </div>
-              {(search || filterRepair !== "ALL" || filterStatus !== "ALL") && (
-                <button onClick={() => { setSearch(""); setFilterRepair("ALL"); setFilterStatus("ALL"); }}
+              {search && (
+                <button onClick={() => setSearch("")}
                   className="h-9 px-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-medium hover:bg-gray-200 transition">
                   Reset
                 </button>
               )}
+              <p className="text-xs text-gray-400 ml-auto">
+                <span className="font-semibold text-gray-700">{filtered.length}</span> dari <span className="font-semibold text-gray-700">{units.length}</span> unit
+              </p>
             </div>
           </div>
 
-          {/* Table — sembunyikan saat tab ANTRIAN (render AntrianSparepartTab sebagai gantinya di atas) */}
-          {activeTab !== "ANTRIAN" && (isLoading ? (
+          {/* Table — hanya tampil di tab BARANG_MINUS (tab ANTRIAN render
+              AntrianSparepartTab component di atas) */}
+          {activeTab === "BARANG_MINUS" && (isLoading ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
               <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin mx-auto" />
               <p className="text-xs text-gray-400 mt-3">Memuat data...</p>
@@ -775,8 +652,8 @@ function MinusContent() {
           ) : filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
               <div className="text-5xl mb-3"><Wrench size={48} className="mx-auto text-gray-300" /></div>
-              <p className="text-gray-500 font-semibold text-base">Tidak ada unit ditemukan</p>
-              <p className="text-gray-400 text-sm mt-1">Coba ubah filter pencarian</p>
+              <p className="text-gray-500 font-semibold text-base">Belum ada unit Barang Minus</p>
+              <p className="text-gray-400 text-sm mt-1">Unit muncul di sini begitu Team QC menandai sebagai MINUS</p>
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -784,164 +661,111 @@ function MinusContent() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Laptop</th>
-                      {/* Kolom teknisi-flow (Status, Perbaikan, Progress, Tgl Masuk)
-                          HANYA tampil di tab UMUM. Di DARI_QC flow-nya belum masuk
-                          perbaikan — Pengelola Barang langsung putusin
-                          Perbaiki/MSJ/Matot, jadi metrik perbaikan belum relevan.
-                          "Analisa" direname jadi "Keterangan" di DARI_QC karena
-                          konten-nya = alasan MINUS dari Team QC, bukan diagnosa teknisi. */}
-                      {activeTab === "UMUM" && (
-                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                      {/* Kolom standar — SEMUA role Pengelola Barang lihat ini */}
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Nama Laptop</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Brand</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">CPU</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">RAM</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Storage</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">SN</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Grade</th>
+                      {/* Kolom sensitif — KHUSUS role kepala untuk taksir profit
+                          sparepart sebelum ambil keputusan. */}
+                      {canSeeHeadColumns && (
+                        <>
+                          <th className="px-4 py-3 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Harga Modal</th>
+                          <th className="px-4 py-3 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Harga Jual</th>
+                          <th className="px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Riwayat Cek Kondisi</th>
+                        </>
                       )}
-                      {activeTab === "UMUM" && (
-                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Perbaikan</th>
-                      )}
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[180px]">
-                        {activeTab === "DARI_QC" ? "Keterangan" : "Analisa"}
-                      </th>
-                      {activeTab === "UMUM" && (
-                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[180px]">Progress</th>
-                      )}
-                      {activeTab === "UMUM" && (
-                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Tgl Masuk</th>
-                      )}
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[200px]">Keterangan Team QC</th>
                       <th className="px-4 py-3 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {filtered.map((unit, idx) => {
-                      const rs = unit.repair_status ? REPAIR_STATUS[unit.repair_status] : null;
-                      const ust = UNIT_STATUS[unit.status];
-                      // Highlight baris yang BELUM_SIAP dan belum ada analisa
-                      const missingAnalisa = unit.status === "BELUM_SIAP" && !unit.analisa && !unit.condition_note;
-
-                      return (
-                        <tr key={unit.id}
-                          onClick={() => canEdit && setEditTarget(unit)}
-                          className={`transition-colors hover:bg-gray-50 ${canEdit ? "cursor-pointer" : ""} ${missingAnalisa ? "bg-amber-50/40" : idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"
-                            }`}
-                        >
-                          <td className="px-4 py-3.5 max-w-[180px]">
-                            <p className="font-semibold text-gray-800 truncate text-sm" title={unit.laptop?.laptop_name}>
-                              {unit.laptop?.laptop_name || "—"}
-                            </p>
-                            <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5">
-                              <span className="font-mono text-gray-500">{unit.serial_number}</span>
-                              {(unit.laptop?.brand || unit.laptop?.cpu) && (
-                                <>
-                                  <span>·</span>
-                                  <span>{[unit.laptop?.brand, unit.laptop?.cpu].filter(Boolean).join(" · ")}</span>
-                                </>
-                              )}
-                            </p>
-                          </td>
-                          {activeTab === "UMUM" && (
-                            <td className="px-4 py-3.5 whitespace-nowrap">
-                              {ust && (
-                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${ust.badge}`}>
-                                  {ust.label}
-                                </span>
-                              )}
-                              {/* Badge "Dari QC" — defensive, biar kalau ada unit FROM_QC
-                                  bocor ke tab UMUM pun tetap kelihatan asalnya. */}
-                              {unit.qc_status === "FROM_QC" && (
-                                <span className="flex items-center gap-1 text-[10px] text-indigo-600 mt-1 font-semibold">
-                                  <AlertTriangle size={11} className="flex-shrink-0" /> dari Team QC
-                                </span>
-                              )}
-                              {missingAnalisa && (
-                                <span className="flex items-center gap-1 text-[10px] text-amber-600 mt-1 font-medium"><AlertTriangle size={11} className="flex-shrink-0" /> perlu analisa</span>
-                              )}
+                    {filtered.map((unit, idx) => (
+                      <tr key={unit.id}
+                        onClick={() => canEdit && setEditTarget(unit)}
+                        className={`transition-colors hover:bg-gray-50 ${canEdit ? "cursor-pointer" : ""} ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
+                      >
+                        <td className="px-4 py-3.5 max-w-[200px]">
+                          <p className="font-semibold text-gray-800 truncate text-sm" title={unit.laptop?.laptop_name}>
+                            {unit.laptop?.laptop_name || "—"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 text-xs text-gray-600">{unit.laptop?.brand || "—"}</td>
+                        <td className="px-4 py-3.5 text-xs text-gray-600">{unit.laptop?.cpu || "—"}</td>
+                        <td className="px-4 py-3.5 text-xs text-gray-600">{unit.laptop?.ram || "—"}</td>
+                        <td className="px-4 py-3.5 text-xs text-gray-600">{unit.laptop?.storage || "—"}</td>
+                        <td className="px-4 py-3.5 text-xs font-mono text-gray-700">{unit.serial_number}</td>
+                        <td className="px-4 py-3.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                            unit.grade === "A" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : unit.grade === "B" ? "bg-amber-50 text-amber-700 border-amber-200"
+                              : "bg-red-50 text-red-700 border-red-200"
+                          }`}>
+                            {unit.grade || "—"}
+                          </span>
+                        </td>
+                        {/* Kolom sensitif — khusus kepala */}
+                        {canSeeHeadColumns && (
+                          <>
+                            <td className="px-4 py-3.5 text-right text-xs text-gray-700 font-semibold tabular-nums whitespace-nowrap">
+                              {fmt(unit.purchase_price)}
                             </td>
-                          )}
-                          {activeTab === "UMUM" && (
-                            <td className="px-4 py-3.5 whitespace-nowrap">
-                              {rs ? (
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${rs.badge}`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${rs.dot}`} />
-                                  <rs.emoji size={14} /> {rs.label}
-                                </span>
+                            <td className="px-4 py-3.5 text-right text-xs text-gray-800 font-bold tabular-nums whitespace-nowrap">
+                              {fmt(unit.selling_price)}
+                            </td>
+                            <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                              {unit.condition_checks && Object.keys(unit.condition_checks).length > 0 ? (
+                                <button onClick={() => setConditionViewTarget(unit)}
+                                  className="h-7 px-2.5 text-[11px] font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition inline-flex items-center gap-1">
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  Lihat
+                                </button>
                               ) : (
-                                <span className="text-xs text-gray-300 italic">Belum diset</span>
+                                <span className="text-[11px] text-gray-300 italic">—</span>
                               )}
-                              <div className="mt-1">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${(unit.minus_status || "BELUM_DIATASI") === "SUDAH_DIATASI" ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-400"}`}>
-                                  {(unit.minus_status || "BELUM_DIATASI") === "SUDAH_DIATASI" ? "Sudah Diatasi" : "Belum Diatasi"}
-                                </span>
-                              </div>
                             </td>
-                          )}
-                          {/* Kolom Analisa — bedakan asal keterangan:
-                              - qc_status === 'FROM_QC' → analisa dari Team QC
-                                (styling ungu + badge + nama & tgl Team QC)
-                              - Lainnya → analisa teknisi atau condition_note lama */}
-                          <td className="px-4 py-3.5 max-w-[220px]">
-                            {unit.qc_status === "FROM_QC" ? (
-                              <div className="bg-indigo-50/60 border-l-2 border-indigo-400 rounded-r-lg px-2 py-1.5 space-y-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                    <AlertTriangle size={9} /> Dari Team QC
-                                  </span>
-                                  {unit.qc_marked_minus_at && (
-                                    <span className="text-[9px] text-indigo-500 font-mono">
-                                      {fmtDate(unit.qc_marked_minus_at)}
-                                    </span>
-                                  )}
-                                </div>
-                                {unit.qc_marked_minus_by_name && (
-                                  <p className="text-[10px] text-indigo-600">
-                                    oleh <span className="font-semibold">{unit.qc_marked_minus_by_name}</span>
-                                  </p>
-                                )}
-                                {unit.analisa ? (
-                                  <p className="text-xs text-gray-800 line-clamp-3" title={unit.analisa}>
-                                    {unit.analisa}
-                                  </p>
-                                ) : (
-                                  <p className="text-[11px] text-amber-600 italic">— alasan tidak tersimpan —</p>
-                                )}
-                              </div>
-                            ) : unit.analisa ? (
-                              <p className="text-xs text-gray-700 line-clamp-2" title={unit.analisa}>{unit.analisa}</p>
-                            ) : unit.condition_note ? (
-                              <p className="text-xs text-gray-400 line-clamp-2 italic" title={unit.condition_note}>{unit.condition_note}</p>
+                          </>
+                        )}
+                        {/* Keterangan Team QC — alasan tandai MINUS */}
+                        <td className="px-4 py-3.5 max-w-[240px]">
+                          <div className="bg-indigo-50/60 border-l-2 border-indigo-400 rounded-r-lg px-2 py-1.5 space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {unit.qc_marked_minus_at && (
+                                <span className="text-[9px] text-indigo-500 font-mono">
+                                  {fmtDate(unit.qc_marked_minus_at)}
+                                </span>
+                              )}
+                              {unit.qc_marked_minus_by_name && (
+                                <span className="text-[10px] text-indigo-600">
+                                  oleh <span className="font-semibold">{unit.qc_marked_minus_by_name}</span>
+                                </span>
+                              )}
+                            </div>
+                            {unit.analisa ? (
+                              <p className="text-xs text-gray-800 line-clamp-3" title={unit.analisa}>
+                                {unit.analisa}
+                              </p>
                             ) : (
-                              <span className="text-[11px] text-amber-500 font-medium">— belum diisi</span>
+                              <p className="text-[11px] text-amber-600 italic">— alasan tidak tersimpan —</p>
                             )}
-                          </td>
-                          {/* Kolom Progress — teknisi-only */}
-                          {activeTab === "UMUM" && (
-                            <td className="px-4 py-3.5 max-w-[200px]">
-                              {unit.progress_pengerjaan ? (
-                                <p className="text-xs text-gray-600 line-clamp-2" title={unit.progress_pengerjaan}>{unit.progress_pengerjaan}</p>
-                              ) : (
-                                <span className="text-xs text-gray-300">—</span>
-                              )}
-                            </td>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          {canEdit && (
+                            <button onClick={(e) => { e.stopPropagation(); setEditTarget(unit); }}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg border text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 transition">
+                              Putuskan
+                            </button>
                           )}
-                          {/* Tgl Masuk — teknisi-only. Di DARI_QC, tanggal
-                              QC-marked sudah tampil dalam badge "DARI TEAM QC"
-                              di kolom Keterangan, jadi tidak perlu duplikasi. */}
-                          {activeTab === "UMUM" && (
-                            <td className="px-4 py-3.5 whitespace-nowrap">
-                              <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
-                            </td>
-                          )}
-                          <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                            {canEdit && (
-                              <button onClick={(e) => { e.stopPropagation(); setEditTarget(unit); }}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${missingAnalisa
-                                  ? "text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100"
-                                  : "text-gray-600 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-                                  }`}>
-                                Update
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -956,32 +780,10 @@ function MinusContent() {
         </div>
       </main>
 
-      {/* ─── Modal: Routing berdasarkan tab aktif ──────────────────────────
-          Tab "UMUM" (Perbaikan Umum) → EditRepairModal existing (teknisi flow).
-          Tab "DARI_QC" (Dari Team QC) → QcDecisionModal baru (3 opsi keputusan).
-          Dipisah supaya UX & role flow jelas. */}
-      {editTarget && activeTab === "UMUM" && (
-        <EditRepairModal
-          unit={editTarget}
-          canReview={canReview}
-          onDecision={handleDecision}
-          onClose={() => setEditTarget(null)}
-          onSuccess={(updated) => {
-            setUnits(prev => prev
-              // Kalau statusnya SIAP_JUAL, hilangkan dari list (sudah pindah halaman)
-              .filter(u => !(u.id === updated.id && updated.status === "SIAP_JUAL"))
-              .map(u => u.id === updated.id ? { ...u, ...updated } : u)
-            );
-            setAlertMsg(
-              updated.status === "SIAP_JUAL"
-                ? "Unit dipindahkan ke Siap Jual "
-                : "Status perbaikan diperbarui "
-            );
-          }}
-        />
-      )}
+      {/* EditRepairModal (flow teknisi UMUM) dihapus — sekarang semua
+          keputusan Pengelola Barang lewat QcDecisionModal di bawah. */}
 
-      {editTarget && activeTab === "DARI_QC" && (
+      {editTarget && activeTab === "BARANG_MINUS" && (
         <QcDecisionModal
           unit={{
             id: editTarget.id,
@@ -1004,6 +806,39 @@ function MinusContent() {
             setEditTarget(null);
           }}
         />
+      )}
+
+      {/* Modal view-only Riwayat Cek Kondisi — pakai ConditionChecklist
+          komponen yang sudah ada, dipaksa readOnly supaya cuma lihat. */}
+      {conditionViewTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConditionViewTarget(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[85vh] flex flex-col">
+            <div className="h-1 w-full bg-gradient-to-r from-sky-400 via-sky-600 to-sky-800" />
+            <div className="px-5 py-4 bg-sky-600">
+              <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Riwayat Cek Kondisi</p>
+              <h3 className="text-sm font-bold text-white mt-0.5 truncate">
+                SN: <span className="font-mono">{conditionViewTarget.serial_number}</span> · {conditionViewTarget.laptop?.laptop_name}
+              </h3>
+            </div>
+            <div className="overflow-y-auto flex-1 px-5 py-4">
+              <ConditionChecklist
+                value={(conditionViewTarget.condition_checks ?? {}) as any}
+                onChange={() => { /* read-only, no-op */ }}
+                readOnly={true}
+              />
+              {(!conditionViewTarget.condition_checks || Object.keys(conditionViewTarget.condition_checks).length === 0) && (
+                <p className="text-sm text-gray-400 text-center py-6">Belum ada hasil cek kondisi</p>
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setConditionViewTarget(null)}
+                className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast notification */}

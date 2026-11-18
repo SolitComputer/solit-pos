@@ -949,6 +949,12 @@ export default function UnifiedBarangContent() {
     const [convertTarget, setConvertTarget] = useState<UnifiedRow | null>(null);
     const [converting, setConverting] = useState(false);
     const [archivingId, setArchivingId] = useState<string | null>(null);
+    // ── State untuk fitur "Perlu di QC" — kirim semua unit aktif model laptop
+    // ini balik ke antrian Team QC. Status unit diubah ke BELUM_SIAP + NEEDS_QC
+    // (mirror flow unit baru), field unit TETAP (bukan reset), Team QC tinggal
+    // isi ulang via QcEditModal. Edit spek laptop sekarang HANYA lewat Team QC.
+    const [perluQcTarget, setPerluQcTarget] = useState<UnifiedRow | null>(null);
+    const [perluQcing, setPerluQcing] = useState(false);
     // ── State untuk tombol Reset SO manual
     const [resetSoConfirm, setResetSoConfirm] = useState(false);
     const [resettingSo, setResettingSo] = useState(false);
@@ -1640,6 +1646,30 @@ export default function UnifiedBarangContent() {
             toast.error(e instanceof Error ? e.message : "Gagal mengarsipkan");
         } finally {
             setArchivingId(null);
+        }
+    };
+
+    // ── Perlu di QC — kirim SEMUA unit aktif model laptop ini balik ke antrian
+    // Team QC. Validasi di endpoint: unit RESERVED/HELD/PACKING/PENDING ditolak
+    // supaya transaksi berjalan tidak kacau. Field unit tetap jadi default di
+    // QcEditModal — team cuma koreksi, bukan isi dari nol.
+    const requestPerluQc = async () => {
+        if (!perluQcTarget) return;
+        setPerluQcing(true);
+        try {
+            const res = await fetch(`/api/laptops/${perluQcTarget.id}/perlu-qc`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal mengirim ke Team QC");
+            toast.success(`${json.data?.count ?? 0} unit dikirim ke Team QC`);
+            setPerluQcTarget(null);
+            fetchAll();
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal mengirim ke Team QC");
+        } finally {
+            setPerluQcing(false);
         }
     };
 
@@ -2453,7 +2483,18 @@ export default function UnifiedBarangContent() {
                                                                     Tes Kondisi
                                                                 </button>
                                                             )}
-                                                            {canEditThis && (
+                                                            {/* LAPTOP: tombol Edit lama diganti "Perlu di QC" — edit spek
+                                                                hanya lewat Team QC. AKSESORIS: Edit tetap flow lama. */}
+                                                            {/* Stok > 1: tombol disembunyikan, user masuk Kelola Unit dan
+                                                                pilih unit via checklist — bulk action "Perlu di QC X Unit". */}
+                                                            {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count === 1 && (
+                                                                <button onClick={() => setPerluQcTarget(row)}
+                                                                    title="Kirim unit ini ke antrian Team QC"
+                                                                    className={`${cardActionCls} text-indigo-700 bg-indigo-50 hover:bg-indigo-100`}>
+                                                                    Perlu di QC
+                                                                </button>
+                                                            )}  
+                                                            {row.tipe === "AKSESORIS" && canEditAcc && (
                                                                 <button onClick={() => openEdit(row)}
                                                                     className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
                                                                     Edit
@@ -2667,7 +2708,16 @@ export default function UnifiedBarangContent() {
                                                                                 title="Edit tes kondisi tanpa buka form Edit penuh"
                                                                                 className="h-7 px-2 text-[11px] font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition">Tes Kondisi</button>
                                                                         )}
-                                                                        {((row.tipe === "LAPTOP" && canEditLaptop) || (row.tipe === "AKSESORIS" && canEditAcc)) && (
+                                                                        {/* LAPTOP: tombol Edit lama diganti "Perlu di QC" — edit spek
+                                                                            hanya lewat Team QC. AKSESORIS: Edit tetap flow lama. */}
+                                                                        {/* Stok > 1: tombol disembunyikan, user masuk Kelola Unit dan
+                                                                            pilih unit via checklist — bulk action "Perlu di QC X Unit". */}
+                                                                        {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count === 1 && (
+                                                                            <button onClick={() => setPerluQcTarget(row)}
+                                                                                title="Kirim unit ini ke antrian Team QC"
+                                                                                className="h-7 px-2 text-[11px] font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">Perlu di QC</button>
+                                                                        )}
+                                                                        {row.tipe === "AKSESORIS" && canEditAcc && (
                                                                             <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
                                                                         )}
                                                                         {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
@@ -2990,6 +3040,49 @@ export default function UnifiedBarangContent() {
                                 >
                                     {resettingSo && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                                     {resettingSo ? "Memproses..." : "Reset SO"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL: Konfirmasi Perlu di QC ─────────────────────── */}
+            {perluQcTarget && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+                    <div
+                        className="absolute inset-0 bg-black/50 backdrop-blur-md"
+                        onClick={() => !perluQcing && setPerluQcTarget(null)}
+                    />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                        <div className="h-1 w-full bg-gradient-to-r from-indigo-400 via-indigo-600 to-indigo-800" />
+                        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-5">
+                            <p className="font-bold text-white text-sm">Kirim ke Team QC</p>
+                            <p className="text-xs text-white/70 mt-0.5 truncate">{perluQcTarget.nama}</p>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-sm text-zinc-600 text-center mb-3">
+                                Unit ini akan dikirim ke antrian Team QC.
+                            </p>
+                            <p className="text-xs text-indigo-700 text-center mb-4 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 leading-relaxed">
+                                Status unit akan diubah jadi <b>Belum Siap Jual</b>, field terisi dipertahankan sebagai default. Team QC isi ulang di halaman Team QC.
+                                Unit yang sedang transaksi (Reserved/Held/Packing/Pending) tidak akan diikutkan.
+                            </p>
+                            <div className="flex gap-3 mt-4">
+                                <button
+                                    onClick={() => setPerluQcTarget(null)}
+                                    disabled={perluQcing}
+                                    className="flex-1 h-11 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 transition disabled:opacity-50"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={requestPerluQc}
+                                    disabled={perluQcing}
+                                    className="flex-1 h-11 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {perluQcing && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                    {perluQcing ? "Mengirim..." : "Kirim ke QC"}
                                 </button>
                             </div>
                         </div>
