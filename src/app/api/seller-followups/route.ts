@@ -31,12 +31,24 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
     // sudah tidak follow-up lagi → dilimpahkan ke Nova/Fauzia/Novita).
     const delegatedFromIds = getSellerFollowupDelegatedFromIds(user.id);
 
-    // ✅ Whitelist check PER KATEGORI untuk user yang login.
-    // Satu orang bisa aktif di USER saja, PEDAGANG saja, atau keduanya.
-    const { data: myPicRows } = await supabaseAdmin
-      .from("seller_followup_pics")
-      .select("seller_type, is_active")
-      .eq("user_id", user.id);
+    // ✅ PERFORMA: 2 query whitelist di bawah ini TIDAK saling bergantung —
+    // sebelumnya ditulis berurutan (await satu-satu) = 2x round-trip DB secara
+    // berurutan sebelum query utama followups jalan. Digabung Promise.all biar
+    // jalan BERSAMAAN (paralel) — motong waktu tunggu bagian ini ±separuhnya.
+    const [{ data: myPicRows }, { data: activePicsRows }] = await Promise.all([
+      // Whitelist check PER KATEGORI untuk user yang login.
+      // Satu orang bisa aktif di USER saja, PEDAGANG saja, atau keduanya.
+      supabaseAdmin
+        .from("seller_followup_pics")
+        .select("seller_type, is_active")
+        .eq("user_id", user.id),
+      // Daftar PIC aktif, DIPISAH per kategori. Dipakai untuk menentukan apakah
+      // seorang PIC masih "mengunci" customer bertipe tertentu.
+      supabaseAdmin
+        .from("seller_followup_pics")
+        .select("user_id, seller_type")
+        .eq("is_active", true),
+    ]);
 
     const whitelistedByType: Record<"USER" | "PEDAGANG", boolean> = {
       USER: (myPicRows ?? []).some((p: any) => p.seller_type === "USER" && p.is_active),
@@ -45,13 +57,6 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
     // Aktif di salah satu kategori — dipakai untuk visibility kasar (boleh lihat
     // customer orphan atau tidak sama sekali).
     const isWhitelistedAny = whitelistedByType.USER || whitelistedByType.PEDAGANG;
-
-    // ✅ Daftar PIC aktif, DIPISAH per kategori. Dipakai untuk menentukan apakah
-    // seorang PIC masih "mengunci" customer bertipe tertentu.
-    const { data: activePicsRows } = await supabaseAdmin
-      .from("seller_followup_pics")
-      .select("user_id, seller_type")
-      .eq("is_active", true);
 
     const activePicIdsByType: Record<"USER" | "PEDAGANG", Set<string>> = {
       USER: new Set(
@@ -66,9 +71,16 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
       ),
     };
 
+    // ✅ PERFORMA: dulu select("*") narik SEMUA kolom tabel, termasuk yang
+    // nggak kepakai sama sekali di frontend. Diganti jadi daftar kolom eksplisit
+    // — persis field yang dipakai interface Followup di page.tsx + yang dibaca
+    // di enrichment bawah (pic_user_id, seller_type, next_followup_at, closed_by).
+    // Lebih sedikit data ditarik dari DB & dikirim ke browser = lebih cepat.
     let query = supabase
       .from("seller_followups")
-      .select("*")
+      .select(
+        "id, transaction_id, invoice_number, customer_name, customer_phone, seller_type, last_purchase_at, last_followup_at, next_followup_at, followup_count, purchase_count, last_followup_by, closed_by, notes, is_active, created_at, pic_user_id, last_followup_proof_url, archive_reason, archived_at, archived_by"
+      )
       .order("next_followup_at", { ascending: true });
 
     // ✅ Visibility rules:
