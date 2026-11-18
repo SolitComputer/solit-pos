@@ -122,14 +122,13 @@ const TRANSACTION_VIEW: UserRole[] = [
 
 /** Boleh membuka halaman Management Seller */
 export const SELLER_FOLLOWUP_VIEW_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES",
+  ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "MARKETING",
 ];
 
 /** Melihat SEMUA data lintas PIC (tidak difilter ownership) */
 export const SELLER_FOLLOWUP_SUPERVISOR_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES", "KEPALA_ZENITH",
+  ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES", "KEPALA_ZENITH", "MARKETING",
 ];
-
 /** Role yang boleh follow-up, DIPISAH PER KATEGORI (keputusan 2026-10-30 rev).
  *  - USER     → Crew Sales
  *  - PEDAGANG → Kepala Marketing

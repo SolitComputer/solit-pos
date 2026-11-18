@@ -786,6 +786,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Management", items: [ITEM_USERS] },
     { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
+    { label: "Transaksi", items: [ITEM_MANAGEMENT_SELLER] },
   ],
 
   KEPALA_MARKETING: [
