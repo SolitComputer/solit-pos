@@ -174,6 +174,45 @@ export const SELLER_PIC_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = Array.from(
   new Set<UserRole>([...SELLER_FOLLOWUP_ACTOR_ROLES])
 );
+
+// ── Follow-up: Delegasi ambil-alih PIC (per-AKUN) ───────────────────────────
+// Dipakai saat seorang PIC sudah tidak follow-up lagi (resign/pindah tugas/dll)
+// tapi row lama-nya mau dilanjutkan akun lain, TANPA mengganti pic_user_id di
+// database dan TANPA ngasih akses "lihat semua". Akun penerima jadi "pemilik
+// tambahan" HANYA untuk row yang PIC-nya ada di key berikut.
+// Key = user id PIC LAMA, Value = array user id penerima pelimpahan.
+// Keputusan 2026-11-18: Nur Alim (KEPALA_MARKETING, sudah tidak follow-up)
+// dilimpahkan ke Nova, Fauzia, Novita. Tambah/hapus pelimpahan lain di sini.
+export const SELLER_FOLLOWUP_DELEGATE_FROM: Record<string, string[]> = {
+  "c35db5bc-8f7e-4e96-9015-dc84092bac19": [ // Nur Alim
+    "d1364203-90b2-49d4-8fd2-54feee4f7b46", // Fauzia Nurul Rahma
+    "2c570a8b-9c98-46f5-ad86-b0b0953a2afc", // Novita Glory Sendouw
+    "680c7e1c-512b-4223-85f2-df38dcdd7a97", // Nova Rovatul Walidah
+  ],
+  "26f13a77-9179-4ac7-97ec-e1dfa1af4096": [ // Amaliah (PENYEDIA_BARANG, sudah tidak follow-up)
+    "d1364203-90b2-49d4-8fd2-54feee4f7b46", // Fauzia Nurul Rahma
+  ],
+};
+
+/** True kalau row dengan pic_user_id = oldPicUserId sudah dilimpahkan ke userId. */
+export function isSellerFollowupDelegate(
+  oldPicUserId: string | null | undefined,
+  userId: string | null | undefined
+): boolean {
+  if (!oldPicUserId || !userId) return false;
+  return (SELLER_FOLLOWUP_DELEGATE_FROM[oldPicUserId] ?? []).includes(userId);
+}
+
+/** Daftar user id PIC LAMA yang row-nya dilimpahkan ke userId ini. */
+export function getSellerFollowupDelegatedFromIds(
+  userId: string | null | undefined
+): string[] {
+  if (!userId) return [];
+  return Object.entries(SELLER_FOLLOWUP_DELEGATE_FROM)
+    .filter(([, recipients]) => recipients.includes(userId))
+    .map(([oldPicId]) => oldPicId);
+}
+
 /** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
 export const ALL_UNITS_ROLES: UserRole[] = [
   ...FULL_ACCESS, "ACCOUNTING", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_ADMIN_BARANG",

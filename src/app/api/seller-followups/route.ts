@@ -9,6 +9,8 @@ import {
   expandRolesWithParents,
   PERMISSIONS as PERMS,
   canActorFollowupType, // ✅ cek role boleh FU kategori tertentu (per baris)
+  isSellerFollowupDelegate, // ✅ cek row ini dilimpahkan ke akun ini
+  getSellerFollowupDelegatedFromIds, // ✅ daftar PIC lama yang dilimpahkan ke akun ini
 } from "@/lib/permissions";
 
 async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUser) {
@@ -23,6 +25,11 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
     const roles = expandRolesWithParents(user.roles ?? [user.role]);
     const isSupervisor = hasAnyRole(roles, PERMS.VIEW_ALL_SELLER_FOLLOWUP);
     const isActorRole = hasAnyRole(roles, PERMS.FOLLOWUP_SELLER);
+
+    // ✅ Delegasi ambil-alih PIC: akun ini jadi "pemilik tambahan" untuk row
+    // yang PIC lama-nya ada di SELLER_FOLLOWUP_DELEGATE_FROM (mis. Nur Alim
+    // sudah tidak follow-up lagi → dilimpahkan ke Nova/Fauzia/Novita).
+    const delegatedFromIds = getSellerFollowupDelegatedFromIds(user.id);
 
     // ✅ Whitelist check PER KATEGORI untuk user yang login.
     // Satu orang bisa aktif di USER saja, PEDAGANG saja, atau keduanya.
@@ -69,6 +76,13 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
     // - PIC aktif: lihat miliknya sendiri + customer yang BELUM punya PIC (orphan)
     // - PIC tidak aktif/role lain: hanya miliknya sendiri
     if (!isSupervisor) {
+      // ✅ Row dengan PIC lama yang dilimpahkan ke akun ini — selalu ikut
+      // kebuka, apapun status lock PIC lama tersebut.
+      const delegatedClause =
+        delegatedFromIds.length > 0
+          ? `,pic_user_id.in.(${delegatedFromIds.join(",")})`
+          : "";
+
       if (isActorRole && isWhitelistedAny) {
         // ✅ OWNERSHIP KETAT (keputusan 2026-10-30):
         // Sales yang tercentang boleh lihat:
@@ -88,17 +102,17 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
 
         if (lockingOtherIds.length > 0) {
           // Terlihat kalau: punya sendiri ATAU belum ada PIC ATAU PIC-nya sudah
-          // tidak aktif (tidak termasuk daftar lockingOtherIds).
+          // tidak aktif (tidak termasuk daftar lockingOtherIds) ATAU dilimpahkan.
           query = query.or(
-            `pic_user_id.eq.${user.id},pic_user_id.is.null,pic_user_id.not.in.(${lockingOtherIds.join(",")})`
+            `pic_user_id.eq.${user.id},pic_user_id.is.null,pic_user_id.not.in.(${lockingOtherIds.join(",")})${delegatedClause}`
           );
         }
         // kalau tidak ada PIC aktif lain yang mengunci, semua row terbuka —
-        // tidak perlu filter tambahan.
+        // tidak perlu filter tambahan (delegasi otomatis ikut).
       } else {
         // Role bukan actor / tidak tercentang di kategori mana pun → hanya
-        // bisa lihat customer miliknya sendiri.
-        query = query.eq("pic_user_id", user.id);
+        // bisa lihat customer miliknya sendiri + yang dilimpahkan ke dia.
+        query = query.or(`pic_user_id.eq.${user.id}${delegatedClause}`);
       }
     }
 
@@ -141,24 +155,34 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
         const picIsStillActive = !!row.pic_user_id && activeSetForType.has(row.pic_user_id);
         const isTrueOwner = row.pic_user_id === user.id;
 
+        // ✅ Delegasi: PIC lama row ini ada di SELLER_FOLLOWUP_DELEGATE_FROM
+        // untuk akun ini → dianggap "milik" + "boleh FU" walau role/kategori
+        // normalnya tidak cocok (mis. Crew Sales ambil alih row PEDAGANG Kepala
+        // Marketing yang sudah tidak aktif follow-up).
+        const isDelegatedToMe = isSellerFollowupDelegate(row.pic_user_id, user.id);
+        const effectiveIsActor = iAmActorForType || isDelegatedToMe;
+        const effectiveIsWhitelisted = iAmWhitelistedForType || isDelegatedToMe;
+
         // is_owner (gating tombol) — OWNERSHIP KETAT:
         //   - belum ada PIC (null), ATAU
         //   - aku memang pemiliknya, ATAU
-        //   - PIC yang tercatat sudah tidak aktif di kategori ini (terbuka lagi).
+        //   - PIC yang tercatat sudah tidak aktif di kategori ini (terbuka lagi), ATAU
+        //   - row ini dilimpahkan ke aku.
         // Customer milik PIC lain yang MASIH aktif di kategori ini → BUKAN owner.
-        const isOwner = row.pic_user_id === null || isTrueOwner || !picIsStillActive;
+        const isOwner = row.pic_user_id === null || isTrueOwner || !picIsStillActive || isDelegatedToMe;
 
         let lockReason: string | null = null;
-        if (!iAmActorForType) {
+        if (!effectiveIsActor) {
           lockReason = `Follow-up ${rowType === "PEDAGANG" ? "Pedagang" : "User"} bukan wewenang role kamu`;
-        } else if (!iAmWhitelistedForType) {
+        } else if (!effectiveIsWhitelisted) {
           lockReason = `Akses follow-up ${rowType === "PEDAGANG" ? "Pedagang" : "User"} kamu belum diaktifkan Admin`;
         } else if (!isOwner) {
           lockReason = `Customer ini sudah milik ${row.closed_by ?? "PIC lain"}`;
         }
 
-        // ✅ can_followup: actor SESUAI kategori + whitelist sesuai kategori + owner.
-        const canFollowup = iAmActorForType && iAmWhitelistedForType && isOwner;
+        // ✅ can_followup: actor SESUAI kategori + whitelist sesuai kategori + owner
+        // (atau dilimpahkan — lihat effectiveIsActor/effectiveIsWhitelisted/isOwner).
+        const canFollowup = effectiveIsActor && effectiveIsWhitelisted && isOwner;
 
         return {
           ...row,
@@ -182,8 +206,10 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
         const hasOwner = !!row.pic_user_id;
         const ownerStillLocks =
           hasOwner && activePicIdsByType[row._row_type as "USER" | "PEDAGANG"].has(row.pic_user_id);
+        const isDelegatedToMe = isSellerFollowupDelegate(row.pic_user_id, user.id);
         // tampilkan kalau: punyaku ATAU belum ada PIC ATAU PIC-nya sudah lepas
-        return isTrueOwner || !hasOwner || !ownerStillLocks;
+        // ATAU row ini dilimpahkan ke aku (SELLER_FOLLOWUP_DELEGATE_FROM)
+        return isTrueOwner || !hasOwner || !ownerStillLocks || isDelegatedToMe;
       });
 
     return NextResponse.json({
