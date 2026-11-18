@@ -64,7 +64,14 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
           console.warn("[pending-orders] accessory_items tidak terbaca:", accError.message);
         } else {
           for (const row of accRows || []) {
-            accessoryMap.set(row.id, Array.isArray(row.accessory_items) ? row.accessory_items : []);
+            // FIX: handle accessory_items yg disimpan sebagai TEXT (string JSON),
+            // bukan cuma JSONB. Kalau tipenya TEXT, Array.isArray() return false
+            // → aksesori hilang. Parse dulu string-nya.
+            let parsed = row.accessory_items;
+            if (typeof parsed === "string") {
+              try { parsed = JSON.parse(parsed); } catch { parsed = []; }
+            }
+            accessoryMap.set(row.id, Array.isArray(parsed) ? parsed : []);
           }
         }
       }
