@@ -968,6 +968,33 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     // ── Handle update accessories ────────────────────────────────────
     if (Array.isArray(body.accessories) && !isCancelling) {
+      // ✅ FIX: Kumpulkan unit_id aksesori LAMA sebelum row-nya dihapus.
+      // Dipakai di bawah untuk MEMASTIKAN unit yang sudah tidak terpakai
+      // di-restore ke TERSEDIA — jadi tidak bergantung sepenuhnya pada
+      // cancelOutflowByInvoice (yang bisa gagal kalau outflow lama tidak
+      // punya unit_id tersimpan).
+      const { data: oldAccItemRows } = await supabase
+        .from("transaction_items")
+        .select("unit_id, serial_number")
+        .eq("invoice_number", invoice)
+        .eq("item_type", "accessory");
+      const oldAccUnitIds = new Set<string>(
+        (oldAccItemRows ?? [])
+          .map((it: any) => it.unit_id)
+          .filter((id: any): id is string => !!id)
+      );
+      // Fallback: kalau unit_id kosong, coba resolve dari serial_number
+      const oldAccSNsWithoutId = (oldAccItemRows ?? [])
+        .filter((it: any) => !it.unit_id && it.serial_number && it.serial_number !== "-")
+        .map((it: any) => String(it.serial_number).trim());
+      if (oldAccSNsWithoutId.length > 0) {
+        const { data: resolvedUnits } = await supabase
+          .from("accessory_units")
+          .select("id")
+          .in("serial_number", oldAccSNsWithoutId);
+        for (const u of resolvedUnits ?? []) if (u.id) oldAccUnitIds.add(u.id);
+      }
+
       // 1. Hapus row aksesori lama dari transaction_items
       await supabase
         .from("transaction_items")
@@ -1095,6 +1122,64 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
             .from("accessories")
             .update({ stock: Math.max(0, (Number(acc.stock) || 0) - Number(a.quantity)) })
             .eq("id", accId);
+        }
+      }
+
+      // ✅ FIX: Safeguard restore aksesori lama yang sudah tidak dipakai.
+      // cancelOutflowByInvoice mungkin tidak bisa restore unit kalau outflow
+      // lama tidak punya unit_id — ini jadi jaring pengaman terakhir.
+      // Kumpulkan unit_id aksesori BARU dari loop di atas.
+      const newAccUnitIds = new Set<string>();
+      for (const a of body.accessories) {
+        // Resolve unit_id dari data yang dikirim frontend
+        let resolvedUnitId = a.unit_id ? String(a.unit_id).trim() : null;
+        if (!resolvedUnitId && a.serial_number) {
+          const accSn = String(a.serial_number).trim();
+          if (accSn) {
+            const { data: lookupResult } = await supabase
+              .from("accessory_units")
+              .select("id")
+              .ilike("serial_number", accSn)
+              .limit(1);
+            resolvedUnitId = lookupResult?.[0]?.id ?? null;
+          }
+        }
+        if (resolvedUnitId) newAccUnitIds.add(resolvedUnitId);
+      }
+
+      // Unit lama yang TIDAK ada di list baru → restore ke TERSEDIA
+      const accToRestore = [...oldAccUnitIds].filter(id => !newAccUnitIds.has(id));
+      if (accToRestore.length > 0) {
+        const { error: restoreErr } = await supabase
+          .from("accessory_units")
+          .update({ status: "TERSEDIA" })
+          .in("id", accToRestore)
+          .in("status", ["KELUAR", "TERJUAL", "SOLD", "BELUM_SIAP"]);
+        if (restoreErr) {
+          console.error("[PUT transaction] gagal restore aksesori lama:", restoreErr.message);
+        } else if (accToRestore.length > 0) {
+          console.log(`[PUT transaction] ✅ Restored ${accToRestore.length} aksesori lama ke TERSEDIA:`, accToRestore);
+        }
+
+        // Tambah balik stok bulk untuk unit yang direstore
+        const { data: restoredUnitsData } = await supabase
+          .from("accessory_units")
+          .select("accessory_id")
+          .in("id", accToRestore);
+        const restoreAccIds = [...new Set((restoredUnitsData ?? []).map((u: any) => u.accessory_id).filter(Boolean))];
+        for (const accId of restoreAccIds) {
+          const countRestored = (restoredUnitsData ?? []).filter((u: any) => u.accessory_id === accId).length;
+          const { data: accRow } = await supabase
+            .from("accessories")
+            .select("stock")
+            .eq("id", accId)
+            .maybeSingle();
+          if (accRow) {
+            await supabase
+              .from("accessories")
+              .update({ stock: (Number(accRow.stock) || 0) + countRestored })
+              .eq("id", accId);
+          }
         }
       }
 

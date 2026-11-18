@@ -569,10 +569,26 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         gpu: trx.gpu || laptopSpecs?.vga || undefined,
         laptop_name: trx.laptop_name || laptopSpecs?.name || undefined,
         serial_numbers: (() => {
-          // ✅ FIX: stored SN kadang comma-joined (1 string "MIN-065, MIN-034, ...")
-          // atau array 1-elemen comma-joined. Dulu dipakai mentah → UI merender
-          // 1 badge panjang nowrap yang meluber ke samping. splitSerials memecahnya
-          // jadi SN individual, jadi SerialNumberList bisa stack + batasi maxVisible.
+          // ✅ FIX: Kalau transaksi punya transaction_items, gunakan HANYA SN
+          // dari transaction_items + laptop_units sebagai sumber kebenaran.
+          // JANGAN merge dengan transactions.serial_numbers/serial_number yang
+          // bisa stale setelah "ganti unit/aksesori" — SN lama yang sudah
+          // ditukar tetap nyangkut di kolom itu, bikin UI tampilkan SN dobel
+          // (lama + baru) padahal unit lamanya sudah di-restore ke stok.
+          if (items.length > 0) {
+            const itemSerials = items
+              .filter((it: any) => !it.restored) // skip unit yang sudah direstore
+              .map((it: any) => it.serial_number)
+              .filter((sn: any): sn is string => !!sn && sn !== "-");
+            // allSerialNumbers = SN dari laptop_units (via unit_ids resolve)
+            const fromUnits = [...allSerialNumbers];
+            for (const sn of itemSerials) {
+              if (sn && !fromUnits.includes(sn)) fromUnits.push(sn);
+            }
+            return fromUnits;
+          }
+
+          // Fallback legacy: transaksi lama tanpa transaction_items
           const stored: string[] = [
             ...splitSerials(trx.serial_numbers),
             ...splitSerials(trx.serial_number),
