@@ -49,29 +49,27 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    // ── Rincian aksesori per transaksi ──────────────────────────────────────
-    // Query terpisah + defensif: kalau kolom accessory_items tidak ada / gagal,
-    // list pending TETAP jalan (hanya tanpa info aksesori).
+     // ── Rincian aksesori per transaksi ──────────────────────────────────────
+    // FIX: aksesori disimpan di tabel transaction_items dengan item_type = "accessory",
+    // SAMA seperti cara GET /api/transaction/[invoice] membacanya (line 442-458).
+    // Sebelumnya salah query ke kolom JSON transactions.accessory_items yang tidak ada.
     const accessoryMap = new Map<string, any[]>();
     try {
       const ids = (data || []).map((t: any) => t.id);
       if (ids.length > 0) {
         const { data: accRows, error: accError } = await supabase
-          .from("transactions")
-          .select("id, accessory_items")
-          .in("id", ids);
+          .from("transaction_items")
+          .select("transaction_id, item_name, laptop_name, quantity, serial_number")
+          .in("transaction_id", ids)
+          .eq("item_type", "accessory");
+
         if (accError) {
-          console.warn("[pending-orders] accessory_items tidak terbaca:", accError.message);
+          console.warn("[pending-orders] transaction_items (accessory) gagal:", accError.message);
         } else {
           for (const row of accRows || []) {
-            // FIX: handle accessory_items yg disimpan sebagai TEXT (string JSON),
-            // bukan cuma JSONB. Kalau tipenya TEXT, Array.isArray() return false
-            // → aksesori hilang. Parse dulu string-nya.
-            let parsed = row.accessory_items;
-            if (typeof parsed === "string") {
-              try { parsed = JSON.parse(parsed); } catch { parsed = []; }
-            }
-            accessoryMap.set(row.id, Array.isArray(parsed) ? parsed : []);
+            const txId = row.transaction_id;
+            if (!accessoryMap.has(txId)) accessoryMap.set(txId, []);
+            accessoryMap.get(txId)!.push(row);
           }
         }
       }
@@ -90,9 +88,9 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
         const sisa_pembayaran = Math.max(0, dealTotal - paid);
 
         const accessory_items = (accessoryMap.get(t.id) ?? []).map((a: any) => ({
-          name: a.name || a.item_name || "Aksesori",
+          name: a.item_name || a.laptop_name || a.name || "Aksesori",
           quantity: Number(a.quantity) || 1,
-          serial_number: a.serial_number ? String(a.serial_number) : null,
+          serial_number: a.serial_number && a.serial_number !== "-" ? String(a.serial_number) : null,
         }));
         // Tidak ada laptop/unit sama sekali + ada aksesori = transaksi khusus aksesori
         const hasLaptopUnit =
