@@ -294,6 +294,7 @@ const STORES: StoreDef[] = [
   { key: "sotech", label: "Sotech" },
   { key: "onpoint", label: "On Point" },
   { key: "sultop", label: "Sultop" },
+  { key: "solit_jogja", label: "Solit Jogja" },
 ];
 
 // 7/14/30 hari → berapa snapshot mingguan terakhir yang dihitung (1 snapshot ≈ 7 hari).
