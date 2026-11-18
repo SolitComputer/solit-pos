@@ -1190,7 +1190,7 @@ function DeleteConfirmModal({
 // ── Alasan arsip: preset ─────────────────────────────────────────────────────
 const ARCHIVE_PRESETS = [
   "Customer tidak merespon",
-  "Nomor tidak aktif / salah",
+  "Nomor tidak aktif",
   "Customer minta tidak dihubungi lagi",
   "Customer sudah tidak relevan (pindah / ganti usaha)",
   "Data duplikat",
@@ -2196,7 +2196,9 @@ export default function ManagementSellerPage() {
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await fetch(`/api/seller-followups?type=ALL&scope=${scope}`);
+      const res = await fetch(`/api/seller-followups?type=ALL&scope=${scope}`, {
+        cache: "no-store",
+      });
       const result = await res.json();
       setItems(result.success ? (result.data as Followup[]) : []);
     } catch {

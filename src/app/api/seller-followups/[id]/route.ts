@@ -354,6 +354,21 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
     }
 
+    const KNOWN_ACTIONS = [
+      "followup",
+      "update_phone",
+      "archive",
+      "update_archive_reason",
+      "reactivate",
+      "assign",
+    ];
+    if (action && !KNOWN_ACTIONS.includes(action)) {
+      return NextResponse.json(
+        { success: false, message: `Aksi "${action}" tidak dikenali server` },
+        { status: 400 }
+      );
+    }
+
     const { data, error } = await supabase
       .from("seller_followups")
       .update(update)

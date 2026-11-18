@@ -51,6 +51,9 @@ export default function GlobalError({
           Aplikasi menerima pembaruan sistem terbaru atau terjadi kendala memori. 
           Silakan muat ulang halaman ini untuk melanjutkan.
         </p>
+        <p className="mb-6 rounded-lg bg-red-50 p-3 text-left text-[11px] font-mono text-red-600 break-words">
+          {error.name}: {error.message}
+        </p>
         <button
           onClick={() => {
             window.location.reload();
