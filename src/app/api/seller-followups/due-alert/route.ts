@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { expandRolesWithParents, canActorFollowupType } from "@/lib/permissions";
 
 async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
     const nowISO = new Date().toISOString();
@@ -13,8 +14,15 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
         .select("seller_type, is_active")
         .eq("user_id", user.id);
 
+    // ✅ Hanya kategori yang (a) dicentang Admin DAN (b) sesuai role user:
+    // Crew Sales → USER, Kepala Marketing → PEDAGANG.
+    const roles = expandRolesWithParents(user.roles ?? [user.role]);
     const activeTypes = (myPicRows ?? [])
-        .filter((p: any) => p.is_active)
+        .filter(
+            (p: any) =>
+                p.is_active &&
+                canActorFollowupType(roles, p.seller_type as "USER" | "PEDAGANG")
+        )
         .map((p: any) => p.seller_type as string);
 
     // Kalau user tidak aktif di kategori mana pun → tidak ada notif sama sekali.

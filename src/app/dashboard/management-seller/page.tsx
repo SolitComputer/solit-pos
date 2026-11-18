@@ -22,6 +22,7 @@ import {
   Lock,
   AlertTriangle,
   AlertCircle,
+  Info,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -53,6 +54,11 @@ interface Followup {
   is_true_owner: boolean; // NEW — khusus buat badge "Kamu", beda dari is_owner yang sudah dilonggarkan
   can_followup: boolean;
   lock_reason: string | null;
+
+  // arsip
+  archive_reason: string | null;
+  archived_at: string | null;
+  archived_by: string | null;
 }
 
 interface AuthUser {
@@ -1181,6 +1187,376 @@ function DeleteConfirmModal({
   );
 }
 
+// ── Alasan arsip: preset ─────────────────────────────────────────────────────
+const ARCHIVE_PRESETS = [
+  "Customer tidak merespon",
+  "Nomor tidak aktif / salah",
+  "Customer minta tidak dihubungi lagi",
+  "Customer sudah tidak relevan (pindah / ganti usaha)",
+  "Data duplikat",
+  "Lainnya",
+] as const;
+
+// ── Archive Modal (2 langkah: alasan → konfirmasi final) ─────────────────────
+function ArchiveConfirmModal({
+  followup,
+  onConfirm,
+  onCancel,
+  processing,
+  mode = "archive",
+}: {
+  followup: Followup | null;
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+  processing: boolean;
+  mode?: "archive" | "edit";
+}) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [preset, setPreset] = useState<string>("");
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (!followup) return;
+    setStep(1);
+    const r = followup.archive_reason?.trim() ?? "";
+    if (mode === "edit" && r) {
+      const matched = ARCHIVE_PRESETS.find(
+        (p) => p !== "Lainnya" && (r === p || r.startsWith(`${p} — `))
+      );
+      if (matched) {
+        setPreset(matched);
+        setNote(r === matched ? "" : r.slice(matched.length + 3).slice(0, 200));
+      } else {
+        setPreset("Lainnya");
+        setNote(r.slice(0, 200));
+      }
+    } else {
+      setPreset("");
+      setNote("");
+    }
+  }, [followup, mode]);
+
+  useEffect(() => {
+    if (!followup) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [followup]);
+
+  useEffect(() => {
+    if (!followup || processing) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [followup, processing, onCancel]);
+
+  if (!followup) return null;
+
+  const trimmed = note.trim();
+  const isOther = preset === "Lainnya";
+  const finalReason = isOther ? trimmed : trimmed ? `${preset} — ${trimmed}` : preset;
+  const canProceed = !!preset && finalReason.length >= 5 && finalReason.length <= 300;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="archive-title"
+    >
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={!processing ? onCancel : undefined}
+      />
+
+      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] sm:max-h-[88vh] flex flex-col">
+        <div className="flex h-1 bg-gray-100 flex-shrink-0">
+          <div
+            className={cx(
+              "h-full bg-gray-800 transition-all duration-300",
+              step === 1 ? "w-1/2" : "w-full"
+            )}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={!processing ? onCancel : undefined}
+          aria-label="Tutup"
+          className="sm:hidden w-full flex justify-center pt-3 pb-1.5 flex-shrink-0"
+        >
+          <span className="w-10 h-1 rounded-full bg-gray-200" />
+        </button>
+
+        <div className="px-4 sm:px-5 pt-3 sm:pt-5 pb-4 overflow-y-auto overscroll-contain flex-1">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 sm:mb-4">
+            {mode === "edit" ? "Edit alasan arsip" : `Langkah ${step} dari 2`}
+          </p>
+
+          {step === 1 ? (
+            <>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-11 h-11 rounded-xl bg-gray-100 border border-gray-200 text-gray-600 flex items-center justify-center flex-shrink-0">
+                  <Archive size={20} />
+                </div>
+                <div className="min-w-0">
+                  <h2
+                    id="archive-title"
+                    className="text-sm font-black text-gray-900 leading-tight truncate"
+                  >
+                    {mode === "edit"
+                      ? `Ubah alasan — ${followup.customer_name}`
+                      : `Arsipkan ${followup.customer_name}?`}
+                  </h2>
+                  <p className="text-xs text-gray-400 mt-0.5 truncate tabular-nums">
+                    {followup.customer_phone}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                Alasan diarsipkan <span className="text-red-500">*</span>
+              </p>
+
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {ARCHIVE_PRESETS.map((p) => {
+                  const active = preset === p;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPreset(p)}
+                      aria-pressed={active}
+                      className={cx(
+                        "px-3 min-h-8 py-1.5 rounded-full border text-[11px] font-bold transition-all text-left",
+                        FOCUS_RING,
+                        active
+                          ? "bg-gray-900 border-gray-900 text-white"
+                          : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                      )}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value.slice(0, 200))}
+                rows={3}
+                placeholder={
+                  isOther
+                    ? "Tulis alasan arsip (wajib, min. 5 karakter)…"
+                    : "Catatan tambahan (opsional)…"
+                }
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 transition placeholder:text-gray-400 resize-none"
+              />
+              <p className="text-[10px] text-gray-400 mt-1 text-right tabular-nums">
+                {note.length}/200
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="mb-4">
+                <h2 id="archive-title" className="text-sm font-black text-gray-900 mb-1">
+                  Konfirmasi Final
+                </h2>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Periksa kembali sebelum customer ini dipindahkan ke Arsip.
+                </p>
+              </div>
+
+              <div className="space-y-2 mb-4">
+                <SummaryRow label="Customer">{followup.customer_name}</SummaryRow>
+                <SummaryRow label="Tipe">
+                  {followup.seller_type === "PEDAGANG" ? "Pedagang" : "User"}
+                </SummaryRow>
+                {followup.invoice_number && (
+                  <SummaryRow label="Invoice" mono>
+                    {followup.invoice_number}
+                  </SummaryRow>
+                )}
+              </div>
+
+              <div className="rounded-xl bg-gray-50 border border-gray-200 px-3.5 py-3 mb-4">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                  Alasan arsip
+                </p>
+                <p className="text-xs font-semibold text-gray-800 leading-relaxed break-words">
+                  {finalReason}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-3">
+                <p className="text-xs font-black text-amber-800 leading-relaxed inline-flex items-center gap-1.5">
+                  <AlertTriangle size={14} className="flex-shrink-0" /> Yakin mengarsipkan
+                  customer ini?
+                </p>
+                <p className="text-[11px] text-amber-600 mt-1 leading-relaxed">
+                  Follow-up akan <span className="font-bold">dihentikan</span> dan reminder tidak
+                  muncul lagi. Customer bisa diaktifkan kembali dari tab Arsip.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex-shrink-0 border-t border-gray-100 bg-white px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3">
+          {step === 1 ? (
+            <div className="flex gap-2">
+              <button
+                onClick={onCancel}
+                className={cx(
+                  "flex-1 h-12 sm:h-11 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all",
+                  FOCUS_RING
+                )}
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => (mode === "edit" ? onConfirm(finalReason) : setStep(2))}
+                disabled={!canProceed || processing}
+                title={!canProceed ? "Pilih / isi alasan terlebih dahulu" : ""}
+                className={cx(
+                  "flex-1 h-12 sm:h-11 rounded-xl text-white text-sm font-bold transition-all inline-flex items-center justify-center gap-1.5",
+                  FOCUS_RING,
+                  canProceed && !processing
+                    ? "bg-gray-900 hover:bg-gray-800 active:scale-[0.98]"
+                    : "bg-gray-300 cursor-not-allowed"
+                )}
+              >
+                {mode === "edit" ? (
+                  <>
+                    {processing ? <Spinner /> : <CheckIcon />}
+                    {processing ? "Menyimpan..." : "Simpan"}
+                  </>
+                ) : (
+                  <>
+                    Lanjut
+                    <ArrowRightIcon />
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStep(1)}
+                disabled={processing}
+                aria-label="Kembali"
+                title="Kembali — ubah alasan"
+                className={cx(
+                  "h-12 w-12 sm:h-11 sm:w-11 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 active:scale-[0.98] transition-all flex items-center justify-center flex-shrink-0 disabled:opacity-40",
+                  FOCUS_RING
+                )}
+              >
+                <BackIcon />
+              </button>
+              <button
+                onClick={() => onConfirm(finalReason)}
+                disabled={processing}
+                className={cx(
+                  "flex-1 min-w-0 h-12 sm:h-11 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 px-3",
+                  FOCUS_RING,
+                  processing ? "bg-gray-500 cursor-not-allowed" : "bg-gray-900 hover:bg-gray-800"
+                )}
+              >
+                <span className="flex-shrink-0 inline-flex">
+                  {processing ? <Spinner /> : <ArchiveIcon />}
+                </span>
+                <span className="truncate">{processing ? "Mengarsipkan..." : "Ya, Arsipkan"}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal lihat alasan arsip ─────────────────────────────────────────────────
+function ArchiveReasonModal({
+  followup,
+  onClose,
+}: {
+  followup: Followup | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!followup) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [followup, onClose]);
+
+  if (!followup) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="archive-reason-title"
+    >
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Tutup"
+          className="sm:hidden w-full flex justify-center pt-3 pb-1.5"
+        >
+          <span className="w-10 h-1 rounded-full bg-gray-200" />
+        </button>
+
+        <div className="px-5 pt-3 sm:pt-6 pb-5">
+          <div className="w-11 h-11 rounded-xl bg-gray-100 border border-gray-200 text-gray-600 flex items-center justify-center mb-3">
+            <Info size={20} />
+          </div>
+          <h2 id="archive-reason-title" className="text-sm font-black text-gray-900 mb-0.5">
+            Alasan diarsipkan
+          </h2>
+          <p className="text-xs text-gray-400 mb-4 truncate">{followup.customer_name}</p>
+
+          <div className="rounded-xl bg-gray-50 border border-gray-200 px-3.5 py-3 mb-3">
+            <p className="text-xs font-semibold text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
+              {followup.archive_reason?.trim() ||
+                "Tidak ada alasan tercatat (diarsipkan sebelum fitur ini ada)."}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <InfoCell label="Diarsipkan oleh" value={followup.archived_by ?? "—"} />
+            <InfoCell label="Tanggal" value={fmtDate(followup.archived_at)} />
+          </div>
+
+          <button
+            onClick={onClose}
+            className={cx(
+              "w-full h-11 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800 active:scale-[0.98] transition-all",
+              FOCUS_RING
+            )}
+          >
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── PIC block di dalam kartu ──────────────────────────────────────────────────
 function PicBlock({ f }: { f: Followup }) {
   // picName: pakai closed_by atau last_followup_by sebagai fallback data lama
@@ -1351,6 +1727,8 @@ function FollowupCard({
   onReactivate,
   onEditPhone,
   onDelete,
+  onShowArchiveReason,
+  onEditArchiveReason,
 }: {
   f: Followup;
   scope: Scope;
@@ -1362,6 +1740,8 @@ function FollowupCard({
   onReactivate: (id: string) => void;
   onEditPhone?: (id: string, phone: string) => void;
   onDelete?: (id: string) => void;
+  onShowArchiveReason?: (id: string) => void;
+  onEditArchiveReason?: (id: string) => void;
 }) {
   const diff = daysDiff(f.next_followup_at);
   const isPedagang = f.seller_type === "PEDAGANG";
@@ -1431,6 +1811,22 @@ function FollowupCard({
       {/* ── Card Body ── */}
       <div className="px-3.5 sm:px-4 py-3 sm:py-3.5 flex-1 space-y-2.5 sm:space-y-3">
         <PicBlock f={f} />
+
+        {scope === "ARCHIVED" && (
+          <div className="rounded-xl bg-gray-50 border border-gray-200 px-3 py-2.5">
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1 inline-flex items-center gap-1">
+              <Archive size={10} /> Alasan diarsipkan
+            </p>
+            <p className="text-xs font-semibold text-gray-700 leading-snug line-clamp-2 break-words">
+              {f.archive_reason?.trim() || "Belum ada alasan tercatat"}
+            </p>
+            {f.archived_by && (
+              <p className="text-[9px] text-gray-400 mt-1 truncate">
+                oleh {f.archived_by} · {fmtDate(f.archived_at)}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <InfoCell
@@ -1544,6 +1940,20 @@ function FollowupCard({
         ) : (
           <>
             <WaChatButton f={f} fullWidth={!canManage} />
+            {canManage && (
+            <button
+              onClick={() => onEditArchiveReason?.(f.id)}
+              title="Lihat / ubah alasan diarsipkan"
+              aria-label="Lihat alasan arsip"
+              className={cx(
+                "h-11 sm:h-10 px-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white text-gray-600 text-xs font-bold hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98] transition-all flex-shrink-0",
+                FOCUS_RING
+              )}
+            >
+              <Info size={14} />
+              <span className="hidden sm:inline">Alasan</span>
+            </button>
+            )}
             {canManage && (
               <button
                 onClick={() => onReactivate(f.id)}
@@ -1723,6 +2133,9 @@ export default function ManagementSellerPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [confirmFu, setConfirmFu] = useState<Followup | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Followup | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Followup | null>(null);
+  const [reasonTarget, setReasonTarget] = useState<Followup | null>(null);
+  const [editReasonTarget, setEditReasonTarget] = useState<Followup | null>(null);
 
   // ── PIC checklist state ──
   const [pics, setPics] = useState<PicCandidate[]>([]);
@@ -1868,7 +2281,11 @@ export default function ManagementSellerPage() {
   };
 
   // ── PATCH runner ──
-  const runAction = async (id: string, body: Record<string, unknown>, buktiFuFile?: File) => {
+  const runAction = async (
+    id: string,
+    body: Record<string, unknown>,
+    buktiFuFile?: File
+  ): Promise<boolean> => {
     setProcessingId(id);
     try {
       let res: Response;
@@ -1906,17 +2323,20 @@ export default function ManagementSellerPage() {
         } else {
           alert(`Gagal memproses (status ${res.status}). Buka console untuk detail teknis.`);
         }
-        return;
+        return false;
       }
 
       if (!result.success) {
         alert(result.message || "Gagal memproses");
-        return;
+        return false;
       }
       await loadData(true);
+      window.dispatchEvent(new Event("seller-followup-changed"));
+      return true;
     } catch (err) {
       console.error("[runAction] Fetch gagal total", err);
       alert("Terjadi kesalahan koneksi");
+      return false;
     } finally {
       setProcessingId(null);
     }
@@ -1933,7 +2353,42 @@ export default function ManagementSellerPage() {
     setConfirmFu(null);
   };
 
-  const onArchive = (id: string) => runAction(id, { action: "archive" });
+  const onArchive = (id: string) => {
+    setArchiveTarget(items.find((i) => i.id === id) ?? null);
+  };
+
+  const handleConfirmArchive = async (reason: string) => {
+    if (!archiveTarget) return;
+    const ok = await runAction(archiveTarget.id, {
+      action: "archive",
+      archive_reason: reason,
+    });
+    if (ok) {
+      toast.success("Customer diarsipkan");
+      setArchiveTarget(null);
+    }
+    // kalau gagal: modal tetap terbuka supaya bisa dicoba lagi
+  };
+
+  const onShowArchiveReason = (id: string) => {
+    setReasonTarget(items.find((i) => i.id === id) ?? null);
+  };
+
+  const onEditArchiveReason = (id: string) => {
+    setEditReasonTarget(items.find((i) => i.id === id) ?? null);
+  };
+
+  const handleConfirmEditReason = async (reason: string) => {
+    if (!editReasonTarget) return;
+    const ok = await runAction(editReasonTarget.id, {
+      action: "update_archive_reason",
+      archive_reason: reason,
+    });
+    if (ok) {
+      toast.success("Alasan arsip diperbarui");
+      setEditReasonTarget(null);
+    }
+  };
   const onReactivate = (id: string) => runAction(id, { action: "reactivate" });
   const onEditPhone = (id: string, phone: string) =>
     runAction(id, { action: "update_phone", customer_phone: phone });
@@ -1954,6 +2409,7 @@ export default function ManagementSellerPage() {
         return;
       }
       await loadData(true);
+      window.dispatchEvent(new Event("seller-followup-changed"));
     } catch {
       alert("Terjadi kesalahan koneksi");
     } finally {
@@ -2330,6 +2786,8 @@ export default function ManagementSellerPage() {
                   onReactivate={onReactivate}
                   onEditPhone={onEditPhone}
                   onDelete={onDeleteRequest}
+                  onShowArchiveReason={onShowArchiveReason}
+                  onEditArchiveReason={onEditArchiveReason}
                 />
               ))}
             </div>
@@ -2350,6 +2808,23 @@ export default function ManagementSellerPage() {
         onCancel={() => setDeleteTarget(null)}
         processing={processingId === deleteTarget?.id}
       />
+
+      <ArchiveConfirmModal
+        followup={archiveTarget}
+        onConfirm={handleConfirmArchive}
+        onCancel={() => setArchiveTarget(null)}
+        processing={processingId === archiveTarget?.id}
+      />
+
+      <ArchiveConfirmModal
+        mode="edit"
+        followup={editReasonTarget}
+        onConfirm={handleConfirmEditReason}
+        onCancel={() => setEditReasonTarget(null)}
+        processing={processingId === editReasonTarget?.id}
+      />
+
+      <ArchiveReasonModal followup={reasonTarget} onClose={() => setReasonTarget(null)} />
     </DashboardLayout>
   );
 }

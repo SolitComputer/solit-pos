@@ -16,11 +16,19 @@ export interface DueAlert {
   sample: string;
 }
 
-const POLL_INTERVAL_MS = 3 * 60 * 1000; // fallback — menangkap jadwal yang lewat murni karena waktu berjalan
+// Cek ke server tiap 30 detik. Setiap pengecekan, kalau masih ada customer
+// yang belum di-FU, toast + bunyi muncul lagi (spam sampai FU ditekan).
+// Ubah angka ini kalau mau lebih sering / lebih jarang.
+const POLL_INTERVAL_MS = 30 * 1000;
+// 0 = tanpa jeda tambahan, alert muncul di setiap pengecekan.
+const REPEAT_INTERVAL_MS = 0;
 const REALTIME_DEBOUNCE_MS = 800;
 
 function seenKey(userId: string) {
   return `solit_due_alert_seen_${userId}`;
+}
+function lastAlertKey(userId: string) {
+  return `solit_due_alert_last_${userId}`;
 }
 
 function loadSeenIds(userId: string): Set<string> {
@@ -35,17 +43,30 @@ function loadSeenIds(userId: string): Set<string> {
 function saveSeenIds(userId: string, ids: Set<string>) {
   try {
     sessionStorage.setItem(seenKey(userId), JSON.stringify(Array.from(ids)));
+  } catch {}
+}
+
+// Waktu alert terakhir disimpan di localStorage supaya pindah halaman
+// (DashboardLayout ke-mount ulang) tidak mereset jeda pengulangan,
+// dan beberapa tab tidak berbunyi bersamaan.
+function loadLastAlert(userId: string): number {
+  try {
+    return Number(localStorage.getItem(lastAlertKey(userId)) ?? 0) || 0;
   } catch {
-    // tidak fatal — paling toast bisa muncul lagi di tab baru
+    return 0;
   }
+}
+function saveLastAlert(userId: string, ts: number) {
+  try {
+    localStorage.setItem(lastAlertKey(userId), String(ts));
+  } catch {}
 }
 
 /**
- * Notifikasi OTOMATIS — beda dari reminder manual Admin.
- * Deteksi langsung dari data seller_followups milik user ini yang sudah lewat
- * jadwal, tanpa perlu aksi siapa pun. Realtime menangkap perubahan status
- * (sudah FU / diarsip); polling 3 menit menangkap jadwal yang "baru lewat"
- * murni karena waktu berjalan.
+ * Notifikasi OTOMATIS untuk PIC.
+ * - Data diambil dari server (hanya milik PIC ini, aktif, dan kategori yang sesuai role).
+ * - Selama masih ada customer yang belum di-FU, toast + bunyi diulang tiap REPEAT_INTERVAL_MS.
+ * - Begitu FU ditekan (next_followup_at maju), item hilang dan pengulangan berhenti.
  */
 export function useSellerFollowupDueAlert(userId: string | null | undefined) {
   const [dueItems, setDueItems] = useState<DueFollowupItem[]>([]);
@@ -56,6 +77,7 @@ export function useSellerFollowupDueAlert(userId: string | null | undefined) {
   const initedRef = useRef<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const isInitialLoadRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -64,12 +86,10 @@ export function useSellerFollowupDueAlert(userId: string | null | undefined) {
     };
   }, []);
 
-  const isInitialLoadRef = useRef(true);
-
   const fetchDue = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch("/api/seller-followups/due-alert");
+      const res = await fetch("/api/seller-followups/due-alert", { cache: "no-store" });
       if (res.status === 403) {
         if (mountedRef.current) setForbidden(true);
         return;
@@ -87,17 +107,33 @@ export function useSellerFollowupDueAlert(userId: string | null | undefined) {
       setDueItems(items);
       setDueCount(count);
 
-      // Jangan bunyikan notifikasi / toast saat initial load
-      if (newlyDue.length > 0 && !isInitialLoadRef.current) {
+      // Tidak ada yang perlu di-FU → hentikan semua notifikasi
+      if (items.length === 0) {
+        setNewAlert(null);
+        isInitialLoadRef.current = false;
+        return;
+      }
+
+      const now = Date.now();
+      const justBecameDue = newlyDue.length > 0 && !isInitialLoadRef.current;
+      const repeatDue = now - loadLastAlert(userId) >= REPEAT_INTERVAL_MS;
+
+      if (justBecameDue) {
+        // Ada customer yang BARU jatuh tempo → langsung ingatkan
         setNewAlert({ count: newlyDue.length, sample: newlyDue[0].customer_name });
+        saveLastAlert(userId, now);
+      } else if (repeatDue) {
+        // Masih ada yang belum di-FU → ingatkan lagi (berulang)
+        setNewAlert({ count, sample: items[0].customer_name });
+        saveLastAlert(userId, now);
       }
       isInitialLoadRef.current = false;
     } catch {
-      // silent — polling / realtime berikutnya akan mencoba lagi
+      // silent — polling berikutnya akan mencoba lagi
     }
   }, [userId]);
 
-  // ── Hydrate + polling fallback ──
+  // ── Hydrate + polling ──
   useEffect(() => {
     if (!userId) return;
     if (initedRef.current !== userId) {
@@ -110,8 +146,6 @@ export function useSellerFollowupDueAlert(userId: string | null | undefined) {
   }, [userId, fetchDue]);
 
   // ── Realtime: refetch begitu ada perubahan followup milik user ini ──
-  // Menangkap kasus sales sudah FU (next_followup_at maju) atau di-archive
-  // → item hilang dari daftar due tanpa nunggu polling 3 menit.
   useEffect(() => {
     if (!userId || forbidden) return;
 
@@ -139,6 +173,17 @@ export function useSellerFollowupDueAlert(userId: string | null | undefined) {
       supabase.removeChannel(channel);
     };
   }, [userId, forbidden, fetchDue]);
+
+  // ── Sinyal dari halaman Management Seller: FU/arsip/hapus barusan berhasil ──
+  // Supaya notifikasi hilang seketika tanpa menunggu realtime / polling.
+  useEffect(() => {
+    if (!userId) return;
+    const onChanged = () => {
+      fetchDue();
+    };
+    window.addEventListener("seller-followup-changed", onChanged);
+    return () => window.removeEventListener("seller-followup-changed", onChanged);
+  }, [userId, fetchDue]);
 
   const dismissDueAlert = useCallback(() => setNewAlert(null), []);
 

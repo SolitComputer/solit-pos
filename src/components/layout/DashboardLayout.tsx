@@ -18,11 +18,12 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { isPrepSilent } from "@/lib/prepAlarm";
 import { expandRolesWithParents } from "@/lib/permissions";
 import PengajuanDanaNotifier from "@/components/layout/PengajuanDanaNotifier";
-import PengajuanDanaExecuteNotifier from "@/components/layout/PengajuanDanaExecuteNotifier"; 
+import PengajuanDanaExecuteNotifier from "@/components/layout/PengajuanDanaExecuteNotifier";
 import ItemLoanNotifier from "@/components/layout/ItemLoanNotifier";
 import ItemLoanReminderNotifier from "@/components/layout/ItemLoanReminderNotifier";
 import VehiclePendingNotifier from "@/components/layout/VehiclePendingNotifier";
 import JurnalChangedNotifier from "@/components/layout/JurnalChangedNotifier";
+import SellerFollowupBanner from "@/components/layout/SellerFollowupBanner";
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -117,11 +118,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Sengaja TIDAK dibungkus !isSilentAdmin karena Kepala Sales bukan role
             yang dibisukan global. */}
         <VehiclePendingNotifier userRoles={authUserRoles} />
-            {/* Notif perubahan jurnal — self-gate ke user yang di-whitelist di
+        {/* Notif perubahan jurnal — self-gate ke user yang di-whitelist di
                 journal_notif_recipients.enabled (dikelola dari modal "Kelola Notif"
                 di Jurnal Umum). Tidak perlu userRoles — API filter per-akun.
                 Tidak dibungkus !isSilentAdmin karena tidak bersuara (silent popup). */}
-            <JurnalChangedNotifier userId={soundUserId} />
+        <JurnalChangedNotifier userId={soundUserId} />
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}
           <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0 sticky top-0 z-30">
@@ -139,6 +140,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
             <div className="px-4 pb-4 pt-2 lg:px-5 lg:pb-5 lg:pt-2 w-full">
+              {/* Peringatan FU Seller — hanya di dashboard utama, hanya untuk PIC */}
+              {isDashboardHome && !isSilentAdmin && (
+                <div className="mb-4">
+                  <SellerFollowupBanner />
+                </div>
+              )}
               {children}
             </div>
           </main>

@@ -251,7 +251,12 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
 
       update.customer_phone = parsed.data.customer_phone;
-    } else if (action === "archive" || action === "reactivate" || action === "assign") {
+    } else if (
+      action === "archive" ||
+      action === "update_archive_reason" ||
+      action === "reactivate" ||
+      action === "assign"
+    ) {
       if (!canManage) {
         return NextResponse.json(
           { success: false, message: "Hanya Admin yang bisa melakukan aksi ini" },
@@ -260,10 +265,46 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
 
       if (action === "archive") {
+        // ✅ Alasan arsip wajib, divalidasi di server supaya tidak bisa
+        // dilewati lewat request manual.
+        const reason = String(fields.archive_reason ?? "").trim();
+        if (reason.length < 5 || reason.length > 300) {
+          return NextResponse.json(
+            { success: false, message: "Alasan arsip wajib diisi (5–300 karakter)" },
+            { status: 400 }
+          );
+        }
         update.is_active = false;
+        update.archive_reason = reason;
+        update.archived_at = nowISO;
+        update.archived_by = user.name;
+      } else if (action === "update_archive_reason") {
+        if (existing.is_active) {
+          return NextResponse.json(
+            { success: false, message: "Customer ini tidak sedang diarsipkan" },
+            { status: 400 }
+          );
+        }
+        const reason = String(fields.archive_reason ?? "").trim();
+        if (reason.length < 5 || reason.length > 300) {
+          return NextResponse.json(
+            { success: false, message: "Alasan arsip wajib diisi (5–300 karakter)" },
+            { status: 400 }
+          );
+        }
+        update.archive_reason = reason;
+        // data lama (diarsipkan sebelum fitur ini) belum punya pencatat → isi sekarang
+        if (!existing.archived_by) {
+          update.archived_by = user.name;
+          update.archived_at = nowISO;
+        }
       } else if (action === "reactivate") {
         update.is_active = true;
         update.next_followup_at = nextFollowupISO(sellerType);
+        // ✅ Bersihkan jejak arsip lama
+        update.archive_reason = null;
+        update.archived_at = null;
+        update.archived_by = null;
       } else if (action === "assign") {
         const targetId: string | undefined = fields.pic_user_id;
         if (!targetId) {
@@ -328,6 +369,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       const labelMap: Record<string, string> = {
         followup: "Follow-up",
         archive: "Arsip",
+        update_archive_reason: "Edit Alasan Arsip",
         reactivate: "Aktifkan",
         assign: "Assign PIC",
         update_phone: "Edit Nomor HP",
@@ -340,7 +382,9 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
           action: "EDIT",
           entity: "seller_followup",
           entityId: id,
-          entityLabel: `${labelMap[action] ?? action} — ${existing.customer_name} (${sellerType})`,
+          entityLabel: `${labelMap[action] ?? action} — ${existing.customer_name} (${sellerType})${
+            (action === "archive" || action === "update_archive_reason") && update.archive_reason ? ` · Alasan: ${update.archive_reason}` : ""
+          }`,
           beforeData: existing,
           afterData: data,
         });
