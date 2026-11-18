@@ -180,11 +180,16 @@ function getItemDisplay(tx: PendingTransaction): { name: string; sn: string; snS
     const realSN = (tx.serial_number || "").trim();
     const accSNs = accs.map(a => (a.serial_number || "").trim()).filter(Boolean);
 
+    // REVISI: infer accessory-only dari DATA, bukan cuma flag is_accessory_only.
+    // Kalau laptop_name kosong DAN ada accessory_items → perlakukan sebagai aksesori,
+    // supaya SN aksesori tetap tampil walau flag is_accessory_only tidak di-set API.
+    const isEffectivelyAccessoryOnly = tx.is_accessory_only || (!laptopName && accs.length > 0);
+
     let snState: SnState;
     let sn = "";
     if (realSN && realSN !== "-") {
         snState = "REAL"; sn = realSN;
-    } else if (tx.is_accessory_only) {
+    } else if (isEffectivelyAccessoryOnly) {
         if (accSNs.length > 0) { snState = "ACC_SN"; sn = accSNs.join(", "); }
         else snState = "ACC_NO_SN";      // aksesori via nama (fitur lama) → memang tanpa SN
     } else {
@@ -238,7 +243,7 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
         { label: "Customer", value: tx.customer_name },
         { label: "No. HP", value: tx.customer_phone || "—" },
         { label: "Perusahaan", value: tx.company_name || "—" },
-        { label: "Laptop", value: item.name || "—" },
+        { label: "Barang", value: item.name || "—" },
         {
             label: "Serial Number", value:
                 item.snState === "REAL" || item.snState === "ACC_SN"
@@ -515,7 +520,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                             // pakai StatusBadge yang sama dengan tabel biar konsisten.
                             { label: "Status", value: <StatusBadge status={tx.status as "RESERVED" | "HELD" | "PENDING" | "PACKING"} /> },
                             { label: "Customer", value: <span className="text-xs font-semibold text-slate-800">{tx.customer_name}</span> },
-                            { label: "Laptop", value: <span className="text-xs font-semibold text-slate-800 truncate max-w-[180px] block" title={itemDisplay.fullTitle || itemDisplay.name}>{itemDisplay.name || "—"}</span> },
+                                                    { label: "Barang", value: <span className="text-xs font-semibold text-slate-800 truncate max-w-[180px] block" title={itemDisplay.fullTitle || itemDisplay.name}>{itemDisplay.name || "—"}</span> },
                             { label: "Harga Deal", value: <span className="text-sm font-bold text-slate-800">{fmt(dealTotal)}</span> },
                         ].map((row, i) => (
                             <div key={i} className="flex items-center justify-between px-4 py-2.5">
@@ -1050,7 +1055,7 @@ function EditPendingModal({ tx, onClose, onSuccess }: {
                             <StatusBadge status={tx.status as "RESERVED" | "HELD" | "PENDING" | "PACKING"} />
                         </div>
                         <div className="flex items-center justify-between px-3.5 py-2">
-                            <span className="text-[11px] text-slate-400 font-semibold uppercase">Laptop</span>
+                                                     <span className="text-[11px] text-slate-400 font-semibold uppercase">Barang</span>
                             <span className="text-xs font-semibold text-slate-800 truncate max-w-[220px] text-right" title={itemDisplay.fullTitle || itemDisplay.name}>
                                 {itemDisplay.name || "—"}
                             </span>
@@ -1618,7 +1623,7 @@ function TableHead({ isHistory }: { isHistory?: boolean }) {
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Customer</span>
                 </th>
                 <th className="px-3 py-3 text-left">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Laptop</span>
+                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Barang</span>
                 </th>
                 <th className="px-3 py-3 text-right">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Harga</span>
