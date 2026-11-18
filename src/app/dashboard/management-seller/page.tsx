@@ -1190,7 +1190,7 @@ function DeleteConfirmModal({
 // ── Alasan arsip: preset ─────────────────────────────────────────────────────
 const ARCHIVE_PRESETS = [
   "Customer tidak merespon",
-  "Nomor tidak aktif / salah",
+  "Nomor tidak aktif",
   "Customer minta tidak dihubungi lagi",
   "Customer sudah tidak relevan (pindah / ganti usaha)",
   "Data duplikat",
