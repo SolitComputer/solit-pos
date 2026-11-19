@@ -50,6 +50,7 @@ export const GET = withAuth(async (_req, _ctx, user: any) => {
       created_at,
       created_by,
       created_by_user:users!journal_change_notifications_created_by_fkey(id, name),
+      entry:journal_entries(period, tanggal),
       reads:journal_change_notification_reads!left(user_id)
     `)
     .order("created_at", { ascending: false })
@@ -75,6 +76,8 @@ export const GET = withAuth(async (_req, _ctx, user: any) => {
     invoice_number: n.invoice_number,
     created_at: n.created_at,
     created_by_name: n.created_by_user?.name ?? null,
+    entry_period: n.entry?.period ?? null,    // ⬅️ BARU — "YYYY-MM" untuk routing "Buka Jurnal"
+    entry_tanggal: n.entry?.tanggal ?? null,  // ⬅️ BARU — tanggal persis entry
   }));
 
   return NextResponse.json({ success: true, data });

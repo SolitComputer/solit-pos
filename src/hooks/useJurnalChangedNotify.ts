@@ -11,6 +11,8 @@ export interface JurnalChangedAlert {
   invoice_number: string | null;
   created_at: string;
   created_by_name: string | null;
+  entry_period: string | null;   // ⬅️ BARU — "YYYY-MM" periode entry (dipakai untuk URL "Buka Jurnal")
+  entry_tanggal: string | null;  // ⬅️ BARU — tanggal persis entry (opsional)
 }
 
 // Jarak antar-poll (ms). API sudah filter eligible user & ack status jadi

@@ -67,8 +67,15 @@ export default function JurnalChangedNotifier({ userId }: Props) {
   // Hidden state: user belum login, user tidak eligible, atau tidak ada notif.
   if (!userId || count === 0) return null;
 
-  const handleGoToJurnal = () => {
-    router.push("/dashboard/akutansi");
+  // ⬅️ FIX — Buka langsung halaman periode entry + pass entry_id via query param
+  // supaya JurnalUmum bisa auto-scroll & flash highlight ke entry yang dimaksud.
+  // Fallback ke halaman pilih bulan kalau entry_period tidak ada (data lama).
+  const handleGoToJurnal = (alert: JurnalChangedAlert) => {
+    if (alert.entry_period) {
+      router.push(`/dashboard/akutansi/${alert.entry_period}?entry=${alert.entry_id}`);
+    } else {
+      router.push("/dashboard/akutansi");
+    }
     setOpen(false);
   };
 
@@ -168,7 +175,7 @@ export default function JurnalChangedNotifier({ userId }: Props) {
                         <div className="flex items-center gap-2 mt-3">
                           <button
                             type="button"
-                            onClick={handleGoToJurnal}
+                            onClick={() => handleGoToJurnal(alert)}
                             className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 hover:text-amber-700"
                           >
                             <ExternalLink className="w-3 h-3" />

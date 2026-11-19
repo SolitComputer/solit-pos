@@ -203,7 +203,8 @@ export const GET = withAuth(async (req) => {
   const hppPendingSyncDraftMap = new Map<string, any>();  // ⬅️ BARU
   let cashflowSyncDraftMap = new Map<string, any>();
   let serviceSyncDraftMap = new Map<string, any>();
-  const cashflowTargetNameMap = new Map<string, string>();
+ const cashflowTargetNameMap = new Map<string, string>();
+  const manualTargetNameMap = new Map<string, string>(); // ⬅️ BARU — nama karyawan Kasbon/Cicilan jurnal manual
 
   if (withSync) {
     const tMeta = Date.now();
@@ -258,6 +259,17 @@ export const GET = withAuth(async (req) => {
         }
       }
     }
+// ⬅️ BARU — nama karyawan (target_user) untuk entry MANUAL Kasbon/Cicilan
+    const manualWithTarget = entries.filter(
+      (e: any) => e.source_type === "MANUAL" && e.target_user_id
+    );
+    const manualTargetIds = [...new Set(manualWithTarget.map((e: any) => e.target_user_id as string))];
+    if (manualTargetIds.length > 0) {
+      const { data: manualTargetUsers } = await supabase.from("users").select("id, name").in("id", manualTargetIds);
+      for (const u of (manualTargetUsers ?? []) as any[]) {
+        manualTargetNameMap.set(u.id as string, u.name as string);
+      }
+    }
     console.log(`[jurnal timing] meta+sync: ${Date.now() - tMeta}ms`);
   }
 
@@ -292,7 +304,15 @@ export const GET = withAuth(async (req) => {
     }
 
     if (e.source_type !== "TRANSACTION" || !e.source_id) {
-      return { ...e, trx_meta: null, sync_available: false };
+      // ⬅️ BARU — Manual entry dgn akun Kasbon/Cicilan → tampilkan nama karyawan
+      const manualNama = e.source_type === "MANUAL" && e.target_user_id
+        ? manualTargetNameMap.get(e.target_user_id as string) ?? null
+        : null;
+      return {
+        ...e,
+        trx_meta: manualNama ? { nama: manualNama } : null,
+        sync_available: false,
+      };
     }
     const baseInvoice = (e.source_id as string).split("__")[0];
     const baseMeta = trxMetaMap.get(baseInvoice) ?? null;
@@ -411,13 +431,14 @@ export const GET = withAuth(async (req) => {
 // ── POST /api/akuntansi/jurnal — jurnal MANUAL ───────────────────────────────
 export const POST = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
-  const { tanggal, keterangan, ref, source_category, is_closing, is_adjusting, lines } = body as {
+  const { tanggal, keterangan, ref, source_category, is_closing, is_adjusting, target_user_id, lines } = body as {
     tanggal: string;
     keterangan: string;
     ref?: string | null;
     source_category?: string | null;
     is_closing?: boolean;
-    is_adjusting?: boolean; // ⬅️ BARU — jurnal penyesuaian; TIDAK di-exclude dari Laba Rugi
+    is_adjusting?: boolean;
+    target_user_id?: string | null; // ⬅️ BARU — karyawan terkait untuk akun Kasbon/Cicilan
     lines: DraftLine[];
   };
 
@@ -439,7 +460,17 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       return NextResponse.json({ success: false, message: "Side harus DEBIT/KREDIT" }, { status: 400 });
     if (!Number.isFinite(Number(l.nominal)) || Number(l.nominal) < 0)
       return NextResponse.json({ success: false, message: "Nominal tidak boleh negatif" }, { status: 400 });
-  }
+ }
+
+  // ⬅️ BARU — Kasbon/Cicilan wajib menunjuk karyawan
+  const hasKasbonCicilan = lines.some(
+    (l) => l.account_code === AKUN.KASBON || l.account_code === AKUN.CICILAN
+  );
+  if (hasKasbonCicilan && !target_user_id)
+    return NextResponse.json(
+      { success: false, message: "Pilih karyawan dulu untuk akun Kasbon/Cicilan" },
+      { status: 400 }
+    );
 
   const merged = cleanManualLines(lines);
   if (!isBalanced(merged))
@@ -465,7 +496,8 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       source_category: source_category ?? null,
       total: totalOf(merged),
       is_closing: is_closing === true, // ⬅️ BARU — jurnal penutup; di-exclude dari Laba Rugi periode berjalan
-      is_adjusting: is_adjusting === true, // ⬅️ BARU — jurnal penyesuaian; TETAP masuk Laba Rugi periode berjalan (beda dari is_closing)
+      is_adjusting: is_adjusting === true,
+      target_user_id: hasKasbonCicilan ? target_user_id : null, // ⬅️ BARU
       created_by: user.id,
     })
     .select("id")

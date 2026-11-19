@@ -95,17 +95,30 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
           ? `,pic_user_id.in.(${delegatedFromIds.join(",")})`
           : "";
 
+       // ✅ Teman satu kategori boleh bantu FU (keputusan 2026-11-19): kalau aku
+      // aktif + berwenang sebagai actor di kategori USER/PEDAGANG, aku boleh
+      // lihat & FU SEMUA customer kategori itu, walau PIC-nya bukan aku —
+      // supaya tim (CREW_SALES utk USER, KEPALA_MARKETING utk PEDAGANG) bisa
+      // saling bantu cover customer satu sama lain.
+      const isTeammateForUser = canActorFollowupType(roles, "USER") && whitelistedByType.USER;
+      const isTeammateForPedagang =
+        canActorFollowupType(roles, "PEDAGANG") && whitelistedByType.PEDAGANG;
+      const teammateTypeClauses: string[] = [];
+      if (isTeammateForUser) teammateTypeClauses.push("seller_type.eq.USER");
+      if (isTeammateForPedagang) teammateTypeClauses.push("seller_type.eq.PEDAGANG");
+      const teammateClause =
+        teammateTypeClauses.length > 0 ? `,${teammateTypeClauses.join(",")}` : "";
+
       if (isActorRole && isWhitelistedAny) {
-        // ✅ OWNERSHIP KETAT (keputusan 2026-10-30):
+        // ✅ OWNERSHIP KETAT (keputusan 2026-10-30), DIPERLONGGAR utk teman satu
+        // kategori (keputusan 2026-11-19 — lihat teammateClause di atas):
         // Sales yang tercentang boleh lihat:
         //   - customer MILIK SENDIRI, ATAU
         //   - customer yang BELUM punya PIC (pic_user_id null), ATAU
-        //   - customer yang PIC-nya sudah dinonaktifkan Admin (tidak ada di
-        //     daftar PIC aktif kategori mana pun → dianggap terbuka lagi).
-        // Customer milik PIC lain yang MASIH aktif = TIDAK terlihat (privat).
-        //
-        // Gabungan PIC aktif dari kedua kategori — seorang PIC "mengunci"
-        // customer selama dia masih aktif di MINIMAL satu kategori.
+        //   - customer yang PIC-nya sudah dinonaktifkan Admin (terbuka lagi), ATAU
+        //   - SEMUA customer di kategori tempat aku jadi teman aktif (teammateClause).
+        // Customer kategori LAIN (bukan kategoriku) milik PIC lain yang masih
+        // aktif = tetap TIDAK terlihat (privat).
         const anyActiveIds = new Set<string>([
           ...activePicIdsByType.USER,
           ...activePicIdsByType.PEDAGANG,
@@ -114,17 +127,18 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
 
         if (lockingOtherIds.length > 0) {
           // Terlihat kalau: punya sendiri ATAU belum ada PIC ATAU PIC-nya sudah
-          // tidak aktif (tidak termasuk daftar lockingOtherIds) ATAU dilimpahkan.
+          // tidak aktif ATAU dilimpahkan ATAU aku teman aktif di kategori row ini.
           query = query.or(
-            `pic_user_id.eq.${user.id},pic_user_id.is.null,pic_user_id.not.in.(${lockingOtherIds.join(",")})${delegatedClause}`
+            `pic_user_id.eq.${user.id},pic_user_id.is.null,pic_user_id.not.in.(${lockingOtherIds.join(",")})${delegatedClause}${teammateClause}`
           );
         }
         // kalau tidak ada PIC aktif lain yang mengunci, semua row terbuka —
-        // tidak perlu filter tambahan (delegasi otomatis ikut).
+        // tidak perlu filter tambahan (delegasi & teammate otomatis ikut).
       } else {
         // Role bukan actor / tidak tercentang di kategori mana pun → hanya
         // bisa lihat customer miliknya sendiri + yang dilimpahkan ke dia.
-        query = query.or(`pic_user_id.eq.${user.id}${delegatedClause}`);
+        // (teammateClause selalu kosong di sini karena isWhitelistedAny false)
+        query = query.or(`pic_user_id.eq.${user.id}${delegatedClause}${teammateClause}`);
       }
     }
 
@@ -175,13 +189,24 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
         const effectiveIsActor = iAmActorForType || isDelegatedToMe;
         const effectiveIsWhitelisted = iAmWhitelistedForType || isDelegatedToMe;
 
-        // is_owner (gating tombol) — OWNERSHIP KETAT:
+        // ✅ Teman satu kategori boleh bantu FU (keputusan 2026-11-19): kalau aku
+        // memang actor + aktif whitelist DI KATEGORI row ini, aku dianggap boleh
+        // FU row ini walau PIC-nya orang lain. pic_user_id TIDAK berubah — ini
+        // cuma soal "boleh sentuh", bukan ambil alih kepemilikan.
+        const isTeammateForType = iAmActorForType && iAmWhitelistedForType;
+
+        // is_owner (gating tombol) — OWNERSHIP KETAT, DIPERLONGGAR utk teman:
         //   - belum ada PIC (null), ATAU
         //   - aku memang pemiliknya, ATAU
         //   - PIC yang tercatat sudah tidak aktif di kategori ini (terbuka lagi), ATAU
-        //   - row ini dilimpahkan ke aku.
-        // Customer milik PIC lain yang MASIH aktif di kategori ini → BUKAN owner.
-        const isOwner = row.pic_user_id === null || isTrueOwner || !picIsStillActive || isDelegatedToMe;
+        //   - row ini dilimpahkan ke aku, ATAU
+        //   - aku teman satu kategori yang aktif (isTeammateForType).
+        const isOwner =
+          row.pic_user_id === null ||
+          isTrueOwner ||
+          !picIsStillActive ||
+          isDelegatedToMe ||
+          isTeammateForType;
 
         let lockReason: string | null = null;
         if (!effectiveIsActor) {
@@ -206,12 +231,14 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
           // ✅ flag bantu buat frontend (opsional dipakai di Langkah 8)
           _row_type: rowType,
           _whitelisted_for_type: iAmWhitelistedForType,
+          _is_teammate_for_type: isTeammateForType,
         };
       })
-      // ✅ FILTER HALUS (ownership ketat per kategori):
+      // ✅ FILTER HALUS (ownership ketat per kategori, DIPERLONGGAR utk teman):
       // Supervisor lihat semua (jangan disaring). Untuk non-supervisor, buang
-      // baris yang: BUKAN miliknya, sudah ADA PIC-nya, DAN PIC itu masih aktif
-      // di kategori baris ini → itu privat milik orang lain, tidak boleh nongol.
+      // baris yang: BUKAN miliknya, sudah ADA PIC-nya, PIC itu masih aktif di
+      // kategori baris ini, DAN aku bukan teman satu kategori → itu privat
+      // milik orang lain, tidak boleh nongol.
       .filter((row: any) => {
         if (isSupervisor) return true;
         const isTrueOwner = row.pic_user_id === user.id;
@@ -220,8 +247,8 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
           hasOwner && activePicIdsByType[row._row_type as "USER" | "PEDAGANG"].has(row.pic_user_id);
         const isDelegatedToMe = isSellerFollowupDelegate(row.pic_user_id, user.id);
         // tampilkan kalau: punyaku ATAU belum ada PIC ATAU PIC-nya sudah lepas
-        // ATAU row ini dilimpahkan ke aku (SELLER_FOLLOWUP_DELEGATE_FROM)
-        return isTrueOwner || !hasOwner || !ownerStillLocks || isDelegatedToMe;
+        // ATAU row ini dilimpahkan ke aku ATAU aku teman satu kategori (2026-11-19)
+        return isTrueOwner || !hasOwner || !ownerStillLocks || isDelegatedToMe || row._is_teammate_for_type;
       });
 
     return NextResponse.json({

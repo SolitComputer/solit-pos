@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
+  AKUN,
   DraftLine,
   isBalanced,
   isValidAccount,
@@ -48,12 +49,13 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
   if (!id) return NextResponse.json({ success: false, message: "ID tidak valid" }, { status: 400 });
 
   const body = await req.json();
-  const { tanggal, keterangan, ref, is_closing, is_adjusting, lines } = body as {
+  const { tanggal, keterangan, ref, is_closing, is_adjusting, target_user_id, lines } = body as {
     tanggal: string;
     keterangan: string;
     ref?: string | null;
     is_closing?: boolean;
-    is_adjusting?: boolean; // ⬅️ BARU — penanda jurnal penyesuaian
+    is_adjusting?: boolean;
+    target_user_id?: string | null; // ⬅️ BARU — karyawan terkait untuk akun Kasbon/Cicilan
     lines: DraftLine[];
   };
 
@@ -71,6 +73,16 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
     if (!Number.isFinite(Number(l.nominal)) || Number(l.nominal) < 0)
       return NextResponse.json({ success: false, message: "Nominal tidak boleh negatif" }, { status: 400 });
   }
+
+  // ⬅️ BARU — Kasbon/Cicilan wajib menunjuk karyawan
+  const hasKasbonCicilan = lines.some(
+    (l) => l.account_code === AKUN.KASBON || l.account_code === AKUN.CICILAN
+  );
+  if (hasKasbonCicilan && !target_user_id)
+    return NextResponse.json(
+      { success: false, message: "Pilih karyawan dulu untuk akun Kasbon/Cicilan" },
+      { status: 400 }
+    );
 
   const merged = cleanManualLines(lines);
   if (!isBalanced(merged))
@@ -102,6 +114,8 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
       ...(is_closing === undefined ? {} : { is_closing: is_closing === true }),
       // Idem untuk flag jurnal penyesuaian — pola sama persis.
       ...(is_adjusting === undefined ? {} : { is_adjusting: is_adjusting === true }),
+      // ⬅️ BARU — update target_user_id (set null kalau tidak ada akun 141/142)
+      target_user_id: hasKasbonCicilan ? (target_user_id || null) : null,
       updated_by: user.id,
       updated_at: new Date().toISOString(),
     })
