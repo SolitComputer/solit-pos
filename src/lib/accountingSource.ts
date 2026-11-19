@@ -622,7 +622,7 @@ export async function syncJournalAfterPartialCancel(
     laptopName: string;
   }
 ): Promise<{
-  action: "synced" | "reversed" | "skipped_no_entry" | "skipped_identical";
+  action: "synced" | "reversed" | "skipped_no_entry" | "skipped_identical" | "notified";
   entryId?: string;
   message: string;
 }> {
@@ -668,7 +668,11 @@ export async function syncJournalAfterPartialCancel(
   const entryPeriod = primaryEntry.period as string;
   const sameMonth = entryPeriod === todayPeriod;
 
-  // 5a. SAMA BULAN → update in-place
+   // 5a. SAMA BULAN → JANGAN auto-sync. HANYA kirim notif.
+  // Rayhan mau baca dulu apa yang berubah sebelum sync — jadi entry di Jurnal Umum
+  // tetap tampil nominal LAMA dengan badge "Nominal Berubah" (via existing
+  // sync_available mechanism di /api/akutansi/jurnal). Rayhan klik entry →
+  // popover "Sinkronkan Sekarang" → trigger sync MANUAL via /api/akutansi/jurnal/[id]/sync.
   if (sameMonth) {
     const linesChanged = !linesEqual(primaryEntry.lines ?? [], newDraft.lines);
     const ketChanged = primaryEntry.keterangan !== newDraft.keterangan;
@@ -680,56 +684,19 @@ export async function syncJournalAfterPartialCancel(
       };
     }
 
-    if (linesChanged) {
-      const { toUpdate, toInsert, deleteIds } = diffJournalLines(primaryEntry.lines ?? [], newDraft.lines);
-      if (toInsert.length > 0) {
-        await supabase
-          .from("journal_lines")
-          .insert(draftToLineRowsWithOrder(primaryEntry.id as string, toInsert));
-      }
-      for (const u of toUpdate) {
-        await supabase.from("journal_lines").update({ keterangan: u.keterangan }).eq("id", u.id);
-      }
-      if (deleteIds.length > 0) {
-        await supabase.from("journal_umum_line_checks").delete().in("line_id", deleteIds);
-        await supabase.from("journal_line_checks").delete().in("line_id", deleteIds);
-        await supabase.from("journal_lines").delete().in("id", deleteIds);
-      }
-    }
-
-    await supabase
-      .from("journal_entries")
-      .update({
-        keterangan: newDraft.keterangan,
-        total: newDraft.total,
-        is_edited: true,
-        updated_by: cancelledInfo.userId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", primaryEntry.id as string);
-
-    await supabase.from("journal_audit_logs").insert({
-      entry_id: primaryEntry.id,
-      period: entryPeriod,
-      action: "SYNC",
-      before_data: { keterangan: primaryEntry.keterangan, lines: primaryEntry.lines },
-      after_data: { keterangan: newDraft.keterangan, lines: newDraft.lines, trigger: "PARTIAL_CANCEL" },
-      changed_by: cancelledInfo.userId,
-    });
-
-    // ⬅️ BARU — Event notif untuk Rayhan (Bug 4)
+    // Kirim notif saja — Rayhan sync manual via popover
     await createJournalChangeNotification(supabase, {
       entry_id: primaryEntry.id as string,
       trigger_type: "NOMINAL_CHANGED",
-      detail_message: `Entry jurnal INV ${invoiceNumber} ter-sync karena partial cancel · SN ${cancelledInfo.cancelledSNs.join(", ")} dibatalkan · ${cancelledInfo.laptopName} - ${cancelledInfo.customerName}`,
+      detail_message: `Entry jurnal INV ${invoiceNumber} ada perubahan nominal karena partial cancel · SN ${cancelledInfo.cancelledSNs.join(", ")} dibatalkan · ${cancelledInfo.laptopName} - ${cancelledInfo.customerName}. Silakan review & sinkronkan manual.`,
       invoice_number: invoiceNumber,
       created_by: cancelledInfo.userId,
     });
 
     return {
-      action: "synced",
+      action: "notified",
       entryId: primaryEntry.id as string,
-      message: `Jurnal INV ${invoiceNumber} ter-sync (SN ${cancelledInfo.cancelledSNs.join(", ")} dibatalkan).`,
+      message: `Notif perubahan dikirim untuk INV ${invoiceNumber} — sinkronkan manual lewat popover di Jurnal Umum.`,
     };
   }
 
@@ -833,7 +800,7 @@ export async function syncJournalAfterEditTransaction(
     changeLabel?: string; // optional: untuk keterangan koreksi (misal "SN 0007800→0007801")
   }
 ): Promise<{
-  action: "synced" | "reversed" | "skipped_no_entry" | "skipped_identical";
+  action: "synced" | "reversed" | "skipped_no_entry" | "skipped_identical" | "notified";
   entryId?: string;
   message: string;
 }> {
@@ -895,7 +862,11 @@ export async function syncJournalAfterEditTransaction(
   const entryPeriod = primaryEntry.period as string;
   const sameMonth = entryPeriod === todayPeriod;
 
-  // 4a. SAMA BULAN → update in-place (sama pola seperti syncJournalAfterPartialCancel)
+   // 4a. SAMA BULAN → JANGAN auto-sync. HANYA kirim notif.
+  // Rayhan mau baca dulu apa yang berubah sebelum sync — jadi entry di Jurnal Umum
+  // tetap tampil nominal LAMA dengan badge "Nominal Berubah" (via existing
+  // sync_available mechanism). Rayhan klik entry → popover "Sinkronkan Sekarang" →
+  // trigger sync MANUAL via /api/akutansi/jurnal/[id]/sync.
   if (sameMonth) {
     const linesChanged = !linesEqual(primaryEntry.lines ?? [], newDraft.lines);
     const ketChanged = primaryEntry.keterangan !== newDraft.keterangan;
@@ -904,54 +875,19 @@ export async function syncJournalAfterEditTransaction(
       return { action: "skipped_identical", message: "Jurnal sudah sama dengan data terbaru." };
     }
 
-    if (linesChanged) {
-      const { toUpdate, toInsert, deleteIds } = diffJournalLines(primaryEntry.lines ?? [], newDraft.lines);
-      if (toInsert.length > 0) {
-        await supabase.from("journal_lines").insert(draftToLineRowsWithOrder(primaryEntry.id as string, toInsert));
-      }
-      for (const u of toUpdate) {
-        await supabase.from("journal_lines").update({ keterangan: u.keterangan }).eq("id", u.id);
-      }
-      if (deleteIds.length > 0) {
-        await supabase.from("journal_umum_line_checks").delete().in("line_id", deleteIds);
-        await supabase.from("journal_line_checks").delete().in("line_id", deleteIds);
-        await supabase.from("journal_lines").delete().in("id", deleteIds);
-      }
-    }
-
-    await supabase
-      .from("journal_entries")
-      .update({
-        keterangan: newDraft.keterangan,
-        total: newDraft.total,
-        is_edited: true,
-        updated_by: editInfo.userId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", primaryEntry.id as string);
-
-    await supabase.from("journal_audit_logs").insert({
-      entry_id: primaryEntry.id,
-      period: entryPeriod,
-      action: "SYNC",
-      before_data: { keterangan: primaryEntry.keterangan, lines: primaryEntry.lines },
-      after_data: { keterangan: newDraft.keterangan, lines: newDraft.lines, trigger: "EDIT_TRANSACTION" },
-      changed_by: editInfo.userId,
-    });
-
-    // ⬅️ BARU — Event notif untuk Rayhan (Bug 4)
+    // Kirim notif saja — Rayhan sync manual via popover
     await createJournalChangeNotification(supabase, {
       entry_id: primaryEntry.id as string,
       trigger_type: "NOMINAL_CHANGED",
-      detail_message: `Entry jurnal INV ${invoiceNumber} ter-sync karena ${editInfo.changeLabel ?? "edit transaksi"} · ${editInfo.laptopName} - ${editInfo.customerName}`,
+      detail_message: `Entry jurnal INV ${invoiceNumber} ada perubahan nominal karena ${editInfo.changeLabel ?? "edit transaksi"} · ${editInfo.laptopName} - ${editInfo.customerName}. Silakan review & sinkronkan manual.`,
       invoice_number: invoiceNumber,
       created_by: editInfo.userId,
     });
 
     return {
-      action: "synced",
+      action: "notified",
       entryId: primaryEntry.id as string,
-      message: `Jurnal INV ${invoiceNumber} ter-sync (edit transaksi).`,
+      message: `Notif perubahan dikirim untuk INV ${invoiceNumber} — sinkronkan manual lewat popover di Jurnal Umum.`,
     };
   }
 
