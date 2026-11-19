@@ -328,6 +328,28 @@ export async function getTransactionSyncDraftsByInvoices(
   // deal (harga jual) + modal (harga beli) aksesoris per invoice.
   const accMap = await getAccessoryDealModalByInvoices(supabase, accInvoiceNumbers);
 
+  // ⬅️ BARU — Scan invoice yang SUDAH punya entry __HPP_PENDING. Modal
+  // (laptop & aksesoris) di entry PAID harus di-skip kalau sudah tercatat
+  // di entry HPP Pending — biar tidak double-post saat preview sync.
+  // Logic ini sejajar dengan buildTransactionDrafts (fix bug yg Rayhan temuin
+  // 19 Nov 2026: preview sync tambah modal 450/170 padahal udah ada di HPP Pending).
+  const hpOnlyInvoices = new Set<string>();
+  if (invoiceNumbers.length > 0) {
+    for (const batch of chunkArray(invoiceNumbers, 150)) {
+      const { data: existingHpp } = await supabase
+        .from("journal_entries")
+        .select("source_id")
+        .eq("source_type", "TRANSACTION")
+        .in("source_id", batch.map((inv) => `${inv}__HPP_PENDING`));
+      for (const e of (existingHpp ?? []) as any[]) {
+        const sourceId = e.source_id as string;
+        if (sourceId.endsWith("__HPP_PENDING")) {
+          hpOnlyInvoices.add(sourceId.replace(/__HPP_PENDING$/, ""));
+        }
+      }
+    }
+  }
+
   for (const t of trxs as any[]) {
     if (t.status !== "PAID") continue; // lihat catatan di JSDoc — accrual/cancelled tidak disinkronkan
 
@@ -388,8 +410,13 @@ export async function getTransactionSyncDraftsByInvoices(
       lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
     }
 
+    // ⬅️ BARU — Skip modal/HPP kalau invoice sudah punya entry __HPP_PENDING
+    // (modal sudah tercatat di sana saat packing ecommerce). Entry PAID ini
+    // cukup Kas + Pendapatan — sejajar dengan logic di buildTransactionDrafts.
+    const skipModalHpp = hpOnlyInvoices.has(t.invoice_number as string);
+
     // Modal LAPTOP (D440 Modal Keluar / K130 HPP) — hanya kalau ada unit laptop.
-    if (modal > 0 && effectiveItemKind !== "accessory") {
+    if (modal > 0 && effectiveItemKind !== "accessory" && !skipModalHpp) {
       lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
       lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
     }
@@ -397,7 +424,7 @@ export async function getTransactionSyncDraftsByInvoices(
     // termasuk aksesoris bonus (deal 0). Dari modal aksesoris di accMap (bukan `modal` laptop).
     if (effectiveItemKind === "accessory" || effectiveItemKind === "mixed") {
       const accessoryModal = Math.round(accMap.get(t.invoice_number as string)?.modal ?? 0);
-      if (accessoryModal > 0) {
+      if (accessoryModal > 0 && !skipModalHpp) {
         lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: accessoryModal });
         lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: accessoryModal });
       }
