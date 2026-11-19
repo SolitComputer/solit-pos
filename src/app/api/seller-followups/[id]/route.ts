@@ -102,24 +102,41 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     // dianggap terbuka lagi — tidak mengunci selamanya ke orang nonaktif.
     // (PIC yang aktif di USER tapi nonaktif di PEDAGANG tidak mengunci customer
     // PEDAGANG, dan sebaliknya.)
-    let picStillActive = false;
-    if (existing.pic_user_id) {
-      const { data: picActiveRow } = await supabaseAdmin
-        .from("seller_followup_pics")
-        .select("is_active")
-        .eq("user_id", existing.pic_user_id)
-        .eq("seller_type", existingType)
-        .maybeSingle();
-      picStillActive = !!picActiveRow?.is_active;
-    }
+       // ✅ Cek PIC lama masih aktif di kategori ini, SEKALIGUS cek apakah user
+    // yang request ini juga aktif di kategori yang sama (dipakai utk fitur
+    // "teman satu kategori boleh bantu FU" — isTeammateForType di bawah).
+    // Digabung jadi 1 query biar tidak 2x round-trip ke DB.
+    const picCheckIds = Array.from(
+      new Set([existing.pic_user_id, user.id].filter(Boolean) as string[])
+    );
+    const { data: picActiveRows } = await supabaseAdmin
+      .from("seller_followup_pics")
+      .select("user_id, is_active")
+      .eq("seller_type", existingType)
+      .in("user_id", picCheckIds);
+
+    const picStillActive =
+      !!existing.pic_user_id &&
+      !!picActiveRows?.find((r: any) => r.user_id === existing.pic_user_id)?.is_active;
+    const iAmActiveForType = !!picActiveRows?.find((r: any) => r.user_id === user.id)?.is_active;
 
     // ── Ownership ─────────────────────────────────────────────────────────────
     const isOwnedByMe = !!existing.pic_user_id && existing.pic_user_id === user.id;
     // belum ada PIC, ATAU PIC lama sudah dinonaktifkan Admin → siapa pun (berwenang) bisa klaim
     const isUnowned = !existing.pic_user_id || !picStillActive;
 
-    // ── GATE 0: non-supervisor hanya boleh sentuh miliknya atau yang belum ada PIC ──
-    if (!isSupervisor && !isOwnedByMe && !isUnowned) {
+    // ── Teman satu kategori boleh bantu FU (keputusan 2026-11-19) ──────────────
+    // Sesama actor kategori ini (CREW_SALES utk USER, KEPALA_MARKETING utk
+    // PEDAGANG) yang aktif di whitelist kategori ini boleh bantu follow-up
+    // customer siapapun di kategori itu, walau PIC-nya bukan dia — supaya tim
+    // bisa saling cover. pic_user_id TIDAK berubah (lihat auto-claim di bawah,
+    // itu cuma jalan kalau isUnowned, jadi PIC asli tetap tercatat).
+    const isTeammateForType =
+      canActorFollowupType(roles, existingType as "USER" | "PEDAGANG") && iAmActiveForType;
+
+    // ── GATE 0: non-supervisor hanya boleh sentuh miliknya, yang belum ada PIC,
+    // atau milik teman satu kategori (isTeammateForType) ───────────────────────
+    if (!isSupervisor && !isOwnedByMe && !isUnowned && !isTeammateForType) {
       return NextResponse.json(
         { success: false, message: "Customer ini sudah milik PIC lain" },
         { status: 403 }
@@ -170,8 +187,8 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         );
       }
 
-      // GATE 3 — hanya pemilik atau unowned yang bisa FU
-      if (!isOwnedByMe && !isUnowned) {
+      // GATE 3 — pemilik, unowned, ATAU teman satu kategori (co-FU) yang bisa FU
+      if (!isOwnedByMe && !isUnowned && !isTeammateForType) {
         return NextResponse.json(
           {
             success: false,
