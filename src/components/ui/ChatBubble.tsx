@@ -11,6 +11,19 @@ import { Check, CheckCheck, MessageCircle } from "lucide-react";
 
 const supabase = getSupabaseClient();
 
+function useIsDark() {
+    const [isDark, setIsDark] = useState(false);
+    useEffect(() => {
+        const el = document.documentElement;
+        const update = () => setIsDark(el.classList.contains("dark"));
+        update();
+        const obs = new MutationObserver(update);
+        obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+        return () => obs.disconnect();
+    }, []);
+    return isDark;
+}
+
 export interface ChatUser {
     id: string;
     name: string;
@@ -179,6 +192,7 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: {
     const [saving, setSaving] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const editRef = useRef<HTMLInputElement>(null);
+    const isDark = useIsDark();
 
     useEffect(() => { if (!isEditing) setEditContent(msg.content); }, [msg.content, isEditing]);
     useEffect(() => { if (isEditing) { editRef.current?.focus(); editRef.current?.select(); } }, [isEditing]);
@@ -245,10 +259,10 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: {
                     <div className="max-w-[210px] px-3 py-2"
                         style={{
                             borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
-                            background: isMine ? "linear-gradient(135deg,#1e40af,#4f46e5)" : "#ffffff",
-                            border: isMine ? "none" : "1px solid #e8ecf0",
-                            boxShadow: isMine ? "0 3px 10px rgba(79,70,229,0.3)" : "0 1px 6px rgba(0,0,0,0.06)",
-                            color: isMine ? "#fff" : "#1e293b",
+                            background: isMine ? "linear-gradient(135deg,#1e40af,#4f46e5)" : (isDark ? "#1a263a" : "#ffffff"),
+                            border: isMine ? "none" : (isDark ? "1px solid #24314a" : "1px solid #e8ecf0"),
+                            boxShadow: isMine ? "0 3px 10px rgba(79,70,229,0.3)" : (isDark ? "0 1px 6px rgba(0,0,0,0.4)" : "0 1px 6px rgba(0,0,0,0.06)"),
+                            color: isMine ? "#fff" : (isDark ? "#e2e8f0" : "#1e293b"),
                         }}>
                         {hasAttachment && (
                             <div className={hasContent ? "mb-1.5" : ""}>
@@ -277,8 +291,7 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: {
                     {showMenu && (
                         <div ref={menuRef}
                             className={`absolute bottom-full mb-1.5 z-50 bg-white overflow-hidden py-1 min-w-[135px] ${isMine ? "right-0" : "left-0"}`}
-                            style={{ borderRadius: 12, border: "1px solid #f0f0f5", boxShadow: "0 8px 28px rgba(0,0,0,0.12)" }}>
-                            {isMine && hasContent && (
+                            style={{ borderRadius: 12, border: isDark ? "1px solid #24314a" : "1px solid #f0f0f5", boxShadow: isDark ? "0 8px 28px rgba(0,0,0,0.5)" : "0 8px 28px rgba(0,0,0,0.12)" }}>                            {isMine && hasContent && (
                                 <button onClick={() => { setIsEditing(true); setShowMenu(false); }}
                                     className="w-full text-left px-3.5 py-2 text-[11px] text-indigo-600 hover:bg-indigo-50 flex items-center gap-2 font-semibold transition">
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -328,6 +341,7 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
     const bottomRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
+    const isDark = useIsDark();
 
     const fetchMessages = useCallback(async () => {
         setLoading(true);
@@ -570,8 +584,8 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
                 width: 296,
                 height: preview ? 472 : 408,
                 borderRadius: "14px 14px 0 0",
-                background: "#f8f9fc",
-                boxShadow: "0 -2px 20px rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.06)",
+                background: isDark ? "#0c1322" : "#f8f9fc",
+                boxShadow: isDark ? "0 -2px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)" : "0 -2px 20px rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.06)",
                 transition: "height 0.18s ease",
             }}>
 
@@ -610,16 +624,16 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
             <div style={{ height: 2, background: "linear-gradient(90deg,#6366f1,#8b5cf6 50%,#ec4899)", flexShrink: 0, opacity: 0.65 }} />
 
             {/* ── Messages ── */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5" style={{ background: "#f8f9fc" }}>
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5" style={{ background: isDark ? "#0c1322" : "#f8f9fc" }}>
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
                         <div className="w-5 h-5 rounded-full animate-spin"
-                            style={{ border: "2px solid #e2e8f0", borderTopColor: "#6366f1" }} />
+                            style={{ border: isDark ? "2px solid #24314a" : "2px solid #e2e8f0", borderTopColor: "#6366f1" }} />
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
                         <MessageCircle size={30} className="opacity-20" />
-                        <p className="text-[11px] text-gray-400">Mulai percakapan!</p>
+                        <p className="text-[11px]" style={{ color: isDark ? "#64748b" : "#9ca3af" }}>Mulai percakapan!</p>
                     </div>
                 ) : messages.map(msg => (
                     <MessageItem key={msg.id} msg={msg}
@@ -633,7 +647,7 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
             {preview && (
                 <div className="flex-shrink-0 px-3 py-2 bg-white border-t border-gray-100">
                     <div className="flex items-center gap-2 p-2 rounded-xl"
-                        style={{ background: "#f0f4ff", border: "1px solid #e0e7ff" }}>
+                        style={{ background: isDark ? "rgba(99,102,241,0.12)" : "#f0f4ff", border: isDark ? "1px solid rgba(99,102,241,0.25)" : "1px solid #e0e7ff" }}>
                         {preview.type === "image"
                             ? <img src={preview.url} alt="preview" className="w-9 h-9 object-cover rounded-lg flex-shrink-0" />
                             : <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
@@ -662,7 +676,7 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
                 {/* Attachment */}
                 <button onClick={() => fileRef.current?.click()} disabled={isUploading}
                     className="w-7 h-7 rounded-lg flex items-center justify-center transition hover:bg-indigo-50 disabled:opacity-40 flex-shrink-0"
-                    style={{ background: "#f0f4ff", color: "#818cf8" }}>
+                    style={{ background: isDark ? "rgba(99,102,241,0.12)" : "#f0f4ff", color: "#818cf8" }}>
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                             d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -674,14 +688,13 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
                     placeholder={preview ? "Caption (opsional)..." : "Tulis pesan..."}
                     maxLength={1000} disabled={isUploading}
                     className="flex-1 h-8 rounded-full px-3 text-xs font-medium outline-none disabled:opacity-50"
-                    style={{ background: "#f1f5f9", border: "1.5px solid #e2e8f0", color: "#334155" }} />
+                    style={{ background: isDark ? "#131d2e" : "#f1f5f9", border: isDark ? "1.5px solid #22324a" : "1.5px solid #e2e8f0", color: isDark ? "#f1f5f9" : "#334155" }} />
 
                 {/* Ada teks/file → tombol Kirim; kosong → mic VN (overlay) */}
                 {input.trim() || preview ? (
                     <button onClick={preview ? sendAttachment : send} disabled={!canSend}
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white transition hover:scale-105 active:scale-95 disabled:opacity-40 flex-shrink-0"
-                        style={{ background: canSend ? "linear-gradient(135deg,#4f46e5,#7c3aed)" : "#e2e8f0", boxShadow: canSend ? "0 2px 8px rgba(79,70,229,0.35)" : "none" }}>
-                        {isUploading
+                        style={{ background: canSend ? "linear-gradient(135deg,#4f46e5,#7c3aed)" : (isDark ? "#24314a" : "#e2e8f0"), boxShadow: canSend ? "0 2px 8px rgba(79,70,229,0.35)" : "none" }}>                        {isUploading
                             ? <div className="w-3 h-3 rounded-full animate-spin" style={{ border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
                             : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>}
                     </button>
