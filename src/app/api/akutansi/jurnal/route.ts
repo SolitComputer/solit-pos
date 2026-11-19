@@ -22,6 +22,8 @@ import {
   getCashflowMetaByIds,
   getServiceSyncDraftsByIds,
   getMaxJournalSeqByDate,
+  getAccrualSyncDraftByInvoice,     // ⬅️ BARU — handle entry accrual (Piutang Debit)
+  getHppPendingSyncDraftByInvoice,  // ⬅️ BARU — handle entry __HPP_PENDING
 } from "@/lib/accountingSource";
 
 function getAdmin(): SupabaseClient {
@@ -72,7 +74,7 @@ export const GET = withAuth(async (req) => {
   const supabase = getAdmin();
   const t0 = Date.now();
 
- let query = supabase
+  let query = supabase
     .from("journal_entries")
     .select(withSync ? ENTRY_SELECT : LIGHT_SELECT)
     .eq("period", period);
@@ -91,7 +93,7 @@ export const GET = withAuth(async (req) => {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
- const entries = (data ?? []).map((e: any) => ({
+  const entries = (data ?? []).map((e: any) => ({
     // (perf) default biar field yang cuma ada di fase lengkap (warning_logs, nama
     // pembuat/pengedit) nggak undefined di fase cepat → UI nggak error. Fase lengkap
     // yang punya nilainya bakal nimpa default ini (karena ...e di bawahnya).
@@ -135,6 +137,42 @@ export const GET = withAuth(async (req) => {
     ),
   ];
 
+  // ⬅️ BARU — entry accrual POLOS (Piutang Debit, bukan Kas) di transaksi
+  // RESERVED/HELD/PACKING. Dipakai untuk compute sync_available supaya Rayhan
+  // dapat badge "Nominal Berubah" kalau transaksi pending diedit (edit SN /
+  // edit modal / partial cancel di pending).
+  const isPiutangShapedEntry = (e: any) =>
+    (e.lines ?? []).some((l: any) => l.side === "DEBIT" && l.account_code === AKUN.PIUTANG);
+
+  const accrualTrxInvoiceNumbers = [
+    ...new Set(
+      entries
+        .filter(
+          (e: any) =>
+            e.source_type === "TRANSACTION" &&
+            e.source_id &&
+            !(e.source_id as string).includes("__") &&
+            isPiutangShapedEntry(e)
+        )
+        .map((e: any) => e.source_id as string)
+    ),
+  ];
+
+  // ⬅️ BARU — entry HPP Pending (source_id = invoice__HPP_PENDING). Dipakai
+  // untuk compute sync_available saat modal unit di-edit di Data Barang.
+  const hppPendingBaseInvoices = [
+    ...new Set(
+      entries
+        .filter(
+          (e: any) =>
+            e.source_type === "TRANSACTION" &&
+            typeof e.source_id === "string" &&
+            (e.source_id as string).endsWith("__HPP_PENDING")
+        )
+        .map((e: any) => (e.source_id as string).replace(/__HPP_PENDING$/, ""))
+    ),
+  ];
+
   // Sinkronisasi Nominal juga berlaku untuk CASHFLOW (entry manual) dan SERVICE
   // (entry tunggal, belum pernah dipecah DP/Cicilan/Pelunasan) — lihat JSDoc
   // masing-masing fungsi di accountingSource.ts untuk batasannya.
@@ -157,10 +195,12 @@ export const GET = withAuth(async (req) => {
     ),
   ];
 
-  // (perf) SEMUA meta (toko/spek/nama) + hitung-ulang sync dibungkus di sini —
+   // (perf) SEMUA meta (toko/spek/nama) + hitung-ulang sync dibungkus di sini —
   // cuma jalan di fase lengkap (?sync=1). Fase cepat (?sync=0) lewat semua ini.
   let cashflowMetaMap = new Map<string, any>();
   let syncDraftMap = new Map<string, any>();
+  const accrualSyncDraftMap = new Map<string, any>();     // ⬅️ BARU
+  const hppPendingSyncDraftMap = new Map<string, any>();  // ⬅️ BARU
   let cashflowSyncDraftMap = new Map<string, any>();
   let serviceSyncDraftMap = new Map<string, any>();
   const cashflowTargetNameMap = new Map<string, string>();
@@ -173,12 +213,33 @@ export const GET = withAuth(async (req) => {
       getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers),
       getCashflowSyncDraftsByIds(supabase, primaryCashflowIds),
       getServiceSyncDraftsByIds(supabase, primaryServiceIds),
+      // ⬅️ BARU — Accrual sync drafts (loop Promise.all per invoice karena helper single-invoice)
+      Promise.all(
+        accrualTrxInvoiceNumbers.map(async (inv) => {
+          const draft = await getAccrualSyncDraftByInvoice(supabase, inv);
+          return [inv, draft] as const;
+        })
+      ),
+      // ⬅️ BARU — HPP Pending sync drafts
+      Promise.all(
+        hppPendingBaseInvoices.map(async (inv) => {
+          const draft = await getHppPendingSyncDraftByInvoice(supabase, inv);
+          return [inv, draft] as const;
+        })
+      ),
     ]);
     trxMetaMap = metaResults[0];
     cashflowMetaMap = metaResults[1];
     syncDraftMap = metaResults[2];
     cashflowSyncDraftMap = metaResults[3];
     serviceSyncDraftMap = metaResults[4];
+    // ⬅️ BARU — populate accrual & HPP pending maps
+    for (const [inv, draft] of metaResults[5]) {
+      if (draft) accrualSyncDraftMap.set(inv, draft);
+    }
+    for (const [inv, draft] of metaResults[6]) {
+      if (draft) hppPendingSyncDraftMap.set(inv, draft);
+    }
 
     // nama karyawan (target_user) utk entry Kasbon/Cicilan dari Cashflow.
     if (primaryCashflowIds.length > 0) {
@@ -247,10 +308,26 @@ export const GET = withAuth(async (req) => {
     );
     const modalAddressed = hasModalLine || e.is_edited === true;
 
-    const syncDraft = syncDraftMap.get(e.source_id as string);
+    // ⬅️ BARU — Pilih sync draft berdasarkan tipe entry:
+    // 1. __HPP_PENDING → hppPendingSyncDraftMap (pakai baseInvoice)
+    // 2. Polos + Piutang Debit (accrual RESERVED/HELD/PACKING) → accrualSyncDraftMap
+    // 3. Polos + Kas Debit (PAID) → syncDraftMap (existing)
+    const isHppPendingEntry = (e.source_id as string).endsWith("__HPP_PENDING");
+    const isAccrualEntry =
+      !(e.source_id as string).includes("__") &&
+      (e.lines ?? []).some((l: any) => l.side === "DEBIT" && l.account_code === AKUN.PIUTANG);
+
+    let syncDraft: any;
+    if (isHppPendingEntry) {
+      syncDraft = hppPendingSyncDraftMap.get(baseInvoice);
+    } else if (isAccrualEntry) {
+      syncDraft = accrualSyncDraftMap.get(e.source_id as string);
+    } else {
+      syncDraft = syncDraftMap.get(e.source_id as string);
+    }
+
     const syncAvailable =
       !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
-    // ⬅️ BARU
     const sync_preview = syncAvailable && syncDraft ? { keterangan: syncDraft.keterangan, lines: syncDraft.lines } : null;
 
     return {
@@ -334,7 +411,7 @@ export const GET = withAuth(async (req) => {
 // ── POST /api/akuntansi/jurnal — jurnal MANUAL ───────────────────────────────
 export const POST = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
-   const { tanggal, keterangan, ref, source_category, is_closing, is_adjusting, lines } = body as {
+  const { tanggal, keterangan, ref, source_category, is_closing, is_adjusting, lines } = body as {
     tanggal: string;
     keterangan: string;
     ref?: string | null;
@@ -385,7 +462,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       journal_no: journalNo,
       source_type: "MANUAL",
       source_id: null,
-            source_category: source_category ?? null,
+      source_category: source_category ?? null,
       total: totalOf(merged),
       is_closing: is_closing === true, // ⬅️ BARU — jurnal penutup; di-exclude dari Laba Rugi periode berjalan
       is_adjusting: is_adjusting === true, // ⬅️ BARU — jurnal penyesuaian; TETAP masuk Laba Rugi periode berjalan (beda dari is_closing)
