@@ -48,4 +48,55 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
   }
 }
 
+// ─── POST /api/laptops/sparepart-queue ──────────────────────────────────
+// Tambah 1 sparepart ke unit yang SUDAH di antrian (qc_status='IN_SPAREPART').
+// Body: { unit_id, sparepart_name, estimasi_harga?, catatan? }
+async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
+  try {
+    const body = await req.json();
+    const { unit_id, sparepart_name, estimasi_harga, catatan } = body;
+
+    if (!unit_id || typeof unit_id !== "string") {
+      return NextResponse.json({ success: false, message: "unit_id wajib" }, { status: 400 });
+    }
+    if (!sparepart_name || typeof sparepart_name !== "string" || !sparepart_name.trim()) {
+      return NextResponse.json({ success: false, message: "Nama sparepart wajib diisi" }, { status: 400 });
+    }
+
+    // Guard: unit harus di antrian (IN_SPAREPART)
+    const { data: unit, error: fetchErr } = await supabase
+      .from("laptop_units")
+      .select("id, laptop_id, qc_status")
+      .eq("id", unit_id)
+      .single();
+    if (fetchErr || !unit) {
+      return NextResponse.json({ success: false, message: "Unit tidak ditemukan" }, { status: 404 });
+    }
+    if (unit.qc_status !== "IN_SPAREPART") {
+      return NextResponse.json({
+        success: false,
+        message: `Unit ini bukan di antrian sparepart (qc_status: ${unit.qc_status ?? "—"})`,
+      }, { status: 400 });
+    }
+
+    const { data, error } = await supabase.from("sparepart_queue").insert({
+      unit_id,
+      laptop_id: unit.laptop_id,
+      sparepart_name: sparepart_name.trim(),
+      estimasi_harga: estimasi_harga != null && estimasi_harga !== ""
+        ? Math.round(Number(estimasi_harga)) : null,
+      catatan: catatan?.trim() || null,
+      created_by: user.id,
+    }).select().single();
+
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    console.error("[sparepart-queue POST]", err);
+    return NextResponse.json({ success: false }, { status: 500 });
+  }
+}
+
 export const GET = withAuth(getHandler, PENGELOLA_DECISION_ROLES);
+export const POST = withAuth(postHandler, PENGELOLA_DECISION_ROLES);
