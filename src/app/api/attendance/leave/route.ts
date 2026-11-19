@@ -9,54 +9,31 @@ const supabase = createClient(
 
 
 async function ensureLeaveBalance(userId: string, year: number, month: number) {
-  // ── 1. Ambil SEMUA record balance user ini, urut kronologis ──
-  const { data: allRecs } = await supabase
+  const { data: existing } = await supabase
     .from("user_leave_balance")
     .select("*")
     .eq("user_id", userId)
-    .order("year", { ascending: true })
-    .order("month", { ascending: true });
+    .eq("year", year)
+    .eq("month", month)
+    .maybeSingle();
 
-  const records = allRecs || [];
-
-  // ── 2. Forward-pass: hitung ulang carried_over dari record pertama ──
-  //    Ini memperbaiki chain yang basi karena cuti ditambah/dihapus
-  //    di bulan sebelumnya SETELAH record sudah terlanjur dibuat.
-  let prevRemaining = 0;
-  let prevYear = 0;
-  let prevMonth = 0;
-
-  for (const rec of records) {
-    // Gap months (bulan tanpa record) dianggap quota=1, used=0
-    if (prevYear > 0) {
-      const gapMonths = (rec.year - prevYear) * 12 + (rec.month - prevMonth) - 1;
-      if (gapMonths > 0) prevRemaining += gapMonths;
-    }
-
-    const correctCO = prevRemaining;
-
-    // Update di DB kalau ternyata basi
-    if (rec.carried_over !== correctCO) {
-      await supabase
-        .from("user_leave_balance")
-        .update({ carried_over: correctCO, updated_at: new Date().toISOString() })
-        .eq("id", rec.id);
-      rec.carried_over = correctCO;
-    }
-
-    prevRemaining = Math.max(0, rec.quota + correctCO - rec.used);
-    prevYear = rec.year;
-    prevMonth = rec.month;
-  }
-
-  // ── 3. Cek apakah bulan target sudah ada ──
-  const existing = records.find(r => r.year === year && r.month === month);
   if (existing) return existing;
 
-  // ── 4. Belum ada → hitung gap dari record terakhir, buat baru ──
-  if (prevYear > 0) {
-    const gapMonths = (year - prevYear) * 12 + (month - prevMonth) - 1;
-    if (gapMonths > 0) prevRemaining += gapMonths;
+  let carryOver = 0;
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+
+  const { data: prevBalance } = await supabase
+    .from("user_leave_balance")
+    .select("quota, used, carried_over")
+    .eq("user_id", userId)
+    .eq("year", prevYear)
+    .eq("month", prevMonth)
+    .maybeSingle();
+
+  if (prevBalance) {
+    const prevRemaining = prevBalance.quota + prevBalance.carried_over - prevBalance.used;
+    carryOver = Math.max(0, prevRemaining);
   }
 
   const { data: newRecord, error } = await supabase
@@ -67,7 +44,7 @@ async function ensureLeaveBalance(userId: string, year: number, month: number) {
       month,
       quota: 1,
       used: 0,
-      carried_over: prevRemaining,
+      carried_over: carryOver,
     })
     .select()
     .single();
