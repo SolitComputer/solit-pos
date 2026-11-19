@@ -8,6 +8,7 @@ import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import AddUnitModalAccessory from "@/components/inventory/AddUnitModalAccessory";
+import AddUnitSnFirstModal from "@/components/inventory/AddUnitSnFirstModal";
 import AccessoryUnitDetailModal, { AccessoryUnitDetailData } from "@/components/inventory/AccessoryUnitDetailModal";
 import ConditionChecklist from "@/components/inventory/ConditionChecklist";
 import { ConditionChecks, isConditionCheckCategory, sanitizeConditionChecks } from "@/lib/conditionChecks";
@@ -975,6 +976,9 @@ export default function UnifiedBarangContent() {
     const [addUnitAccessoryTarget, setAddUnitAccessoryTarget] = useState<UnifiedRow | null>(null);
     const [unitDetailAccessoryTarget, setUnitDetailAccessoryTarget] = useState<{ unit: AccessoryUnitDetailData; row: UnifiedRow } | null>(null);
     const [unitDetailAccessoryLoading, setUnitDetailAccessoryLoading] = useState(false);
+    // SN-first modal (Fase 1) — 1 form bikin unit lengkap dgn identitas,
+    // parent auto-dedup di endpoint /api/data-barang/units/create.
+    const [showAddUnitSnFirst, setShowAddUnitSnFirst] = useState(false);
 
     // Set berisi key row ("TIPE-id") yang kartunya sedang dibuka detailnya — khusus mode mobile.
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -2025,12 +2029,26 @@ export default function UnifiedBarangContent() {
                                     </button>
                                 )}
                                 {!canOnlyViewBasic && !isPklPengelolaViewOnly && (canCreateLaptop || canCreateAcc) && (
-                                    <button
-                                        onClick={openCreate}
-                                        className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition whitespace-nowrap"
-                                    >
-                                        + Tambah<span className="hidden sm:inline"> Barang</span>
-                                    </button>
+                                    <>
+                                        {/* Tombol SECONDARY: bikin folder (flow lama) — parent kosong tanpa SN.
+                                            Dipakai kalau Rayhan mau bikin "kotak" duluan sebelum SN masuk. */}
+                                        <button
+                                            onClick={openCreate}
+                                            title="Bikin folder baru (tanpa SN)"
+                                            className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-zinc-700 bg-zinc-100 border border-zinc-200 hover:bg-zinc-200 transition whitespace-nowrap"
+                                        >
+                                            + Folder
+                                        </button>
+                                        {/* Tombol PRIMARY: SN-first (flow baru Fase 1) — 1 form langsung bikin
+                                            unit lengkap dgn identitas. Parent auto-dedup di backend. */}
+                                        <button
+                                            onClick={() => setShowAddUnitSnFirst(true)}
+                                            title="Tambah unit/SN baru dengan identitas lengkap (SN-first)"
+                                            className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 transition whitespace-nowrap"
+                                        >
+                                            + Unit<span className="hidden sm:inline">/SN</span>
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -3006,6 +3024,22 @@ export default function UnifiedBarangContent() {
                         setUnitDetailAccessoryTarget(null);
                         fetchAll();
                         toast.success(`Unit dengan SN "${created.serial_number}" berhasil ditambahkan`);
+                    }}
+                />
+            )}
+
+            {/* ── MODAL: Tambah Unit/SN SN-first (flow baru Fase 1) ──────────────── */}
+            {showAddUnitSnFirst && (
+                <AddUnitSnFirstModal
+                    categories={categories}
+                    onClose={() => setShowAddUnitSnFirst(false)}
+                    onCreated={({ unit, was_existing_parent, message }) => {
+                        setShowAddUnitSnFirst(false);
+                        fetchAll();
+                        toast.success(
+                            message || `Unit SN "${unit.serial_number}" ditambahkan` +
+                            (was_existing_parent ? " (masuk folder existing)" : " (folder baru dibuat)")
+                        );
                     }}
                 />
             )}
