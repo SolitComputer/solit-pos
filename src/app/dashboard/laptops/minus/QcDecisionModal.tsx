@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { X, Wrench, Package, Trash2, Plus, AlertTriangle } from "lucide-react";
+import { X, Wrench, Package, Trash2, AlertTriangle } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════════════
 // QcDecisionModal
@@ -29,13 +29,7 @@ interface UnitFromQc {
   };
 }
 
-interface SparepartRow {
-  sparepart_name: string;
-  estimasi_harga: string; // string karena input, dikonversi ke number saat submit
-  catatan: string;
-}
-
-type ViewMode = "MAIN" | "PERBAIKI" | "MSJ_CONFIRM" | "MATOT_FORM";
+type ViewMode = "MAIN" | "PERBAIKI_CONFIRM" | "MSJ_CONFIRM" | "MATOT_FORM";
 
 export default function QcDecisionModal({
   unit,
@@ -49,10 +43,7 @@ export default function QcDecisionModal({
   const [view, setView] = useState<ViewMode>("MAIN");
   const [submitting, setSubmitting] = useState(false);
 
-  // State untuk PERBAIKI (multi-item sparepart)
-  const [spareparts, setSpareparts] = useState<SparepartRow[]>([
-    { sparepart_name: "", estimasi_harga: "", catatan: "" },
-  ]);
+  // State sparepart DIHAPUS 2026-11-19 — sparepart diisi nanti di tab Antrian.
 
   // State untuk MATOT
   const [matotKeterangan, setMatotKeterangan] = useState("");
@@ -88,21 +79,12 @@ export default function QcDecisionModal({
   };
 
   // ── Handler: PERBAIKI ────────────────────────────────────────────────
+  // ✅ REVISI 2026-11-19: tidak input sparepart di sini. Cukup konfirmasi,
+  // unit masuk antrian, sparepart diisi nanti di tab Antrian Sparepart.
   const handlePerbaiki = async () => {
-    // Validasi minimal 1 sparepart dgn nama terisi
-    const valid = spareparts.filter(s => s.sparepart_name.trim() !== "");
-    if (valid.length === 0) {
-      toast.error("Minimal 1 nama sparepart wajib diisi");
-      return;
-    }
-    const payload = valid.map(s => ({
-      sparepart_name: s.sparepart_name.trim(),
-      estimasi_harga: s.estimasi_harga.trim() === "" ? null : Number(s.estimasi_harga),
-      catatan: s.catatan.trim() || null,
-    }));
     await submitDecision(
-      { unit_id: unit.id, decision: "PERBAIKI", spareparts: payload },
-      `${valid.length} sparepart masuk antrian — unit pindah ke SERVICE`
+      { unit_id: unit.id, decision: "PERBAIKI" },
+      "Unit masuk antrian sparepart — lanjut isi sparepart di tab Antrian Sparepart"
     );
   };
 
@@ -164,7 +146,7 @@ export default function QcDecisionModal({
 
               {/* Opsi 1: BISA DIPERBAIKI */}
               <button
-                onClick={() => setView("PERBAIKI")}
+                onClick={() => setView("PERBAIKI_CONFIRM")}
                 className="w-full text-left bg-gradient-to-br from-emerald-50 to-white border-2 border-emerald-200 hover:border-emerald-400 rounded-2xl p-4 transition group"
               >
                 <div className="flex items-start gap-3">
@@ -212,67 +194,19 @@ export default function QcDecisionModal({
             </div>
           )}
 
-          {/* ─── VIEW: PERBAIKI — Form Sparepart ─── */}
-          {view === "PERBAIKI" && (
-            <div className="space-y-3">
+          {/* ─── VIEW: PERBAIKI_CONFIRM (REVISI 2026-11-19) ─── */}
+          {view === "PERBAIKI_CONFIRM" && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
               <div className="flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-emerald-600" />
-                <p className="text-sm font-bold text-emerald-700">Antrian Sparepart</p>
+                <Wrench className="w-5 h-5 text-emerald-600" />
+                <p className="font-bold text-emerald-800">Masukin Unit ke Antrian Sparepart?</p>
               </div>
-              <p className="text-[11px] text-gray-500">Tambahkan sparepart yang perlu dibeli. Bisa lebih dari satu.</p>
-
-              {spareparts.map((sp, idx) => (
-                <div key={idx} className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sparepart #{idx + 1}</span>
-                    {spareparts.length > 1 && (
-                      <button
-                        onClick={() => setSpareparts(prev => prev.filter((_, i) => i !== idx))}
-                        className="text-red-500 hover:text-red-700 text-[10px] font-bold"
-                      >
-                        Hapus
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Nama sparepart (misal: LCD 14 inch)"
-                    value={sp.sparepart_name}
-                    onChange={e => {
-                      const v = e.target.value;
-                      setSpareparts(prev => prev.map((s, i) => i === idx ? { ...s, sparepart_name: v } : s));
-                    }}
-                    className="w-full h-9 px-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-400"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Estimasi harga (opsional)"
-                    value={sp.estimasi_harga}
-                    onChange={e => {
-                      const v = e.target.value;
-                      setSpareparts(prev => prev.map((s, i) => i === idx ? { ...s, estimasi_harga: v } : s));
-                    }}
-                    className="w-full h-9 px-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-400"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Catatan (opsional)"
-                    value={sp.catatan}
-                    onChange={e => {
-                      const v = e.target.value;
-                      setSpareparts(prev => prev.map((s, i) => i === idx ? { ...s, catatan: v } : s));
-                    }}
-                    className="w-full h-9 px-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-400"
-                  />
-                </div>
-              ))}
-
-              <button
-                onClick={() => setSpareparts(prev => [...prev, { sparepart_name: "", estimasi_harga: "", catatan: "" }])}
-                className="w-full h-10 bg-emerald-50 text-emerald-700 border-2 border-dashed border-emerald-300 rounded-xl text-xs font-bold hover:bg-emerald-100 transition flex items-center justify-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" /> Tambah Sparepart
-              </button>
+              <p className="text-xs text-emerald-700 leading-relaxed">
+                Unit <span className="font-mono font-bold">{unit.serial_number}</span> akan dipindah ke antrian sparepart. Status jadi <span className="font-bold">SERVICE</span>.
+              </p>
+              <p className="text-xs text-emerald-700 leading-relaxed">
+                Daftar sparepart (nama, biaya, keterangan) <span className="font-bold">diisi nanti</span> di tab Antrian Sparepart — bisa multi item, bisa juga tanpa sparepart (klik "Selesai Tanpa Sparepart" di tab itu).
+              </p>
             </div>
           )}
 
@@ -334,11 +268,11 @@ export default function QcDecisionModal({
             </button>
           )}
 
-          {view === "PERBAIKI" && (
+          {view === "PERBAIKI_CONFIRM" && (
             <button onClick={handlePerbaiki} disabled={submitting}
               className="flex-1 h-10 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl text-sm font-bold hover:from-emerald-700 hover:to-emerald-800 disabled:opacity-40 flex items-center justify-center gap-2">
               {submitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              Submit ke Antrian Sparepart
+              Konfirmasi — Masukin ke Antrian
             </button>
           )}
 
