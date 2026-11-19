@@ -86,7 +86,7 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
     MARKETING: "#db2777", KEBERSIHAN: "#0891b2",
     PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
     KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
-    KEPALA_SOTECH: "#4d7c0f", PKL: "#475569", CUSTOMER_SERVICE: "#0369a1",
+    KEPALA_SOTECH: "#4d7c0f", PKL: "var(--gc-ink3)", CUSTOMER_SERVICE: "#0369a1",
 };
 
 const FULL_ACCESS = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
@@ -148,7 +148,7 @@ function renderTextWithMentions(text: string, currentUserId?: string, currentUse
             return (
                 <span key={i}
                     className="inline-flex items-center px-1.5 py-0.5 font-semibold text-xs"
-                    style={{ background: "#fef3c7", color: "#b45309", borderRadius: 5 }}>
+                    style={{ background: "var(--gc-amberbg)", color: "#b45309", borderRadius: 5 }}>
                     @semua
                 </span>
             );
@@ -160,8 +160,8 @@ function renderTextWithMentions(text: string, currentUserId?: string, currentUse
                 <span key={i}
                     className="inline-flex items-center px-1.5 py-0.5 font-semibold text-xs"
                     style={{
-                        background: isMe ? "#eef2ff" : "#f1f5f9",
-                        color: isMe ? "#4338ca" : "#475569",
+                        background: isMe ? "var(--gc-bluebg)" : "var(--gc-inset)",
+                        color: isMe ? "#4338ca" : "var(--gc-ink3)",
                         borderRadius: 5,
                     }}>
                     {part}
@@ -173,6 +173,19 @@ function renderTextWithMentions(text: string, currentUserId?: string, currentUse
 }
 
 // ─── Logo Solit ───────────────────────────────────────────────────────────────
+function useIsDark() {
+    const [isDark, setIsDark] = useState(false);
+    useEffect(() => {
+        const el = document.documentElement;
+        const update = () => setIsDark(el.classList.contains("dark"));
+        update();
+        const obs = new MutationObserver(update);
+        obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+        return () => obs.disconnect();
+    }, []);
+    return isDark;
+}
+
 function SolitLogo({ size = 44, radius = 12 }: { size?: number; radius?: number }) {
     const [imgError, setImgError] = useState(false);
     if (imgError) {
@@ -351,7 +364,7 @@ function ReadByModal({ messageId, onClose }: { messageId: string; onClose: () =>
                 style={{ borderRadius: 18, boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}
                 onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between px-4 py-3 flex-shrink-0"
-                    style={{ borderBottom: "1px solid #e5e7eb" }}>
+                    style={{ borderBottom: "1px solid var(--gc-line)" }}>
                     <div className="flex items-center gap-2">
                         <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -369,7 +382,7 @@ function ReadByModal({ messageId, onClose }: { messageId: string; onClose: () =>
                 <div className="overflow-y-auto flex-1 py-1">
                     {readers === null && !error && (
                         <div className="flex items-center justify-center py-8">
-                            <div className="w-5 h-5 rounded-full animate-spin" style={{ border: "2px solid #e2e8f0", borderTopColor: "#2563eb" }} />
+                            <div className="w-5 h-5 rounded-full animate-spin" style={{ border: "2px solid var(--gc-line2)", borderTopColor: "#2563eb" }} />
                         </div>
                     )}
                     {error && <p className="text-[11px] text-slate-400 text-center py-8">Gagal memuat daftar pembaca</p>}
@@ -408,6 +421,7 @@ interface BubbleProps {
 }
 
 const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, currentUserName, senderPhotoUrl, onReply, onDelete, onEdit, onScrollToReply }: BubbleProps) {
+    const isDark = useIsDark();
     const [showMenu, setShowMenu] = useState(false);
     const [showReads, setShowReads] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -472,7 +486,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                         </span>
                     )}
                     <div className="px-3 py-2 text-slate-400 text-xs italic flex items-center gap-1.5"
-                        style={{ background: "#f1f5f9", border: "1px solid #e5e7eb", borderRadius: 12 }}>
+                        style={{ background: "var(--gc-inset)", border: "1px solid var(--gc-line)", borderRadius: 12 }}>
                         <FileText className="w-4 h-4 inline opacity-60" />
                         <span>Pesan dihapus</span>
                     </div>
@@ -508,8 +522,8 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                         <div className={`px-3.5 pt-3 pb-2.5 min-w-[220px]`}
                             style={{
                                 borderRadius: isMine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                                background: isMine ? "#eaf2ff" : "#fff",
-                                border: isMine ? "1px solid #dbeafe" : "1px solid #e5e7eb",
+                                background: isMine ? "var(--gc-bluebg)" : "var(--gc-card)",
+                                border: isMine ? "1px solid var(--gc-blueln)" : "1px solid var(--gc-line)",
                                 boxShadow: "0 1px 4px rgba(15,23,42,0.04)",
                             }}>
                             <textarea
@@ -550,10 +564,10 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                             className={`relative px-3.5 py-2.5 cursor-pointer select-text transition-all`}
                             style={{
                                 borderRadius: isMine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                                background: isMine ? "#eaf2ff" : "#fff",
-                                border: isMine ? "1px solid #dbeafe" : "1px solid #e5e7eb",
-                                boxShadow: "0 1px 3px rgba(15,23,42,0.05)",
-                                color: "#1e293b",
+                                background: isMine ? (isDark ? "#14233d" : "var(--gc-bluebg)") : (isDark ? "#1a263a" : "var(--gc-card)"),
+                                border: isMine ? (isDark ? "1px solid #2a4a72" : "1px solid var(--gc-blueln)") : (isDark ? "1px solid #24314a" : "1px solid var(--gc-line)"),
+                                boxShadow: isDark ? "0 1px 3px rgba(0,0,0,0.4)" : "0 1px 3px rgba(15,23,42,0.05)",
+                                color: isDark ? "#e2e8f0" : "var(--gc-ink)",
                             }}
                             onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}>
 
@@ -564,7 +578,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                     style={{
                                         borderRadius: 10,
                                         borderLeft: `2.5px solid ${isMine ? "#93c5fd" : "#3b82f6"}`,
-                                        background: isMine ? "rgba(255,255,255,0.6)" : "#f8fafc",
+                                        background: isMine ? (isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.6)") : (isDark ? "rgba(255,255,255,0.06)" : "var(--gc-msg2)"),
                                     }}
                                     onClick={() => onScrollToReply(msg.reply_to_id!)}>
                                     <p className="font-semibold truncate text-[9.5px]"
@@ -597,7 +611,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
 
                             {/* Text */}
                             {hasContent && (
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                <p className="gcp-msg text-sm leading-relaxed whitespace-pre-wrap break-words">
                                     {renderTextWithMentions(msg.content, undefined, currentUserName)}
                                 </p>
                             )}
@@ -627,7 +641,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                 }`}
                             style={{
                                 borderRadius: 18,
-                                border: "1px solid #f0f0f5",
+                                border: "1px solid var(--gc-line2)",
                                 boxShadow: "0 12px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
                             }}>
                             <button
@@ -641,7 +655,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                             </button>
                             {isMine && hasContent && (
                                 <>
-                                    <div style={{ height: 1, background: "#f1f5f9", margin: "2px 12px" }} />
+                                    <div style={{ height: 1, background: "var(--gc-inset)", margin: "2px 12px" }} />
                                     <button
                                         onClick={() => { setIsEditing(true); setShowMenu(false); }}
                                         className="w-full text-left px-4 py-2.5 text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-3 transition font-medium">
@@ -655,7 +669,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                             )}
                             {(isMine || isAdmin) && (
                                 <>
-                                    <div style={{ height: 1, background: "#f1f5f9", margin: "2px 12px" }} />
+                                    <div style={{ height: 1, background: "var(--gc-inset)", margin: "2px 12px" }} />
                                     <button
                                         onClick={() => { onDelete(msg.id); setShowMenu(false); }}
                                         className="w-full text-left px-4 py-2.5 text-xs text-red-500 hover:bg-red-50 flex items-center gap-3 transition font-medium">
@@ -678,7 +692,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                     <button
                         onClick={() => onReply(msg)}
                         className="w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 hover:bg-blue-50"
-                        style={{ background: "#fff", border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
+                        style={{ background: "var(--gc-card)", border: "1px solid var(--gc-line)", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
                         title="Balas">
                         <svg className="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -715,12 +729,12 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
         <div className="absolute bottom-full left-0 mb-3 w-64 bg-white overflow-hidden z-50"
             style={{
                 borderRadius: 18,
-                border: "1px solid #e5e7eb",
+                border: "1px solid var(--gc-line)",
                 boxShadow: "0 16px 48px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.05)",
             }}>
             {/* Header */}
             <div className="px-4 py-2.5 flex items-center gap-2"
-                style={{ borderBottom: "1px solid #e5e7eb", background: "#fafafa" }}>
+                style={{ borderBottom: "1px solid var(--gc-line)", background: "var(--gc-side)" }}>
                 <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Mention Anggota</span>
             </div>
             <div className="max-h-52 overflow-y-auto">
@@ -730,7 +744,7 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
                             }`}
                         onMouseDown={(e) => { e.preventDefault(); onSelect(null); }}>
                         <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
-                            style={{ borderRadius: 10, background: "linear-gradient(135deg, #fef3c7, #fde68a)" }}>
+                            style={{ borderRadius: 10, background: "linear-gradient(135deg, var(--gc-amberbg), var(--gc-amberln))" }}>
                             <span className="text-amber-600 font-black text-sm">@</span>
                         </div>
                         <div className="min-w-0">
@@ -869,7 +883,7 @@ function CameraCaptureModal({ onCapture, onClose }: CameraCaptureModalProps) {
                             {!ready && (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="animate-spin rounded-full"
-                                        style={{ width: 28, height: 28, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+                                        style={{ width: 28, height: 28, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "var(--gc-card)" }} />
                                 </div>
                             )}
                         </div>
@@ -877,10 +891,10 @@ function CameraCaptureModal({ onCapture, onClose }: CameraCaptureModalProps) {
                             onClick={handleCapture}
                             disabled={!ready || capturing}
                             className="w-16 h-16 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                            style={{ background: "#fff", border: "4px solid rgba(255,255,255,0.3)" }}>
+                            style={{ background: "var(--gc-card)", border: "4px solid rgba(255,255,255,0.3)" }}>
                             {capturing ? (
                                 <div className="animate-spin rounded-full"
-                                    style={{ width: 18, height: 18, border: "2.5px solid #e5e7eb", borderTopColor: "#2563eb" }} />
+                                    style={{ width: 18, height: 18, border: "2.5px solid var(--gc-line)", borderTopColor: "#2563eb" }} />
                             ) : (
                                 <div className="rounded-full" style={{ width: 52, height: 52, background: "#2563eb" }} />
                             )}
@@ -1069,12 +1083,12 @@ function InputArea({ currentUser, currentUserPhotoUrl, replyTo, users, onCancelR
     const isLoading = uploading || sending;
 
     return (
-        <div className="flex-shrink-0 bg-white" style={{ borderTop: "1px solid #e5e7eb" }}>
+        <div className="flex-shrink-0 bg-white" style={{ borderTop: "1px solid var(--gc-line)" }}>
 
             {/* Reply preview */}
             {replyTo && (
                 <div className="flex items-center gap-3 px-5 py-3"
-                    style={{ borderBottom: "1px solid #e5e7eb", background: "#fafafa" }}>
+                    style={{ borderBottom: "1px solid var(--gc-line)", background: "var(--gc-side)" }}>
                     <div className="flex-1 min-w-0 pl-3" style={{ borderLeft: "3px solid #3b82f6" }}>
                         <p className="text-[10px] font-semibold text-blue-600 mb-0.5">{replyTo.sender_name}</p>
                         <p className="text-xs text-slate-500 truncate">
@@ -1086,7 +1100,7 @@ function InputArea({ currentUser, currentUserPhotoUrl, replyTo, users, onCancelR
                     </div>
                     <button onClick={onCancelReply}
                         className="flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 hover:bg-slate-200"
-                        style={{ width: 26, height: 26, borderRadius: "50%", background: "#f1f5f9" }}>
+                        style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--gc-inset)" }}>
                         <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -1096,12 +1110,12 @@ function InputArea({ currentUser, currentUserPhotoUrl, replyTo, users, onCancelR
 
             {/* File preview */}
             {preview && (
-                <div className="px-4 py-3" style={{ borderBottom: "1px solid #e5e7eb" }}>
+                <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--gc-line)" }}>
                     <div className="flex items-center gap-3 p-2.5 rounded-2xl"
-                        style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+                        style={{ background: "var(--gc-msg2)", border: "1px solid var(--gc-line)" }}>
                         {preview.type === "image" ? (
                             <img src={preview.url} alt="preview" className="object-cover flex-shrink-0"
-                                style={{ width: 52, height: 52, borderRadius: 12, border: "1px solid #e0e0f0" }} />
+                                style={{ width: 52, height: 52, borderRadius: 12, border: "1px solid var(--gc-line)" }} />
                         ) : (
                             <div className="flex flex-col items-center justify-center flex-shrink-0 gap-1"
                                 style={{ width: 52, height: 52, borderRadius: 12, background: "#2563eb" }}>
@@ -1120,7 +1134,7 @@ function InputArea({ currentUser, currentUserPhotoUrl, replyTo, users, onCancelR
                         </div>
                         <button onClick={cancelPreview}
                             className="flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 hover:bg-slate-200"
-                            style={{ width: 24, height: 24, borderRadius: "50%", background: "#e2e8f0" }}>
+                            style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--gc-line2)" }}>
                             <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -1137,8 +1151,8 @@ function InputArea({ currentUser, currentUserPhotoUrl, replyTo, users, onCancelR
 
                 <div className="flex-1 flex items-end gap-2 relative"
                     style={{
-                        background: "#f8fafc",
-                        border: "1.5px solid #e5e7eb",
+                        background: "var(--gc-msg2)",
+                        border: "1.5px solid var(--gc-line)",
                         borderRadius: 22,
                         padding: "9px 14px",
                         minHeight: 44,
@@ -1171,7 +1185,7 @@ function InputArea({ currentUser, currentUserPhotoUrl, replyTo, users, onCancelR
                             <div className="absolute bottom-full left-0 mb-3 w-52 bg-white overflow-hidden z-50 py-1.5"
                                 style={{
                                     borderRadius: 18,
-                                    border: "1px solid #e5e7eb",
+                                    border: "1px solid var(--gc-line)",
                                     boxShadow: "0 16px 48px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.05)",
                                 }}>
                                 <button
@@ -1187,7 +1201,7 @@ function InputArea({ currentUser, currentUserPhotoUrl, replyTo, users, onCancelR
                                     onClick={() => { fileRef.current?.click(); setShowAttachMenu(false); }}
                                     className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors">
                                     <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
-                                        style={{ borderRadius: 10, background: "#dbeafe", color: "#2563eb" }}>
+                                        style={{ borderRadius: 10, background: "var(--gc-blueln)", color: "#2563eb" }}>
                                         <ImageIcon className="w-4 h-4" />
                                     </div>
                                     <span className="text-xs font-semibold text-slate-700">Foto & Video</span>
@@ -1229,7 +1243,7 @@ function InputArea({ currentUser, currentUserPhotoUrl, replyTo, users, onCancelR
                         onClick={preview ? handleSendFile : handleSendText}
                         disabled={!canSend}
                         className="flex items-center justify-center flex-shrink-0 text-white transition-all self-end disabled:opacity-40 hover:scale-105 active:scale-95"
-                        style={{ width: 44, height: 44, borderRadius: 14, background: canSend ? "#2563eb" : "#e2e8f0", boxShadow: canSend ? "0 2px 8px rgba(37,99,235,0.3)" : "none" }}>
+                        style={{ width: 44, height: 44, borderRadius: 14, background: canSend ? "#2563eb" : "var(--gc-line2)", boxShadow: canSend ? "0 2px 8px rgba(37,99,235,0.3)" : "none" }}>
                         {isLoading ? (
                             <div className="animate-spin" style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%" }} />
                         ) : (
@@ -1405,10 +1419,10 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
 
     return (
         <>
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2" style={{ background: "#f7f8fc" }}>
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2" style={{ background: "var(--gc-msg)" }}>
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
-                        <div className="w-5 h-5 rounded-full animate-spin" style={{ border: "2px solid #e2e8f0", borderTopColor: "#2563eb" }} />
+                        <div className="w-5 h-5 rounded-full animate-spin" style={{ border: "2px solid var(--gc-line2)", borderTopColor: "#2563eb" }} />
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
@@ -1432,10 +1446,10 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                             <div className="max-w-[82%] px-3 py-2"
                                 style={{
                                     borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
-                                    background: isMine ? "#eaf2ff" : "#fff",
-                                    border: isMine ? "1px solid #dbeafe" : "1px solid #e5e7eb",
+                                    background: isMine ? "var(--gc-bluebg)" : "var(--gc-card)",
+                                    border: isMine ? "1px solid var(--gc-blueln)" : "1px solid var(--gc-line)",
                                     boxShadow: "0 1px 3px rgba(15,23,42,0.05)",
-                                    color: "#1e293b",
+                                    color: "var(--gc-ink)",
                                 }}>
                                 {hasAttachment && (
                                     <div className={hasContent ? "mb-1.5" : ""}>
@@ -1467,7 +1481,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
             </div>
 
             {/* Input — teks → tombol kirim, kosong → mic VN */}
-            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-3 bg-white" style={{ borderTop: "1px solid #e5e7eb" }}>
+            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-3 bg-white" style={{ borderTop: "1px solid var(--gc-line)" }}>
                 <input
                     ref={inputRef}
                     value={input}
@@ -1477,7 +1491,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                     maxLength={1000}
                     disabled={isBusy}
                     className="flex-1 h-9 rounded-xl px-3.5 text-xs font-medium outline-none disabled:opacity-50 transition focus:ring-2 focus:ring-blue-200"
-                    style={{ background: "#f8fafc", border: "1.5px solid #e5e7eb", color: "#334155" }}
+                    style={{ background: "var(--gc-msg2)", border: "1.5px solid var(--gc-line)", color: "var(--gc-ink2)" }}
                 />
                 {input.trim() ? (
                     <button
@@ -1486,7 +1500,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                         className="w-9 h-9 rounded-xl flex items-center justify-center text-white transition hover:scale-105 active:scale-95 disabled:opacity-40 flex-shrink-0"
                         style={{ background: "#2563eb", boxShadow: "0 2px 8px rgba(37,99,235,0.3)" }}>
                         {sending
-                            ? <div className="w-3 h-3 rounded-full animate-spin" style={{ border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+                            ? <div className="w-3 h-3 rounded-full animate-spin" style={{ border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "var(--gc-card)" }} />
                             : <svg className="w-3.5 h-3.5" fill="none" stroke="white" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>}
                     </button>
                 ) : (
@@ -1499,6 +1513,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
 
 // ─── Main GroupChatPanel ──────────────────────────────────────────────────────
 export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
+    const isDark = useIsDark();
     const [messages, setMessages] = useState<GroupMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -2028,23 +2043,30 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
      return (
         <div
-    className="fixed inset-0 z-[99998] flex items-center justify-center p-0 md:p-4"
+    className="gcp-overlay fixed inset-0 z-[99998] flex items-center justify-center p-0 md:p-4"
     style={{ backdropFilter: "blur(8px)", backgroundColor: "rgba(15,23,42,0.45)" }}>
+            <style>{`
+                /* DARK MODE TOKENS — light values = original, so light mode unchanged */
+                .gcp-overlay { --gc-card:#ffffff; --gc-side:#fafafa; --gc-msg:#f7f8fc; --gc-msg2:#f8fafc; --gc-inset:#f1f5f9; --gc-bluebg:#eaf2ff; --gc-blueln:#dbeafe; --gc-line:#e5e7eb; --gc-line2:#e2e8f0; --gc-amberbg:#fef3c7; --gc-amberln:#fde68a; --gc-ink:#1e293b; --gc-ink2:#334155; --gc-ink3:#475569; }
+                html.dark .gcp-overlay { --gc-card:#101827; --gc-side:#10192b; --gc-msg:#0c1322; --gc-msg2:#0c1322; --gc-inset:#131d2e; --gc-bluebg:#14233d; --gc-blueln:#2a4a72; --gc-line:#24314a; --gc-line2:#1e2a40; --gc-amberbg:#2b1b06; --gc-amberln:#5c390a; --gc-ink:#f1f5f9; --gc-ink2:#cbd5e1; --gc-ink3:#cbd5e1; }
+                /* teks pesan chat selalu terang di dark biar kebaca */
+                html.dark .gcp-overlay .gcp-msg { color: #f1f5f9 !important; }
+            `}</style>
             <div
                 className="relative flex overflow-hidden w-full h-full rounded-none md:w-[min(1160px,100%)] md:h-[min(800px,95vh)] md:rounded-2xl"
                 style={{
-                    background: "#fff",
-                    boxShadow: "0 20px 60px rgba(15,23,42,0.18), 0 2px 8px rgba(15,23,42,0.06)",
-                    border: "1px solid #e5e7eb",
+                    background: isDark ? "#101827" : "var(--gc-card)",
+                    boxShadow: isDark ? "0 20px 60px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)" : "0 20px 60px rgba(15,23,42,0.18), 0 2px 8px rgba(15,23,42,0.06)",
+                    border: isDark ? "1px solid #24314a" : "1px solid var(--gc-line)",
                 }}>
 
                 {/* ── Sidebar kiri: Member List ── */}
                 <div className={`flex-col flex-shrink-0 w-full md:w-60 md:border-r md:border-[#e5e7eb] ${embeddedDMUser ? "hidden md:flex" : `${mobileView === "members" ? "flex" : "hidden"} md:flex`}`}
-                    style={{ background: "#fafafa" }}>
+                    style={{ background: isDark ? "#10192b" : "var(--gc-side)" }}>
 
                     {/* Sidebar header */}
                     <div className="px-4 pt-4 pb-3 flex-shrink-0"
-                        style={{ borderBottom: "1px solid #e5e7eb" }}>
+                        style={{ borderBottom: "1px solid var(--gc-line)" }}>
                         {/* Tombol kembali — mobile only */}
                         <button
                             onClick={() => setMobileView("chat")}
@@ -2079,9 +2101,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 onChange={e => setMemberSearch(e.target.value)}
                                 className="w-full h-8 rounded-xl pl-8 pr-3 text-[11px] font-medium outline-none focus:ring-2 focus:ring-blue-200 transition"
                                 style={{
-                                    background: "#f1f5f9",
-                                    border: "1px solid #e2e8f0",
-                                    color: "#334155",
+                                    background: isDark ? "#131d2e" : "var(--gc-inset)",
+                                    border: isDark ? "1px solid #22324a" : "1px solid var(--gc-line2)",
+                                    color: isDark ? "#f1f5f9" : "var(--gc-ink2)",
                                 }}
                             />
                         </div>
@@ -2101,9 +2123,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     <button
                         onClick={() => { setEmbeddedDMUser(null); setMobileView("chat"); setActiveGroupId(DEFAULT_GROUP_ID); }}
                         className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${!embeddedDMUser && activeGroupId === DEFAULT_GROUP_ID ? "bg-blue-50" : "hover:bg-slate-50"}`}
-                        style={{ borderBottom: "1px solid #e5e7eb" }}>
+                        style={{ borderBottom: "1px solid var(--gc-line)" }}>
                         <div className="relative flex-shrink-0"
-                            style={{ width: 34, height: 34, borderRadius: 11, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+                            style={{ width: 34, height: 34, borderRadius: 11, overflow: "hidden", border: "1px solid var(--gc-line)" }}>
                             <SolitLogo size={34} radius={11} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -2118,9 +2140,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     {canCreateGroup && (
                         <button onClick={() => setShowCreateGroup(true)}
                             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all hover:bg-slate-50 flex-shrink-0"
-                            style={{ borderBottom: "1px solid #e5e7eb" }}>
+                            style={{ borderBottom: "1px solid var(--gc-line)" }}>
                             <div className="flex items-center justify-center flex-shrink-0"
-                                style={{ width: 34, height: 34, borderRadius: 11, background: "#eff6ff", border: "1px dashed #93c5fd" }}>
+                                style={{ width: 34, height: 34, borderRadius: 11, background: "var(--gc-bluebg)", border: "1px dashed #93c5fd" }}>
                                 <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                                 </svg>
@@ -2133,7 +2155,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         <button key={g.id}
                             onClick={() => { setActiveGroupId(g.id); setEmbeddedDMUser(null); setMobileView("chat"); }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${activeGroupId === g.id ? "bg-blue-50" : "hover:bg-slate-50"}`}
-                            style={{ borderBottom: "1px solid #e5e7eb" }}>
+                            style={{ borderBottom: "1px solid var(--gc-line)" }}>
                             <div className="flex items-center justify-center flex-shrink-0 text-white font-black text-xs"
                                 style={{ width: 34, height: 34, borderRadius: 11, background: "#2563eb" }}>
                                 {g.name.slice(0, 2).toUpperCase()}
@@ -2221,7 +2243,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
                     {/* Footer sidebar — current user info */}
                     <div className="flex-shrink-0 px-3 py-3 flex items-center gap-2.5"
-                        style={{ borderTop: "1px solid #e5e7eb", background: "#f8fafc" }}>
+                        style={{ borderTop: "1px solid var(--gc-line)", background: "var(--gc-msg2)" }}>
                         <div
                             className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[10px] overflow-hidden"
                             style={{
@@ -2251,14 +2273,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     {/* ── Header ── */}
                     <div
                         className="flex-shrink-0 flex items-center gap-3.5 px-4 md:px-6 py-4 relative"
-                        style={{ background: "#ffffff", borderBottom: "1px solid #e5e7eb" }}>
+                        style={{ background: isDark ? "#141d30" : "var(--gc-card)", borderBottom: isDark ? "1px solid #24314a" : "1px solid var(--gc-line)" }}>
 
                         {/* Logo */}
                         <div className="relative flex-shrink-0 z-10">
                             <div style={{
                                 borderRadius: 14,
                                 overflow: "hidden",
-                                border: "1px solid #e5e7eb",
+                                border: "1px solid var(--gc-line)",
                             }}>
                                 <SolitLogo size={48} radius={14} />
                             </div>
@@ -2296,8 +2318,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             className="md:hidden w-9 h-9 flex items-center justify-center transition-all active:scale-95 flex-shrink-0 z-10 mr-1 relative"
                             style={{
                                 borderRadius: 12,
-                                background: "#f8fafc",
-                                border: "1px solid #e5e7eb",
+                                background: "var(--gc-msg2)",
+                                border: "1px solid var(--gc-line)",
                                 color: "#64748b",
                             }}
                             title="Anggota tim">
@@ -2316,8 +2338,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             className="w-9 h-9 flex items-center justify-center transition-all hover:bg-slate-100 flex-shrink-0 z-10"
                             style={{
                                 borderRadius: 12,
-                                background: "#f8fafc",
-                                border: "1px solid #e5e7eb",
+                                background: "var(--gc-msg2)",
+                                border: "1px solid var(--gc-line)",
                                 color: "#64748b",
                             }}>
                             <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2331,12 +2353,12 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         ref={messagesRef}
                         onScroll={handleScroll}
                         className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-1"
-                        style={{ background: "#f7f8fc" }}>
+                        style={{ background: isDark ? "#0c1322" : "var(--gc-msg)" }}>
 
                         {loadingMore && (
                             <div className="flex justify-center py-3">
                                 <div className="animate-spin rounded-full"
-                                    style={{ width: 20, height: 20, border: "2.5px solid #e5e7eb", borderTopColor: "#2563eb" }} />
+                                    style={{ width: 20, height: 20, border: "2.5px solid var(--gc-line)", borderTopColor: "#2563eb" }} />
                             </div>
                         )}
 
@@ -2344,7 +2366,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             <div className="flex justify-center py-2">
                                 <button onClick={loadMore}
                                     className="text-[11px] text-blue-600 hover:text-blue-700 transition-all px-5 py-2 font-semibold hover:scale-105"
-                                    style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 100, boxShadow: "0 1px 4px rgba(15,23,42,0.04)" }}>
+                                    style={{ background: "var(--gc-card)", border: "1px solid var(--gc-line)", borderRadius: 100, boxShadow: "0 1px 4px rgba(15,23,42,0.04)" }}>
                                     <ChevronUp className="inline w-3.5 h-3.5 mr-1" />Muat pesan lebih lama
                                 </button>
                             </div>
@@ -2353,13 +2375,13 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         {loading ? (
                             <div className="flex flex-col items-center justify-center h-full gap-3">
                                 <div className="animate-spin rounded-full"
-                                    style={{ width: 30, height: 30, border: "3px solid #e5e7eb", borderTopColor: "#2563eb" }} />
+                                    style={{ width: 30, height: 30, border: "3px solid var(--gc-line)", borderTopColor: "#2563eb" }} />
                                 <p className="text-xs text-slate-400 font-medium">Memuat pesan...</p>
                             </div>
                         ) : messages.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
                                 <div className="flex items-center justify-center text-4xl"
-                                    style={{ width: 80, height: 80, borderRadius: 26, background: "#fff", border: "1px solid #e5e7eb", boxShadow: "0 8px 24px rgba(0,0,0,0.06)" }}>
+                                    style={{ width: 80, height: 80, borderRadius: 26, background: "var(--gc-card)", border: "1px solid var(--gc-line)", boxShadow: "0 8px 24px rgba(0,0,0,0.06)" }}>
 
                                 </div>
                                 <div>
@@ -2373,12 +2395,12 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                     {/* Date pill */}
                                     <div className="flex items-center justify-center py-4">
                                         <div className="flex items-center gap-3">
-                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, transparent, #e5e7eb)" }} />
+                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, transparent, var(--gc-line))" }} />
                                             <div className="text-slate-400 text-[9.5px] font-semibold px-3.5 py-1.5 bg-white"
-                                                style={{ borderRadius: 100, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(15,23,42,0.03)", letterSpacing: "0.03em" }}>
+                                                style={{ borderRadius: 100, border: "1px solid var(--gc-line)", boxShadow: "0 1px 3px rgba(15,23,42,0.03)", letterSpacing: "0.03em" }}>
                                                 {group.dateLabel}
                                             </div>
-                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, #e5e7eb, transparent)" }} />
+                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, var(--gc-line), transparent)" }} />
                                         </div>
                                     </div>
                                     {group.msgs.map((msg: GroupMessage, idx: number) => {
@@ -2415,8 +2437,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 className="relative w-10 h-10 flex items-center justify-center transition-all hover:scale-110"
                                 style={{
                                     borderRadius: "50%",
-                                    background: "#fff",
-                                    border: "1px solid #e5e7eb",
+                                    background: "var(--gc-card)",
+                                    border: "1px solid var(--gc-line)",
                                     boxShadow: "0 6px 24px rgba(0,0,0,0.1)",
                                 }}>
                                 <svg className="w-4 h-4" style={{ color: "#2563eb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2459,8 +2481,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         <div
                             className="flex-shrink-0 flex items-center gap-3 px-4 py-3.5"
                             style={{
-                                background: "#ffffff",
-                                borderBottom: "1px solid #e5e7eb",
+                                background: "var(--gc-card)",
+                                borderBottom: "1px solid var(--gc-line)",
                             }}
                         >
                             <div
