@@ -175,7 +175,7 @@ export default function AddUnitModal({
                             onChange={(v) => setForm(prev => ({ ...prev, condition_note: v }))}
                             className={inputCls}
                         />
-                    </Field>src/components/inventory/AddUnitModalAccessory.tsx
+                    </Field>
 
                     <Field label="Catatan">
                         <textarea name="notes" value={form.notes} onChange={handleChange} rows={2} className={inputCls} />
