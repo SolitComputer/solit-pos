@@ -2,6 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, ChevronsUpDown, Plus, Calendar, Layers, MoreVertical, Undo2, Sparkles, RefreshCw, Bookmark, BookmarkCheck } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
@@ -1068,6 +1069,25 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
             setPendingScrollId(null);
         }
     }, [pendingScrollId, visibleEntries, doScrollToBookmark]);
+
+    // ⬅️ BARU — Auto-scroll ke entry dari query param `?entry=<id>` (dari klik "Buka Jurnal" di notif).
+    // Kalau entry ada di periode ini tapi di luar displayLimit, auto-expand dulu baru scroll.
+    const searchParams = useSearchParams();
+    const entryIdFromQuery = searchParams.get("entry");
+    const hasHandledEntryQuery = useRef(false);
+    useEffect(() => {
+        if (!entryIdFromQuery || loading || entries.length === 0) return;
+        if (hasHandledEntryQuery.current) return;
+        const idx = entries.findIndex((e) => e.id === entryIdFromQuery);
+        if (idx < 0) return; // entry tidak ada di periode ini
+        hasHandledEntryQuery.current = true;
+        // Expand display limit kalau entry di luar jangkauan awal
+        if (idx + 1 > displayLimit) {
+            setDisplayLimit(Math.ceil((idx + 1) / 100) * 100);
+        }
+        // Trigger scroll via existing mechanism (pending → doScrollToBookmark setelah render)
+        setPendingScrollId(entryIdFromQuery);
+    }, [entryIdFromQuery, loading, entries, displayLimit]);
 
     const filteredPending = useMemo(() => {
         let pendingResult = pending;
