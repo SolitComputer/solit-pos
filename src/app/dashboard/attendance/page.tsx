@@ -1323,7 +1323,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
             onClose={onClose}
             headerColor="bg-gradient-to-r from-cyan-600 to-teal-700"
             title="Kelola Cuti Karyawan"
-            subtitle={`${MONTH_NAMES[calMonth]} ${calYear} · ${users.length} karyawan`}
+            subtitle={`${MONTH_NAMES[calMonth]} ${calYear} · ${users.filter(u => !isPKLRole(u.role)).length} karyawan`}
             wide
             footer={
                 <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
@@ -1354,7 +1354,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                            {users.map(u => {
+                            {users.filter(u => !isPKLRole(u.role)).map(u => {
                                 const ud = getUserLeave(u.id);
                                 const isExpanded = expandedUid === u.id;
                                 const isQuotaMode = quotaUid === u.id;
