@@ -18,6 +18,7 @@ import {
     jakartaDate,
     sumSide,
 } from "@/lib/accounting";
+import TargetUserSelect from "@/components/kasbon/TargetUserSelect";
 // NotifRecipientsModal dipindah ke AkuntansiTabs (lihat Perubahan #5-8) —
 // tombol "Kelola Notif" sekarang hidup di header sejajar Export Excel.
 
@@ -49,9 +50,10 @@ interface JournalEntry {
     keterangan: string;
     ref: string | null;
     journal_no?: string | null; // ⬅️ BARU — kode jurnal GJ-YYYYMMDD-NNN (entry baru)
-    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN" | "SALARY";
+source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN" | "SALARY";
     source_id: string | null;
-    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU — tag cabang dari journal_entries
+    branch?: "UTAMA" | "JOGJA" | null;
+    target_user_id?: string | null; // ⬅️ BARU — karyawan terkait untuk akun Kasbon/Cicilan
     total: number;
     is_edited: boolean;
     is_closing?: boolean; // flag jurnal penutup (dari API; sinkron sama field DB)
@@ -2800,7 +2802,14 @@ function EntryFormModal({
         ];
     });
     const [saving, setSaving] = useState(false);
+    const [targetUserId, setTargetUserId] = useState(entry?.target_user_id ?? "");
     const [error, setError] = useState("");
+
+    // ⬅️ BARU — Deteksi apakah ada baris dengan akun Kasbon (141) / Cicilan (142)
+    const hasKasbonCicilan = useMemo(
+        () => lines.some((l) => l.account_code === AKUN.KASBON || l.account_code === AKUN.CICILAN),
+        [lines]
+    );
 
     const applyTemplate = (key: string) => {
         setTemplate(key);
@@ -2921,10 +2930,11 @@ function EntryFormModal({
         }
     };
 
-    const submit = async () => {
+ const submit = async () => {
         setError("");
         if (!keterangan.trim()) return setError("Keterangan wajib diisi");
         if (!balanced) return setError("Total debit harus sama dengan total kredit");
+        if (hasKasbonCicilan && !targetUserId) return setError("Pilih karyawan dulu untuk akun Kasbon/Cicilan");
 
         setSaving(true);
         try {
@@ -2937,8 +2947,9 @@ function EntryFormModal({
                     keterangan: keterangan.trim(),
                     ref: ref.trim() || null,
                     source_category: isEdit ? undefined : template,
-                    is_closing: isClosing, // ⬅️ kirim selalu — route edit kini juga baca flag ini
-                    is_adjusting: isAdjusting, // ⬅️ BARU — sama pola, biar sync saat edit
+                    is_closing: isClosing,
+                    is_adjusting: isAdjusting,
+                    target_user_id: hasKasbonCicilan ? targetUserId || null : null, // ⬅️ BARU
                     lines: lines.map(({ _id, ...rest }) => rest),
                 }),
             });
@@ -3240,6 +3251,18 @@ function EntryFormModal({
                             </Droppable>
                         </DragDropContext>
                     </div>
+
+                    {/* ⬅️ BARU — Dropdown karyawan untuk akun Kasbon (141) / Cicilan (142) */}
+                    {hasKasbonCicilan && (
+                        <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/60">
+                            <TargetUserSelect
+                                value={targetUserId}
+                                onChange={setTargetUserId}
+                                selectClassName="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                                label="Untuk Karyawan (Kasbon/Cicilan)"
+                            />
+                        </div>
+                    )}
 
                     <div className={`rounded-xl border p-3 flex flex-wrap items-center justify-between gap-2 ${balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
                         <span className={`text-xs font-bold inline-flex items-center gap-1 ${balanced ? "text-emerald-700" : "text-red-700"}`}>
@@ -3583,8 +3606,9 @@ function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<stri
     const branchBadge = getBranchBadge(entry.branch); // ⬅️ BARU
     const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
     const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
-    const cashflowNama = entry.source_type === "CASHFLOW" ? entry.trx_meta?.nama ?? null : null;
-    const isPengajuanDana = entry.source_type === "CASHFLOW" && entry.trx_meta?.source_type === "PENGAJUAN_DANA";
+ const cashflowNama = (entry.source_type === "CASHFLOW" || entry.source_type === "MANUAL")
+        ? entry.trx_meta?.nama ?? null
+        : null;    const isPengajuanDana = entry.source_type === "CASHFLOW" && entry.trx_meta?.source_type === "PENGAJUAN_DANA";
 
     const displayLines: JournalLine[] = useMemo(() => {
         if (!modalMissing) return entry.lines;
