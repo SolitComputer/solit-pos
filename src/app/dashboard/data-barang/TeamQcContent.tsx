@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Search, X, CheckCircle2, AlertTriangle, Clock, Laptop as LaptopIcon,
-  ChevronRight, Ban,
+  ChevronRight, Ban, ScanLine,
 } from "lucide-react";
 import MinusReasonModal from "@/components/inventory/MinusReasonModal";
 import AutocompleteInput from "@/components/ui/AutocompleteInput";
@@ -245,12 +245,12 @@ function QcEditModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-5 py-5 space-y-5">
-          {/* Info Section */}
+          {/* Info Section — info aturan QC terbaru (2026-11-19) */}
           <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3.5 flex gap-2.5">
             <AlertTriangle className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-indigo-700 leading-relaxed">
-              Isi SEMUA field. Nilai <span className="font-mono bg-white px-1.5 py-0.5 rounded">0</span> dianggap terisi (contoh: sparepart Rp 0 = tidak ada sparepart).
-              Hanya field yang <span className="font-bold">kosong total</span> yang bikin unit tidak lolos QC.
+              Isi field dengan tanda <span className="text-red-500 font-bold">*</span> untuk lolos QC. <span className="font-bold">Biaya Sparepart</span> & <span className="font-bold">Kondisi & Catatan</span> OPSIONAL — kosong tetap boleh lolos.
+              Nilai <span className="font-mono bg-white px-1.5 py-0.5 rounded">0</span> dianggap terisi.
             </p>
           </div>
 
@@ -280,11 +280,13 @@ function QcEditModal({
               <QcInputField label="Grade (A/B/C)" name="grade" required autocompleteField="grade" form={form} setForm={setForm} />
               <QcInputField label="Sumber" name="source" required autocompleteField="source" form={form} setForm={setForm} />
               <QcInputField label="Harga Modal (Rp)" name="purchase_price" type="number" required form={form} setForm={setForm} />
-              <QcInputField label="Biaya Sparepart (Rp)" name="sparepart_cost" type="number" required form={form} setForm={setForm} />
+              {/* Biaya Sparepart: OPSIONAL per 2026-11-19 — unit mulus boleh kosong. */}
+              <QcInputField label="Biaya Sparepart (Rp)" name="sparepart_cost" type="number" form={form} setForm={setForm} />
               <QcInputField label="Harga Setor (Rp)" name="selling_price" type="number" required form={form} setForm={setForm} />
                           <QcInputField label="Harga Official (Rp)" name="official_price" type="number" required readOnly hint="Otomatis: Harga Setor + Rp 300.000" form={form} setForm={setForm} />
               <div className="md:col-span-2">
-                <QcInputField label="Kondisi & Catatan" name="condition_note" required autocompleteField="condition_note" form={form} setForm={setForm} />
+                {/* Kondisi & Catatan: OPSIONAL per 2026-11-19 — gak semua unit butuh catatan. */}
+                <QcInputField label="Kondisi & Catatan" name="condition_note" autocompleteField="condition_note" form={form} setForm={setForm} />
               </div>
             </div>
           </div>
@@ -330,12 +332,32 @@ function QcEditModal({
   );
 }
 
+// ─── Type untuk Scan Preview (Fitur 2) ─────────────────────────────────
+interface ScanPreview {
+  total: number;
+  already_needs_qc: number;
+  will_drop_from_siap_jual: number;
+  preview: {
+    id: string;
+    serial_number: string | null;
+    laptop_name: string | null;
+    qc_status: string;
+    status: string;
+    missing_fields: string[];
+  }[];
+}
+
 // ─── Main Content ──────────────────────────────────────────────────────
 export default function TeamQcContent() {
   const [units, setUnits] = useState<QcUnit[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [editTarget, setEditTarget] = useState<QcUnit | null>(null);
+
+  // ── Scan Data Lama (Fitur 2) ──────────────────────────────────────────
+  const [scanPreview, setScanPreview] = useState<ScanPreview | null>(null);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanExecuting, setScanExecuting] = useState(false);
 
   const fetchUnits = useCallback(async () => {
     setLoading(true);
@@ -347,6 +369,47 @@ export default function TeamQcContent() {
   }, []);
 
   useEffect(() => { fetchUnits(); }, [fetchUnits]);
+
+  // Handler: buka modal + fetch preview (dry-run)
+  const openScanModal = useCallback(async () => {
+    setScanLoading(true);
+    setScanPreview({ total: 0, already_needs_qc: 0, will_drop_from_siap_jual: 0, preview: [] });
+    try {
+      const res = await fetch("/api/laptops/qc/scan-flag-incomplete");
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(json.message || "Gagal memuat preview scan");
+        setScanPreview(null);
+        return;
+      }
+      setScanPreview(json.data);
+    } catch {
+      toast.error("Gagal koneksi ke server");
+      setScanPreview(null);
+    } finally {
+      setScanLoading(false);
+    }
+  }, []);
+
+  // Handler: execute scan + flag unit ke NEEDS_QC
+  const executeScan = useCallback(async () => {
+    setScanExecuting(true);
+    try {
+      const res = await fetch("/api/laptops/qc/scan-flag-incomplete", { method: "POST" });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(json.message || "Gagal menjalankan scan");
+        return;
+      }
+      toast.success(json.message);
+      setScanPreview(null);
+      fetchUnits(); // refresh list Team QC
+    } catch {
+      toast.error("Gagal koneksi ke server");
+    } finally {
+      setScanExecuting(false);
+    }
+  }, [fetchUnits]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -366,12 +429,23 @@ export default function TeamQcContent() {
           <div className="w-11 h-11 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-md">
             <CheckCircle2 className="w-5 h-5 text-white" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold text-gray-800">Team QC — Perlu Pengecekan</h1>
             <p className="text-xs text-gray-400 mt-0.5">
               {loading ? "Memuat..." : `${units.length} unit menunggu QC`}
             </p>
           </div>
+          {/* Fitur 2: tombol Scan Data Lama — flag unit yg field wajibnya kosong */}
+          <button
+            onClick={openScanModal}
+            disabled={scanLoading || scanExecuting}
+            title="Scan semua unit laptop + flag yg field wajibnya kurang → masuk antrian QC"
+            className="h-10 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition disabled:opacity-40 flex items-center gap-2 whitespace-nowrap"
+          >
+            <ScanLine className="w-4 h-4" />
+            <span className="hidden sm:inline">Scan Data Lama</span>
+            <span className="sm:hidden">Scan</span>
+          </button>
         </div>
 
         {/* Search */}
@@ -455,6 +529,125 @@ export default function TeamQcContent() {
           onClose={() => setEditTarget(null)}
           onSaved={() => { setEditTarget(null); fetchUnits(); }}
         />
+      )}
+
+      {/* ── MODAL: Scan Data Lama (Fitur 2) ─────────────────────────── */}
+      {scanPreview && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-md"
+            onClick={() => !scanExecuting && setScanPreview(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[85vh] flex flex-col animate-popIn">
+            <div className="h-1 w-full bg-gradient-to-r from-indigo-400 via-indigo-600 to-indigo-800 flex-shrink-0" />
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <ScanLine className="w-5 h-5 text-white" />
+                <p className="font-bold text-white text-sm">Scan Data Lama — Preview</p>
+              </div>
+              <p className="text-xs text-white/70 mt-0.5">Pakai aturan 10 field wajib (sparepart & catatan sudah opsional)</p>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-6 space-y-4">
+              {scanLoading ? (
+                <div className="py-10 text-center">
+                  <div className="w-8 h-8 border-2 border-gray-200 border-t-indigo-500 rounded-full animate-spin mx-auto" />
+                  <p className="text-xs text-gray-400 mt-3">Memuat preview…</p>
+                </div>
+              ) : scanPreview.total === 0 ? (
+                <div className="py-8 text-center">
+                  <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-gray-800">Semua Data Sudah Lengkap</p>
+                  <p className="text-xs text-gray-500 mt-1">Nggak ada unit yang perlu di-flag. Mantap!</p>
+                </div>
+              ) : (
+                <>
+                  {/* Statistik */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-center">
+                      <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Total</p>
+                      <p className="text-xl font-black text-indigo-700 tabular-nums mt-1">{scanPreview.total}</p>
+                      <p className="text-[10px] text-indigo-500 mt-0.5">unit kena flag</p>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-center">
+                      <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Sudah QC</p>
+                      <p className="text-xl font-black text-amber-700 tabular-nums mt-1">{scanPreview.already_needs_qc}</p>
+                      <p className="text-[10px] text-amber-500 mt-0.5">tetap NEEDS_QC</p>
+                    </div>
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+                      <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Turun</p>
+                      <p className="text-xl font-black text-red-700 tabular-nums mt-1">{scanPreview.will_drop_from_siap_jual}</p>
+                      <p className="text-[10px] text-red-500 mt-0.5">dari SIAP_JUAL</p>
+                    </div>
+                  </div>
+
+                  {/* Info */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-800 leading-relaxed">
+                      <p className="font-semibold mb-1">Yang terjadi kalau di-eksekusi:</p>
+                      <ul className="list-disc pl-4 space-y-0.5">
+                        <li>Semua {scanPreview.total} unit → status <code className="bg-white px-1 rounded">BELUM_SIAP</code> + <code className="bg-white px-1 rounded">NEEDS_QC</code></li>
+                        {scanPreview.will_drop_from_siap_jual > 0 && (
+                          <li><b>{scanPreview.will_drop_from_siap_jual} unit</b> yg sekarang SIAP_JUAL → <b>turun</b> ke BELUM_SIAP sampai field lengkap</li>
+                        )}
+                        <li>Unit TERJUAL/RESERVED/dll <b>aman, nggak kena flag</b></li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Preview sample */}
+                  {scanPreview.preview.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                        Preview {scanPreview.preview.length} unit {scanPreview.total > 50 ? `(dari total ${scanPreview.total})` : ""}
+                      </p>
+                      <div className="border border-gray-100 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                        {scanPreview.preview.map((u) => (
+                          <div key={u.id} className="px-3 py-2 border-b border-gray-50 last:border-b-0 hover:bg-gray-50">
+                            <div className="flex items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-gray-800 truncate">{u.laptop_name || "Tanpa Nama"}</p>
+                                <p className="text-[10px] font-mono text-gray-500">{u.serial_number || "no-SN"}</p>
+                              </div>
+                              <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
+                                {u.missing_fields.slice(0, 3).map(f => (
+                                  <span key={f} className="text-[9px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">{f}</span>
+                                ))}
+                                {u.missing_fields.length > 3 && (
+                                  <span className="text-[9px] text-amber-600">+{u.missing_fields.length - 3}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+              <button
+                onClick={() => setScanPreview(null)}
+                disabled={scanExecuting}
+                className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+              >
+                {scanPreview.total === 0 ? "Tutup" : "Batal"}
+              </button>
+              {scanPreview.total > 0 && !scanLoading && (
+                <button
+                  onClick={executeScan}
+                  disabled={scanExecuting}
+                  className="flex-1 h-11 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-sm font-semibold hover:from-indigo-700 hover:to-indigo-800 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {scanExecuting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  {scanExecuting ? "Memproses..." : `Eksekusi (${scanPreview.total} unit)`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
