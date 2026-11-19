@@ -8,6 +8,7 @@ import {
   ChevronRight, Ban,
 } from "lucide-react";
 import MinusReasonModal from "@/components/inventory/MinusReasonModal";
+import AutocompleteInput from "@/components/ui/AutocompleteInput";
 
 interface QcUnit {
   id: string;
@@ -54,6 +55,7 @@ type FormShape = {
 };
 function QcInputField({
   label, name, type = "text", required = false, form, setForm, readOnly = false, hint,
+  autocompleteField,
 }: {
   label: string;
   name: keyof FormShape;
@@ -63,26 +65,43 @@ function QcInputField({
   setForm: React.Dispatch<React.SetStateAction<FormShape>>;
   readOnly?: boolean;   // ⬅️ BARU: field auto, tidak bisa diketik manual
   hint?: string;        // ⬅️ BARU: teks kecil di bawah input
+  // ⬅️ BARU: kalau diisi, input pakai AutocompleteInput yang narik saran dari
+  // /api/suggestions?field=<autocompleteField>. Dipakai di field teks yang
+  // sering berulang (source, brand, cpu, ram, storage, laptop_name,
+  // condition_note). Field angka & readOnly tidak pakai autocomplete.
+  autocompleteField?: string;
 }) {
   const isEmpty = form[name].trim() === "";
+  const inputCls = `w-full h-10 border rounded-xl px-3 text-sm transition focus:outline-none ${
+    readOnly
+      ? "bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed"
+      : `bg-gray-50 focus:ring-2 focus:ring-indigo-400/20 focus:border-indigo-400 focus:bg-white ${
+          isEmpty && required ? "border-amber-300 bg-amber-50/30" : "border-gray-200"
+        }`
+  }`;
+
   return (
     <div>
       <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
         {label}{required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
-      <input
-        type={type}
-        value={form[name]}
-        readOnly={readOnly}
-        onChange={(e) => { if (!readOnly) setForm(f => ({ ...f, [name]: e.target.value })); }}
-        className={`w-full h-10 border rounded-xl px-3 text-sm transition focus:outline-none ${
-          readOnly
-            ? "bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed"
-            : `bg-gray-50 focus:ring-2 focus:ring-indigo-400/20 focus:border-indigo-400 focus:bg-white ${
-                isEmpty && required ? "border-amber-300 bg-amber-50/30" : "border-gray-200"
-              }`
-        }`}
-      />
+      {autocompleteField && !readOnly ? (
+        <AutocompleteInput
+          field={autocompleteField}
+          name={name}
+          value={form[name]}
+          onChange={(v) => setForm(f => ({ ...f, [name]: v }))}
+          className={inputCls}
+        />
+      ) : (
+        <input
+          type={type}
+          value={form[name]}
+          readOnly={readOnly}
+          onChange={(e) => { if (!readOnly) setForm(f => ({ ...f, [name]: e.target.value })); }}
+          className={inputCls}
+        />
+      )}
       {hint && <p className="text-[10px] text-gray-400 mt-1">{hint}</p>}
     </div>
   );
@@ -241,11 +260,12 @@ function QcEditModal({
               <LaptopIcon size={14} /> Spesifikasi Model
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <QcInputField label="Nama Laptop" name="laptop_name" required form={form} setForm={setForm} />
-              <QcInputField label="Brand" name="brand" required form={form} setForm={setForm} />
-              <QcInputField label="CPU" name="cpu" required form={form} setForm={setForm} />
-              <QcInputField label="RAM" name="ram" required form={form} setForm={setForm} />
-              <QcInputField label="Storage" name="storage" required form={form} setForm={setForm} />
+              {/* Field teks yang sering berulang dapat autocomplete dari /api/suggestions. */}
+              <QcInputField label="Nama Laptop" name="laptop_name" required autocompleteField="laptop_name" form={form} setForm={setForm} />
+              <QcInputField label="Brand" name="brand" required autocompleteField="brand" form={form} setForm={setForm} />
+              <QcInputField label="CPU" name="cpu" required autocompleteField="cpu" form={form} setForm={setForm} />
+              <QcInputField label="RAM" name="ram" required autocompleteField="ram" form={form} setForm={setForm} />
+              <QcInputField label="Storage" name="storage" required autocompleteField="storage" form={form} setForm={setForm} />
             </div>
           </div>
 
@@ -255,15 +275,16 @@ function QcEditModal({
               <CheckCircle2 size={14} /> Data Unit (per SN)
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Serial Number: tidak pakai autocomplete — SN harus unik. */}
               <QcInputField label="Serial Number" name="serial_number" required form={form} setForm={setForm} />
-              <QcInputField label="Grade (A/B/C)" name="grade" required form={form} setForm={setForm} />
-              <QcInputField label="Sumber" name="source" required form={form} setForm={setForm} />
+              <QcInputField label="Grade (A/B/C)" name="grade" required autocompleteField="grade" form={form} setForm={setForm} />
+              <QcInputField label="Sumber" name="source" required autocompleteField="source" form={form} setForm={setForm} />
               <QcInputField label="Harga Modal (Rp)" name="purchase_price" type="number" required form={form} setForm={setForm} />
               <QcInputField label="Biaya Sparepart (Rp)" name="sparepart_cost" type="number" required form={form} setForm={setForm} />
               <QcInputField label="Harga Setor (Rp)" name="selling_price" type="number" required form={form} setForm={setForm} />
                           <QcInputField label="Harga Official (Rp)" name="official_price" type="number" required readOnly hint="Otomatis: Harga Setor + Rp 300.000" form={form} setForm={setForm} />
               <div className="md:col-span-2">
-                <QcInputField label="Kondisi & Catatan" name="condition_note" required form={form} setForm={setForm} />
+                <QcInputField label="Kondisi & Catatan" name="condition_note" required autocompleteField="condition_note" form={form} setForm={setForm} />
               </div>
             </div>
           </div>

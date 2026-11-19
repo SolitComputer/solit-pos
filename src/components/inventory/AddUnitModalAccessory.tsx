@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CurrencyInput } from "@/components/ui/CurrencyInputField";
+import AutocompleteInput from "@/components/ui/AutocompleteInput";
 
 export interface CreatedAccessoryUnit {
     id: string;
@@ -109,11 +110,17 @@ export default function AddUnitModalAccessory({
                         </select>
                     </Field>
 
-                                       <Field label="Sumber">
-                        <input name="source" value={form.source} onChange={handleChange}
-                            placeholder="Contoh: Kosasih, Lelang, China" className={inputCls} />
+                    <Field label="Sumber">
+                        <AutocompleteInput
+                            field="source"
+                            name="source"
+                            value={form.source}
+                            onChange={(v) => setForm(prev => ({ ...prev, source: v }))}
+                            placeholder="Contoh: Kosasih, Lelang, China"
+                            className={inputCls}
+                        />
                     </Field>
-
+                    
                     {/* ⬅️ BARU: Cabang per unit. Kardus boleh campur cabang, jadi diisi per SN. */}
                     <Field label="Cabang">
                         <select name="branch" value={form.branch} onChange={handleChange} className={inputCls}>

@@ -100,17 +100,21 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       }, { status: 400 });
     }
 
-    // Reset ke BELUM_SIAP + NEEDS_QC, bersihkan flag minus lama biar tidak
-    // nyangkut. Field spek (brand/cpu/ram/storage/selling_price/dll) TIDAK
-    // disentuh — jadi di QcEditModal nanti otomatis muncul sebagai default,
-    // bukan kosong.
+    // Reset ke BELUM_SIAP + NEEDS_QC. Field spek (brand/cpu/ram/storage/
+    // selling_price/dll) TIDAK disentuh — jadi di QcEditModal nanti otomatis
+    // muncul sebagai default, bukan kosong.
+    //
+    // minus_status & analisa SENGAJA TIDAK di-reset:
+    //  - minus_status kolomnya NOT NULL di schema → null ditolak DB
+    //  - Default existing "BELUM_DIATASI" aman karena qc_status = NEEDS_QC
+    //    sudah menandakan unit kembali di antrian QC (bukan di minus flow)
+    //  - analisa dibiarkan sebagai referensi Team QC — kalau dulu pernah
+    //    ditandai MINUS, konteks alasannya masih ada sebagai info
     const { error: updateErr } = await supabase
       .from("laptop_units")
       .update({
         status: "BELUM_SIAP",
         qc_status: "NEEDS_QC",
-        minus_status: null,
-        analisa: null,
       })
       .in("id", targetIds);
 
