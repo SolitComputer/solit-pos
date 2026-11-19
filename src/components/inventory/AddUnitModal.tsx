@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CurrencyInput } from "@/components/ui/CurrencyInputField";
+import AutocompleteInput from "@/components/ui/AutocompleteInput";
 
 export interface CreatedUnit {
     id: string;
@@ -130,9 +131,15 @@ export default function AddUnitModal({
                         </p>
                     </div>
 
-                                        <Field label="Sumber">
-                        <input name="source" value={form.source} onChange={handleChange}
-                            placeholder="Supplier Jakarta, Tukar Tambah, Lelang..." className={inputCls} />
+                    <Field label="Sumber">
+                        <AutocompleteInput
+                            field="source"
+                            name="source"
+                            value={form.source}
+                            onChange={(v) => setForm(prev => ({ ...prev, source: v }))}
+                            placeholder="Supplier Jakarta, Tukar Tambah, Lelang..."
+                            className={inputCls}
+                        />
                     </Field>
 
                     {/* ⬅️ BARU: Cabang per unit. Kardus boleh campur cabang, jadi diisi per SN. */}
@@ -161,8 +168,14 @@ export default function AddUnitModal({
                     </Field>
 
                     <Field label="Kondisi">
-                        <input name="condition_note" value={form.condition_note} onChange={handleChange} className={inputCls} />
-                    </Field>
+                        <AutocompleteInput
+                            field="condition_note"
+                            name="condition_note"
+                            value={form.condition_note}
+                            onChange={(v) => setForm(prev => ({ ...prev, condition_note: v }))}
+                            className={inputCls}
+                        />
+                    </Field>src/components/inventory/AddUnitModalAccessory.tsx
 
                     <Field label="Catatan">
                         <textarea name="notes" value={form.notes} onChange={handleChange} rows={2} className={inputCls} />
