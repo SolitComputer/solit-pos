@@ -114,6 +114,12 @@ export function isValidAccount(code: string): boolean {
   return !!ACCOUNT_MAP[code];
 }
 
+/** Cek apakah akun termasuk Kasbon (141) atau Cicilan (142) — butuh pilih karyawan */
+export function isKasbonCicilanAccount(code: string): boolean {
+  return code === AKUN.KASBON || code === AKUN.CICILAN;
+}
+
+
 export const ACCOUNT_TYPE_ORDER: AccountType[] = ["ASET", "HUTANG", "MODAL", "PEMASUKAN", "BEBAN"];
 export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
   ASET: "Aset",

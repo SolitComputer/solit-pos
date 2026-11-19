@@ -143,7 +143,55 @@ export async function GET(request: Request) {
           else a.cicilanDibayar += nominal;
         }
       }
-      // tanggal bulan depan → diabaikan utk tampilan bulan ini
+ // tanggal bulan depan → diabaikan utk tampilan bulan ini
+    }
+
+    // ⬅️ BARU — Kasbon/Cicilan dari Jurnal Manual (sinkronisasi Jurnal Umum → Absensi)
+    // Query journal_entries MANUAL yang punya target_user_id, lalu ambil baris 141/142-nya.
+    const { data: manualJournalEntries } = await supabase
+      .from("journal_entries")
+      .select("id, tanggal, target_user_id")
+      .eq("source_type", "MANUAL")
+      .not("target_user_id", "is", null);
+
+    if ((manualJournalEntries ?? []).length > 0) {
+      const jeIds = (manualJournalEntries ?? []).map((je: any) => je.id as string);
+      const jeMap = new Map((manualJournalEntries ?? []).map((je: any) => [je.id as string, je]));
+
+      // Ambil baris jurnal yg akun-nya 141 (Kasbon) atau 142 (Cicilan)
+      const { data: kasbonLines } = await supabase
+        .from("journal_lines")
+        .select("entry_id, account_code, side, nominal")
+        .in("entry_id", jeIds)
+        .in("account_code", ["141", "142"]);
+
+      for (const line of (kasbonLines ?? []) as any[]) {
+        const je = jeMap.get(line.entry_id as string);
+        if (!je) continue;
+        const uid = je.target_user_id as string;
+        const nominal = Math.round(Number(line.nominal ?? 0));
+        if (!uid || !Number.isFinite(nominal) || nominal <= 0) continue;
+        const tgl = String(je.tanggal ?? "");
+        if (tgl < AUTO_SYNC_CUTOFF) continue;
+        const isKasbon = line.account_code === "141";
+        // DEBIT akun 141/142 = aset bertambah = kasbon/cicilan KELUAR ke karyawan
+        // KREDIT akun 141/142 = aset berkurang = karyawan BAYAR/cicil
+        const isOut = line.side === "DEBIT";
+        const a = ensure(uid);
+
+        if (tgl < monthStart) {
+          if (isKasbon) isOut ? (a.priorKasbonOut += nominal) : (a.priorKasbonIn += nominal);
+          else isOut ? (a.priorCicilanOut += nominal) : (a.priorCicilanIn += nominal);
+        } else if (tgl < nextMonthStart) {
+          if (isKasbon) {
+            if (isOut) a.weeks[weekOfMonth(tgl) - 1] += nominal;
+            else a.kasbonDibayar += nominal;
+          } else {
+            if (isOut) a.monthCicilanOut += nominal;
+            else a.cicilanDibayar += nominal;
+          }
+        }
+      }
     }
 
     // ── Pelunasan via POTONG GAJI (Rekap Gaji → Tunjangan) ──
