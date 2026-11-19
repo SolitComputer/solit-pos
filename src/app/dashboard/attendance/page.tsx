@@ -8173,13 +8173,17 @@ export default function AttendanceDashboardPage() {
                                         <p className="text-sm text-gray-400 font-medium">Belum ada karyawan aktif</p>
                                     </div>
                                 ) : (
+                                    (() => {
+                                        // ✅ Filter PKL out — konsisten dengan tab "Cuti Bulan Ini"
+                                        const filteredLeaveHistory = leaveHistory.filter(u => !isPKLRole(u.user.role));
+                                        return (
                                     <div className="overflow-x-auto">
                                         <div className="px-6 py-3 bg-cyan-50/50 border-b border-cyan-100 text-xs font-bold text-cyan-700 flex items-center gap-3 flex-wrap">
-                                            <span>Total: {leaveHistory.length} karyawan</span>
+                                            <span>Total: {filteredLeaveHistory.length} karyawan</span>
                                             <span className="text-gray-400">·</span>
-                                            <span>{leaveHistory.filter(u => u.leaveDates.length > 0).length} pernah cuti</span>
+                                            <span>{filteredLeaveHistory.filter(u => u.leaveDates.length > 0).length} pernah cuti</span>
                                             <span className="text-gray-400">·</span>
-                                            <span>{leaveHistory.reduce((sum, u) => sum + u.leaveDates.length, 0)} total hari cuti</span>
+                                            <span>{filteredLeaveHistory.reduce((sum, u) => sum + u.leaveDates.length, 0)} total hari cuti</span>
                                         </div>
                                         <table className="w-full text-sm">
                                             <thead>
@@ -8190,7 +8194,7 @@ export default function AttendanceDashboardPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
-                                                {leaveHistory.map((u, i) => (
+                                                {filteredLeaveHistory.map((u, i) => (
                                                     <tr key={u.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
                                                         <td className="px-6 py-4 text-[11px] text-gray-400 font-black">{i + 1}</td>
                                                         <td className="px-4 py-4">
@@ -8222,6 +8226,8 @@ export default function AttendanceDashboardPage() {
                                             </tbody>
                                         </table>
                                     </div>
+                                        );
+                                    })()
                                 )}
                             </>
                         )}

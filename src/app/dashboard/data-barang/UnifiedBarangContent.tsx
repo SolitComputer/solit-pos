@@ -2943,9 +2943,15 @@ export default function UnifiedBarangContent() {
                         { label: "RAM", value: unitDetailTarget.row.ram },
                         { label: "Storage", value: unitDetailTarget.row.storage },
                     ]}
-                    canEdit={canFullAccessBarang}
+                    // canEdit & canEditChecklist sengaja false — konsisten dengan
+                    // Kelola Unit: edit laptop sekarang HANYA lewat Team QC.
+                    // Modal detail cuma untuk VIEW. Kalau mau ubah, user pencet
+                    // "Perlu di QC" dulu di baris Data Barang / Kelola Unit.
+                    // canManageUnit TETAP — tambah unit baru boleh (auto masuk
+                    // antrian Team QC), tidak melanggar aturan edit-via-QC.
+                    canEdit={false}
                     canManageUnit={canAddUnit}
-                    canEditChecklist={canEditChecklist}
+                    canEditChecklist={false}
                     canSeePrivate={canSeePrivate}
                     defaultSellingPrice={unitDetailTarget.row.harga_jual}
                     onClose={() => setUnitDetailTarget(null)}
