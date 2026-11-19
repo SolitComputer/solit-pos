@@ -57,23 +57,12 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
     const nowIso = new Date().toISOString();
 
     // ─── OPSI 1: PERBAIKI → masuk antrian sparepart ──────────────────────
+    // ✅ REVISI 2026-11-19: sparepart TIDAK lagi di-input di sini.
+    // Pengelola cuma klik "Bisa Diperbaiki" + konfirmasi. Unit masuk antrian
+    // IN_SPAREPART, user tambah sparepart (opsional, multi-item) nanti
+    // di halaman Antrian Sparepart.
     if (decision === "PERBAIKI") {
-      if (!Array.isArray(spareparts) || spareparts.length === 0) {
-        return NextResponse.json({
-          success: false, message: "Minimal 1 item sparepart wajib diisi untuk opsi PERBAIKI",
-        }, { status: 400 });
-      }
-
-      // Validasi setiap sparepart
-      for (const sp of spareparts) {
-        if (!sp.sparepart_name || typeof sp.sparepart_name !== "string" || !sp.sparepart_name.trim()) {
-          return NextResponse.json({
-            success: false, message: "Nama sparepart wajib diisi untuk tiap item",
-          }, { status: 400 });
-        }
-      }
-
-      // Update unit
+      // Update unit — masuk antrian sparepart
       const { error: updErr } = await supabase.from("laptop_units").update({
         qc_status: "IN_SPAREPART",
         status: "SERVICE",
@@ -83,38 +72,24 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       }).eq("id", unit_id);
       if (updErr) return NextResponse.json({ success: false, message: updErr.message }, { status: 400 });
 
-      // Insert sparepart queue (bulk)
-      const rows = spareparts.map((sp: Record<string, any>) => ({
-        unit_id,
-        laptop_id: unit.laptop_id,
-        sparepart_name: String(sp.sparepart_name).trim(),
-        estimasi_harga: sp.estimasi_harga != null && sp.estimasi_harga !== "" ? Math.round(Number(sp.estimasi_harga)) : null,
-        pic_user_id: sp.pic_user_id || null,
-        catatan: sp.catatan?.trim() || null,
-        created_by: user.id,
-      }));
-      const { error: spErr } = await supabase.from("sparepart_queue").insert(rows);
-      if (spErr) return NextResponse.json({ success: false, message: `Insert sparepart: ${spErr.message}` }, { status: 400 });
-
       await recalcLaptopParentQty(supabase, unit.laptop_id);
       await supabase.from("qc_history").insert({
         unit_id, laptop_id: unit.laptop_id,
         from_qc_status: "FROM_QC", to_qc_status: "IN_SPAREPART",
         from_status: unit.status, to_status: "SERVICE",
         actor_user_id: user.id, actor_name: user.name,
-        reason: `Pengelola Barang: BISA DIPERBAIKI (${spareparts.length} sparepart)`,
+        reason: "Pengelola Barang: BISA DIPERBAIKI → masuk antrian sparepart",
       });
       await logActivity({
         userId: user.id, userName: user.name, userRole: user.role,
         action: "EDIT", entity: "unit", entityId: unit_id,
-        entityLabel: `SN: ${unit.serial_number} — Pengelola: PERBAIKI`,
+        entityLabel: `SN: ${unit.serial_number} — Pengelola: PERBAIKI (sparepart diisi nanti)`,
         beforeData: unit,
       });
 
       return NextResponse.json({
         success: true,
         decision: "PERBAIKI",
-        sparepart_count: spareparts.length,
       });
     }
 
