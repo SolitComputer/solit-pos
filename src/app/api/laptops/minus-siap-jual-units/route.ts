@@ -48,9 +48,14 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     // (beda dgn ready-units yg mewajibkan modal & jual > 0), karena barang minus
     // sering baru dilengkapi modalnya belakangan. Tambahkan
     // `Number(u.purchase_price) > 0 &&` di filter ini kalau mau 100% sama.
-    const filtered = (data || []).filter(
-      (u: Record<string, any>) => Number(u.selling_price) > 0
-    );
+    // ✅ Hybrid read untuk harga guard: SN Lepas pakai unit.selling_price,
+    //    unit folder bisa pakai laptop.selling_price sebagai fallback.
+    //    Tanpa fallback, unit folder yang harganya di parent-level bisa
+    //    ke-exclude padahal valid untuk dijual.
+    const filtered = (data || []).filter((u: Record<string, any>) => {
+      const effectivePrice = Number(u.selling_price ?? u.laptop?.selling_price ?? 0);
+      return effectivePrice > 0;
+    });
 
     // ── Tandai unit yang SEDANG dipegang Penyiapan Barang aktif ──────────────
     // Sama persis dengan logika di ready-units (dicocokkan lewat serial_number).
@@ -91,6 +96,17 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       ...u,
       being_prepared: preparingSnMap.has(u.serial_number),
       preparing_order_number: preparingSnMap.get(u.serial_number) ?? null,
+      // ✅ SN-First awareness (pola Step 3-5): flag unit tanpa parent folder.
+      // Consumer manapun langsung bisa render badge "LEPAS" tanpa cek laptop_id manual.
+      is_sn_lepas: u.laptop_id === null,
+      // ✅ Hybrid read: effective field unit-level prioritas, fallback laptop.
+      //    Konsisten dengan pattern Step 3-5 — SN Lepas & unit folder sama API shape.
+      effective_laptop_name: u.laptop_name ?? u.laptop?.laptop_name ?? null,
+      effective_brand: u.brand ?? u.laptop?.brand ?? null,
+      effective_cpu: u.cpu ?? u.laptop?.cpu ?? null,
+      effective_ram: u.ram ?? u.laptop?.ram ?? null,
+      effective_storage: u.storage ?? u.laptop?.storage ?? null,
+      effective_selling_price: u.selling_price ?? u.laptop?.selling_price ?? 0,
     }));
 
     // Harga modal/sparepart disaring DI SERVER untuk role non-privat (mis. Sales),

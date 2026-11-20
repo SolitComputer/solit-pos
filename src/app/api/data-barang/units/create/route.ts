@@ -1,13 +1,21 @@
 // src/app/api/data-barang/units/create/route.ts
 //
 // ═══════════════════════════════════════════════════════════════════════════
-// FASE 1 — SN-First Add Barang
+// STEP 2 REWORK (2026-11-20) — Explicit Target Folder
 // Endpoint: POST /api/data-barang/units/create
 //
-// Flow baru: 1 request = 1 SN lengkap dengan identitas spek.
-// Backend auto-cari parent (kotak) existing dengan dedup hash match.
-// - Match     → insert SN ke parent itu (masuk folder existing)
-// - Tidak match → bikin parent baru + insert SN sebagai penghuni pertama
+// Paradigma baru: USER pilih target folder secara EXPLICIT.
+//   target_folder_id = string UUID → Case A atau B (auto-detect isi/kosong)
+//   target_folder_id = null         → Case C (SN Lepas, laptop_id=NULL)
+//
+// Case A — Folder ISI:
+//   Validasi 5 field pengunci STRICT match (nama, spek, harga jual, grade,
+//   kategori). Mismatch → 400 reject dengan list field yang beda.
+// Case B — Folder KOSONG (identitas detail NULL):
+//   Insert unit + UPDATE folder adopt identitas dari unit (nama, brand,
+//   cpu, ram, storage, gpu, display, harga jual, grade).
+// Case C — Tanpa Folder:
+//   Insert unit dengan laptop_id=NULL (atau accessory_id=NULL). SN Lepas.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,394 +26,325 @@ import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
 import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
-import { computeDedupHash } from "@/lib/dedupHash";
-import crypto from "crypto";
 
-// Markup tetap untuk Harga Official (konsisten dgn /api/laptops/[id]/units)
 const OFFICIAL_PRICE_MARKUP = 300_000;
 
-// Helper hash aksesoris — 3 field (name+brand+spec). Sengaja DIPISAH dari
-// lib/dedupHash supaya aturan dedup aksesoris bisa di-tweak sendiri tanpa
-// ganggu dedup laptop.
-function computeAccessoryDedupHash(input: {
-    name: string | null;
-    brand: string | null;
-    spec: string | null;
-}): string {
-    const norm = (s: string | null) => (s ?? "").trim().toLowerCase();
-    const raw = `${norm(input.name)}|${norm(input.brand)}|${norm(input.spec)}`;
-    return crypto.createHash("sha256").update(raw).digest("hex");
-}
-
 async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
-    try {
-        // ── Permission check (reuse pola yg sama dgn endpoint create existing) ──
-        const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
-        const hasStaticAccess = effectiveRoles.some(r =>
-            (PERMISSIONS.CREATE_UNITS as string[]).includes(r)
-        );
-        if (!hasStaticAccess) {
-            const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/data-barang", "create");
-            if (!dyn.allowed) {
-                return NextResponse.json(
-                    { success: false, message: "Forbidden" },
-                    { status: 403 }
-                );
-            }
-        }
-
-        const body = await req.json();
-        const {
-            tipe, // "LAPTOP" | "AKSESORIS"
-            category_id,
-            serial_number,
-            // Identitas spek
-            name, brand,
-            cpu, ram, storage, gpu, display, // laptop only
-            spec,                            // aksesoris only
-            // Harga & grade per-SN
-            grade,                 // laptop: A/B/C
-            condition,             // aksesoris: BARU/BEKAS
-            purchase_price,        // laptop
-            sparepart_cost,        // laptop
-            buy_price,             // aksesoris
-            selling_price,         // keduanya
-            // Per-SN lain
-            source, branch, notes,
-            condition_note,        // laptop
-            kelengkapan,           // laptop
-            condition_checks,      // laptop
-        } = body;
-
-        // ── Validasi dasar ─────────────────────────────────────────────────
-        if (tipe !== "LAPTOP" && tipe !== "AKSESORIS") {
-            return NextResponse.json(
-                { success: false, message: "Tipe wajib LAPTOP atau AKSESORIS" },
-                { status: 400 }
-            );
-        }
-        if (!serial_number || typeof serial_number !== "string" || !serial_number.trim()) {
-            return NextResponse.json(
-                { success: false, message: "Serial number wajib diisi" },
-                { status: 400 }
-            );
-        }
-        if (!name || typeof name !== "string" || !name.trim()) {
-            return NextResponse.json(
-                { success: false, message: "Nama barang wajib diisi" },
-                { status: 400 }
-            );
-        }
-
-        const safeBranch = branch === "UTAMA" || branch === "JOGJA" ? branch : null;
-
-        // ═══════════════════════════════════════════════════════════════════
-        // FLOW LAPTOP
-        // ═══════════════════════════════════════════════════════════════════
-        if (tipe === "LAPTOP") {
-            // 1. Cek duplikat SN GLOBAL
-            const { data: existingSn } = await supabaseAdmin
-                .from("laptop_units")
-                .select("id, serial_number, laptop:laptops(laptop_name)")
-                .eq("serial_number", serial_number.trim())
-                .limit(1);
-
-            if (existingSn && existingSn.length > 0) {
-                const dup = existingSn[0] as any;
-                const lap = Array.isArray(dup.laptop) ? dup.laptop[0] : dup.laptop;
-                const lokasi = lap?.laptop_name ? ` pada "${lap.laptop_name}"` : "";
-                return NextResponse.json({
-                    success: false,
-                    message: `Serial number "${serial_number}" sudah terdaftar${lokasi}`,
-                }, { status: 409 });
-            }
-
-            // 2. Compute dedup hash parent (6 field)
-            const dedupHash = await computeDedupHash({
-                brand: brand ?? null,
-                laptop_name: name ?? null,
-                cpu: cpu ?? null,
-                ram: ram ?? null,
-                storage: storage ?? null,
-                gpu: gpu ?? null,
-            });
-
-            // 3. Cari parent existing
-            const { data: existingLaptop } = await supabaseAdmin
-                .from("laptops")
-                .select("*")
-                .eq("dedup_hash", dedupHash)
-                .limit(1)
-                .maybeSingle();
-
-            let parentLaptopId: string;
-            let wasExistingParent = false;
-
-            if (existingLaptop) {
-                parentLaptopId = existingLaptop.id;
-                wasExistingParent = true;
-            } else {
-                // 4. Create parent baru
-                const sellingPriceNum = selling_price != null && selling_price !== ""
-                    ? Math.round(Number(selling_price)) : 0;
-
-                const { data: newParent, error: parentErr } = await supabaseAdmin
-                    .from("laptops")
-                    .insert({
-                        laptop_name: name.trim(),
-                        category_id: category_id || null,
-                        brand: brand || null,
-                        cpu: cpu || null,
-                        ram: ram || null,
-                        storage: storage || null,
-                        gpu: gpu || null,
-                        display: display || null,
-                        selling_price: sellingPriceNum,
-                        qty: 0, // di-recalc setelah unit insert
-                        status: "BELUM_SIAP",
-                        condition_note: condition_note || null,
-                        notes: notes || null,
-                        dedup_hash: dedupHash,
-                    })
-                    .select()
-                    .single();
-
-                if (parentErr) throw parentErr;
-                parentLaptopId = newParent.id;
-            }
-
-            // 5. Insert SN dgn identitas lengkap (SN-first!)
-            const purchasePriceNum = purchase_price != null && purchase_price !== ""
-                ? Math.round(Number(purchase_price)) : null;
-            const sellingPriceNum = selling_price != null && selling_price !== ""
-                ? Math.round(Number(selling_price)) : null;
-            const sparepartNum = sparepart_cost != null && sparepart_cost !== ""
-                ? Math.round(Number(sparepart_cost)) : null;
-
-            const { data: newUnit, error: unitErr } = await supabaseAdmin
-                .from("laptop_units")
-                .insert({
-                    laptop_id: parentLaptopId,
-                    serial_number: serial_number.trim(),
-                    // Identitas per-SN
-                    name: name.trim(),
-                    brand: brand || null,
-                    cpu: cpu || null,
-                    ram: ram || null,
-                    storage: storage || null,
-                    gpu: gpu || null,
-                    display: display || null,
-                    // Grade & harga
-                    grade: grade || "A",
-                    purchase_price: purchasePriceNum,
-                    selling_price: sellingPriceNum,
-                    sparepart_cost: sparepartNum,
-                    official_price: sellingPriceNum != null
-                        ? sellingPriceNum + OFFICIAL_PRICE_MARKUP : null,
-                    // Status default — ikut flow QC
-                    status: "BELUM_SIAP",
-                    qc_status: "NEEDS_QC",
-                    // Per-SN lain
-                    source: source || null,
-                    branch: safeBranch,
-                    notes: notes || null,
-                    condition_note: condition_note?.trim() || null,
-                    kelengkapan: kelengkapan ?? null,
-                    condition_checks: condition_checks ?? {},
-                })
-                .select()
-                .single();
-
-            if (unitErr) throw unitErr;
-
-            // 6. Recalc parent qty
-            await recalcLaptopParentQty(supabaseAdmin, parentLaptopId);
-
-            // 7. Log activity
-            try {
-                await logActivity({
-                    userId: user.id,
-                    userName: user.name,
-                    userRole: user.role,
-                    action: "CREATE",
-                    entity: "unit",
-                    entityId: newUnit.id,
-                    entityLabel: `SN: ${newUnit.serial_number} (${name})${wasExistingParent ? " — masuk folder existing" : " — folder baru"}`,
-                    afterData: newUnit,
-                });
-            } catch { /* non-blocking */ }
-
-            return NextResponse.json({
-                success: true,
-                data: {
-                    unit: newUnit,
-                    parent_id: parentLaptopId,
-                    was_existing_parent: wasExistingParent,
-                },
-                message: wasExistingParent
-                    ? `SN masuk ke folder existing "${name}"`
-                    : `Folder "${name}" baru dibuat + SN pertama masuk`,
-            });
-        }
-
-        // ═══════════════════════════════════════════════════════════════════
-        // FLOW AKSESORIS
-        // ═══════════════════════════════════════════════════════════════════
-        if (tipe === "AKSESORIS") {
-            // Ambil nama kategori (aksesoris simpen nama, bukan ID)
-            let categoryName = "";
-            if (category_id) {
-                const { data: cat } = await supabaseAdmin
-                    .from("categories")
-                    .select("name")
-                    .eq("id", category_id)
-                    .maybeSingle();
-                categoryName = cat?.name ?? "";
-            }
-
-            if (!categoryName) {
-                return NextResponse.json(
-                    { success: false, message: "Kategori aksesoris wajib dipilih" },
-                    { status: 400 }
-                );
-            }
-
-            // 1. Cek duplikat SN GLOBAL
-            const snUpper = serial_number.trim().toUpperCase();
-            const { count: snExists } = await supabaseAdmin
-                .from("accessory_units")
-                .select("id", { count: "exact", head: true })
-                .eq("serial_number", snUpper);
-
-            if (snExists && snExists > 0) {
-                return NextResponse.json(
-                    { success: false, message: `Serial number "${snUpper}" sudah digunakan` },
-                    { status: 409 }
-                );
-            }
-
-            // 2. Compute dedup hash parent (3 field)
-            const dedupHash = computeAccessoryDedupHash({
-                name: name ?? null,
-                brand: brand ?? null,
-                spec: spec ?? null,
-            });
-
-            // 3. Cari parent existing
-            const { data: existingAccessory } = await supabaseAdmin
-                .from("accessories")
-                .select("*")
-                .eq("dedup_hash", dedupHash)
-                .limit(1)
-                .maybeSingle();
-
-            let parentAccessoryId: string;
-            let wasExistingParent = false;
-
-            if (existingAccessory) {
-                parentAccessoryId = existingAccessory.id;
-                wasExistingParent = true;
-            } else {
-                // 4. Create parent baru
-                const sellPriceNum = selling_price != null && selling_price !== ""
-                    ? Math.max(0, Math.round(Number(selling_price))) : 0;
-                const buyPriceNum = buy_price != null && buy_price !== ""
-                    ? Math.max(0, Math.round(Number(buy_price))) : 0;
-
-                const { data: newParent, error: parentErr } = await supabaseAdmin
-                    .from("accessories")
-                    .insert({
-                        name: name.trim(),
-                        category: categoryName.trim().toUpperCase(),
-                        brand: brand?.trim() || null,
-                        spec: spec?.trim() || null,
-                        buy_price: buyPriceNum,
-                        sell_price: sellPriceNum,
-                        stock: 0, // di-recalc setelah unit insert
-                        notes: notes?.trim() || null,
-                        dedup_hash: dedupHash,
-                    })
-                    .select()
-                    .single();
-
-                if (parentErr) throw parentErr;
-                parentAccessoryId = newParent.id;
-            }
-
-            // 5. Insert SN
-            const finalSelling = selling_price != null && selling_price !== ""
-                ? Math.max(0, Math.round(Number(selling_price))) : 0;
-            const finalBuy = buy_price != null && buy_price !== ""
-                ? Math.max(0, Math.round(Number(buy_price))) : 0;
-
-            const safeCondition = condition === "BARU" || condition === "BEKAS" ? condition : "BARU";
-
-            const { data: newUnit, error: unitErr } = await supabaseAdmin
-                .from("accessory_units")
-                .insert({
-                    accessory_id: parentAccessoryId,
-                    serial_number: snUpper,
-                    // Identitas per-SN
-                    name: name.trim(),
-                    brand: brand || null,
-                    spec: spec || null,
-                    // Kondisi & harga
-                    condition: safeCondition,
-                    status: "TERSEDIA",
-                    buy_price: finalBuy,
-                    selling_price: finalSelling,
-                    // Per-SN lain
-                    source: source?.trim() || null,
-                    branch: safeBranch,
-                    notes: notes?.trim() || null,
-                })
-                .select()
-                .single();
-
-            if (unitErr) throw unitErr;
-
-            // 6. Recalc parent stock
-            await recalcAccessoryParentStock(supabaseAdmin, parentAccessoryId);
-
-            // 7. Log
-            try {
-                await logActivity({
-                    userId: user.id,
-                    userName: user.name,
-                    userRole: user.role,
-                    action: "CREATE",
-                    entity: "unit",
-                    entityId: newUnit.id,
-                    entityLabel: `SN: ${newUnit.serial_number} (${name})${wasExistingParent ? " — masuk folder existing" : " — folder baru"}`,
-                    afterData: newUnit,
-                });
-            } catch { /* non-blocking */ }
-
-            return NextResponse.json({
-                success: true,
-                data: {
-                    unit: newUnit,
-                    parent_id: parentAccessoryId,
-                    was_existing_parent: wasExistingParent,
-                },
-                message: wasExistingParent
-                    ? `SN masuk ke folder existing "${name}"`
-                    : `Folder "${name}" baru dibuat + SN pertama masuk`,
-            });
-        }
-
-        return NextResponse.json(
-            { success: false, message: "Tipe tidak dikenali" },
-            { status: 400 }
-        );
-    } catch (err) {
-        console.error("[POST /api/data-barang/units/create]", err);
-        const msg = err instanceof Error ? err.message : "Internal server error";
-        return NextResponse.json(
-            { success: false, message: msg },
-            { status: 500 }
-        );
+  try {
+    // ── Permission check ──────────────────────────────────────────────────
+    const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+    const hasStaticAccess = effectiveRoles.some(r =>
+      (PERMISSIONS.CREATE_UNITS as string[]).includes(r)
+    );
+    if (!hasStaticAccess) {
+      const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/data-barang", "create");
+      if (!dyn.allowed) {
+        return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+      }
     }
+
+    const body = await req.json();
+    const {
+      tipe,
+      category_id,
+      target_folder_id,       // string UUID = ke folder; null = SN Lepas
+      serial_number,
+      name, brand,
+      cpu, ram, storage, gpu, display,
+      spec,
+      grade, condition,
+      purchase_price, sparepart_cost, buy_price, selling_price,
+      source, branch, notes,
+      condition_note, kelengkapan, condition_checks,
+    } = body;
+
+    // ── Validasi dasar ─────────────────────────────────────────────────
+    if (tipe !== "LAPTOP" && tipe !== "AKSESORIS") {
+      return NextResponse.json({ success: false, message: "Tipe wajib LAPTOP atau AKSESORIS" }, { status: 400 });
+    }
+    if (!serial_number?.trim()) {
+      return NextResponse.json({ success: false, message: "Serial number wajib diisi" }, { status: 400 });
+    }
+    if (!name?.trim()) {
+      return NextResponse.json({ success: false, message: "Nama barang wajib diisi" }, { status: 400 });
+    }
+    if (!category_id) {
+      return NextResponse.json({ success: false, message: "Kategori wajib dipilih" }, { status: 400 });
+    }
+
+    // Ambil nama kategori dari laptop_categories
+    const { data: cat } = await supabaseAdmin
+      .from("laptop_categories")
+      .select("name, type")
+      .eq("id", category_id)
+      .maybeSingle();
+    if (!cat) {
+      return NextResponse.json({ success: false, message: "Kategori tidak ditemukan" }, { status: 400 });
+    }
+
+    const safeBranch = branch === "UTAMA" || branch === "JOGJA" ? branch : null;
+    const sellingPriceNum = selling_price != null && selling_price !== ""
+      ? Math.round(Number(selling_price)) : null;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // FLOW LAPTOP
+    // ═══════════════════════════════════════════════════════════════════
+    if (tipe === "LAPTOP") {
+      // 1. Cek duplikat SN GLOBAL
+      const { data: existingSn } = await supabaseAdmin
+        .from("laptop_units")
+        .select("id, serial_number, laptop:laptops(laptop_name)")
+        .eq("serial_number", serial_number.trim())
+        .limit(1);
+
+      if (existingSn && existingSn.length > 0) {
+        const dup = existingSn[0] as any;
+        const lap = Array.isArray(dup.laptop) ? dup.laptop[0] : dup.laptop;
+        const lokasi = lap?.laptop_name ? ` pada "${lap.laptop_name}"` : "";
+        return NextResponse.json({
+          success: false,
+          message: `Serial number "${serial_number}" sudah terdaftar${lokasi}`,
+        }, { status: 409 });
+      }
+
+      let parentLaptopId: string | null = null;
+      let wasExistingParent = false;
+      let caseDetected: "A" | "B" | "C" = "C";
+      const deviceType = cat.name.trim().toUpperCase() === "PC" ? "PC" : "LAPTOP";
+
+      // 2. Handle target folder
+      if (target_folder_id) {
+        const { data: tFolder, error: tErr } = await supabaseAdmin
+          .from("laptops")
+          .select("*")
+          .eq("id", target_folder_id)
+          .maybeSingle();
+        if (tErr || !tFolder) {
+          return NextResponse.json({ success: false, message: "Folder tujuan tidak ditemukan" }, { status: 404 });
+        }
+        if (tFolder.category !== cat.name) {
+          return NextResponse.json({
+            success: false,
+            message: `Kategori unit (${cat.name}) berbeda dengan folder tujuan (${tFolder.category})`,
+          }, { status: 400 });
+        }
+
+        const isEmpty = tFolder.laptop_name === null;
+        if (isEmpty) {
+          // Case B — folder kosong → ADOPT identitas unit
+          caseDetected = "B";
+          const { error: adoptErr } = await supabaseAdmin.from("laptops").update({
+            laptop_name: name.trim(),
+            brand: brand || null,
+            cpu: cpu || null, ram: ram || null, storage: storage || null,
+            gpu: gpu || null, display: display || null,
+            selling_price: sellingPriceNum,
+            grade: grade || null,
+          }).eq("id", target_folder_id);
+          if (adoptErr) return NextResponse.json({ success: false, message: adoptErr.message }, { status: 400 });
+        } else {
+          // Case A — folder isi → STRICT validate 5 field pengunci
+          caseDetected = "A";
+          const mismatches: string[] = [];
+          if ((tFolder.laptop_name ?? "").trim() !== name.trim()) mismatches.push("Nama");
+          if ((tFolder.cpu ?? "") !== (cpu ?? "")) mismatches.push("CPU");
+          if ((tFolder.ram ?? "") !== (ram ?? "")) mismatches.push("RAM");
+          if ((tFolder.storage ?? "") !== (storage ?? "")) mismatches.push("Storage");
+          if ((tFolder.gpu ?? "") !== (gpu ?? "")) mismatches.push("GPU");
+          if ((tFolder.display ?? "") !== (display ?? "")) mismatches.push("Display");
+          if (Number(tFolder.selling_price) !== (sellingPriceNum ?? 0)) mismatches.push("Harga Jual");
+          if ((tFolder.grade ?? "") !== (grade ?? "")) mismatches.push("Grade");
+
+          if (mismatches.length > 0) {
+            return NextResponse.json({
+              success: false,
+              message: `Spec tidak match dengan folder tujuan di field: ${mismatches.join(", ")}. Perbaiki data atau pilih folder lain.`,
+            }, { status: 400 });
+          }
+        }
+        parentLaptopId = target_folder_id;
+        wasExistingParent = true;
+      }
+      // else: parentLaptopId = null (Case C — SN Lepas)
+
+      // 3. Insert unit
+      const purchasePriceNum = purchase_price != null && purchase_price !== ""
+        ? Math.round(Number(purchase_price)) : null;
+      const sparepartNum = sparepart_cost != null && sparepart_cost !== ""
+        ? Math.round(Number(sparepart_cost)) : null;
+
+      const { data: newUnit, error: unitErr } = await supabaseAdmin
+        .from("laptop_units")
+        .insert({
+          laptop_id: parentLaptopId,       // bisa null (SN Lepas)
+          serial_number: serial_number.trim(),
+          device_type: deviceType,
+          category: cat.name,
+          // Identitas per-SN
+          name: name.trim(),
+          brand: brand || null,
+          cpu: cpu || null, ram: ram || null, storage: storage || null,
+          gpu: gpu || null, display: display || null,
+          grade: grade || "A",
+          purchase_price: purchasePriceNum,
+          selling_price: sellingPriceNum,
+          sparepart_cost: sparepartNum,
+          official_price: sellingPriceNum != null ? sellingPriceNum + OFFICIAL_PRICE_MARKUP : null,
+          status: "BELUM_SIAP",
+          qc_status: "NEEDS_QC",
+          source: source || null,
+          branch: safeBranch,
+          notes: notes || null,
+          condition_note: condition_note?.trim() || null,
+          kelengkapan: kelengkapan ?? null,
+          condition_checks: condition_checks ?? {},
+        })
+        .select()
+        .single();
+      if (unitErr) throw unitErr;
+
+      // 4. Recalc parent qty kalau ada parent
+      if (parentLaptopId) await recalcLaptopParentQty(supabaseAdmin, parentLaptopId);
+
+      // 5. Log
+      try {
+        const caseLabel = caseDetected === "A" ? "masuk folder isi"
+          : caseDetected === "B" ? "folder kosong di-adopt"
+          : "SN Lepas (tanpa folder)";
+        await logActivity({
+          userId: user.id, userName: user.name, userRole: user.role,
+          action: "CREATE", entity: "unit", entityId: newUnit.id,
+          entityLabel: `SN: ${newUnit.serial_number} (${name}) — ${caseLabel}`,
+          afterData: newUnit,
+        });
+      } catch { /* non-blocking */ }
+
+      return NextResponse.json({
+        success: true,
+        data: { unit: newUnit, parent_id: parentLaptopId, was_existing_parent: wasExistingParent, case: caseDetected },
+        message: caseDetected === "A" ? `SN masuk ke folder existing "${name}"`
+          : caseDetected === "B" ? `Folder kosong di-adopt + SN pertama masuk`
+          : `SN Lepas (tanpa folder) tercipta`,
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // FLOW AKSESORIS
+    // ═══════════════════════════════════════════════════════════════════
+    if (tipe === "AKSESORIS") {
+      const snUpper = serial_number.trim().toUpperCase();
+      const { count: snExists } = await supabaseAdmin
+        .from("accessory_units")
+        .select("id", { count: "exact", head: true })
+        .eq("serial_number", snUpper);
+      if (snExists && snExists > 0) {
+        return NextResponse.json({ success: false, message: `Serial number "${snUpper}" sudah digunakan` }, { status: 409 });
+      }
+
+      const buyPriceNum = buy_price != null && buy_price !== "" ? Math.max(0, Math.round(Number(buy_price))) : 0;
+      let parentAccId: string | null = null;
+      let wasExistingParent = false;
+      let caseDetected: "A" | "B" | "C" = "C";
+
+      if (target_folder_id) {
+        const { data: tFolder, error: tErr } = await supabaseAdmin
+          .from("accessories")
+          .select("*")
+          .eq("id", target_folder_id)
+          .maybeSingle();
+        if (tErr || !tFolder) {
+          return NextResponse.json({ success: false, message: "Folder tujuan tidak ditemukan" }, { status: 404 });
+        }
+        if (tFolder.category !== cat.name) {
+          return NextResponse.json({
+            success: false,
+            message: `Kategori unit (${cat.name}) berbeda dengan folder tujuan (${tFolder.category})`,
+          }, { status: 400 });
+        }
+
+        const isEmpty = tFolder.name === null;
+        if (isEmpty) {
+          // Case B
+          caseDetected = "B";
+          await supabaseAdmin.from("accessories").update({
+            name: name.trim(), brand: brand || null, spec: spec || null,
+            sell_price: sellingPriceNum ?? 0, grade: grade || null,
+          }).eq("id", target_folder_id);
+        } else {
+          // Case A — STRICT validate
+          caseDetected = "A";
+          const mismatches: string[] = [];
+          if ((tFolder.name ?? "").trim() !== name.trim()) mismatches.push("Nama");
+          if ((tFolder.brand ?? "") !== (brand ?? "")) mismatches.push("Brand");
+          if ((tFolder.spec ?? "") !== (spec ?? "")) mismatches.push("Spek");
+          if (Number(tFolder.sell_price) !== (sellingPriceNum ?? 0)) mismatches.push("Harga Jual");
+          if ((tFolder.grade ?? "") !== (grade ?? "")) mismatches.push("Grade");
+
+          if (mismatches.length > 0) {
+            return NextResponse.json({
+              success: false,
+              message: `Spec tidak match dengan folder tujuan di field: ${mismatches.join(", ")}. Perbaiki data atau pilih folder lain.`,
+            }, { status: 400 });
+          }
+        }
+        parentAccId = target_folder_id;
+        wasExistingParent = true;
+      }
+
+      const safeCondition = condition === "BARU" || condition === "BEKAS" ? condition : "BARU";
+
+      const { data: newUnit, error: unitErr } = await supabaseAdmin
+        .from("accessory_units")
+        .insert({
+          accessory_id: parentAccId,     // bisa null (SN Lepas)
+          serial_number: snUpper,
+          device_type: "ACCESSORY",
+          category: cat.name,
+          name: name.trim(),
+          brand: brand || null,
+          spec: spec || null,
+          grade: grade || null,
+          condition: safeCondition,
+          status: "TERSEDIA",
+          buy_price: buyPriceNum,
+          selling_price: sellingPriceNum ?? 0,
+          source: source?.trim() || null,
+          branch: safeBranch,
+          notes: notes?.trim() || null,
+        })
+        .select()
+        .single();
+      if (unitErr) throw unitErr;
+
+      if (parentAccId) await recalcAccessoryParentStock(supabaseAdmin, parentAccId);
+
+      try {
+        const caseLabel = caseDetected === "A" ? "masuk folder isi"
+          : caseDetected === "B" ? "folder kosong di-adopt"
+          : "SN Lepas (tanpa folder)";
+        await logActivity({
+          userId: user.id, userName: user.name, userRole: user.role,
+          action: "CREATE", entity: "unit", entityId: newUnit.id,
+          entityLabel: `SN: ${newUnit.serial_number} (${name}) — ${caseLabel}`,
+          afterData: newUnit,
+        });
+      } catch { /* non-blocking */ }
+
+      return NextResponse.json({
+        success: true,
+        data: { unit: newUnit, parent_id: parentAccId, was_existing_parent: wasExistingParent, case: caseDetected },
+        message: caseDetected === "A" ? `SN masuk ke folder existing "${name}"`
+          : caseDetected === "B" ? `Folder kosong di-adopt + SN pertama masuk`
+          : `SN Lepas (tanpa folder) tercipta`,
+      });
+    }
+
+    return NextResponse.json({ success: false, message: "Tipe tidak dikenali" }, { status: 400 });
+  } catch (err) {
+    console.error("[POST /api/data-barang/units/create]", err);
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ success: false, message: msg }, { status: 500 });
+  }
 }
 
 export const POST = withAuth(postHandler);

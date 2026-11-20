@@ -14,6 +14,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { Wrench, CheckCircle2, Package, Clock, Plus, Trash2 } from "lucide-react";
+import SuggestFolderModal from "@/components/inventory/SuggestFolderModal";
 
 interface SparepartItem {
   id: string;
@@ -56,6 +57,26 @@ export default function AntrianSparepartTab() {
   // Form tambah sparepart per unit — key = unit_id
   const [addForms, setAddForms] = useState<Record<string, { name: string; cost: string; note: string }>>({});
   const [addingUnitId, setAddingUnitId] = useState<string | null>(null);
+
+  // ✅ SN Lepas lulus sparepart + QC → tawarkan folder match (pola Step 4).
+  // Null = modal tertutup; object = munculin SuggestFolderModal dengan data.
+  // Type match dengan SuggestFolder interface di SuggestFolderModal.tsx —
+  // folder match butuh full field 5 pengunci + brand + selling_price buat preview.
+  const [suggestFolderData, setSuggestFolderData] = useState<{
+    unitId: string;
+    unitName: string;
+    folders: Array<{
+      id: string;
+      laptop_name: string | null;
+      brand: string | null;
+      cpu: string | null;
+      ram: string | null;
+      storage: string | null;
+      selling_price: number | null;
+      grade: string | null;
+      category: string | null;
+    }>;
+  } | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -171,6 +192,19 @@ export default function AntrianSparepartTab() {
       const json = await res.json();
       if (!json.success) { toast.error(json.message || "Gagal"); return; }
       toast.success(json.message);
+
+      // ✅ SN Lepas lulus sparepart + QC complete → tawarkan folder match
+      // (konsisten dengan Step 4 QC auto-suggest folder).
+      // Backend /finish endpoint harus return { is_sn_lepas, suggest_folders[] }
+      // sejajar dengan logic di Patch 5.3 (endpoint /complete).
+      if (json.is_sn_lepas && Array.isArray(json.suggest_folders) && json.suggest_folders.length > 0) {
+        setSuggestFolderData({
+          unitId: group.unit_id,
+          unitName: `${group.laptop_name} (SN ${group.serial_number ?? "—"})`,
+          folders: json.suggest_folders,
+        });
+      }
+
       fetchItems();
     } catch {
       toast.error("Terjadi kesalahan koneksi");
@@ -344,6 +378,20 @@ export default function AntrianSparepartTab() {
             );
           })}
         </div>
+      )}
+
+      {/* ✅ Modal auto-suggest folder untuk SN Lepas lulus sparepart + QC */}
+      {suggestFolderData && (
+        <SuggestFolderModal
+          unitId={suggestFolderData.unitId}
+          unitName={suggestFolderData.unitName}
+          folders={suggestFolderData.folders}
+          onClose={() => setSuggestFolderData(null)}
+          onMoved={() => {
+            setSuggestFolderData(null);
+            fetchItems();
+          }}
+        />
       )}
     </div>
   );

@@ -13,7 +13,8 @@ import { Trophy, ThumbsUp, AlertTriangle, Wrench, Laptop, CheckCircle2, Lock, Ca
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface LaptopUnit {
     id: string;
-    laptop_id: string;
+    // ✅ SN-First: laptop_id nullable untuk SN Lepas (unit tanpa parent folder)
+    laptop_id: string | null;
     serial_number: string;
     grade: "A" | "B" | "C";
     condition_note: string;
@@ -28,18 +29,37 @@ interface LaptopUnit {
     created_at: string;
     reserved_by?: string;
     reserved_invoice?: string;
-      being_prepared?: boolean;
+    being_prepared?: boolean;
     preparing_order_number?: string | null;
-    branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU: cabang per unit
+    branch?: "UTAMA" | "JOGJA" | null;
+    // ✅ SN-First hybrid read: field identitas di unit-level (optional fallback
+    //    kalau SN Lepas), parent laptop sebagai secondary source.
+    laptop_name?: string | null;
+    brand?: string | null;
+    cpu?: string | null;
+    ram?: string | null;
+    storage?: string | null;
+    display?: string | null;
+    // ✅ Flag dari backend (Patch 7.1) — unit tanpa parent folder
+    is_sn_lepas?: boolean;
+    // ✅ Pre-computed effective fields dari backend (Patch 7.1)
+    effective_laptop_name?: string | null;
+    effective_brand?: string | null;
+    effective_cpu?: string | null;
+    effective_ram?: string | null;
+    effective_storage?: string | null;
+    effective_display?: string | null;
+    effective_selling_price?: number;
+    // Parent laptop — nullable fields untuk SN Lepas
     laptop?: {
-        id: string;
-        laptop_name: string;
-        brand: string;
-        cpu: string;
-        ram: string;
-        storage: string;
-        display?: string;
-        selling_price: number;
+        id: string | null;
+        laptop_name: string | null;
+        brand: string | null;
+        cpu: string | null;
+        ram: string | null;
+        storage: string | null;
+        display?: string | null;
+        selling_price: number | null;
     };
 }
 
@@ -129,10 +149,15 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
     const st = STATUS_CONFIG[unit.status];
     const GradeIcon = unit.grade === "A" ? Trophy : unit.grade === "B" ? ThumbsUp : AlertTriangle;
 
+    // ✅ Hybrid read: prefer effective_* (pre-computed backend), fallback manual
+    const effBrand = unit.effective_brand ?? unit.brand ?? unit.laptop?.brand ?? "—";
+    const effCpu = unit.effective_cpu ?? unit.cpu ?? unit.laptop?.cpu ?? "—";
+    const effDisplay = unit.effective_display ?? unit.display ?? unit.laptop?.display ?? "—";
+
     const rows: { label: string; value: React.ReactNode }[] = [
-        { label: "Brand", value: unit.laptop?.brand || "—" },
-        { label: "CPU", value: unit.laptop?.cpu || "—" },
-        { label: "Display", value: unit.laptop?.display || "—" },
+        { label: "Brand", value: effBrand || "—" },
+        { label: "CPU", value: effCpu || "—" },
+        { label: "Display", value: effDisplay || "—" },
         {
             label: "Grade", value: (
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${GRADE_BADGE[unit.grade] || ""}`}>
@@ -140,6 +165,14 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
                 </span>
             )
         },
+        // ✅ Badge SN Lepas di detail modal (konsisten Step 3-6)
+        ...(unit.is_sn_lepas ? [{
+            label: "Folder", value: (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-sky-50 text-sky-700 border-sky-200">
+                    🆓 SN Lepas (tanpa folder)
+                </span>
+            )
+        }] : []),
         ...(unit.being_prepared ? [{
             label: "Status Penyiapan", value: (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-orange-50 text-orange-700 border-orange-200">
@@ -159,9 +192,18 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
                 <div className={`${BRAND_GRADIENT} px-5 py-5 flex-shrink-0`}>
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <h3 className="font-bold text-white truncate text-[15px]">{unit.laptop?.laptop_name || "—"}</h3>
+                            <h3 className="font-bold text-white truncate text-[15px]">
+                                {/* ✅ Hybrid read nama laptop */}
+                                {unit.effective_laptop_name ?? unit.laptop_name ?? unit.laptop?.laptop_name ?? "—"}
+                            </h3>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                                 <code className="font-mono text-[11px] text-gray-100 bg-white/10 ring-1 ring-white/10 px-2 py-0.5 rounded-md">{unit.serial_number}</code>
+                                {/* ✅ Badge LEPAS inline di header modal */}
+                                {unit.is_sn_lepas && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-400/30 text-white border border-sky-300/40">
+                                        🆓 LEPAS
+                                    </span>
+                                )}
                                 {st && (
                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${st.badge}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
@@ -220,8 +262,17 @@ function ConditionViewModal({ unit, checks, checkedBy, checkedAt, loading, onClo
                                 <ClipboardList size={16} className="flex-shrink-0 text-white/80" /> Cek Kondisi
                             </h3>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <span className="text-xs text-gray-200 truncate">{unit.laptop?.laptop_name || "—"}</span>
+                                <span className="text-xs text-gray-200 truncate">
+                                    {/* ✅ Hybrid read */}
+                                    {unit.effective_laptop_name ?? unit.laptop_name ?? unit.laptop?.laptop_name ?? "—"}
+                                </span>
                                 <code className="font-mono text-[11px] text-gray-100 bg-white/10 ring-1 ring-white/10 px-2 py-0.5 rounded-md">{unit.serial_number}</code>
+                                {/* ✅ Badge LEPAS */}
+                                {unit.is_sn_lepas && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-400/30 text-white border border-sky-300/40">
+                                        🆓 LEPAS
+                                    </span>
+                                )}
                             </div>
                         </div>
                         <button onClick={onClose} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition active:scale-95">
@@ -459,10 +510,20 @@ async function buildAndDownloadExcel(opts: {
 function groupUnitsByLaptop(list: LaptopUnit[], getPrice: (u: LaptopUnit) => number) {
     const map = new Map<string, {
         laptop_name: string; brand: string; cpu: string; ram: string; storage: string;
-        qty: number; priceSum: number; priceCount: number;
+        qty: number; priceSum: number; priceCount: number; is_sn_lepas?: boolean;
     }>();
     list.forEach(u => {
-        const key = u.laptop_id || u.laptop?.laptop_name || "unknown";
+        // ✅ Hybrid read effective fields
+        const effName = u.effective_laptop_name ?? u.laptop_name ?? u.laptop?.laptop_name ?? "—";
+        const effBrand = u.effective_brand ?? u.brand ?? u.laptop?.brand ?? "—";
+        const effCpu = u.effective_cpu ?? u.cpu ?? u.laptop?.cpu ?? "—";
+        const effRam = u.effective_ram ?? u.ram ?? u.laptop?.ram ?? "—";
+        const effStorage = u.effective_storage ?? u.storage ?? u.laptop?.storage ?? "—";
+
+        // ✅ Grouping key: unit folder pakai laptop_id, SN Lepas group by
+        //    effective spec signature (nama+cpu+ram+storage) supaya SN Lepas
+        //    yang spesnya sama jadi 1 group — konsisten dengan folder match.
+        const key = u.laptop_id || `LEPAS::${effName}::${effCpu}::${effRam}::${effStorage}`;
         const price = Number(getPrice(u)) || 0;
         const row = map.get(key);
         if (row) {
@@ -470,14 +531,15 @@ function groupUnitsByLaptop(list: LaptopUnit[], getPrice: (u: LaptopUnit) => num
             if (price > 0) { row.priceSum += price; row.priceCount += 1; }
         } else {
             map.set(key, {
-                laptop_name: u.laptop?.laptop_name ?? "—",
-                brand: u.laptop?.brand ?? "—",
-                cpu: u.laptop?.cpu ?? "—",
-                ram: u.laptop?.ram ?? "—",
-                storage: u.laptop?.storage ?? "—",
+                laptop_name: effName,
+                brand: effBrand,
+                cpu: effCpu,
+                ram: effRam,
+                storage: effStorage,
                 qty: 1,
                 priceSum: price > 0 ? price : 0,
                 priceCount: price > 0 ? 1 : 0,
+                is_sn_lepas: !u.laptop_id, // tag group kalau asalnya SN Lepas
             });
         }
     });
@@ -610,12 +672,20 @@ function ReadyContent() {
     useEffect(() => { fetchUnits(); }, []);
 
     const uniqueBrands = useMemo(() => {
-        const b = new Set(units.map(u => u.laptop?.brand).filter(Boolean) as string[]);
+        // ✅ Hybrid: SN Lepas pakai brand unit-level, unit folder pakai parent laptop
+        const b = new Set(
+            units.map(u => u.effective_brand ?? u.brand ?? u.laptop?.brand)
+                .filter(Boolean) as string[]
+        );
         return ["ALL", ...Array.from(b)];
     }, [units]);
 
     const uniqueRams = useMemo(() => {
-        const r = new Set(units.map(u => u.laptop?.ram).filter(Boolean) as string[]);
+        // ✅ Hybrid: SN Lepas pakai ram unit-level
+        const r = new Set(
+            units.map(u => u.effective_ram ?? u.ram ?? u.laptop?.ram)
+                .filter(Boolean) as string[]
+        );
         return ["ALL", ...Array.from(r).sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0))];
     }, [units]);
 
@@ -632,29 +702,47 @@ function ReadyContent() {
         }
         if (search.trim()) {
             const t = search.toLowerCase();
-            list = list.filter(u =>
-                u.laptop?.laptop_name?.toLowerCase().includes(t) ||
-                u.laptop?.brand?.toLowerCase().includes(t) ||
-                u.laptop?.cpu?.toLowerCase().includes(t) ||
-                u.laptop?.ram?.toLowerCase().includes(t) ||
-                u.laptop?.storage?.toLowerCase().includes(t)
-            );
+            // ✅ Hybrid: cari di effective fields (SN Lepas & unit folder sama2 ter-cover)
+            list = list.filter(u => {
+                const name = u.effective_laptop_name ?? u.laptop_name ?? u.laptop?.laptop_name ?? "";
+                const brand = u.effective_brand ?? u.brand ?? u.laptop?.brand ?? "";
+                const cpu = u.effective_cpu ?? u.cpu ?? u.laptop?.cpu ?? "";
+                const ram = u.effective_ram ?? u.ram ?? u.laptop?.ram ?? "";
+                const storage = u.effective_storage ?? u.storage ?? u.laptop?.storage ?? "";
+                return name.toLowerCase().includes(t) ||
+                    brand.toLowerCase().includes(t) ||
+                    cpu.toLowerCase().includes(t) ||
+                    ram.toLowerCase().includes(t) ||
+                    storage.toLowerCase().includes(t);
+            });
         }
         if (filterSN.trim()) {
             const snQ = filterSN.trim().toLowerCase();
-            const matchedGroupIds = new Set(
+            // ✅ SN Lepas fix: split jadi 2 behavior —
+            //   - Unit folder: SN match → tampilkan semua unit di folder itu (group)
+            //   - SN Lepas: SN match → tampilkan unit itu sendiri (standalone, no group)
+            const matchedFolderIds = new Set(
                 units
-                    .filter(u => u.serial_number?.toLowerCase().includes(snQ))
+                    .filter(u => u.laptop_id && u.serial_number?.toLowerCase().includes(snQ))
                     .map(u => u.laptop_id)
-                    .filter(Boolean)
+                    .filter(Boolean) as string[]
             );
-            list = list.filter(u => u.laptop_id && matchedGroupIds.has(u.laptop_id));
+            const matchedLepasIds = new Set(
+                units
+                    .filter(u => !u.laptop_id && u.serial_number?.toLowerCase().includes(snQ))
+                    .map(u => u.id)
+            );
+            list = list.filter(u =>
+                (u.laptop_id && matchedFolderIds.has(u.laptop_id)) ||
+                (!u.laptop_id && matchedLepasIds.has(u.id))
+            );
         }
         if (filterStatus !== "ALL") {
             list = list.filter(u => u.status === filterStatus);
         }
-        if (filterBrand !== "ALL") list = list.filter(u => u.laptop?.brand === filterBrand);
-        if (filterRam !== "ALL") list = list.filter(u => u.laptop?.ram === filterRam);
+        // ✅ Hybrid filter: SN Lepas brand/ram di unit-level
+        if (filterBrand !== "ALL") list = list.filter(u => (u.effective_brand ?? u.brand ?? u.laptop?.brand) === filterBrand);
+        if (filterRam !== "ALL") list = list.filter(u => (u.effective_ram ?? u.ram ?? u.laptop?.ram) === filterRam);
         if (filterPriceRange !== "ALL") {
             const ranges: Record<string, [number, number]> = {
                 "1-2": [1_000_000, 2_000_000],
@@ -671,32 +759,38 @@ function ReadyContent() {
             list = list.filter(u => !u.being_prepared);
         }
 
+        // ✅ Hybrid helpers untuk sort — konsisten pattern
+        const getName = (u: LaptopUnit) => u.effective_laptop_name ?? u.laptop_name ?? u.laptop?.laptop_name ?? "";
+        const getCpu = (u: LaptopUnit) => u.effective_cpu ?? u.cpu ?? u.laptop?.cpu ?? "";
+        const getRam = (u: LaptopUnit) => u.effective_ram ?? u.ram ?? u.laptop?.ram ?? "";
+        const getStorage = (u: LaptopUnit) => u.effective_storage ?? u.storage ?? u.laptop?.storage ?? "";
+
         switch (sortBy) {
             case "AZ":
             case "NAMA_ASC":
-                list.sort((a, b) => (a.laptop?.laptop_name || "").localeCompare(b.laptop?.laptop_name || "", "id"));
+                list.sort((a, b) => getName(a).localeCompare(getName(b), "id"));
                 break;
             case "ZA":
             case "NAMA_DESC":
-                list.sort((a, b) => (b.laptop?.laptop_name || "").localeCompare(a.laptop?.laptop_name || "", "id"));
+                list.sort((a, b) => getName(b).localeCompare(getName(a), "id"));
                 break;
             case "CPU_ASC":
-                list.sort((a, b) => (a.laptop?.cpu || "").localeCompare(b.laptop?.cpu || "", "id"));
+                list.sort((a, b) => getCpu(a).localeCompare(getCpu(b), "id"));
                 break;
             case "CPU_DESC":
-                list.sort((a, b) => (b.laptop?.cpu || "").localeCompare(a.laptop?.cpu || "", "id"));
+                list.sort((a, b) => getCpu(b).localeCompare(getCpu(a), "id"));
                 break;
             case "RAM_ASC":
-                list.sort((a, b) => (a.laptop?.ram || "").localeCompare(b.laptop?.ram || "", "id", { numeric: true }));
+                list.sort((a, b) => getRam(a).localeCompare(getRam(b), "id", { numeric: true }));
                 break;
             case "RAM_DESC":
-                list.sort((a, b) => (b.laptop?.ram || "").localeCompare(a.laptop?.ram || "", "id", { numeric: true }));
+                list.sort((a, b) => getRam(b).localeCompare(getRam(a), "id", { numeric: true }));
                 break;
             case "STORAGE_ASC":
-                list.sort((a, b) => (a.laptop?.storage || "").localeCompare(b.laptop?.storage || "", "id", { numeric: true }));
+                list.sort((a, b) => getStorage(a).localeCompare(getStorage(b), "id", { numeric: true }));
                 break;
             case "STORAGE_DESC":
-                list.sort((a, b) => (b.laptop?.storage || "").localeCompare(a.laptop?.storage || "", "id", { numeric: true }));
+                list.sort((a, b) => getStorage(b).localeCompare(getStorage(a), "id", { numeric: true }));
                 break;
             case "PRICE_ASC":
                 list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0));
@@ -722,7 +816,8 @@ function ReadyContent() {
                 list.sort((a, b) => {
                     const d = (order[a.status] ?? 9) - (order[b.status] ?? 9);
                     if (d !== 0) return d;
-                    return (a.laptop?.laptop_name ?? "").localeCompare(b.laptop?.laptop_name ?? "", "id");
+                    // ✅ Hybrid read di default sort
+                    return getName(a).localeCompare(getName(b), "id");
                 });
             }
         }
@@ -748,6 +843,8 @@ function ReadyContent() {
                 { header: "CPU", width: 22, align: "left" },
                 { header: "Display", width: 20, align: "left" },
                 { header: "Serial Number", width: 24, align: "center" },
+                // ✅ Kolom baru — tag "LEPAS" / "FOLDER" buat CEO aware
+                { header: "Folder", width: 10, align: "center" },
                 { header: "Grade", width: 12, align: "center" },
                 { header: "Harga Setor", width: 18, align: "right", numFmt: '"Rp "#,##0' },
                 { header: "Status", width: 16, align: "center" },
@@ -757,11 +854,14 @@ function ReadyContent() {
 
             const rows = filtered.map((u, idx) => [
                 idx + 1,
-                u.laptop?.laptop_name ?? "—",
-                u.laptop?.brand ?? "—",
-                u.laptop?.cpu ?? "—",
-                u.laptop?.display ?? "—",
+                // ✅ Hybrid read semua field laptop
+                u.effective_laptop_name ?? u.laptop_name ?? u.laptop?.laptop_name ?? "—",
+                u.effective_brand ?? u.brand ?? u.laptop?.brand ?? "—",
+                u.effective_cpu ?? u.cpu ?? u.laptop?.cpu ?? "—",
+                u.effective_display ?? u.display ?? u.laptop?.display ?? "—",
                 u.serial_number ?? "—",
+                // ✅ Tag LEPAS / FOLDER
+                u.is_sn_lepas ? "LEPAS" : "FOLDER",
                 `Grade ${u.grade}`,
                 u.selling_price || 0,
                 STATUS_CONFIG[u.status]?.label ?? u.status,
@@ -886,21 +986,25 @@ function ReadyContent() {
 
     const laptopRows: InventoryRow[] = filtered.map(u => ({
         id: u.id,
-        laptop_name: u.laptop?.laptop_name ?? "—",
-        cpu: u.laptop?.cpu ?? "",
-        ram: u.laptop?.ram ?? "",
-        storage: u.laptop?.storage ?? "",
+        // ✅ Hybrid read: effective → unit → laptop → fallback
+        laptop_name: u.effective_laptop_name ?? u.laptop_name ?? u.laptop?.laptop_name ?? "—",
+        cpu: u.effective_cpu ?? u.cpu ?? u.laptop?.cpu ?? "",
+        ram: u.effective_ram ?? u.ram ?? u.laptop?.ram ?? "",
+        storage: u.effective_storage ?? u.storage ?? u.laptop?.storage ?? "",
         harga_modal: null,
         harga_jual: u.selling_price ?? 0,
         sumber: null,
         tanggal_masuk: null,
         sn: u.serial_number,
-        branch: u.branch ?? null, // ⬅️ BARU (per-SN)
+        branch: u.branch ?? null,
         stok_tersisa: 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
         minus: 0,
         is_new: isNewArrival(u.created_at),
-    }));    
+        // ✅ SN Lepas flag — kalau InventoryTable support, bakal render badge
+        //    Kalau InventoryTable gak support (prop gak didefine), silently ignored
+        is_sn_lepas: u.is_sn_lepas,
+    } as InventoryRow & { is_sn_lepas?: boolean }));
 
     // ── Baris aksesoris (HDD & RAM) — per-MODEL, digabung ke tabel yang sama ──
     // Sales cuma lihat Nama + Harga Jual + Stok (lewat kolom SJ). Tanpa SN/CPU/

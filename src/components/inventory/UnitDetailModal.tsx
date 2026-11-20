@@ -14,6 +14,7 @@ import { useRegisterOverlay } from "@/contexts/OverlayContext";
 import { CurrencyInput } from "@/components/ui/CurrencyInputField";
 import ConditionChecklist from "@/components/inventory/ConditionChecklist";
 import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
+import MoveUnitModal from "@/components/inventory/MoveUnitModal";
 
 export interface UnitDetailData {
     id: string;
@@ -50,6 +51,9 @@ interface Props {
     canSeePrivate: boolean;
     /** Boleh isi/ubah checklist Tes Kondisi unit (default false kalau tidak dikirim) */
     canEditChecklist?: boolean;
+    /** Boleh pindahkan unit antar folder atau ke etalase (SN Lepas).
+     *  Admin Barang only (ADMIN, KEPALA_ADMIN_BARANG, ADMIN_BARANG). Default false. */
+    canMoveUnit?: boolean;
     onClose: () => void;
     onSaved: (updated: UnitDetailData) => void;
     /** Opsional: tombol "Info Laptop" (nama/CPU/RAM) — hanya dari Data Barang */
@@ -58,6 +62,9 @@ interface Props {
     defaultSellingPrice?: number;
     /** Dipanggil setelah unit BARU berhasil dibuat lewat form "Tambah Unit" di dalam pop-up ini */
     onCreated?: (created: UnitDetailData) => void;
+    /** Dipanggil setelah unit BERHASIL dipindah ke folder lain / etalase.
+     *  Parent WAJIB refresh data karena laptop_id unit berubah. */
+    onMoved?: () => void;
     /** Kalau modal ini dibuka dari Pop-up Detail Laptop, tampilkan tombol "Kembali" di header */
     onBack?: () => void;
 }
@@ -106,8 +113,9 @@ const inputCls =
 const OFFICIAL_PRICE_MARKUP = 300_000;
 
 export default function UnitDetailModal({
-    unit, laptopName, laptopMeta, laptopSpecs, canEdit, canManageUnit, canSeePrivate, canEditChecklist = false, onClose, onSaved, onEditLaptop,
-    defaultSellingPrice, onCreated, onBack,
+    unit, laptopName, laptopMeta, laptopSpecs, canEdit, canManageUnit, canSeePrivate, canEditChecklist = false,
+    canMoveUnit = false, onClose, onSaved, onEditLaptop,
+    defaultSellingPrice, onCreated, onMoved, onBack,
 }: Props) {
     useRegisterOverlay();
     //  canManage khusus untuk aksi "+ Tambah Unit" & "Edit Data" (butuh CREATE_UNITS/
@@ -115,6 +123,9 @@ export default function UnitDetailModal({
     //  (butuh EDIT_LAPTOP). Fallback ke canEdit kalau pemanggil belum kirim prop ini.
     const canManage = canManageUnit ?? canEdit;
     const [isEditing, setIsEditing] = useState(false);
+    //  State modal Pindah Unit (Step 1.5 — Rework 2026-11-20). Dibuka dari tombol
+    //  "Pindah Unit" di footer mode VIEW. Admin Barang only (gated via canMoveUnit).
+    const [showMoveModal, setShowMoveModal] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [form, setForm] = useState({
@@ -647,6 +658,16 @@ export default function UnitDetailModal({
                                     Info Laptop
                                 </button>
                             )}
+                            {/* Tombol Pindah Unit (Rework 2026-11-20) — Admin Barang only.
+                                Buka MoveUnitModal untuk pilih folder tujuan (match 5 field
+                                pengunci) atau pindah ke Etalase (SN Lepas). */}
+                            {canMoveUnit && unit.status !== "SOLD" && (
+                                <button onClick={() => setShowMoveModal(true)}
+                                    title="Pindahkan unit ke folder lain atau etalase"
+                                    className="h-11 px-4 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl text-sm font-semibold hover:bg-violet-100 transition flex items-center justify-center whitespace-nowrap">
+                                    Pindah Unit
+                                </button>
+                            )}
                                                         {/*  Tambah unit baru TETAP DI DALAM pop-up ini (bukan navigasi ke
                                 halaman Units) — supaya saat stok = 1, popup ini jadi satu-satunya
                                 tempat yang dibutuhkan untuk lihat, edit, maupun tambah unit. */}
@@ -666,6 +687,27 @@ export default function UnitDetailModal({
                     )}
                 </div>
             </div>
+
+            {/* ── MODAL: Pindah Unit (Step 1.5 — Rework 2026-11-20) ────────── */}
+            {/* Dipanggil dari tombol "Pindah Unit" di footer VIEW. Tampilkan
+                dropdown folder tujuan (5 field pengunci match) + opsi Etalase.
+                Setelah berhasil pindah, parent di-refresh via onMoved + modal
+                ini auto-close (karena unit sudah tidak di folder ini). */}
+            <MoveUnitModal
+                unit={{
+                    id: unit.id,
+                    serial_number: unit.serial_number,
+                    type: "LAPTOP",
+                    current_folder_label: laptopName,
+                }}
+                open={showMoveModal}
+                onClose={() => setShowMoveModal(false)}
+                onMoved={() => {
+                    setShowMoveModal(false);
+                    onMoved?.();
+                    onClose(); // auto-close modal detail karena unit sudah pindah
+                }}
+            />
         </div>
     );
 }

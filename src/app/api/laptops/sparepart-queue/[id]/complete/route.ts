@@ -79,12 +79,60 @@ async function handler(_req: NextRequest, props: Props, user: AuthUser) {
         actor_user_id: user.id, actor_name: user.name,
         reason: "Semua sparepart selesai + kriteria QC lengkap → auto SIAP_JUAL",
       });
-      await recalcLaptopParentQty(supabase, sp.laptop_id);
+
+      // ✅ SN Lepas guard: laptop_id bisa NULL (unit lepas folder)
+      if (sp.laptop_id) {
+        await recalcLaptopParentQty(supabase, sp.laptop_id);
+      }
+
+      // ✅ Auto-suggest folder untuk SN Lepas (pola Step 4 Patch 4.1).
+      // Cari folder match berdasarkan 5 pengunci: laptop_name, cpu, ram, storage, grade.
+      // Return full field (brand, selling_price) biar SuggestFolderModal bisa
+      // preview harga & brand di tiap opsi folder — match SuggestFolder interface.
+      // Return type match persis dengan SuggestFolder interface di
+      // SuggestFolderModal.tsx (line 12-22) — semua nullable, ada field
+      // `category` yang dipakai modal untuk kategorisasi preview.
+      let suggestFolders: Array<{
+        id: string;
+        laptop_name: string | null;
+        brand: string | null;
+        cpu: string | null;
+        ram: string | null;
+        storage: string | null;
+        selling_price: number | null;
+        grade: string | null;
+        category: string | null;
+      }> = [];
+      if (!fresh.laptop_id && fresh.laptop_name) {
+        const { data: matches } = await supabase
+          .from("laptops")
+          .select("id, laptop_name, brand, cpu, ram, storage, grade, selling_price, category")
+          .eq("laptop_name", fresh.laptop_name)
+          .eq("cpu", fresh.cpu ?? "")
+          .eq("ram", fresh.ram ?? "")
+          .eq("storage", fresh.storage ?? "")
+          .eq("grade", fresh.grade ?? "")
+          .limit(5);
+        suggestFolders = (matches ?? []).map(m => ({
+          id: m.id,
+          laptop_name: m.laptop_name ?? null,
+          brand: m.brand ?? null,
+          cpu: m.cpu ?? null,
+          ram: m.ram ?? null,
+          storage: m.storage ?? null,
+          grade: m.grade ?? null,
+          selling_price: m.selling_price ?? null,
+          category: m.category ?? null,
+        }));
+      }
 
       return NextResponse.json({
         success: true,
         message: "Semua sparepart selesai & kriteria lengkap — unit otomatis SIAP JUAL",
-        unit_updated: true, new_status: "SIAP_JUAL",
+        unit_updated: true,
+        new_status: "SIAP_JUAL",
+        is_sn_lepas: !fresh.laptop_id,
+        suggest_folders: suggestFolders,
       });
     }
 
@@ -100,12 +148,15 @@ async function handler(_req: NextRequest, props: Props, user: AuthUser) {
       actor_user_id: user.id, actor_name: user.name,
       reason: "Sparepart selesai tapi kriteria belum lengkap → balik ke Team QC",
     });
-    await recalcLaptopParentQty(supabase, sp.laptop_id);
+    if (sp.laptop_id) {
+      await recalcLaptopParentQty(supabase, sp.laptop_id);
+    }
 
     return NextResponse.json({
       success: true,
       message: "Sparepart selesai, tapi kriteria belum lengkap — unit balik ke Team QC",
       unit_updated: true, new_status: "BELUM_SIAP",
+      is_sn_lepas: !fresh.laptop_id,
     });
   } catch (err) {
     console.error("[sparepart-queue/complete]", err);
