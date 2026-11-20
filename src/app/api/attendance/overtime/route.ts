@@ -1294,7 +1294,14 @@ export async function PATCH(request: Request) {
         const updLateThresholdMinutes = updSchedule?.lateFrom
           ? updSchedule.lateFrom.h * 60 + updSchedule.lateFrom.m
           : 8 * 60;
-        updatePayload.is_late = isHolidayOvertimeLate({ requested_start: resolvedStart }, updLateThresholdMinutes);
+        // Lembur HOLIDAY otomatis: requested_start = jam absen masuk asli (tidak
+        // ikut berubah saat jam lembur diedit), jadi status telat harus tetap
+        // mengikuti jam masuk asli, bukan jam mulai lembur hasil edit.
+        const lateBasis =
+          overtime.direction === "HOLIDAY" && overtime.requested_start
+            ? overtime.requested_start
+            : resolvedStart;
+        updatePayload.is_late = isHolidayOvertimeLate({ requested_start: lateBasis }, updLateThresholdMinutes);
       }
 
       const { data, error } = await supabase
