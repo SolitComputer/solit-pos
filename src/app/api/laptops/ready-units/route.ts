@@ -98,6 +98,18 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       ...u,
       being_prepared: preparingSnMap.has(u.serial_number),
       preparing_order_number: preparingSnMap.get(u.serial_number) ?? null,
+      // ✅ SN-First awareness (pola Step 3-6): flag unit tanpa parent folder.
+      // Frontend langsung bisa render badge "LEPAS" tanpa cek manual.
+      is_sn_lepas: u.laptop_id === null,
+      // ✅ Hybrid read: effective field unit-level prioritas, fallback laptop.
+      //    Konsisten dengan pattern Step 3-6 — SN Lepas & unit folder sama API shape.
+      effective_laptop_name: u.laptop_name ?? u.laptop?.laptop_name ?? null,
+      effective_brand: u.brand ?? u.laptop?.brand ?? null,
+      effective_cpu: u.cpu ?? u.laptop?.cpu ?? null,
+      effective_ram: u.ram ?? u.laptop?.ram ?? null,
+      effective_storage: u.storage ?? u.laptop?.storage ?? null,
+      effective_display: u.display ?? u.laptop?.display ?? null,
+      effective_selling_price: u.selling_price ?? u.laptop?.selling_price ?? 0,
     }));
 
     return NextResponse.json({ success: true, data: withPrepStatus });

@@ -20,12 +20,22 @@ interface UnitFromQc {
   serial_number: string;
   condition_note?: string | null;
   analisa?: string | null;
+  // ✅ SN-First hybrid read: field identitas di unit-level (fallback kalau
+  //    SN Lepas), parent laptop sebagai secondary source.
+  laptop_name?: string | null;
+  brand?: string | null;
+  cpu?: string | null;
+  ram?: string | null;
+  storage?: string | null;
+  // ✅ Flag SN Lepas — render badge visual di header + info di body.
+  is_sn_lepas?: boolean;
+  // Optional parent laptop (legacy — tetap dibaca untuk backward compat)
   laptop?: {
-    laptop_name: string;
-    brand?: string;
-    cpu?: string;
-    ram?: string;
-    storage?: string;
+    laptop_name?: string | null;
+    brand?: string | null;
+    cpu?: string | null;
+    ram?: string | null;
+    storage?: string | null;
   };
 }
 
@@ -111,12 +121,23 @@ export default function QcDecisionModal({
       <div className="relative bg-white w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-indigo-600 to-indigo-700">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Keputusan Pengelola Barang</p>
-            <h2 className="text-white font-bold text-base mt-0.5 truncate">{unit.laptop?.laptop_name || "Laptop"}</h2>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">
+              Keputusan Pengelola Barang
+              {/* ✅ Badge SN Lepas inline di label */}
+              {unit.is_sn_lepas && (
+                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-sky-400/30 text-white text-[9px] font-bold border border-sky-300/40">
+                  🆓 SN LEPAS
+                </span>
+              )}
+            </p>
+            <h2 className="text-white font-bold text-base mt-0.5 truncate">
+              {/* ✅ Hybrid read: unit field prioritas, fallback laptop, fallback literal */}
+              {unit.laptop_name ?? unit.laptop?.laptop_name ?? "Laptop"}
+            </h2>
             <p className="text-xs text-white/60 mt-0.5">
               <span className="font-mono">{unit.serial_number}</span>
-              {unit.laptop?.brand && ` · ${unit.laptop.brand}`}
+              {(unit.brand ?? unit.laptop?.brand) && ` · ${unit.brand ?? unit.laptop?.brand}`}
             </p>
           </div>
           <button onClick={onClose} disabled={submitting}

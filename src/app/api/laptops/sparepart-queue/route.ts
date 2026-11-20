@@ -25,21 +25,47 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
-    // Join manual serial_number dari laptop_units (karena sparepart_queue.unit_id ref ke laptop_units)
+    // Join manual ke laptop_units — selain serial_number, juga ambil field
+    // identitas unit-level (laptop_name, brand) untuk hybrid read SN Lepas.
     const unitIds = (data ?? []).map(d => d.unit_id);
-    const unitMap = new Map<string, string>();
+    const unitMap = new Map<string, {
+      serial_number: string | null;
+      laptop_name: string | null;
+      brand: string | null;
+      laptop_id: string | null;
+    }>();
     if (unitIds.length > 0) {
       const { data: units } = await supabase
         .from("laptop_units")
-        .select("id, serial_number")
+        .select("id, serial_number, laptop_name, brand, laptop_id")
         .in("id", unitIds);
-      (units ?? []).forEach(u => unitMap.set(u.id, u.serial_number));
+      (units ?? []).forEach(u => unitMap.set(u.id, {
+        serial_number: u.serial_number,
+        laptop_name: u.laptop_name,
+        brand: u.brand,
+        laptop_id: u.laptop_id,
+      }));
     }
 
-    const enriched = (data ?? []).map(d => ({
-      ...d,
-      serial_number: unitMap.get(d.unit_id) ?? null,
-    }));
+    const enriched = (data ?? []).map(d => {
+      const unitInfo = unitMap.get(d.unit_id);
+      // ✅ Hybrid read: field unit prioritas, fallback laptop (parent)
+      const effectiveName =
+        unitInfo?.laptop_name || d.laptop?.laptop_name || null;
+      const effectiveBrand =
+        unitInfo?.brand || d.laptop?.brand || null;
+      return {
+        ...d,
+        serial_number: unitInfo?.serial_number ?? null,
+        // Overwrite nested laptop dengan effective values untuk simplify frontend
+        laptop: {
+          ...(d.laptop ?? {}),
+          laptop_name: effectiveName,
+          brand: effectiveBrand,
+        },
+        is_sn_lepas: !unitInfo?.laptop_id,
+      };
+    });
 
     return NextResponse.json({ success: true, data: enriched });
   } catch (err) {

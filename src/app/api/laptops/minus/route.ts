@@ -67,6 +67,10 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       qc_marked_minus_by_name: u.qc_marked_minus_by
         ? (userNameMap.get(u.qc_marked_minus_by) ?? null)
         : null,
+      // ✅ Flag SN Lepas — unit tanpa parent laptop (laptop_id=NULL).
+      // Frontend pakai ini untuk render badge "LEPAS" dan fallback
+      // field identitas ke level unit (hybrid read, pola Step 3-4).
+      is_sn_lepas: u.laptop_id === null,
     }));
 
     return NextResponse.json({ success: true, data: enriched });

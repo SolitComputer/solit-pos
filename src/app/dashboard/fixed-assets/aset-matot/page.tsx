@@ -54,7 +54,9 @@ export default function AsetMatotPage() {
     return items.filter(i =>
       i.nama_barang.toLowerCase().includes(q) ||
       (i.keterangan || "").toLowerCase().includes(q) ||
-      (i.asal_serial_number || "").toLowerCase().includes(q)
+      (i.asal_serial_number || "").toLowerCase().includes(q) ||
+      // ✅ Include asal_laptop_name — biar search ketemu by nama laptop asal
+      (i.asal_laptop_name || "").toLowerCase().includes(q)
     );
   }, [items, query]);
 
@@ -173,7 +175,7 @@ export default function AsetMatotPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari nama barang, keterangan, atau SN asal..."
+                     placeholder="Cari nama barang, keterangan, SN asal, atau nama laptop asal..."
             className="w-full rounded-2xl border border-gray-100 bg-white pl-10 pr-4 py-3 text-sm outline-none shadow-sm shadow-gray-200/60 focus:shadow-md focus:shadow-[#1a1545]/10 focus:ring-2 focus:ring-[#1a1545]/15 focus:border-[#1a1545]/20 transition-shadow"
           />
         </div>
@@ -218,11 +220,20 @@ export default function AsetMatotPage() {
                     <path d="M10 12h4" />
                   </svg>
                 </div>
-                <div className="min-w-0 flex-1">
+                            <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-800">{item.nama_barang}</p>
-                  {item.asal_serial_number && (
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      Dari SN: <span className="font-mono bg-gray-50 px-1.5 py-0.5 rounded text-gray-500 shadow-inner">{item.asal_serial_number}</span>
+                  {/* ✅ Tampilkan asal unit (SN + nama laptop asal) untuk traceability */}
+                  {(item.asal_serial_number || item.asal_laptop_name) && (
+                    <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                      <span>Dari:</span>
+                      {item.asal_serial_number && (
+                        <>
+                          SN <span className="font-mono bg-gray-50 px-1.5 py-0.5 rounded text-gray-500 shadow-inner">{item.asal_serial_number}</span>
+                        </>
+                      )}
+                      {item.asal_laptop_name && item.asal_laptop_name !== item.nama_barang && (
+                        <span className="text-gray-500">· {item.asal_laptop_name}</span>
+                      )}
                     </p>
                   )}
                   {item.keterangan && <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{item.keterangan}</p>}
