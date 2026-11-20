@@ -2,6 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+function useIsDark() {
+    const [isDark, setIsDark] = useState(false);
+    useEffect(() => {
+        const el = document.documentElement;
+        const update = () => setIsDark(el.classList.contains("dark"));
+        update();
+        const obs = new MutationObserver(update);
+        obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+        return () => obs.disconnect();
+    }, []);
+    return isDark;
+}
+
 interface AddableUser { id: string; name: string; role: string; }
 
 interface CreateGroupModalProps {
@@ -22,6 +35,7 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) {
+    const isDark = useIsDark();
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [users, setUsers] = useState<AddableUser[]>([]);
@@ -85,7 +99,7 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                 onClick={e => e.stopPropagation()}>
 
                 <div className="px-5 py-4 flex items-center justify-between flex-shrink-0"
-                    style={{ borderBottom: "1px solid #f0f0f8" }}>
+                    style={{ borderBottom: isDark ? "1px solid #1e2a40" : "1px solid #f0f0f8" }}>
                     <h3 className="text-sm font-black text-slate-800">Buat Grup Baru</h3>
                     <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition">
                         <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,21 +107,20 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                         </svg>
                     </button>
                 </div>
-
-                <div className="px-5 py-4 space-y-3 flex-shrink-0" style={{ borderBottom: "1px solid #f0f0f8" }}>
+                <div className="px-5 py-4 space-y-3 flex-shrink-0" style={{ borderBottom: isDark ? "1px solid #1e2a40" : "1px solid #f0f0f8" }}>
                     <input
                         value={name} onChange={e => setName(e.target.value)}
                         placeholder="Nama grup (contoh: Divisi Sales)"
                         maxLength={60}
                         className="w-full h-10 rounded-xl px-3.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-200"
-                        style={{ background: "#f5f7ff", border: "1.5px solid #e8ecff" }}
+                        style={{ background: isDark ? "#131d2e" : "#f5f7ff", border: isDark ? "1.5px solid #22324a" : "1.5px solid #e8ecff", color: isDark ? "#f1f5f9" : "#1e293b" }}
                     />
                     <input
                         value={description} onChange={e => setDescription(e.target.value)}
                         placeholder="Deskripsi (opsional)"
                         maxLength={150}
                         className="w-full h-10 rounded-xl px-3.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                        style={{ background: "#f5f7ff", border: "1.5px solid #e8ecff" }}
+                        style={{ background: isDark ? "#131d2e" : "#f5f7ff", border: isDark ? "1.5px solid #22324a" : "1.5px solid #e8ecff", color: isDark ? "#f1f5f9" : "#1e293b" }}
                     />
                 </div>
 
@@ -116,7 +129,7 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                         value={search} onChange={e => setSearch(e.target.value)}
                         placeholder="Cari anggota..."
                         className="w-full h-9 rounded-xl px-3.5 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-200"
-                        style={{ background: "#f1f5f9", border: "1px solid #e2e8f0" }}
+                        style={{ background: isDark ? "#131d2e" : "#f1f5f9", border: isDark ? "1px solid #22324a" : "1px solid #e2e8f0", color: isDark ? "#f1f5f9" : "#334155" }}
                     />
                     <p className="text-[10px] text-slate-400 mt-2 font-semibold">
                         {selected.size} anggota dipilih
@@ -126,7 +139,7 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                 <div className="flex-1 overflow-y-auto px-5 py-2">
                     {loading ? (
                         <div className="flex justify-center py-8">
-                            <div className="w-5 h-5 rounded-full animate-spin" style={{ border: "2px solid #e2e8f0", borderTopColor: "#6366f1" }} />
+                            <div className="w-5 h-5 rounded-full animate-spin" style={{ border: isDark ? "2px solid #22324a" : "2px solid #e2e8f0", borderTopColor: "#6366f1" }} />
                         </div>
                     ) : filtered.length === 0 ? (
                         <p className="text-xs text-slate-400 text-center py-8">
@@ -145,12 +158,12 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                 </div>
 
                 {error && (
-                    <div className="mx-5 mb-2 px-3 py-2 rounded-xl text-[11px] font-medium text-red-600" style={{ background: "#fef2f2" }}>
+                    <div className="mx-5 mb-2 px-3 py-2 rounded-xl text-[11px] font-medium text-red-600" style={{ background: isDark ? "rgba(239,68,68,0.12)" : "#fef2f2" }}>
                         {error}
                     </div>
                 )}
 
-                <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: "1px solid #f0f0f8" }}>
+                <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: isDark ? "1px solid #1e2a40" : "1px solid #f0f0f8" }}>
                     <button onClick={handleCreate} disabled={saving}
                         className="w-full h-11 rounded-xl text-white text-sm font-bold transition hover:scale-[1.01] disabled:opacity-50"
                         style={{ background: "linear-gradient(135deg,#4f46e5,#7c3aed)" }}>
