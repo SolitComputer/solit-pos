@@ -258,7 +258,7 @@ type TabKey = "barang" | "team-qc" | "so-laptop" | "arsip" | "return" | "outflow
                 </p>
               </div>
             </div>
-            <span className="inline-flex self-start sm:self-auto text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-full px-3 py-1 font-semibold tabular-nums">
+           <span className="inline-flex self-start sm:self-auto text-[10px] sm:text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 font-semibold tabular-nums">
               {visibleTabs.length} kategori
             </span>
           </div>
@@ -272,7 +272,7 @@ type TabKey = "barang" | "team-qc" | "so-laptop" | "arsip" | "return" | "outflow
         */}
         <div className="-mx-4 lg:-mx-5 px-4 lg:px-5">
           <div className="bg-white/95 backdrop-blur-md border border-gray-200/80 border-t-0 rounded-b-2xl shadow-sm overflow-hidden">
-            <div className="flex overflow-x-auto scrollbar-hide px-4 sm:px-6">
+           <div className="flex overflow-x-auto scrollbar-hide px-3 sm:px-6">
               {visibleTabs.map((tab) => {
                 const isActive = tab.key === activeTab;
                 return (
@@ -280,7 +280,7 @@ type TabKey = "barang" | "team-qc" | "so-laptop" | "arsip" | "return" | "outflow
                     key={tab.key}
                     onClick={() => changeTab(tab.key)}
                     className={[
-                      "flex-shrink-0 flex items-center gap-2 h-11 px-1 mr-6",
+                      "flex-shrink-0 flex items-center gap-1.5 sm:gap-2 h-10 sm:h-11 px-1 mr-4 sm:mr-6",
                       "text-[13px] border-b-2 -mb-px transition-all duration-150 select-none",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-1 rounded-sm",
                       isActive
