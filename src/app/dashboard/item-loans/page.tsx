@@ -35,7 +35,6 @@ const STATUS_META: Record<LoanRow["status"], { label: string; cls: string }> = {
     DIPESAN: { label: "Di Pesan", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
 };
 
-// Format tanggal+jam WIB untuk kolom waktu pinjam.
 const fmtWaktu = (iso: string | null) => {
     if (!iso) return "-";
     return new Date(iso).toLocaleString("id-ID", {
@@ -47,8 +46,6 @@ export default function ItemLoansPage() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userName, setUserName] = useState("");
     const [userId, setUserId] = useState("");
-    // canApprove sekarang DINAMIS — fetch dari /api/item-loans/approvers (whitelist).
-    // Fallback ke role check kalau whitelist kosong (grace period).
     const [canApprove, setCanApprove] = useState(false);
     const canManageApprovers = hasAnyRole(userRoles, LOAN_APPROVER_MANAGE_ROLES);
 
@@ -62,7 +59,6 @@ export default function ItemLoansPage() {
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const boxRef = useRef<HTMLDivElement>(null);
 
-    // Scanner KAMERA (html5-qrcode)
     const [scanOpen, setScanOpen] = useState(false);
     const [scanError, setScanError] = useState<string | null>(null);
     const cameraRef = useRef<Html5Qrcode | null>(null);
@@ -71,14 +67,11 @@ export default function ItemLoansPage() {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<"PENDING" | "APPROVED" | "DIPESAN" | "RETURN_PENDING" | "HISTORY">("PENDING");
     const [actingId, setActingId] = useState<string | null>(null);
-    const [expandedKey, setExpandedKey] = useState<string | null>(null); // kelompok yang sedang dibuka detailnya
-    const [bulkBusyKey, setBulkBusyKey] = useState<string | null>(null);  // penanda aksi massal sedang berjalan
+    const [expandedKey, setExpandedKey] = useState<string | null>(null);
+    const [bulkBusyKey, setBulkBusyKey] = useState<string | null>(null);
 
-    // Filter & search khusus tab Riwayat (HISTORY)
     const [historyFilter, setHistoryFilter] = useState<"ALL" | "SOLD" | "RETURNED">("ALL");
     const [historySearch, setHistorySearch] = useState("");
-
-    // Search khusus tab Sedang Dipinjam (APPROVED)
     const [approvedSearch, setApprovedSearch] = useState("");
 
     useEffect(() => {
@@ -94,9 +87,6 @@ export default function ItemLoansPage() {
         })();
     }, []);
 
-    // Fetch status "apakah user ini approver?" dari whitelist dinamis.
-    // Dipanggil sekali saat mount — kalau Kepala Admin Barang update whitelist,
-    // user existing yg sudah login perlu refresh page untuk dapat state terbaru.
     useEffect(() => {
         (async () => {
             try {
@@ -110,10 +100,6 @@ export default function ItemLoansPage() {
     const fetchLoans = useCallback(async () => {
         setLoading(true);
         try {
-            // PostgREST default cuma balikin maks 1000 baris/response.
-            // Fetch tanpa filter udah > 1000 baris → sebagian pinjaman (termasuk
-            // APPROVED lama) kepotong & nggak pernah sampai ke UI.
-            // Fix: ambil per-status (tiap status < 1000), lalu gabung jadi satu array.
             const STATUSES = ["PENDING", "APPROVED", "DIPESAN", "RETURN_PENDING", "REJECTED", "RETURNED", "SOLD"] as const;
             const results = await Promise.all(
                 STATUSES.map(async (s) => {
@@ -148,50 +134,31 @@ export default function ItemLoansPage() {
         return () => document.removeEventListener("mousedown", onClick);
     }, []);
 
-    // Kunci unik 1 unit barang — cegah SN/unit yang sama masuk keranjang 2x.
     const cartKey = (x: SnResult) => `${x.item_type}-${x.item_id}-${x.unit_id ?? "parent"}`;
 
     const pickSn = (r: SnResult) => {
         setCart(prev => prev.some(p => cartKey(p) === cartKey(r)) ? prev : [...prev, r]);
-        setSnQuery("");      // kosongkan field → langsung bisa scan/ketik barang berikutnya
+        setSnQuery("");
         setSnResults([]);
         setSnOpen(false);
     };
 
-    // Dipicu saat tekan Enter — barcode scanner mengetik SN lalu kirim Enter.
-    // Barcode kita meng-encode serial_number langsung, jadi scan == ketik SN + Enter.
-    // `raw` dibaca dari DOM (e.currentTarget.value) supaya kebal dari lag state React.
     const handleSnEnter = async (raw: string) => {
         const q = raw.trim();
         if (q.length < 2) return;
-
-        // Scanner sering lebih cepat dari debounce 300ms → fetch fresh saat Enter.
         let results = snResults;
         try {
             const res = await fetch(`/api/item-loans/search-sn?q=${encodeURIComponent(q)}`);
             const json = await res.json();
             if (json.success) results = json.data as SnResult[];
-        } catch { /* fallback: pakai hasil yang sudah ada */ }
-
-        // 1) SN cocok persis (hasil scan barcode selalu lewat sini).
-        const exact = results.find(
-            r => (r.serial_number ?? "").trim().toLowerCase() === q.toLowerCase(),
-        );
+        } catch { /* fallback */ }
+        const exact = results.find(r => (r.serial_number ?? "").trim().toLowerCase() === q.toLowerCase());
         if (exact) { pickSn(exact); return; }
-
-        // 2) Cuma 1 hasil → langsung pilih.
         if (results.length === 1) { pickSn(results[0]); return; }
-
-        // 3) Tidak ada hasil → SN salah / unit tidak tersedia.
         if (results.length === 0) { toast.error(`"${q}" tidak ditemukan / unit tidak tersedia`); return; }
-
-        // 4) Banyak hasil & bukan SN persis (user mengetik nama) → buka dropdown manual.
         setSnResults(results); setSnOpen(true);
     };
 
-    // ── Scanner KAMERA — buka kamera, decode barcode, lalu isi field SN &
-    // auto-pilih lewat handleSnEnter. Library & konfig SAMA PERSIS dgn
-    // /scan/camera (BarcodeDetector native + format 1D Code128/39 dst).
     useEffect(() => {
         if (!scanOpen) return;
         let cancelled = false;
@@ -210,7 +177,6 @@ export default function ItemLoansPage() {
             verbose: false,
         });
         cameraRef.current = scanner;
-
         scanner.start(
             { facingMode: "environment" },
             {
@@ -225,24 +191,18 @@ export default function ItemLoansPage() {
             },
             async (decodedText) => {
                 if (cancelled) return;
-                // Bersihkan: buang karakter kontrol + AIM prefix (]C1, ]A0, ]Q0 dll)
-                // yg ditambah BarcodeDetector. Tanpa ini SN jadi "]C1xxx" → 404.
-                const sn = decodedText
-                    .replace(/[\u0000-\u001F\u007F]/g, "")
-                    .replace(/^\][A-Za-z]\d/, "")
-                    .trim();
+                const sn = decodedText.replace(/[\u0000-\u001F\u007F]/g, "").replace(/^\][A-Za-z]\d/, "").trim();
                 if (!sn) return;
                 cancelled = true;
                 try { if (scanner.isScanning) await scanner.stop(); } catch { /* abaikan */ }
                 setScanOpen(false);
                 setSnQuery(sn);
-                handleSnEnter(sn); // auto-cari & auto-pilih, sama seperti scan fisik
+                handleSnEnter(sn);
             },
-            () => { /* per-frame gagal decode — normal, diabaikan */ },
+            () => { },
         ).catch((err) => {
             if (!cancelled) setScanError("Gagal membuka kamera: " + String(err));
         });
-
         return () => {
             cancelled = true;
             const s = cameraRef.current;
@@ -257,9 +217,7 @@ export default function ItemLoansPage() {
         if (cart.length === 0) { toast.error("Pilih barang & SN dulu"); return; }
         setSubmitting(true);
         try {
-            // 1 kali submit = 1 batch_id → semua barang di keranjang terikat dalam satu transaksi peminjaman.
             const batchId = crypto.randomUUID();
-            // Kirim paralel — tiap barang = 1 baris, tapi berbagi batch_id yang sama.
             const outcomes = await Promise.all(
                 cart.map(async (item) => {
                     try {
@@ -279,19 +237,11 @@ export default function ItemLoansPage() {
                     }
                 }),
             );
-
             const okCount = outcomes.filter(o => o.ok).length;
             const failed = outcomes.filter((o): o is { item: SnResult; ok: false; msg: string } => !o.ok);
-
             if (okCount > 0) toast.success(`${okCount} pengajuan pinjaman terkirim`);
             failed.forEach(f => toast.error(`${f.item.item_name}: ${f.msg}`));
-
-            if (failed.length === 0) {
-                resetForm();                        // semua sukses → bersihkan form
-            } else {
-                setCart(failed.map(f => f.item));   // sisakan yang gagal supaya bisa diulang
-                setSnQuery(""); setSnResults([]);
-            }
+            if (failed.length === 0) { resetForm(); } else { setCart(failed.map(f => f.item)); setSnQuery(""); setSnResults([]); }
             fetchLoans();
         } finally { setSubmitting(false); }
     };
@@ -306,8 +256,7 @@ export default function ItemLoansPage() {
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal memproses");
             const msg: Record<string, string> = {
-                "approve": "Pinjaman disetujui",
-                "reject": "Pinjaman ditolak",
+                "approve": "Pinjaman disetujui", "reject": "Pinjaman ditolak",
                 "request-return": "Pengajuan pengembalian terkirim",
                 "approve-return": "Pengembalian disetujui — masuk Riwayat",
                 "reject-return": "Pengajuan pengembalian ditolak",
@@ -320,8 +269,6 @@ export default function ItemLoansPage() {
         } finally { setActingId(null); }
     };
 
-    // Jalankan 1 action untuk banyak barang sekaligus (aksi massal per kelompok).
-    // Memakai endpoint [id] yang sudah ada — backend tidak perlu diubah.
     const actMany = async (ids: string[], action: Parameters<typeof act>[1]) => {
         if (ids.length === 0) return;
         setBulkBusyKey(action + ids.join(","));
@@ -344,13 +291,11 @@ export default function ItemLoansPage() {
         } finally { setBulkBusyKey(null); }
     };
 
-    // Status gabungan 1 kelompok: kalau semua barang sama → status itu; kalau campur → "MIXED".
     const groupStatus = (items: LoanRow[]): LoanRow["status"] | "MIXED" => {
         const uniq = Array.from(new Set(items.map(i => i.status)));
         return uniq.length === 1 ? uniq[0] : "MIXED";
     };
 
-    // Tombol aksi untuk SATU barang — dipakai ulang di dalam panel detail.
     const renderItemActions = (l: LoanRow) => {
         if (l.status === "PENDING" && canApprove) {
             return (
@@ -398,46 +343,30 @@ export default function ItemLoansPage() {
     };
 
     const visibleLoans = loans.filter(l => {
-        // Tab PENDING — tampil apa adanya.
         if (tab === "PENDING") return l.status === "PENDING";
-        // Tab APPROVED (Sedang Dipinjam) — bisa dicari peminjam/barang/SN/keterangan.
         if (tab === "APPROVED") {
             if (l.status !== "APPROVED") return false;
             const q = approvedSearch.trim().toLowerCase();
             if (q) {
-                const hay = [l.borrower_name, l.item_name, l.serial_number ?? "", l.notes ?? ""]
-                    .join(" ").toLowerCase();
+                const hay = [l.borrower_name, l.item_name, l.serial_number ?? "", l.notes ?? ""].join(" ").toLowerCase();
                 if (!hay.includes(q)) return false;
             }
             return true;
         }
         if (tab === "DIPESAN") return l.status === "DIPESAN";
-
-        // Tab RETURN_PENDING (Menunggu ACC Pengembalian) — hanya pengajuan pengembalian
-        // yang belum di-ACC. Tetap di sini sampai di-Setujui (→ Riwayat) / di-Tolak (→ Sedang Dipinjam).
         if (tab === "RETURN_PENDING") return l.status === "RETURN_PENDING";
-
-        // Tab HISTORY (Riwayat): REJECTED / RETURNED / SOLD.
         const isHistory = l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD";
         if (!isHistory) return false;
-
-        // Sub-filter status: Semua / Terjual / Dikembalikan.
         if (historyFilter === "SOLD" && l.status !== "SOLD") return false;
         if (historyFilter === "RETURNED" && l.status !== "RETURNED") return false;
-
-        // Search: peminjam / barang / SN / keterangan (case-insensitive).
         const q = historySearch.trim().toLowerCase();
         if (q) {
-            const hay = [l.borrower_name, l.item_name, l.serial_number ?? "", l.notes ?? ""]
-                .join(" ").toLowerCase();
+            const hay = [l.borrower_name, l.item_name, l.serial_number ?? "", l.notes ?? ""].join(" ").toLowerCase();
             if (!hay.includes(q)) return false;
         }
         return true;
     });
 
-    // Kelompokkan baris yang SUDAH difilter per-tab berdasarkan batch_id.
-    // Baris lama (batch_id null) → jadi kelompok sendiri pakai id-nya.
-    // 1 user + 1 transaksi = 1 baris; barang-barangnya jadi anak kelompok.
     const groupedLoans = Object.values(
         visibleLoans.reduce<Record<string, {
             key: string; borrower_name: string; borrower_id: string;
@@ -453,7 +382,6 @@ export default function ItemLoansPage() {
         }, {}),
     ).sort((a, b) => b.created_at.localeCompare(a.created_at));
 
-    // Jumlah data per tab (untuk badge angka di tombol tab) — dihitung dari status mentah.
     const tabCount = (k: typeof tab): number => {
         if (k === "PENDING") return loans.filter(l => l.status === "PENDING").length;
         if (k === "APPROVED") return loans.filter(l => l.status === "APPROVED").length;
@@ -462,7 +390,6 @@ export default function ItemLoansPage() {
         return loans.filter(l => l.status === "REJECTED" || l.status === "RETURNED" || l.status === "SOLD").length;
     };
 
-    // Pesan kosong kontekstual per tab (lebih informatif daripada "Belum ada data").
     const emptyText: Record<typeof tab, string> = {
         PENDING: "Belum ada pengajuan peminjaman yang menunggu persetujuan",
         APPROVED: "Belum ada barang yang sedang dipinjam",
@@ -485,7 +412,6 @@ export default function ItemLoansPage() {
                                 <h1 className="text-base sm:text-lg font-bold text-zinc-900 tracking-tight leading-tight truncate">Peminjaman Barang</h1>
                                 <p className="text-[11.5px] text-zinc-400 mt-1 truncate">Ajukan pinjam barang inventaris, lalu disetujui Approver</p>
                             </div>
-                            {/* Tombol "Atur Approver" — hanya muncul utk Kepala Admin Barang + Admin */}
                             {canManageApprovers && (
                                 <Link href="/dashboard/item-loans/approvers"
                                     className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition flex-shrink-0">
@@ -493,7 +419,6 @@ export default function ItemLoansPage() {
                                 </Link>
                             )}
                         </div>
-                        {/* Tombol mobile — di bawah header supaya nggak crowded */}
                         {canManageApprovers && (
                             <Link href="/dashboard/item-loans/approvers"
                                 className="sm:hidden flex items-center justify-center gap-1.5 h-10 border-t border-zinc-100 text-xs font-semibold text-indigo-700 bg-indigo-50/60 hover:bg-indigo-50 transition">
@@ -518,9 +443,6 @@ export default function ItemLoansPage() {
                                         onChange={e => setSnQuery(e.target.value)}
                                         onFocus={() => snResults.length > 0 && setSnOpen(true)}
                                         onKeyDown={e => {
-                                            // ✅ SCANNER BARCODE: barcode kami meng-encode SN; scanner USB/BT mengetik
-                                            // SN lalu menekan Enter. handleSnEnter fetch fresh + cocokkan SN persis,
-                                            // jadi tetap jalan walau scanner lebih cepat dari debounce 300ms.
                                             if (e.key === "Enter") {
                                                 e.preventDefault();
                                                 handleSnEnter(e.currentTarget.value);
@@ -555,7 +477,6 @@ export default function ItemLoansPage() {
                             </div>
                         </div>
 
-                        {/* ── Daftar barang yang mau dipinjam (keranjang) ── */}
                         {cart.length > 0 && (
                             <div className="space-y-2 pt-1">
                                 <div className="flex items-center justify-between">
@@ -614,18 +535,22 @@ export default function ItemLoansPage() {
                     </div>
 
                     <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-                        <div className="flex flex-wrap gap-1.5 p-2 border-b border-zinc-100">
+                        {/* ── Tab bar — scrollable di mobile ── */}
+                        <div
+                            className="flex gap-1.5 p-2 border-b border-zinc-100 overflow-x-auto"
+                            style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+                        >
                             {([
                                 { k: "PENDING", l: "Menunggu" },
-                                { k: "APPROVED", l: "Sedang Dipinjam" },
-                                { k: "RETURN_PENDING", l: "Menunggu ACC Pengembalian" },
+                                { k: "APPROVED", l: "Dipinjam" },
+                                { k: "RETURN_PENDING", l: "ACC Kembali" },
                                 { k: "HISTORY", l: "Riwayat" },
                             ] as const).map(t => {
                                 const active = tab === t.k;
                                 const count = tabCount(t.k);
                                 return (
                                     <button key={t.k} onClick={() => setTab(t.k)}
-                                        className={`flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-semibold whitespace-nowrap transition ${active ? "bg-zinc-900 text-white shadow-sm shadow-zinc-900/20" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                        className={`flex-shrink-0 flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-semibold whitespace-nowrap transition ${active ? "bg-zinc-900 text-white shadow-sm shadow-zinc-900/20" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
                                         {t.l}
                                         {count > 0 && (
                                             <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${active ? "bg-white/20 text-white" : "bg-white text-zinc-500 border border-zinc-200"}`}>
@@ -695,138 +620,264 @@ export default function ItemLoansPage() {
                                 <p className="text-xs text-zinc-300 mt-1">Data akan muncul di sini otomatis</p>
                             </div>
                         ) : (
-                            <div className="overflow-auto max-h-[70vh]">
-                                <table className="w-full text-sm">
-                                    <thead className="sticky top-0 z-10">
-                                        <tr className="bg-zinc-50 border-b border-zinc-100">
-                                            {["Peminjam", "Barang", "Kategori", "Waktu", "Status", "Aksi"].map(h => (
-                                                <th key={h} className="px-3 py-3 text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest whitespace-nowrap bg-zinc-50">{h}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {groupedLoans.map(g => {
-                                            const gs = groupStatus(g.items);
-                                            const meta = gs === "MIXED" ? null : STATUS_META[gs];
-                                            const isOpen = expandedKey === g.key;
-                                            // id barang per status → untuk aksi massal
-                                            const pendingIds = g.items.filter(i => i.status === "PENDING").map(i => i.id);
-                                            const approvedIds = g.items.filter(i => i.status === "APPROVED").map(i => i.id);
-                                            const returnPendingIds = g.items.filter(i => i.status === "RETURN_PENDING").map(i => i.id);
-                                            const busy = bulkBusyKey !== null;
-                                            return (
-                                                <Fragment key={g.key}>
-                                                    <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-                                                        <td className="px-3 py-3 font-semibold text-zinc-800 whitespace-nowrap align-top">{g.borrower_name}</td>
-                                                        <td className="px-3 py-3 align-top">
-                                                            <div className="flex flex-col gap-1">
-                                                                {g.items.map(it => (
-                                                                    <div key={it.id} className="flex items-center gap-1.5">
-                                                                        {it.item_type === "LAPTOP"
-                                                                            ? <LaptopIcon size={13} className="text-zinc-400 flex-shrink-0" />
-                                                                            : <Wrench size={13} className="text-zinc-400 flex-shrink-0" />}
-                                                                        <span className="text-[13px] text-zinc-700">{it.item_name}</span>
-                                                                        {it.serial_number && <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{it.serial_number}</span>}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-3 py-3 align-top">
-                                                            {g.category ? (
-                                                                <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${g.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
+                            <>
+                                {/* ═══ MOBILE: Card Layout ═══ */}
+                                <div className="sm:hidden divide-y divide-zinc-100">
+                                    {groupedLoans.map(g => {
+                                        const gs = groupStatus(g.items);
+                                        const meta = gs === "MIXED" ? null : STATUS_META[gs];
+                                        const isOpen = expandedKey === g.key;
+                                        const pendingIds = g.items.filter(i => i.status === "PENDING").map(i => i.id);
+                                        const approvedIds = g.items.filter(i => i.status === "APPROVED").map(i => i.id);
+                                        const returnPendingIds = g.items.filter(i => i.status === "RETURN_PENDING").map(i => i.id);
+                                        const busy = bulkBusyKey !== null;
+                                        return (
+                                            <div key={g.key} className="p-3">
+                                                {/* Baris atas: Peminjam + Status */}
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[13px] font-bold text-zinc-800 truncate">{g.borrower_name}</p>
+                                                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                                            <span className="text-[10px] text-zinc-400 tabular-nums">{fmtWaktu(g.created_at)}</span>
+                                                            {g.category && (
+                                                                <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold border ${g.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
                                                                     {g.category === "PESANAN" ? "Pesanan" : "Kebutuhan"}
                                                                 </span>
-                                                            ) : <span className="text-zinc-300">-</span>}
-                                                        </td>
-                                                        <td className="px-3 py-3 text-[11px] text-zinc-500 whitespace-nowrap tabular-nums align-top">{fmtWaktu(g.created_at)}</td>
-                                                        <td className="px-3 py-3 align-top whitespace-nowrap">
-                                                            {meta
-                                                                ? <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold border ${meta.cls}`}>{meta.label}</span>
-                                                                : <span className="inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold border bg-zinc-100 text-zinc-600 border-zinc-200">Campuran</span>}
-                                                            <span className="ml-1.5 text-[10px] text-zinc-400">{g.items.length} barang</span>
-                                                        </td>
-                                                        <td className="px-3 py-3 align-top">
-                                                            <button onClick={() => setExpandedKey(isOpen ? null : g.key)}
-                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition flex items-center gap-1">
-                                                                {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Detail
-                                                            </button>
-                                                        </td>
-                                                    </tr>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                        {meta
+                                                            ? <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold border ${meta.cls}`}>{meta.label}</span>
+                                                            : <span className="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold border bg-zinc-100 text-zinc-600 border-zinc-200">Campuran</span>}
+                                                        <span className="text-[10px] text-zinc-400">{g.items.length} barang</span>
+                                                    </div>
+                                                </div>
 
-                                                    {isOpen && (
-                                                        <tr className="bg-zinc-50/60 border-b border-zinc-100">
-                                                            <td colSpan={6} className="px-3 py-3">
-                                                                {/* ── Aksi massal (per status yang relevan) ── */}
-                                                                <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-                                                                    {canApprove && pendingIds.length > 0 && (
-                                                                        <>
-                                                                            <button onClick={() => actMany(pendingIds, "approve")} disabled={busy}
-                                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                                <Check size={12} /> Approve Semua
-                                                                            </button>
-                                                                            <button onClick={() => actMany(pendingIds, "reject")} disabled={busy}
-                                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                                <Ban size={12} /> Reject Semua
-                                                                            </button>
-                                                                        </>
-                                                                    )}
-                                                                    {g.borrower_id === userId && approvedIds.length > 0 && (
-                                                                        <button onClick={() => actMany(approvedIds, "request-return")} disabled={busy}
-                                                                            className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                            <RotateCcw size={12} /> Ajukan Pengembalian Semua
-                                                                        </button>
-                                                                    )}
-                                                                    {canApprove && returnPendingIds.length > 0 && (
-                                                                        <>
-                                                                            <button onClick={() => actMany(returnPendingIds, "approve-return")} disabled={busy}
-                                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                                <Check size={12} /> Setujui Semua
-                                                                            </button>
-                                                                            <button onClick={() => actMany(returnPendingIds, "reject-return")} disabled={busy}
-                                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
-                                                                                <Ban size={12} /> Tolak Semua
-                                                                            </button>
-                                                                        </>
-                                                                    )}
-                                                                </div>
+                                                {/* Daftar barang ringkas */}
+                                                <div className="mt-2 space-y-1">
+                                                    {g.items.slice(0, isOpen ? g.items.length : 2).map(it => (
+                                                        <div key={it.id} className="flex items-center gap-1.5">
+                                                            {it.item_type === "LAPTOP"
+                                                                ? <LaptopIcon size={12} className="text-zinc-400 flex-shrink-0" />
+                                                                : <Wrench size={12} className="text-zinc-400 flex-shrink-0" />}
+                                                            <span className="text-[12px] text-zinc-600 truncate flex-1">{it.item_name}</span>
+                                                            {it.serial_number && <span className="font-mono text-[9px] text-zinc-400 bg-zinc-100 px-1 py-0.5 rounded flex-shrink-0">{it.serial_number}</span>}
+                                                        </div>
+                                                    ))}
+                                                    {!isOpen && g.items.length > 2 && (
+                                                        <p className="text-[10px] text-zinc-400">+{g.items.length - 2} barang lagi</p>
+                                                    )}
+                                                </div>
 
-                                                                {/* ── Detail per barang (aksi tetap per-barang) ── */}
-                                                                <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white">
-                                                                    {g.items.map((it, idx) => {
-                                                                        const im = STATUS_META[it.status];
-                                                                        return (
-                                                                            <div key={it.id} className={`flex flex-wrap items-center gap-2 px-3 py-2 ${idx > 0 ? "border-t border-zinc-100" : ""}`}>
-                                                                                {it.item_type === "LAPTOP"
-                                                                                    ? <LaptopIcon size={14} className="text-zinc-500 flex-shrink-0" />
-                                                                                    : <Wrench size={14} className="text-zinc-500 flex-shrink-0" />}
-                                                                                <span className="text-xs text-zinc-700 flex-1 min-w-[120px]">{it.item_name}</span>
-                                                                                {it.serial_number
-                                                                                    ? <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{it.serial_number}</span>
-                                                                                    : <span className="text-[10px] font-semibold text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">tanpa SN</span>}
+                                                {/* Tombol Detail */}
+                                                <button onClick={() => setExpandedKey(isOpen ? null : g.key)}
+                                                    className="mt-2.5 w-full h-8 rounded-lg text-[11px] font-semibold text-zinc-600 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 transition flex items-center justify-center gap-1">
+                                                    {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                                    {isOpen ? "Tutup Detail" : "Lihat Detail"}
+                                                </button>
+
+                                                {/* Panel detail expand */}
+                                                {isOpen && (
+                                                    <div className="mt-2.5 space-y-2">
+                                                        {/* Aksi massal */}
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {canApprove && pendingIds.length > 0 && (
+                                                                <>
+                                                                    <button onClick={() => actMany(pendingIds, "approve")} disabled={busy}
+                                                                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                        <Check size={12} /> Approve Semua
+                                                                    </button>
+                                                                    <button onClick={() => actMany(pendingIds, "reject")} disabled={busy}
+                                                                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                        <Ban size={12} /> Reject Semua
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            {g.borrower_id === userId && approvedIds.length > 0 && (
+                                                                <button onClick={() => actMany(approvedIds, "request-return")} disabled={busy}
+                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                    <RotateCcw size={12} /> Kembalikan Semua
+                                                                </button>
+                                                            )}
+                                                            {canApprove && returnPendingIds.length > 0 && (
+                                                                <>
+                                                                    <button onClick={() => actMany(returnPendingIds, "approve-return")} disabled={busy}
+                                                                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                        <Check size={12} /> Setujui Semua
+                                                                    </button>
+                                                                    <button onClick={() => actMany(returnPendingIds, "reject-return")} disabled={busy}
+                                                                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                        <Ban size={12} /> Tolak Semua
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        {/* Detail per barang */}
+                                                        <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white divide-y divide-zinc-100">
+                                                            {g.items.map(it => {
+                                                                const im = STATUS_META[it.status];
+                                                                return (
+                                                                    <div key={it.id} className="p-2.5 space-y-1.5">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            {it.item_type === "LAPTOP"
+                                                                                ? <LaptopIcon size={13} className="text-zinc-500 flex-shrink-0" />
+                                                                                : <Wrench size={13} className="text-zinc-500 flex-shrink-0" />}
+                                                                            <span className="text-[12px] text-zinc-700 truncate flex-1">{it.item_name}</span>
+                                                                            {it.serial_number
+                                                                                ? <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{it.serial_number}</span>
+                                                                                : <span className="text-[9px] font-semibold text-zinc-400 bg-zinc-100 px-1 py-0.5 rounded">tanpa SN</span>}
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between gap-2">
+                                                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                                                 <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold border ${im.cls}`}>{im.label}</span>
                                                                                 {(it.returned_at || it.sold_at) && (
                                                                                     <span className="text-[10px] text-zinc-400 tabular-nums">{fmtWaktu(it.returned_at ?? it.sold_at)}</span>
                                                                                 )}
-                                                                                {it.notes && <span className="text-[11px] text-zinc-400 italic truncate max-w-[160px]" title={it.notes}>{it.notes}</span>}
-                                                                                <div className="ml-auto">{renderItemActions(it)}</div>
                                                                             </div>
-                                                                        );
-                                                                    })}
+                                                                            <div className="flex-shrink-0">{renderItemActions(it)}</div>
+                                                                        </div>
+                                                                        {it.notes && <p className="text-[11px] text-zinc-400 italic truncate">{it.notes}</p>}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* ═══ DESKTOP: Table Layout ═══ */}
+                                <div className="hidden sm:block overflow-auto max-h-[70vh]">
+                                    <table className="w-full text-sm">
+                                        <thead className="sticky top-0 z-10">
+                                            <tr className="bg-zinc-50 border-b border-zinc-100">
+                                                {["Peminjam", "Barang", "Kategori", "Waktu", "Status", "Aksi"].map(h => (
+                                                    <th key={h} className="px-3 py-3 text-left text-[10px] font-bold text-zinc-400 uppercase tracking-widest whitespace-nowrap bg-zinc-50">{h}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {groupedLoans.map(g => {
+                                                const gs = groupStatus(g.items);
+                                                const meta = gs === "MIXED" ? null : STATUS_META[gs];
+                                                const isOpen = expandedKey === g.key;
+                                                const pendingIds = g.items.filter(i => i.status === "PENDING").map(i => i.id);
+                                                const approvedIds = g.items.filter(i => i.status === "APPROVED").map(i => i.id);
+                                                const returnPendingIds = g.items.filter(i => i.status === "RETURN_PENDING").map(i => i.id);
+                                                const busy = bulkBusyKey !== null;
+                                                return (
+                                                    <Fragment key={g.key}>
+                                                        <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+                                                            <td className="px-3 py-3 font-semibold text-zinc-800 whitespace-nowrap align-top">{g.borrower_name}</td>
+                                                            <td className="px-3 py-3 align-top">
+                                                                <div className="flex flex-col gap-1">
+                                                                    {g.items.map(it => (
+                                                                        <div key={it.id} className="flex items-center gap-1.5">
+                                                                            {it.item_type === "LAPTOP"
+                                                                                ? <LaptopIcon size={13} className="text-zinc-400 flex-shrink-0" />
+                                                                                : <Wrench size={13} className="text-zinc-400 flex-shrink-0" />}
+                                                                            <span className="text-[13px] text-zinc-700">{it.item_name}</span>
+                                                                            {it.serial_number && <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{it.serial_number}</span>}
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
                                                             </td>
+                                                            <td className="px-3 py-3 align-top">
+                                                                {g.category ? (
+                                                                    <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${g.category === "PESANAN" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
+                                                                        {g.category === "PESANAN" ? "Pesanan" : "Kebutuhan"}
+                                                                    </span>
+                                                                ) : <span className="text-zinc-300">-</span>}
+                                                            </td>
+                                                            <td className="px-3 py-3 text-[11px] text-zinc-500 whitespace-nowrap tabular-nums align-top">{fmtWaktu(g.created_at)}</td>
+                                                            <td className="px-3 py-3 align-top whitespace-nowrap">
+                                                                {meta
+                                                                    ? <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold border ${meta.cls}`}>{meta.label}</span>
+                                                                    : <span className="inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold border bg-zinc-100 text-zinc-600 border-zinc-200">Campuran</span>}
+                                                                <span className="ml-1.5 text-[10px] text-zinc-400">{g.items.length} barang</span>
+                                                            </td>
+                                                            <td className="px-3 py-3 align-top">
+                                                                <button onClick={() => setExpandedKey(isOpen ? null : g.key)}
+                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition flex items-center gap-1">
+                                                                    {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Detail
+                                                                </button>
+                                                            </td>
                                                         </tr>
-                                                    )}
-                                                </Fragment>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+
+                                                        {isOpen && (
+                                                            <tr className="bg-zinc-50/60 border-b border-zinc-100">
+                                                                <td colSpan={6} className="px-3 py-3">
+                                                                    <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                                                                        {canApprove && pendingIds.length > 0 && (
+                                                                            <>
+                                                                                <button onClick={() => actMany(pendingIds, "approve")} disabled={busy}
+                                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                                    <Check size={12} /> Approve Semua
+                                                                                </button>
+                                                                                <button onClick={() => actMany(pendingIds, "reject")} disabled={busy}
+                                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                                    <Ban size={12} /> Reject Semua
+                                                                                </button>
+                                                                            </>
+                                                                        )}
+                                                                        {g.borrower_id === userId && approvedIds.length > 0 && (
+                                                                            <button onClick={() => actMany(approvedIds, "request-return")} disabled={busy}
+                                                                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                                <RotateCcw size={12} /> Ajukan Pengembalian Semua
+                                                                            </button>
+                                                                        )}
+                                                                        {canApprove && returnPendingIds.length > 0 && (
+                                                                            <>
+                                                                                <button onClick={() => actMany(returnPendingIds, "approve-return")} disabled={busy}
+                                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                                    <Check size={12} /> Setujui Semua
+                                                                                </button>
+                                                                                <button onClick={() => actMany(returnPendingIds, "reject-return")} disabled={busy}
+                                                                                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-40 flex items-center gap-1">
+                                                                                    <Ban size={12} /> Tolak Semua
+                                                                                </button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white">
+                                                                        {g.items.map((it, idx) => {
+                                                                            const im = STATUS_META[it.status];
+                                                                            return (
+                                                                                <div key={it.id} className={`flex flex-wrap items-center gap-2 px-3 py-2 ${idx > 0 ? "border-t border-zinc-100" : ""}`}>
+                                                                                    {it.item_type === "LAPTOP"
+                                                                                        ? <LaptopIcon size={14} className="text-zinc-500 flex-shrink-0" />
+                                                                                        : <Wrench size={14} className="text-zinc-500 flex-shrink-0" />}
+                                                                                    <span className="text-xs text-zinc-700 flex-1 min-w-[120px]">{it.item_name}</span>
+                                                                                    {it.serial_number
+                                                                                        ? <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">{it.serial_number}</span>
+                                                                                        : <span className="text-[10px] font-semibold text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">tanpa SN</span>}
+                                                                                    <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold border ${im.cls}`}>{im.label}</span>
+                                                                                    {(it.returned_at || it.sold_at) && (
+                                                                                        <span className="text-[10px] text-zinc-400 tabular-nums">{fmtWaktu(it.returned_at ?? it.sold_at)}</span>
+                                                                                    )}
+                                                                                    {it.notes && <span className="text-[11px] text-zinc-400 italic truncate max-w-[160px]" title={it.notes}>{it.notes}</span>}
+                                                                                    <div className="ml-auto">{renderItemActions(it)}</div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </Fragment>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
 
-                {/* ── Modal Scan Kamera ── */}
                 {scanOpen && (
                     <div className="fixed inset-0 z-50 bg-black/90 flex flex-col">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">

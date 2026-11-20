@@ -59,9 +59,14 @@ export default function AsetKeuanganContent() {
   return (
     <DashboardLayout>
       {/* Tab bar */}
-      <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 max-w-6xl mx-auto">
-        <div className="flex items-center gap-2.5">
-          <div className="flex gap-1 p-1 rounded-2xl bg-gray-100 overflow-x-auto flex-1 min-w-0">
+      <div className="px-3 sm:px-6 lg:px-8 pt-4 sm:pt-7 max-w-6xl mx-auto">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Tab scroll container — scrollbar disembunyikan, swipe-friendly */}
+          <div
+            className="flex gap-1 p-1 rounded-2xl bg-gray-100 overflow-x-auto flex-1 min-w-0"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+          >
+            <style>{`.tab-scroll::-webkit-scrollbar{display:none}`}</style>
             {TABS.map((t) => {
               const active = tab === t.key;
               return (
@@ -69,7 +74,7 @@ export default function AsetKeuanganContent() {
                   key={t.key}
                   onClick={() => setTab(t.key)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition whitespace-nowrap ${
+                  className={`flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
                     active ? "bg-[#1a1a2e] text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-white/70"
                   }`}
                 >
@@ -78,11 +83,13 @@ export default function AsetKeuanganContent() {
               );
             })}
           </div>
+
+          {/* Export button */}
           <button
             onClick={handleExport}
             disabled={exporting}
             title="Export semua tab ke Excel (4 sheet)"
-            className="flex-shrink-0 inline-flex items-center gap-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold px-3.5 sm:px-4 py-2.5 hover:bg-emerald-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 transition disabled:opacity-60"
+            className="flex-shrink-0 inline-flex items-center gap-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold px-3 sm:px-4 py-2 sm:py-2.5 hover:bg-emerald-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 transition disabled:opacity-60"
           >
             {exporting ? (
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -108,7 +115,7 @@ export default function AsetKeuanganContent() {
       {tab === "aset" && <FixedAssetsContent />}
       {tab === "utang" && <FinancialEntriesContent entryType="utang" />}
       {tab === "piutang" && <FinancialEntriesContent entryType="piutang" />}
-            {tab === "modal_service" && <FinancialEntriesContent entryType="modal_service" layout="row" />}
+      {tab === "modal_service" && <FinancialEntriesContent entryType="modal_service" layout="row" />}
     </DashboardLayout>
   );
 }
