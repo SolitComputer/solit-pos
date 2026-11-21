@@ -94,6 +94,15 @@ function toWIBDateKey(iso: string): string {
   return new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+// ✅ NEW — key "hari absensi" dengan cutoff 04:00 WIB (konsisten dengan
+// toAttendanceDateKey di server-side seperti /api/auth/face-status).
+// Jam 00:00–03:59 WIB masih dihitung hari sebelumnya, supaya absen pulang
+// dini hari (lanjutan shift SORE kemarin) tidak salah ketempel ke absen
+// masuk shift SORE hari ini. Offset: WIB (+7 jam) − 4 jam cutoff = +3 jam.
+function toAttendanceDateKey(iso: string): string {
+  return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 function getWIBToday(): string {
   return toWIBDateKey(new Date().toISOString());
 }
@@ -196,7 +205,12 @@ export default function DaftarHadirPage() {
             if (a.direction !== "OUT") return;
             const iso = a.check_in_time || a.created_at;
             if (!iso) return;
-            checkoutMap[`${a.user_id}_${toWIBDateKey(iso)}`] = iso;
+            // ✅ FIX: pakai cutoff hari absensi 04:00 WIB, bukan midnight.
+            // Tanpa ini, record OUT jam 00:00–03:59 WIB (lanjutan shift SORE
+            // kemarin — mis. Fitri Hidayat pulang 01:04 untuk shift Kamis)
+            // salah dipetakan ke tanggal kalender yang sama dan ketempel ke
+            // absen masuk hari ini, bikin status "jam pulang" palsu.
+            checkoutMap[`${a.user_id}_${toAttendanceDateKey(iso)}`] = iso;
           });
         }
       } catch (e) {
@@ -216,7 +230,12 @@ export default function DaftarHadirPage() {
         // ✅ NEW — tempelkan jam pulang ke tiap entry absen masuk (dari baseData)
         const attachCheckout = (e: AttendanceEntry): AttendanceEntry => ({
           ...e,
-          check_out_time: checkoutMap[`${e.user_id}_${toWIBDateKey(e.check_in_time)}`] ?? null,
+          // ✅ FIX: key lookup HARUS konsisten dengan key saat membangun
+          // checkoutMap di atas — dua-duanya pakai toAttendanceDateKey
+          // (cutoff 04:00). Kalau beda, mapping OUT dini hari salah nempel
+          // ke IN shift sore hari ini (bug asal tampil "jam pulang 01:04"
+          // padahal user belum pulang hari ini).
+          check_out_time: checkoutMap[`${e.user_id}_${toAttendanceDateKey(e.check_in_time)}`] ?? null,
         });
 
         const merged: GroupedAttendance = {

@@ -28,6 +28,9 @@ interface MsjGroupItem {
     brand?: string;
     selling_price: number;
     status: string;
+    // ✅ SN-First flag — unit tanpa parent folder (pola Step 3-5).
+    //    Dari backend search-sn / msj-groups. Optional karena backward compat.
+    is_sn_lepas?: boolean;
 }
 interface MsjGroup {
     id: string; name: string; status: "OPEN" | "SOLD";
@@ -181,9 +184,15 @@ function AddGroupModal({ editing, onClose, onSaved }: {
                                             {r.item_type === "LAPTOP" ? <Laptop size={14} /> : <Package size={14} />}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-1.5">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                 <span className="font-mono text-sm font-semibold text-gray-800 truncate">{r.serial_number}</span>
                                                 <TypeChip type={r.item_type} />
+                                                {/* ✅ Badge LEPAS — konsisten Step 3-5, user aware unit tanpa folder */}
+                                                {r.is_sn_lepas && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-100 text-sky-700 border border-sky-200 flex-shrink-0">
+                                                        🆓 LEPAS
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="text-[11px] text-gray-500 mt-0.5 truncate">{r.name}{r.selling_price ? ` · ${fmt(r.selling_price)}` : ""}</p>
                                         </div>
@@ -212,9 +221,14 @@ function AddGroupModal({ editing, onClose, onSaved }: {
                                     <div key={p.unit_id} className="flex items-center gap-2.5 bg-gray-50 rounded-xl border border-gray-200 px-3 py-2.5">
                                         <span className="w-5 h-5 rounded-full bg-gradient-to-br from-[#1a1545] to-[#0f0c29] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-1.5">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                 <span className="font-mono text-xs font-semibold text-gray-800 truncate">{p.serial_number}</span>
                                                 <TypeChip type={p.item_type} />
+                                                {p.is_sn_lepas && (
+                                                    <span className="inline-flex items-center px-1 py-0 rounded text-[8px] font-bold bg-sky-100 text-sky-700 border border-sky-200 flex-shrink-0">
+                                                        LEPAS
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="text-[10px] text-gray-500 mt-0.5 truncate">{p.name}</p>
                                         </div>
@@ -433,11 +447,16 @@ function MinusSiapJualContent() {
                                                             {it.item_type === "LAPTOP" ? <Laptop size={12} /> : <Package size={12} />}
                                                         </div>
                                                         <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-1.5">
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                                 <span className="font-mono text-xs font-semibold text-gray-800 truncate">{it.serial_number}</span>
                                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border tracking-wide flex-shrink-0 ${it.item_type === "LAPTOP" ? "bg-zinc-100 text-zinc-600 border-zinc-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
                                                                     {it.item_type === "LAPTOP" ? "LAPTOP" : "AKSESORIS"}
                                                                 </span>
+                                                                {it.is_sn_lepas && (
+                                                                    <span className="inline-flex items-center px-1 py-0 rounded text-[8px] font-bold bg-sky-100 text-sky-700 border border-sky-200 flex-shrink-0">
+                                                                        LEPAS
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                             <p className="text-[10px] text-gray-500 mt-0.5 truncate">{it.name}</p>
                                                         </div>

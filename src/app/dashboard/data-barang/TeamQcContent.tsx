@@ -9,10 +9,11 @@ import {
 } from "lucide-react";
 import MinusReasonModal from "@/components/inventory/MinusReasonModal";
 import AutocompleteInput from "@/components/ui/AutocompleteInput";
+import SuggestFolderModal from "@/components/inventory/SuggestFolderModal";
 
 interface QcUnit {
   id: string;
-  laptop_id: string;
+  laptop_id: string | null; // ⬅️ Step 4: null = SN Lepas
   serial_number: string | null;
   grade: string | null;
   source: string | null;
@@ -25,13 +26,17 @@ interface QcUnit {
   status: string;
   created_at: string;
   missing_fields: string[];
+  is_sn_lepas: boolean; // ⬅️ Step 4: convenience flag dari backend
   laptop: {
-    id: string;
+    id: string | null; // ⬅️ Step 4: null kalau SN Lepas (effective laptop fallback)
     laptop_name: string | null;
     brand: string | null;
     cpu: string | null;
     ram: string | null;
     storage: string | null;
+    gpu?: string | null;
+    display?: string | null;
+    selling_price?: number | null;
   };
 }
 
@@ -188,8 +193,25 @@ function QcEditModal({
       const json = await res.json();
       if (!json.success) { toast.error(json.message || "Gagal menyimpan"); return; }
 
+      // ⬅️ Step 4: was_ejected = user ubah 5 field pengunci folder → unit keluar
+      if (json.was_ejected) {
+        toast.warning("⚠️ Unit ter-eject dari folder — jadi SN Lepas karena ada perubahan field pengunci (nama/spek/harga jual/grade).", { duration: 6000 });
+      }
+
       if (json.is_complete) {
-        toast.success("Semua kriteria lengkap — unit otomatis naik ke SIAP JUAL");
+        // ⬅️ Step 4: Q3 A — SN Lepas lulus QC + ada folder match → tampilin suggest
+        if (json.suggest_folders && json.suggest_folders.length > 0) {
+          toast.success(`✅ SIAP JUAL — ditemukan ${json.suggest_folders.length} folder yang cocok, cek modal pilih folder.`, { duration: 7000 });
+          // Simpan suggest_folders ke state parent untuk munculin modal
+          // (dihandle di TeamQcContent — lihat onSaved callback)
+          (window as any).__qcSuggestFolders = {
+            unit_id: unit.id,
+            unit_name: form.laptop_name || unit.serial_number,
+            folders: json.suggest_folders,
+          };
+        } else {
+          toast.success("Semua kriteria lengkap — unit otomatis naik ke SIAP JUAL");
+        }
       } else {
         toast.success(`Disimpan — masih ${json.missing_fields.length} field kosong`);
       }
@@ -231,8 +253,10 @@ function QcEditModal({
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0 bg-gradient-to-r from-indigo-600 to-indigo-700">
           <div>
-            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">QC — Isi Kriteria Lengkap</p>
-            <h2 className="text-white font-bold text-base mt-0.5 truncate">{unit.laptop.laptop_name || "Laptop"}</h2>
+            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">
+              QC — {unit.is_sn_lepas ? "🆓 SN Lepas" : "📦 Dalam Folder"}
+            </p>
+            <h2 className="text-white font-bold text-base mt-0.5 truncate">{unit.laptop.laptop_name || unit.serial_number || "Laptop"}</h2>
             <p className="text-xs text-white/60 mt-0.5">
               <span className="font-mono">{unit.serial_number || "— tanpa SN —"}</span>
               {" · "}{unit.missing_fields.length} field kosong
@@ -253,6 +277,25 @@ function QcEditModal({
               Nilai <span className="font-mono bg-white px-1.5 py-0.5 rounded">0</span> dianggap terisi.
             </p>
           </div>
+
+          {/* ⬅️ Step 4: Warning khusus folder isi — edit 5 field pengunci = eject */}
+          {!unit.is_sn_lepas && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-800 leading-relaxed">
+                <b>⚠️ Unit ini dalam folder isi.</b> Kalau kamu ubah <b>Nama, CPU, RAM, Storage, GPU, Display, Harga Setor, atau Grade</b>, unit otomatis <b>keluar dari folder</b> jadi SN Lepas (biar folder tetap konsisten).
+              </p>
+            </div>
+          )}
+          {/* ⬅️ Step 4: Info SN Lepas */}
+          {unit.is_sn_lepas && (
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3.5 flex gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-sky-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-sky-800 leading-relaxed">
+                <b>🆓 SN Lepas (tanpa folder).</b> Isi semua field dengan bebas. Setelah lulus QC, sistem otomatis cari folder yang cocok — kamu bisa pilih masukin ke folder atau tetap lepas.
+              </p>
+            </div>
+          )}
 
           {/* ── Model Fields ── */}
           <div>
@@ -353,6 +396,11 @@ export default function TeamQcContent() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [editTarget, setEditTarget] = useState<QcUnit | null>(null);
+
+  // ⬅️ Step 4 Q3 A: state untuk modal suggest folder setelah QC lulus
+  const [suggestFolderData, setSuggestFolderData] = useState<{
+    unit_id: string; unit_name: string; folders: any[];
+  } | null>(null);
 
   // ── Scan Data Lama (Fitur 2) ──────────────────────────────────────────
   const [scanPreview, setScanPreview] = useState<ScanPreview | null>(null);
@@ -486,15 +534,18 @@ export default function TeamQcContent() {
                 onClick={() => setEditTarget(u)}
                 className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all p-4 flex items-start gap-3 text-left group"
               >
-                <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-4 h-4 text-amber-600" />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border ${u.is_sn_lepas ? "bg-sky-50 border-sky-200" : "bg-amber-50 border-amber-100"}`}>
+                  {u.is_sn_lepas ? <span className="text-sky-600 text-base">🆓</span> : <Clock className="w-4 h-4 text-amber-600" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-bold text-gray-800 truncate">{u.laptop.laptop_name || "Tanpa Nama"}</p>
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <p className="text-sm font-bold text-gray-800 truncate">{u.laptop.laptop_name || u.serial_number || "Tanpa Nama"}</p>
                     <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                       {u.serial_number || "no-SN"}
                     </span>
+                    {u.is_sn_lepas && (
+                      <span className="text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-300 px-1.5 py-0.5 rounded">LEPAS</span>
+                    )}
                   </div>
                   <p className="text-[11px] text-gray-500 mb-2">
                     {[u.laptop.brand, u.laptop.cpu, u.laptop.ram, u.laptop.storage].filter(Boolean).join(" · ") || "Belum ada spek"}
@@ -527,7 +578,30 @@ export default function TeamQcContent() {
         <QcEditModal
           unit={editTarget}
           onClose={() => setEditTarget(null)}
-          onSaved={() => { setEditTarget(null); fetchUnits(); }}
+          onSaved={() => {
+            setEditTarget(null);
+            fetchUnits();
+            // ⬅️ Step 4 Q3 A: cek kalau QcEditModal set suggest_folders di window global
+            const suggest = (window as any).__qcSuggestFolders;
+            if (suggest) {
+              setSuggestFolderData(suggest);
+              (window as any).__qcSuggestFolders = null;
+            }
+          }}
+        />
+      )}
+
+      {/* ⬅️ Step 4 Q3 A: Modal suggest folder match setelah QC lulus */}
+      {suggestFolderData && (
+        <SuggestFolderModal
+          unitId={suggestFolderData.unit_id}
+          unitName={suggestFolderData.unit_name}
+          folders={suggestFolderData.folders}
+          onClose={() => setSuggestFolderData(null)}
+          onMoved={() => {
+            setSuggestFolderData(null);
+            fetchUnits();
+          }}
         />
       )}
 

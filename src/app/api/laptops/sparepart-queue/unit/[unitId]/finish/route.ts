@@ -21,14 +21,16 @@ async function postHandler(_req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { unitId } = await props.params;
 
-    // Fetch unit + laptop parent
+    // Fetch unit + laptop parent (optional — SN Lepas laptop_id=NULL)
     const { data: unit, error: unitErr } = await supabase
       .from("laptop_units")
       .select("*, laptop:laptops(*)")
       .eq("id", unitId)
       .single();
 
-    if (unitErr || !unit || !unit.laptop) {
+    // ✅ SN Lepas support: unit.laptop boleh NULL (unit lepas folder).
+    // Guard asli `!unit.laptop` bikin SN Lepas 404 padahal unit valid.
+    if (unitErr || !unit) {
       return NextResponse.json({ success: false, message: "Unit tidak ditemukan" }, { status: 404 });
     }
     if (unit.qc_status !== "IN_SPAREPART") {
@@ -56,12 +58,16 @@ async function postHandler(_req: NextRequest, props: Props, user: AuthUser) {
       if (updErr) return NextResponse.json({ success: false, message: updErr.message }, { status: 400 });
     }
 
-    // 2. Auto cek kelengkapan QC
+    // 2. Auto cek kelengkapan QC — qcCriteria.ts sudah hybrid read
+    //    (Step 4 Patch 4.2): prefer unit field, fallback laptop. Cast via
+    //    `as unknown as LaptopForQc` supaya nullable laptop lolos signature
+    //    yang non-optional (internally sudah null-safe di qcCriteria).
     const isComplete = isUnitQcComplete(
       unit as unknown as import("@/lib/qcCriteria").LaptopUnitForQc,
       unit.laptop as unknown as import("@/lib/qcCriteria").LaptopForQc
     );
 
+    // ─── BRANCH A: isComplete=true → auto SIAP_JUAL + suggest folder (SN Lepas) ───
     if (isComplete) {
       await supabase.from("laptop_units").update({
         qc_status: "QC_DONE", status: "SIAP_JUAL",
@@ -75,16 +81,59 @@ async function postHandler(_req: NextRequest, props: Props, user: AuthUser) {
         actor_user_id: user.id, actor_name: user.name,
         reason: `Perbaikan selesai (${menungguCount ?? 0} sparepart) + kriteria QC lengkap → auto SIAP_JUAL`,
       });
-      await recalcLaptopParentQty(supabase, unit.laptop_id);
+
+      // ✅ SN Lepas guard: laptop_id bisa NULL (unit lepas folder)
+      if (unit.laptop_id) {
+        await recalcLaptopParentQty(supabase, unit.laptop_id);
+      }
+
+      // ✅ Auto-suggest folder untuk SN Lepas (pola Step 4 Patch 4.1 + Step 5 Patch 5.3).
+      // Cari folder match berdasarkan 5 pengunci: laptop_name, cpu, ram, storage, grade.
+      // Return type match SuggestFolder interface di SuggestFolderModal.tsx.
+      let suggestFolders: Array<{
+        id: string;
+        laptop_name: string | null;
+        brand: string | null;
+        cpu: string | null;
+        ram: string | null;
+        storage: string | null;
+        selling_price: number | null;
+        grade: string | null;
+        category: string | null;
+      }> = [];
+      if (!unit.laptop_id && unit.laptop_name) {
+        const { data: matches } = await supabase
+          .from("laptops")
+          .select("id, laptop_name, brand, cpu, ram, storage, grade, selling_price, category")
+          .eq("laptop_name", unit.laptop_name)
+          .eq("cpu", unit.cpu ?? "")
+          .eq("ram", unit.ram ?? "")
+          .eq("storage", unit.storage ?? "")
+          .eq("grade", unit.grade ?? "")
+          .limit(5);
+        suggestFolders = (matches ?? []).map(m => ({
+          id: m.id,
+          laptop_name: m.laptop_name ?? null,
+          brand: m.brand ?? null,
+          cpu: m.cpu ?? null,
+          ram: m.ram ?? null,
+          storage: m.storage ?? null,
+          grade: m.grade ?? null,
+          selling_price: m.selling_price ?? null,
+          category: m.category ?? null,
+        }));
+      }
 
       return NextResponse.json({
         success: true,
         message: `Unit selesai diperbaiki — langsung SIAP JUAL${(menungguCount ?? 0) > 0 ? ` (${menungguCount} sparepart dicatat)` : " (tanpa sparepart)"}`,
         new_status: "SIAP_JUAL",
+        is_sn_lepas: !unit.laptop_id,
+        suggest_folders: suggestFolders,
       });
     }
 
-    // Kriteria QC belum lengkap → balik ke Team QC
+    // ─── BRANCH B: isComplete=false → balik ke Team QC ───
     await supabase.from("laptop_units").update({
       qc_status: "NEEDS_QC", status: "BELUM_SIAP",
     }).eq("id", unitId);
@@ -96,12 +145,17 @@ async function postHandler(_req: NextRequest, props: Props, user: AuthUser) {
       actor_user_id: user.id, actor_name: user.name,
       reason: `Perbaikan selesai (${menungguCount ?? 0} sparepart) tapi kriteria QC belum lengkap → balik ke Team QC`,
     });
-    await recalcLaptopParentQty(supabase, unit.laptop_id);
+
+    // ✅ SN Lepas guard
+    if (unit.laptop_id) {
+      await recalcLaptopParentQty(supabase, unit.laptop_id);
+    }
 
     return NextResponse.json({
       success: true,
       message: `Unit selesai diperbaiki, tapi kriteria QC belum lengkap — balik ke Team QC`,
       new_status: "BELUM_SIAP",
+      is_sn_lepas: !unit.laptop_id,
     });
   } catch (err) {
     console.error("[sparepart-queue/unit/finish]", err);

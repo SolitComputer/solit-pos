@@ -72,7 +72,11 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       }).eq("id", unit_id);
       if (updErr) return NextResponse.json({ success: false, message: updErr.message }, { status: 400 });
 
-      await recalcLaptopParentQty(supabase, unit.laptop_id);
+      // ✅ SN Lepas guard: laptop_id bisa NULL (unit tanpa parent folder).
+      // recalcLaptopParentQty hanya relevan kalau unit punya parent.
+      if (unit.laptop_id) {
+        await recalcLaptopParentQty(supabase, unit.laptop_id);
+      }
       await supabase.from("qc_history").insert({
         unit_id, laptop_id: unit.laptop_id,
         from_qc_status: "FROM_QC", to_qc_status: "IN_SPAREPART",
@@ -104,7 +108,9 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       }).eq("id", unit_id);
       if (updErr) return NextResponse.json({ success: false, message: updErr.message }, { status: 400 });
 
-      await recalcLaptopParentQty(supabase, unit.laptop_id);
+      if (unit.laptop_id) {
+        await recalcLaptopParentQty(supabase, unit.laptop_id);
+      }
       await supabase.from("qc_history").insert({
         unit_id, laptop_id: unit.laptop_id,
         from_qc_status: "FROM_QC", to_qc_status: null,
@@ -124,13 +130,18 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
 
     // ─── OPSI 3: ASET_MATOT ──────────────────────────────────────────────
     if (decision === "ASET_MATOT") {
+      // ✅ Hybrid read (pola Step 3-4): unit field prioritas, fallback laptop.
+      // SN Lepas punya identitas sendiri di unit — jangan fallback ke "Tidak diketahui".
+      const effectiveLaptopName =
+        unit.laptop_name || unit.laptop?.laptop_name || "Tidak diketahui";
+
       // Insert ke dead_assets
       const { error: deadErr } = await supabase.from("dead_assets").insert({
-        nama_barang: unit.laptop?.laptop_name || "Tidak diketahui",
+        nama_barang: effectiveLaptopName,
         keterangan: (keterangan && String(keterangan).trim()) || unit.analisa || unit.repair_notes || null,
         kondisi: unit.condition_note || null,
         asal_serial_number: unit.serial_number,
-        asal_laptop_name: unit.laptop?.laptop_name || null,
+        asal_laptop_name: effectiveLaptopName === "Tidak diketahui" ? null : effectiveLaptopName,
         created_by: user?.id || null,
         created_by_name: user?.name || null,
       });
@@ -148,7 +159,9 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       const { error: delErr } = await supabase.from("laptop_units").delete().eq("id", unit_id);
       if (delErr) return NextResponse.json({ success: false, message: delErr.message }, { status: 400 });
 
-      await recalcLaptopParentQty(supabase, unit.laptop_id);
+      if (unit.laptop_id) {
+        await recalcLaptopParentQty(supabase, unit.laptop_id);
+      }
       await logActivity({
         userId: user.id, userName: user.name, userRole: user.role,
         action: "DELETE", entity: "unit", entityId: unit_id,

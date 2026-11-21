@@ -9,6 +9,7 @@ import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import AddUnitModalAccessory from "@/components/inventory/AddUnitModalAccessory";
 import AddUnitSnFirstModal from "@/components/inventory/AddUnitSnFirstModal";
+import AddFolderOnlyModal from "@/components/inventory/AddFolderOnlyModal";
 import AccessoryUnitDetailModal, { AccessoryUnitDetailData } from "@/components/inventory/AccessoryUnitDetailModal";
 import ConditionChecklist from "@/components/inventory/ConditionChecklist";
 import { ConditionChecks, isConditionCheckCategory, sanitizeConditionChecks } from "@/lib/conditionChecks";
@@ -39,7 +40,7 @@ interface LaptopUnitLite {
     branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU: cabang per unit
 }
 interface LaptopRaw {
-    id: string; laptop_name: string; category_id?: string | null; category_name?: string | null;
+    id: string; laptop_name: string | null; category_id?: string | null; category_name?: string | null;
     brand: string; cpu: string; ram: string; storage: string; gpu: string; display: string;
     condition_note: string; selling_price: number; notes: string; created_at: string;
     condition_checks?: ConditionChecks | null;
@@ -57,7 +58,7 @@ interface AccessoryUnitLite {
     branch?: "UTAMA" | "JOGJA" | null; // ⬅️ BARU: cabang per unit
 }
 interface AccessoryRaw {
-    id: string; name: string; category: string; brand: string | null; spec: string | null;
+    id: string; name: string | null; category: string; brand: string | null; spec: string | null;
     buy_price?: number; sell_price: number; stock: number; notes: string | null; created_at: string;
     audited_at?: string | null; audited_by?: string | null;
     so_at?: string | null; so_by?: string | null;
@@ -87,6 +88,8 @@ interface UnifiedRow {
 
     is_pedagang_listed?: boolean; // laptop: true kalau ADA unit aktif yang masuk Pricelist Pedagang
     branch: "UTAMA" | "JOGJA" | "CAMPURAN" | null; // ⬅️ BARU: ringkasan cabang dari unit aktif
+    is_empty_folder?: boolean; // ⬅️ BARU (Step 3): folder kosong (identitas detail NULL)
+    is_sn_lepas?: boolean;     // ⬅️ BARU (Step 3): pseudo-row untuk SN Lepas (laptop_id/accessory_id=NULL)
     raw: LaptopRaw | AccessoryRaw;
 }
 
@@ -260,8 +263,10 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const min = modals.length ? Math.min(...modals) : 0;
     const max = modals.length ? Math.max(...modals) : 0;
 
+    const isEmptyFolder = l.laptop_name === null;
     return {
-        id: l.id, tipe: "LAPTOP", nama: l.laptop_name,
+        id: l.id, tipe: "LAPTOP",
+        nama: isEmptyFolder ? `📦 Folder Kosong · ${l.category_name ?? "Tanpa Kategori"}` : (l.laptop_name ?? ""),
         kategori: l.category_name ?? null, kategori_id: l.category_id ?? null,
         brand: l.brand || null, cpu: l.cpu || null, ram: l.ram || null, storage: l.storage || null, spek: null,
         harga_modal: one ? (one.purchase_price ?? 0) : null,
@@ -282,6 +287,7 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         is_pedagang_listed: aktif.some(u => u.is_pedagang_listed === true),
         branch: deriveBranch(aktif), // ⬅️ BARU
+        is_empty_folder: isEmptyFolder, // ⬅️ BARU (Step 3)
         raw: l,
     };
 }
@@ -307,8 +313,11 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
     const minModal = modals.length ? Math.min(...modals) : 0;
     const maxModal = modals.length ? Math.max(...modals) : 0;
     const margin = (a.sell_price || 0) - (a.buy_price || 0);
+    const isEmptyFolderAcc = a.name === null;
     return {
-        id: a.id, tipe: "AKSESORIS", nama: a.name, kategori: a.category,
+        id: a.id, tipe: "AKSESORIS",
+        nama: isEmptyFolderAcc ? `📦 Folder Kosong · ${a.category ?? "Tanpa Kategori"}` : (a.name ?? ""),
+        kategori: a.category,
         brand: a.brand || null, cpu: null, ram: null, storage: null, spek: a.spec || null,
         harga_modal: one
             ? (one.buy_price ?? 0)
@@ -333,7 +342,54 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
         pinjam_done: 0, // diisi setelah fetch active-units (lihat useEffect pinjaman)
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         branch: deriveBranch(aktif), // ⬅️ BARU
+        is_empty_folder: isEmptyFolderAcc, // ⬅️ BARU (Step 3)
         raw: a,
+    };
+}
+
+// ─── SN LEPAS (Step 3) ──────────────────────────────────────────────────────
+// Unit yang laptop_id/accessory_id=NULL — convert jadi pseudo-row UnifiedRow.
+// Tipe bisa "LAPTOP" atau "AKSESORIS", tapi ditandai is_sn_lepas=true biar
+// UI bisa render di section terpisah.
+function normalizeSnLepas(u: any, tipe: ItemType): UnifiedRow {
+    const isOut = u.status && ["SOLD", "TERJUAL", "KELUAR", "RETURNED", "RESERVED", "HELD", "PACKING", "PENDING"].includes(u.status);
+    return {
+        id: u.id, tipe,
+        nama: `🆓 ${u.name || u.serial_number}`,
+        kategori: u.category ?? null, kategori_id: null,
+        brand: u.brand ?? null,
+        cpu: tipe === "LAPTOP" ? (u.cpu ?? null) : null,
+        ram: tipe === "LAPTOP" ? (u.ram ?? null) : null,
+        storage: tipe === "LAPTOP" ? (u.storage ?? null) : null,
+        spek: tipe === "AKSESORIS" ? (u.spec ?? null) : null,
+        harga_modal: tipe === "LAPTOP" ? (u.purchase_price ?? 0) : (u.buy_price ?? 0),
+        modal_sparepart: tipe === "LAPTOP" ? (u.sparepart_cost ?? 0) : null,
+        harga_jual: u.selling_price ?? 0,
+        total_jual: isOut ? 0 : (u.selling_price ?? 0),
+        gross_profit: null,
+        sumber: u.source ?? null,
+        tanggal_masuk: u.created_at ?? null,
+        sn: u.serial_number,
+        stok_tersedia: tipe === "LAPTOP" ? (isOut ? 0 : 1) : null,
+        siap_jual: tipe === "LAPTOP" ? (u.status === "SIAP_JUAL" ? 1 : 0) : null,
+        minus: tipe === "LAPTOP" ? (u.status === "SERVICE" || u.status === "BELUM_SIAP" ? 1 : 0) : null,
+        minus_siap_jual: tipe === "LAPTOP" ? (u.status === "MINUS_SIAP_JUAL" ? 1 : 0) : null,
+        stok: tipe === "AKSESORIS" ? (isOut ? 0 : 1) : null,
+        so_at: null, so_by: null, audited_at: null, audited_by: null,
+        so_done: 0, audit_done: 0, pinjam_done: 0,
+        unit_id: u.id, unit_count: isOut ? 0 : 1,
+        is_pedagang_listed: false,
+        branch: (u.branch === "UTAMA" || u.branch === "JOGJA") ? u.branch : null,
+        is_sn_lepas: true, // ⬅️ Flag penting: tag ini sebagai SN Lepas
+        raw: { id: u.id, laptop_name: u.name ?? null, category_id: null, category_name: u.category ?? null,
+               brand: u.brand ?? "", cpu: u.cpu ?? "", ram: u.ram ?? "", storage: u.storage ?? "",
+               gpu: u.gpu ?? "", display: u.display ?? "", condition_note: u.condition_note ?? "",
+               selling_price: u.selling_price ?? 0, notes: u.notes ?? "", created_at: u.created_at,
+               laptop_units: [],
+               // ⬅️ Step 3: tambahan field raw unit yg dipakai handleRowClick buat buka UnitDetailModal
+               _status: u.status, _purchase_price: u.purchase_price, _sparepart_cost: u.sparepart_cost,
+               _notes: u.notes, _condition_note: u.condition_note, _grade: u.grade, _condition: u.condition,
+               } as any, // cast any krn ada field tambahan non-LaptopRaw
     };
 }
 
@@ -975,6 +1031,10 @@ export default function UnifiedBarangContent() {
     // SN-first modal (Fase 1) — 1 form bikin unit lengkap dgn identitas,
     // parent auto-dedup di endpoint /api/data-barang/units/create.
     const [showAddUnitSnFirst, setShowAddUnitSnFirst] = useState(false);
+    // Folder-only modal (Rework 2026-11-20) — modal minimal yg CUMA minta
+    // Type + Kategori. Parent tercipta kosong (identitas detail NULL),
+    // adopt identitas dari SN pertama yang masuk lewat flow "+ Unit/SN".
+    const [showAddFolderOnly, setShowAddFolderOnly] = useState(false);
 
     // Set berisi key row ("TIPE-id") yang kartunya sedang dibuka detailnya — khusus mode mobile.
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -1033,18 +1093,28 @@ export default function UnifiedBarangContent() {
             // Next.js route cache. Wajib untuk data yang diubah banyak user
             // bersamaan (SO barang, audit, pedagang listing, dll).
             const _t = Date.now();
-            const [lapRes, accRes] = await Promise.all([
+            const [lapRes, accRes, lepasRes] = await Promise.all([
                 fetch(`/api/laptops?_t=${_t}`, { cache: "no-store" }),
                 fetch(`/api/accessories?page=1&limit=9999&_t=${_t}`, { cache: "no-store" }),
+                fetch(`/api/data-barang/sn-lepas?_t=${_t}`, { cache: "no-store" }),
             ]);
             const lapJson = await lapRes.json();
             const accJson = await accRes.json();
+            const lepasJson = await lepasRes.json();
             // Barang terarsip (archived_at terisi) TIDAK muncul di Data Barang —
             // ditampilkan di tab Arsip. Disaring di sini, bukan di endpoint,
             // supaya halaman lain yang pakai /api/laptops & /api/accessories aman.
             const laptopRows = (lapJson.success ? lapJson.data : []).filter((l: any) => !l.archived_at).map(normalizeLaptop);
             const accessoryRows = (accJson.success ? accJson.data : []).filter((a: any) => !a.archived_at).map(normalizeAccessory);
-            const merged = [...laptopRows, ...accessoryRows];
+            // SN Lepas (laptop_id/accessory_id=NULL) → convert jadi pseudo-row UnifiedRow
+            // dgn flag is_sn_lepas=true. Tampil di section terpisah di bawah main list.
+            const lepasLaptopRows: UnifiedRow[] = lepasJson.success
+                ? (lepasJson.data?.laptop_units ?? []).map((u: any) => normalizeSnLepas(u, "LAPTOP"))
+                : [];
+            const lepasAccRows: UnifiedRow[] = lepasJson.success
+                ? (lepasJson.data?.accessory_units ?? []).map((u: any) => normalizeSnLepas(u, "AKSESORIS"))
+                : [];
+            const merged = [...laptopRows, ...accessoryRows, ...lepasLaptopRows, ...lepasAccRows];
             setRows(merged);
             writeBarangCache(merged);
         } catch {
@@ -1305,6 +1375,12 @@ export default function UnifiedBarangContent() {
         }
 
         return [...list].sort((a, b) => {
+            // ⬅️ Step 3: Folder Kosong + SN Lepas selalu di BAWAH list (secondary section)
+            const aSecondary = (a.is_sn_lepas ?? false) || (a.is_empty_folder ?? false);
+            const bSecondary = (b.is_sn_lepas ?? false) || (b.is_empty_folder ?? false);
+            if (aSecondary !== bSecondary) return aSecondary ? 1 : -1;
+            // SN Lepas paling bawah (di bawah folder kosong)
+            if ((a.is_sn_lepas ?? false) !== (b.is_sn_lepas ?? false)) return a.is_sn_lepas ? 1 : -1;
             if (sortBy === "NAMA_ASC") return a.nama.trim().localeCompare(b.nama.trim(), "id-ID", { sensitivity: "base", numeric: true });
             if (sortBy === "NAMA_DESC") return b.nama.trim().localeCompare(a.nama.trim(), "id-ID", { sensitivity: "base", numeric: true });
             if (sortBy === "HARGA_DESC") return (b.harga_jual || 0) - (a.harga_jual || 0);
@@ -1757,9 +1833,51 @@ export default function UnifiedBarangContent() {
         }
     };
 
+    // ── Step 3 Helper: construct UnitDetailData untuk SN Lepas (laptop_id/accessory_id=NULL)
+    // Return type `any` SENGAJA — bypass strict type check karena UnifiedRow pakai string|null
+    // di beberapa field sementara UnitDetailData expect string. Konten runtime aman karena
+    // UnitDetailModal handle nullable fields gracefully.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buildSnLepasUnitData = (row: UnifiedRow): any => {
+        const rawUnit = row.raw as any;
+        return {
+            id: row.unit_id!,
+            serial_number: row.sn ?? "",
+            status: rawUnit._status ?? "BELUM_SIAP",
+            purchase_price: rawUnit._purchase_price ?? row.harga_modal ?? 0,
+            sparepart_cost: rawUnit._sparepart_cost ?? 0,
+            selling_price: row.harga_jual,
+            source: row.sumber ?? "",
+            branch: row.branch === "CAMPURAN" ? null : row.branch,
+            notes: rawUnit._notes ?? "",
+            condition_note: rawUnit._condition_note ?? "",
+            created_at: row.tanggal_masuk ?? new Date().toISOString(),
+            name: row.nama.replace(/^🆓\s*/, ""),
+            brand: row.brand ?? "",
+            cpu: row.cpu ?? "",
+            ram: row.ram ?? "",
+            storage: row.storage ?? "",
+            grade: rawUnit._grade ?? null,
+            condition: rawUnit._condition ?? null,
+        };
+    };
+
     // ── Klik baris (desktop) / tap kartu (mobile) ───────────────────────────
     const handleRowClick = (row: UnifiedRow) => {
         if (canOnlyViewBasic) return; // role basic-view: baris tidak bisa diklik
+        // ⬅️ Step 3: Folder kosong — tidak ada unit, cuma bisa dihapus manual (klik Hapus)
+        if (row.is_empty_folder) return;
+        // ⬅️ Step 3: SN Lepas — construct UnitDetailData langsung dari raw data yg udah ada di state.
+        // Dibungkus buildSnLepasUnitData() + cast via unknown biar TypeScript strict happy.
+        if (row.is_sn_lepas && canViewUnits) {
+            const unitData = buildSnLepasUnitData(row);
+            if (row.tipe === "LAPTOP") {
+                setUnitDetailTarget({ unit: unitData as UnitDetailData, row });
+            } else {
+                setUnitDetailAccessoryTarget({ unit: unitData as AccessoryUnitDetailData, row });
+            }
+            return;
+        }
         if (row.tipe === "LAPTOP") {
             if (row.unit_count === 0 && canAddUnit) {
                 setAddUnitTarget(row);
@@ -2016,11 +2134,14 @@ export default function UnifiedBarangContent() {
                                 )}
                                 {!canOnlyViewBasic && !isPklPengelolaViewOnly && (canCreateLaptop || canCreateAcc) && (
                                     <>
-                                        {/* Tombol SECONDARY: bikin folder (flow lama) — parent kosong tanpa SN.
-                                            Dipakai kalau Rayhan mau bikin "kotak" duluan sebelum SN masuk. */}
+                                        {/* Tombol SECONDARY: bikin folder kosong — CUMA minta Type + Kategori.
+                                            Identitas detail (nama, brand, cpu, ram, storage, dll + harga + grade)
+                                            diisi nanti dari SN pertama yang masuk lewat "+ Unit/SN".
+                                            Rework 2026-11-20: ganti dari openCreate (modal besar) ke
+                                            AddFolderOnlyModal (modal minimal 2 field). */}
                                         <button
-                                            onClick={openCreate}
-                                            title="Bikin folder baru (tanpa SN)"
+                                            onClick={() => setShowAddFolderOnly(true)}
+                                            title="Bikin folder kosong (cuma pilih Type + Kategori)"
                                             className="h-9 flex-1 sm:flex-none px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold text-zinc-700 bg-zinc-100 border border-zinc-200 hover:bg-zinc-200 transition whitespace-nowrap"
                                         >
                                             + Folder
@@ -2285,9 +2406,13 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                                                             {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
                                                             {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
                                                         </span>
-                                                        <h3 className="font-bold text-zinc-900 text-[13.5px] leading-snug mt-1.5 line-clamp-2" title={row.nama}>{row.nama}</h3>
+                                                        <h3 className={`font-bold text-[13.5px] leading-snug mt-1.5 line-clamp-2 ${row.is_empty_folder ? "text-amber-700" : row.is_sn_lepas ? "text-sky-700" : "text-zinc-900"}`} title={row.nama}>{row.nama}</h3>
                                                         <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
-                                                            {row.kategori || "Tanpa kategori"}{row.brand ? ` · ${row.brand}` : ""}
+                                                            {row.is_empty_folder
+                                                                ? "Belum ada SN — tambah unit untuk adopt identitas"
+                                                                : row.is_sn_lepas
+                                                                    ? `SN Lepas · ${row.kategori ?? "Tanpa kategori"}${row.brand ? ` · ${row.brand}` : ""}`
+                                                                    : `${row.kategori || "Tanpa kategori"}${row.brand ? ` · ${row.brand}` : ""}`}
                                                         </p>
                                                         <div className="mt-1"><BranchBadge branch={row.branch} /></div>
                                                     </div>
@@ -2557,7 +2682,11 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                                                                     {row.kategori || "Tanpa Kategori"}
                                                                 </span>
                                                             </td>
-                                                            <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 dark:group-hover:bg-[#202d42] ${rowBg}`} title={row.nama}>{row.nama}</td>
+                                                            <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 dark:group-hover:bg-[#202d42] ${rowBg} ${row.is_empty_folder ? "text-amber-700" : row.is_sn_lepas ? "text-sky-700" : "text-zinc-800"}`} title={row.nama}>
+                                                                {row.nama}
+                                                                {row.is_empty_folder && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">KOSONG</span>}
+                                                                {row.is_sn_lepas && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-300">LEPAS</span>}
+                                                            </td>
                                                             <td className="px-3 py-3 whitespace-nowrap"><BranchBadge branch={row.branch} /></td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.brand || <Dash />}</td>
                                                             <td className="px-3 py-3 text-xs text-zinc-500">{row.cpu || <Dash />}</td>
@@ -2945,6 +3074,8 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                     canManageUnit={canAddUnit}
                     canEditChecklist={false}
                     canSeePrivate={canSeePrivate}
+                    // Tombol "Pindah Unit" — Admin Barang only (Rework 2026-11-20).
+                    canMoveUnit={canFullAccessBarang}
                     defaultSellingPrice={unitDetailTarget.row.harga_jual}
                     onClose={() => setUnitDetailTarget(null)}
                     onSaved={() => {
@@ -2956,6 +3087,11 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                         setUnitDetailTarget(null);
                         fetchAll();
                         toast.success(`Unit dengan SN "${created.serial_number}" berhasil ditambahkan`);
+                    }}
+                    onMoved={() => {
+                        setUnitDetailTarget(null);
+                        fetchAll();
+                        toast.success("Unit berhasil dipindahkan");
                     }}
                 />
             )}
@@ -3017,6 +3153,18 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                     }}
                 />
             )}
+
+            {/* ── MODAL: Buat Folder Kosong (Rework 2026-11-20) ──────────────────── */}
+            {/* Modal minimal CUMA minta Type (Laptop/Aksesoris) + Kategori (dari master
+                data laptop_categories). Folder tercipta kosong, identitas detail
+                (nama/spek/harga/grade) adopt dari SN pertama yang masuk nanti. */}
+            <AddFolderOnlyModal
+                open={showAddFolderOnly}
+                onClose={() => setShowAddFolderOnly(false)}
+                onCreated={() => {
+                    fetchAll();
+                }}
+            />
 
             {/* ── MODAL: Konfirmasi Reset SO manual ──────────────────── */}
             {resetSoConfirm && (

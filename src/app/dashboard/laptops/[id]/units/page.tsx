@@ -1538,11 +1538,18 @@ export default function UnitsPage() {
                     canEdit={false}
                     canEditChecklist={false}
                     canSeePrivate={canSeePriceInfo}
+                    // Tombol "Pindah Unit" — Admin Barang only (Rework 2026-11-20).
+                    canMoveUnit={canFullAccessBarang}
                     onClose={() => setDetailUnit(null)}
                     onSaved={(updated) => {
                         setUnits(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
                         setDetailUnit(null);
                         setToast("Data unit berhasil diperbarui!");
+                    }}
+                    onMoved={() => {
+                        // Unit sudah pindah folder → refetch biar list up-to-date
+                        fetchData();
+                        setToast("Unit berhasil dipindahkan");
                     }}
                 />
             )}
