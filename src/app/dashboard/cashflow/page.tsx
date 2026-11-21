@@ -1085,7 +1085,7 @@ function DetailModal({ entry, onClose, onDelete, onEdit, customCategories = [] }
                     <div className="text-center py-3 mb-1">
                         <p className={`text-3xl font-black tabular-nums ${nominalColor}`}>{isOut ? "−" : "+"}{fmtRupiah(entry.nominal)}</p>
                     </div>
-                                  <DetailRow label="Kategori">
+                    <DetailRow label="Kategori">
                         <CategoryBadge direction={entry.direction} category={entry.category} tone="plain" customCategories={customCategories} />
                     </DetailRow>
                     {(entry.source_type === "MANUAL" || entry.source_type === "PENGAJUAN_DANA") && (
@@ -1789,7 +1789,7 @@ function SummaryCard({ label, value, sublabel, color, icon, loading }: {
             <div className="px-5 py-4 flex items-center gap-3.5">
                 <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-lg ${c.iconBg}`}>{icon}</div>
                 <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5 truncate">{label}</p>
                     {loading ? <div className="h-6 w-28 bg-gray-100 rounded animate-pulse mt-1" /> : <p className={`text-xl font-black tabular-nums tracking-tight ${c.value}`}>{value}</p>}
                     {sublabel && !loading && <p className={`text-[10px] ${c.sub} mt-0.5 font-medium`}>{sublabel}</p>}
                 </div>
@@ -2474,7 +2474,7 @@ export default function CashflowPage() {
             {showModalAwal && <ModalAwalModal onClose={() => setShowModalAwal(false)} onSaved={() => fetchData(true)} />}
             {showIncomeModal && <IncomeModal onClose={() => setShowIncomeModal(false)} onSaved={() => fetchData(true)} customCategories={customCategories} />}
             {showTesSinkron && <TesSinkronModal onClose={() => setShowTesSinkron(false)} />}
-                     {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} onEdit={(e) => setEditEntry(e)} customCategories={customCategories} />}
+            {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} onEdit={(e) => setEditEntry(e)} customCategories={customCategories} />}
             {editEntry && <EditEntryModal entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => fetchData(true)} customCategories={customCategories} />}
             {showAuditAccessModal && <AuditAccessModal onClose={() => setShowAuditAccessModal(false)} />}
             {/* ⬅️ BARU — Modal Kelola Kategori Custom. onChanged memicu refetch supaya
@@ -2495,7 +2495,7 @@ export default function CashflowPage() {
                     <div className="flex items-center gap-3">
                         <div className={`w-11 h-11 rounded-2xl ${BRAND_GRADIENT} shadow-lg shadow-violet-900/25 flex items-center justify-center shrink-0 text-white`}><IconWallet /></div>
                         <div>
-                            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Cashflow</h1>
+                            <h1 className="text-xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Cashflow</h1>
                             <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Arus kas masuk & keluar · sejak {startDateFormatted}</p>
                         </div>
                     </div>
@@ -2581,7 +2581,7 @@ export default function CashflowPage() {
                                     <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 text-violet-200 flex items-center justify-center"><IconWallet /></div>
                                     <span className="text-xs font-bold text-violet-300/80 uppercase tracking-widest">{saldoLabel}</span>
                                 </div>
-                                {loading ? <div className="h-10 w-48 bg-white/10 rounded-xl animate-pulse" /> : <p className="text-3xl sm:text-4xl md:text-[2.75rem] font-black text-white tracking-tight tabular-nums">{fmtRupiah(dateFilteredSaldo)}</p>}
+                                {loading ? <div className="h-10 w-48 bg-white/10 rounded-xl animate-pulse" /> : <p className="text-2xl sm:text-4xl md:text-[2.75rem] font-black text-white tracking-tight tabular-nums break-words">{fmtRupiah(dateFilteredSaldo)}</p>}
                                 <p className="text-[11px] text-violet-300/70 mt-2">{saldoSubLabel}</p>
                                 {!loading && isRangeQuery && (
                                     <div className="mt-2 flex items-center gap-3 flex-wrap">
@@ -2659,7 +2659,7 @@ export default function CashflowPage() {
                 })()}
 
                 {/* Tab + Filter + CTA */}
-                <div className={`${CARD_BASE} p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap`}>
+                <div className={`${CARD_BASE} p-3 sm:p-3.5 space-y-2.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3 sm:flex-wrap`}>
                     <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                         <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
                             {(["IN", "OUT"] as const).map((t) => (
@@ -2673,7 +2673,7 @@ export default function CashflowPage() {
                             {filterCount > 0 && <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"}`}>{filterCount}</span>}
                         </button>
                         {/* Search dipisah dari FilterPanel, selalu tampil tanpa perlu buka Filter */}
-                        <div className="relative flex-1 min-w-[160px] max-w-full sm:max-w-xs basis-full sm:basis-auto">
+                        <div className="relative flex-1 min-w-0 max-w-full sm:max-w-xs basis-full sm:basis-auto">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><IconSearch /></div>
                             <input
                                 type="text"
