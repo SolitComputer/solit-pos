@@ -35,7 +35,7 @@ export type ShiftScheduleRow = {
 
 export type EffectiveShift = ShiftWindow & {
   shift: ShiftName;
-  source: "SCHEDULE" | "CONFIG" | "DEFAULT";
+  source: "SCHEDULE" | "WEEKLY" | "CONFIG" | "DEFAULT"; // ✅ NEW — tambah WEEKLY
   schedule_id: string | null;
 };
 
@@ -64,6 +64,23 @@ function spanDays(r: ShiftScheduleRow): number {
   const b = new Date(`${r.end_date}T12:00:00`).getTime();
   return Math.round((b - a) / 86_400_000);
 }
+
+// ✅ NEW — Jadwal Mingguan: jadwal per day_of_week (0=Min, 1=Sen, ..., 6=Sab)
+// Prioritas: Jadwal Tanggal > Jadwal Mingguan > ShiftConfig > Default Shift
+export type WeeklyScheduleRow = {
+  id?: string;
+  user_id: string;
+  day_of_week: number; // 0=Min, 1=Sen, 2=Sel, 3=Rab, 4=Kam, 5=Jum, 6=Sab
+  shift: ShiftName;
+  open_hour: number;
+  open_minute: number;
+  late_hour: number;
+  late_minute: number;
+  close_hour: number;
+  close_minute: number;
+  checkout_hour: number;
+  checkout_minute: number;
+};
 
 /** Rentang paling sempit menang; kalau seri → created_at terbaru. */
 export function pickSchedule(rows: ShiftScheduleRow[], dateStr: string): ShiftScheduleRow | null {
@@ -137,7 +154,7 @@ export async function loadShiftContext(
     };
   }
 
-  const [schedRes, cfgRes, usersRes] = await Promise.all([
+  const [schedRes, cfgRes, usersRes, weeklyRes] = await Promise.all([
     supabase
       .from("user_shift_schedule")
       .select("*")
@@ -146,6 +163,8 @@ export async function loadShiftContext(
       .gte("end_date", startDate),
     supabase.from("user_shift_config").select("*").in("user_id", ids),
     supabase.from("users").select("id, shift").in("id", ids),
+    // ✅ NEW — fetch jadwal mingguan
+    supabase.from("user_weekly_schedules").select("*").in("user_id", ids),
   ]);
 
   const schedulesByUser: Record<string, ShiftScheduleRow[]> = {};
@@ -161,7 +180,15 @@ export async function loadShiftContext(
     baseShiftByUser[u.id] = (u.shift === "SORE" ? "SORE" : "PAGI");
   });
 
+  // ✅ NEW — index jadwal mingguan per user, per day_of_week
+  const weeklyByUser: Record<string, Record<number, WeeklyScheduleRow>> = {};
+  (weeklyRes.data ?? []).forEach((w: any) => {
+    if (!weeklyByUser[w.user_id]) weeklyByUser[w.user_id] = {};
+    weeklyByUser[w.user_id][w.day_of_week] = w as WeeklyScheduleRow;
+  });
+
   const resolve = (userId: string, dateStr: string): EffectiveShift => {
+    // Layer 1: Jadwal Tanggal (paling tinggi)
     const sched = pickSchedule(schedulesByUser[userId] ?? [], dateStr);
     if (sched) {
       return {
@@ -172,12 +199,26 @@ export async function loadShiftContext(
       };
     }
 
+    // ✅ NEW — Layer 2: Jadwal Mingguan (per day_of_week)
+    const dow = dowOf(dateStr);
+    const weekly = weeklyByUser[userId]?.[dow];
+    if (weekly) {
+      return {
+        shift: weekly.shift,
+        source: "WEEKLY" as any,
+        schedule_id: null,
+        ...windowFrom(weekly.shift, weekly),
+      };
+    }
+
+    // Layer 3: ShiftConfig (pengaturan per user)
     const cfg = configByUser[userId];
     if (cfg) {
       const shift: ShiftName = cfg.shift === "SORE" ? "SORE" : "PAGI";
       return { shift, source: "CONFIG", schedule_id: null, ...windowFrom(shift, cfg) };
     }
 
+    // Layer 4: Default shift
     const shift = baseShiftByUser[userId] ?? "PAGI";
     return { shift, source: "DEFAULT", schedule_id: null, ...windowFrom(shift, null) };
   };

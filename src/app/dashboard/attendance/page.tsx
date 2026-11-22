@@ -11,7 +11,7 @@ import { OvertimeSOPBanner } from "@/components/attendance/OvertimeSOPBanner";
 import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
 import { canManageAttendance, DIVISION_MAP, isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
-import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
+import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow, type WeeklyScheduleRow } from "@/lib/shiftSchedule";
 import { resolveBranchByLocation } from "@/lib/attendanceLocations"; // ✅ NEW — jarak diukur ke cabang terdekat
 import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Inbox, CalendarDays, GraduationCap, Briefcase, Trophy } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
@@ -20,6 +20,7 @@ import { ContractBadge } from "@/components/contracts/ContractBadge";
 import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 import SendContractModal from "@/components/contracts/SendContractModal";
 import ContractDetailModal from "@/components/contracts/ContractDetailModal";
+import { WeeklyScheduleModal } from "@/components/attendance/WeeklyScheduleModal";
 
 function isPKLRole(role?: string): boolean {
     if (!role) return false;
@@ -4007,7 +4008,7 @@ function DanaPensiunTab({ data, loading, calYear, isAdmin, onManual, onExport }:
                         {filteredData.length > 0 && (
                             <tfoot>
                                 <tr>
-                                                                  <td className={`sticky left-0 z-10 font-black text-white bg-emerald-600 ${tf} ${freezeShadow}`}>TOTAL</td>
+                                    <td className={`sticky left-0 z-10 font-black text-white bg-emerald-600 ${tf} ${freezeShadow}`}>TOTAL</td>
                                     {monthTotals.map((v, i) => (
                                         <td key={i} className={`${tf} text-right bg-emerald-50 font-mono font-bold text-emerald-800 text-xs`}>{v ? formatRupiah(v) : "—"}</td>
                                     ))}
@@ -4119,7 +4120,7 @@ export default function AttendanceDashboardPage() {
     // ✅ NEW — key sama (`${user_id}_${dateKey}`) → lokasi & metode absen PULANG (OUT).
     // Dipisah dari checkoutTimes karena checkoutTimes cuma simpan jam (string),
     // sedangkan ini butuh beberapa field. Dipakai di kolom "Lokasi Pulang" & "Metode Pulang".
-      const [checkoutMeta, setCheckoutMeta] = useState<Record<string, { latitude: number | null; longitude: number | null; method: string | null; scheduleCheckoutMinute: number | null }>>({});
+    const [checkoutMeta, setCheckoutMeta] = useState<Record<string, { latitude: number | null; longitude: number | null; method: string | null; scheduleCheckoutMinute: number | null }>>({});
     const [afterOutOvertime, setAfterOutOvertime] = useState<Record<string, { minutes: number; status: string; auditStatus: string }>>({});
     // ✅ NEW — key: `${user_id}_${dateKey}`. Isi: lembur yang SUDAH otomatis
     // kedeteksi sistem dari absen OUT lewat jam pulang.
@@ -4227,6 +4228,9 @@ export default function AttendanceDashboardPage() {
     const [contractDetailUser, setContractDetailUser] = useState<UserInfo | null>(null);
     const [shiftSchedules, setShiftSchedules] = useState<ShiftScheduleRow[]>([]);
     const [shiftConfigs, setShiftConfigs] = useState<any[]>([]);
+    // ✅ NEW — Jadwal Mingguan
+    const [weeklySchedules, setWeeklySchedules] = useState<WeeklyScheduleRow[]>([]);
+    const [weeklyScheduleUser, setWeeklyScheduleUser] = useState<{ id: string; name: string; role: string; shift?: "PAGI" | "SORE" | null } | null>(null);
     const [myOvertimeDirections, setMyOvertimeDirections] = useState<Record<string, Set<string>>>({});
     const [dismissedPastOvertimeDates, setDismissedPastOvertimeDates] = useState<Set<string>>(new Set());
 
@@ -4267,6 +4271,17 @@ export default function AttendanceDashboardPage() {
             if (d.success) setShiftConfigs(d.data || []);
         } catch (err) {
             console.error("Failed to fetch shift configs:", err);
+        }
+    }, []);
+
+    // ✅ NEW — fetch jadwal mingguan (semua user sekaligus)
+    const fetchWeeklySchedules = useCallback(async () => {
+        try {
+            const r = await fetch("/api/attendance/weekly-schedule");
+            const d = await r.json();
+            if (d.success) setWeeklySchedules(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch weekly schedules:", err);
         }
     }, []);
 
@@ -4594,6 +4609,7 @@ export default function AttendanceDashboardPage() {
             fetchLeaveData(year, month),
             fetchShiftSchedules(year, month),
             fetchShiftConfigs(),
+            fetchWeeklySchedules(),
         ];
         Promise.all(tasks).finally(() => setLoading(false));
     }, [
@@ -4610,6 +4626,7 @@ export default function AttendanceDashboardPage() {
         fetchLeaveData,
         fetchShiftSchedules,
         fetchShiftConfigs,
+        fetchWeeklySchedules, // ✅ NEW
     ]);
 
     useEffect(() => {
@@ -4677,12 +4694,13 @@ export default function AttendanceDashboardPage() {
             fetchLeaveData(year, month),
             fetchShiftSchedules(year, month),
             fetchShiftConfigs(),
+            fetchWeeklySchedules(),
         ];
         await Promise.all(tasks).finally(() => { if (!silent) setLoading(false); });
         if (userCanViewSalary(currentUser)) {
             fetchSalarySlips(year, month);
         }
-    }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchShiftSchedules, fetchShiftConfigs, fetchSalarySlips, currentUser]);
+       }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchShiftSchedules, fetchShiftConfigs, fetchWeeklySchedules, fetchSalarySlips, currentUser]);
     // ── Derived ───────────────────────────────────────────────────────────────
     const dayOffByName = useMemo(() => { const m: Record<string, Set<number>> = {}; dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); }); return m; }, [dayOffs]);
     const dateOffByName = useMemo(() => {
@@ -4876,6 +4894,16 @@ export default function AttendanceDashboardPage() {
         return m;
     }, [shiftSchedules]);
 
+    // ✅ NEW — Jadwal Mingguan: index per user, per day_of_week
+    const weeklyByUser = useMemo(() => {
+        const m: Record<string, Record<number, WeeklyScheduleRow>> = {};
+        weeklySchedules.forEach(w => {
+            if (!m[w.user_id]) m[w.user_id] = {};
+            m[w.user_id][w.day_of_week] = w;
+        });
+        return m;
+    }, [weeklySchedules]);
+
     const configsByUser = useMemo(() => {
         const m: Record<string, any> = {};
         shiftConfigs.forEach(c => { m[c.user_id] = c; });
@@ -4889,6 +4917,7 @@ export default function AttendanceDashboardPage() {
 
         let shift: "PAGI" | "SORE" = userBaseShift;
         let fromSchedule = false;
+        let fromWeekly = false; // ✅ NEW
         let openMin: number | null = null;
         let lateMin: number | null = null;
         let closeMin: number | null = null;
@@ -4911,8 +4940,24 @@ export default function AttendanceDashboardPage() {
             }
         }
 
+        // ✅ NEW — Layer 2: Jadwal Mingguan (per day_of_week)
+        // Hanya berlaku kalau TIDAK ada Jadwal Tanggal (sched) yang override
+        if (!sched) {
+            const dow = new Date(dk + "T12:00:00+07:00").getDay(); // 0=Min, 1=Sen, ..., 6=Sab
+            const weekly = weeklyByUser[userId]?.[dow];
+            if (weekly) {
+                fromWeekly = true; // ✅ NEW
+                shift = weekly.shift;
+                if (openMin == null) openMin = weekly.open_hour * 60 + (weekly.open_minute ?? 0);
+                if (lateMin == null) lateMin = weekly.late_hour * 60 + (weekly.late_minute ?? 0);
+                if (closeMin == null) closeMin = weekly.close_hour * 60 + (weekly.close_minute ?? 0);
+                if (checkoutMin == null) checkoutMin = weekly.checkout_hour * 60 + (weekly.checkout_minute ?? 0);
+            }
+        }
+
         if (cfg) {
-            if (!sched) {
+            // ✅ FIX: shift cfg hanya override kalau TIDAK ada sched & TIDAK ada jadwal mingguan
+            if (!sched && !fromWeekly) {
                 shift = (cfg.shift ?? userBaseShift) as "PAGI" | "SORE";
             }
             if (openMin == null && cfg.open_hour != null) {
@@ -4945,13 +4990,14 @@ export default function AttendanceDashboardPage() {
         return {
             shift,
             fromSchedule,
+            fromWeekly, // ✅ NEW
             isCustom,
             open: openMin,
             late: lateMin,
             close: closeMin,
             checkout: checkoutMin, // ✅ NEW — pakai INI buat hitung lembur akhir, JANGAN pakai `close`
         };
-    }, [schedulesByUser, configsByUser, allUsers]);
+    }, [schedulesByUser, configsByUser, allUsers, weeklyByUser]);
 
     // ✅ NEW — jadwal pulang buat deteksi SETENGAH HARI, di-resolve dari
     // shift_snapshot yang DIKUNCI saat absen (per record), BUKAN effectiveShiftFor
@@ -7231,17 +7277,35 @@ export default function AttendanceDashboardPage() {
                                                                         {eff.fromSchedule && !eff.isCustom && (
                                                                             <span className="text-[8px] font-bold text-violet-500">dari jadwal</span>
                                                                         )}
+                                                                        {eff.fromWeekly && (
+                                                                            <span className="text-[8px] font-bold text-purple-500">dari mingguan</span>
+                                                                        )}
                                                                         {eff.isCustom && (
                                                                             <span className="text-[8px] font-black text-rose-600">Custom</span>
                                                                         )}
                                                                         {(isAdmin || u.userId !== currentUser?.id) && (
-                                                                            <button
-                                                                                onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShiftModalUserId(u.userId); setShowShiftModal(true); }}
-                                                                                className="text-[9px] font-bold text-gray-400 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
-                                                                                title={`Atur shift default ${u.name}`}
-                                                                            >
-                                                                                Default
-                                                                            </button>
+                                                                            <div className="flex items-center gap-1">
+                                                                                <button
+                                                                                    onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShiftModalUserId(u.userId); setShowShiftModal(true); }}
+                                                                                    className="text-[9px] font-bold text-gray-400 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
+                                                                                    title={`Atur shift default ${u.name}`}
+                                                                                >
+                                                                                    Default
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        if (allUsers.length === 0) fetchAllUsers();
+                                                                                        const userInfo = allUsers.find(au => au.id === u.userId);
+                                                                                        setWeeklyScheduleUser(
+                                                                                            userInfo ?? { id: u.userId, name: u.name, role: "STAFF" }
+                                                                                        );
+                                                                                    }}
+                                                                                    className="text-[9px] font-bold text-gray-400 hover:text-violet-600 border border-gray-200 hover:border-violet-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
+                                                                                    title={`Atur jadwal mingguan ${u.name}`}
+                                                                                >
+                                                                                    Mingguan
+                                                                                </button>
+                                                                            </div>
                                                                         )}
                                                                     </div>
                                                                 );
@@ -8177,55 +8241,55 @@ export default function AttendanceDashboardPage() {
                                         // ✅ Filter PKL out — konsisten dengan tab "Cuti Bulan Ini"
                                         const filteredLeaveHistory = leaveHistory.filter(u => !isPKLRole(u.user.role));
                                         return (
-                                    <div className="overflow-x-auto">
-                                        <div className="px-6 py-3 bg-cyan-50/50 border-b border-cyan-100 text-xs font-bold text-cyan-700 flex items-center gap-3 flex-wrap">
-                                            <span>Total: {filteredLeaveHistory.length} karyawan</span>
-                                            <span className="text-gray-400">·</span>
-                                            <span>{filteredLeaveHistory.filter(u => u.leaveDates.length > 0).length} pernah cuti</span>
-                                            <span className="text-gray-400">·</span>
-                                            <span>{filteredLeaveHistory.reduce((sum, u) => sum + u.leaveDates.length, 0)} total hari cuti</span>
-                                        </div>
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b border-gray-100 bg-gray-50/60">
-                                                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-12">#</th>
-                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
-                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Cuti</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-50">
-                                                {filteredLeaveHistory.map((u, i) => (
-                                                    <tr key={u.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
-                                                        <td className="px-6 py-4 text-[11px] text-gray-400 font-black">{i + 1}</td>
-                                                        <td className="px-4 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
-                                                                    {initials(u.user.name)}
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-bold text-gray-800 block">{u.user.name}</span>
-                                                                    <span className="text-[10px] text-gray-400">{u.user.role?.replace(/_/g, " ") || "—"}</span>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-4">
-                                                            {u.leaveDates.length === 0 ? (
-                                                                <span className="text-gray-200 text-sm font-black">—</span>
-                                                            ) : (
-                                                                <div className="flex flex-wrap gap-1.5">
-                                                                    {u.leaveDates.map(d => (
-                                                                        <span key={d} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
-                                                                            {new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                            <div className="overflow-x-auto">
+                                                <div className="px-6 py-3 bg-cyan-50/50 border-b border-cyan-100 text-xs font-bold text-cyan-700 flex items-center gap-3 flex-wrap">
+                                                    <span>Total: {filteredLeaveHistory.length} karyawan</span>
+                                                    <span className="text-gray-400">·</span>
+                                                    <span>{filteredLeaveHistory.filter(u => u.leaveDates.length > 0).length} pernah cuti</span>
+                                                    <span className="text-gray-400">·</span>
+                                                    <span>{filteredLeaveHistory.reduce((sum, u) => sum + u.leaveDates.length, 0)} total hari cuti</span>
+                                                </div>
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="border-b border-gray-100 bg-gray-50/60">
+                                                            <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-12">#</th>
+                                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Cuti</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-50">
+                                                        {filteredLeaveHistory.map((u, i) => (
+                                                            <tr key={u.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
+                                                                <td className="px-6 py-4 text-[11px] text-gray-400 font-black">{i + 1}</td>
+                                                                <td className="px-4 py-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
+                                                                            {initials(u.user.name)}
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="font-bold text-gray-800 block">{u.user.name}</span>
+                                                                            <span className="text-[10px] text-gray-400">{u.user.role?.replace(/_/g, " ") || "—"}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-4">
+                                                                    {u.leaveDates.length === 0 ? (
+                                                                        <span className="text-gray-200 text-sm font-black">—</span>
+                                                                    ) : (
+                                                                        <div className="flex flex-wrap gap-1.5">
+                                                                            {u.leaveDates.map(d => (
+                                                                                <span key={d} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
+                                                                                    {new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         );
                                     })()
                                 )}
@@ -8925,6 +8989,21 @@ export default function AttendanceDashboardPage() {
                     }}
                 />
             )}
+
+            {/* ✅ NEW — Modal Jadwal Mingguan */}
+            {weeklyScheduleUser && canManage && (
+                <WeeklyScheduleModal
+                    user={weeklyScheduleUser}
+                    existingSchedules={weeklySchedules}
+                    onClose={() => setWeeklyScheduleUser(null)}
+                    onSaved={async () => {
+                        await fetchWeeklySchedules();
+                        await fetchAttendance();
+                        fetchTodayStatus();
+                    }}
+                />
+            )}
+
             {editSalaryUser && isAdminRole(currentUser?.role)
                 && (
                     <InlineSalaryEditModal
