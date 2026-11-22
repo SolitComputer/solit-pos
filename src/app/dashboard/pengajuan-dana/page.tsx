@@ -1808,7 +1808,7 @@ export default function PengajuanDanaPage() {
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
       `}} />
 
-      <div className="space-y-6 max-w-[1400px] mx-auto px-2 sm:px-4 py-2">
+      <div className="space-y-4 sm:space-y-6 max-w-[1400px] mx-auto px-3 sm:px-4 py-2">
 
         {/* ── Header ─────────────────────────────────────────────────────────── */}
         {/* ⬅️ BARU: relative z-30 supaya dropdown lonceng tidak tertimpa hero banner */}
@@ -1819,7 +1819,7 @@ export default function PengajuanDanaPage() {
               <CircleDollarSign className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Pengajuan Dana</h1>
+              <h1 className="text-xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Pengajuan Dana</h1>
               <p className="text-xs text-slate-400 font-medium mt-1">
                 Dana operasional — disetujui CEO, dieksekusi Purchasing
               </p>
@@ -1864,7 +1864,7 @@ export default function PengajuanDanaPage() {
              satu-satunya elemen "berani" di halaman ini. Warnanya tetap indigo & purple
              yang sudah jadi identitas halaman — cuma lebih jenuh/pekat, bukan warna baru. */}
         <div
-          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-900 p-5 sm:p-7 shadow-[0_20px_50px_-20px_rgba(79,70,229,0.45)]"
+          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-900 p-4 sm:p-7 shadow-[0_20px_50px_-20px_rgba(79,70,229,0.45)]"
           style={{ animation: "pdSlideUp 0.4s ease-out both" }}
         >
           {/* Decorative blobs + cahaya lembut */}
@@ -1889,7 +1889,7 @@ export default function PengajuanDanaPage() {
           <div className="relative z-10 space-y-5">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
-                <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">Ringkasan Pengajuan</h2>
+                <h2 className="text-lg sm:text-2xl font-extrabold text-white tracking-tight">Ringkasan Pengajuan</h2>
                 <p className="text-xs sm:text-sm text-indigo-200/80 font-medium mt-0.5">
                   Rekap seluruh pengajuan dana operasional
                 </p>
@@ -1899,7 +1899,7 @@ export default function PengajuanDanaPage() {
                   Murni turunan dari angka yang sudah dihitung di atas (data.length,
                   totalApproved, dst), tidak ada state baru, cuma cara menampilkannya
                   yang lebih pas dengan alur kerja pengajuan dana itu sendiri. */}
-              <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto max-w-full">
+              <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto max-w-full" style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}>
                 {[
                   { label: "Diajukan", count: data.length, icon: <ClipboardList className="w-3.5 h-3.5" /> },
                   { label: "Disetujui", count: totalApproved, icon: <CheckCheck className="w-3.5 h-3.5" /> },
@@ -1919,7 +1919,7 @@ export default function PengajuanDanaPage() {
             </div>
 
             {/* Stat Cards inside banner */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
               <SummaryCard
                 icon={<ClipboardList className="w-4 h-4" />}
                 label="Total Pengajuan"
@@ -2024,7 +2024,7 @@ export default function PengajuanDanaPage() {
 
           {/* ── Filter Status ──────────────────────────────────────────────── */}
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Filter Status</p>
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4">
             {FILTERS.map((f) => (
               <button
                 key={f.key}
