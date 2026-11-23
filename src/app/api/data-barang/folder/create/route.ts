@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { UserRole } from "@/lib/permissions";
 
@@ -39,7 +40,9 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       // kategori lain (Laptop/I Mac/Monitor/Printer) pakai device_type='LAPTOP'.
       // Konsisten dengan isLaptopCategoryType() di UnifiedBarangContent.tsx.
       const deviceType = catCheck.name.trim().toUpperCase() === "PC" ? "PC" : "LAPTOP";
-      const { data, error } = await supabase.from("laptops").insert({
+      // ⬅️ FIX: pakai supabaseAdmin biar bypass RLS. Endpoint sudah di-gate role
+      // via withAuth(postHandler, ALLOWED_ROLES) jadi aman.
+      const { data, error } = await supabaseAdmin.from("laptops").insert({
         device_type: deviceType,
         category: catCheck.name,
         laptop_name: null, brand: null, cpu: null, ram: null, storage: null,
@@ -52,8 +55,14 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
     }
 
     // AKSESORIS
-    const { data, error } = await supabase.from("accessories").insert({
-      device_type: "ACCESSORY",
+    // ⬅️ FIX: pakai supabaseAdmin biar bypass RLS (sama dengan branch LAPTOP di atas).
+    // Endpoint sudah di-gate role via withAuth(postHandler, ALLOWED_ROLES) jadi aman.
+    // ⬅️ FIX #2: device_type DIHAPUS dari payload — CHECK constraint
+    //   accessories_device_type_check menolak value "ACCESSORY". Biarin DB
+    //   pakai default (NULL atau value valid dari constraint). Kalau Moreno
+    //   nanti perlu Printer tracking di accessories, baru kita set device_type
+    //   sesuai nilai yang valid (lihat SQL check di komentar bawah).
+    const { data, error } = await supabaseAdmin.from("accessories").insert({
       category: catCheck.name,
       name: null, brand: null, spec: null,
       buy_price: null, sell_price: null, grade: null,

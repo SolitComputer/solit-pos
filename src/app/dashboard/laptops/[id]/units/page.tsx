@@ -10,8 +10,6 @@ import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTa
 import ConditionChecklist from "@/components/inventory/ConditionChecklist";
 import { ConditionChecks, sanitizeConditionChecks } from "@/lib/conditionChecks";
 import { Trash2, Package, CheckCircle2, Wrench, Wallet } from "lucide-react";
-import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
-import UnitFormModal from "@/components/inventory/UnitFormModal";
 import EditablePriceCell from "@/components/inventory/EditablePriceCell";
 import { exportInventoryExcel } from "@/lib/inventoryExport";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -253,8 +251,7 @@ export default function UnitsPage() {
     const [units, setUnits] = useState<LaptopUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const [showForm, setShowForm] = useState(false);
-    const [editingUnit, setEditingUnit] = useState<LaptopUnit | null>(null);
+    // showForm & editingUnit state DIHAPUS — tambah/edit unit sekarang dari Data Barang.
 
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterGradeTab, setFilterGradeTab] = useState("ALL");
@@ -304,7 +301,7 @@ export default function UnitsPage() {
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
-    const [showBulkModal, setShowBulkModal] = useState(false);
+    // showBulkModal state DIHAPUS — tambah banyak unit sekarang dari Data Barang.
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [showBulkEditModal, setShowBulkEditModal] = useState(false); // ✅ bulk edit unit tercentang
@@ -827,18 +824,13 @@ export default function UnitsPage() {
         so_at: u.so_at ?? null,
     }));
 
-    const openCreate = () => {
-        setEditingUnit(null);
-        setShowForm(true);
-    };
-
-    const openEdit = (unit: LaptopUnit) => {
-        setEditingUnit(unit);
-        setShowForm(true);
-    };
-
-    const closeForm = () => { setShowForm(false); setEditingUnit(null); };
-
+    // openCreate, openEdit, closeForm, handleFormSuccess DIHAPUS.
+    // Fungsi refresh data unit setelah external action (mis. bulk perlu QC) tetap
+    // tersedia inline di handler masing-masing.
+    //
+    // CATATAN: BulkEditUnitsModal (bulk edit unit TERCENTANG) MASIH pakai pola
+    // handleFormSuccess sebagai callback onSuccess. Kalau masih dipakai, keep
+    // helper berikut sebagai fallback refresh:
     const handleFormSuccess = async () => {
         const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
         const freshData = await freshRes.json();
@@ -1078,24 +1070,10 @@ export default function UnitsPage() {
                                 </button>
                             )}
 
-                            {canManageUnits && (
-                                <>
-                                    <button onClick={openCreate}
-                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#1a1a2e] rounded-lg text-sm font-medium text-white hover:bg-[#16213e] transition shadow-sm">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        Tambah Unit
-                                    </button>
-                                    <button onClick={() => setShowBulkModal(true)}
-                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-600 rounded-lg text-sm font-medium text-white transition shadow-sm">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        Tambah Banyak
-                                    </button>
-                                </>
-                            )}
+                            {/* Tombol "Tambah Unit" & "Tambah Banyak" DIHAPUS.
+                                Sekarang semua penambahan unit (single & bulk) dilakukan
+                                lewat tombol "+ Unit/SN" di halaman Data Barang.
+                                Kelola Unit ini jadi VIEW-ONLY untuk unit existing. */}
 
                             {/* Tombol "Set Sumber" dihapus — field `source` termasuk
                                 data QC. Edit source sekarang HANYA lewat Team QC:
@@ -1311,7 +1289,7 @@ export default function UnitsPage() {
                             <p className="text-gray-400 text-xs mt-1">
                                 {hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL"
                                     ? "Coba ubah filter pencarian"
-                                    : canManageUnits ? "Klik 'Tambah Unit' untuk mendaftarkan SN" : "Belum ada unit yang tersedia"}
+                                    : canManageUnits ? "Tambahkan unit baru dari halaman Data Barang lewat tombol '+ Unit/SN'" : "Belum ada unit yang tersedia"}
                             </p>
                             {(hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL") && (
                                 <button onClick={resetFilters} className="mt-3 px-4 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
@@ -1484,28 +1462,8 @@ export default function UnitsPage() {
                 </div>
             </main>
 
-            {showForm && (
-                <UnitFormModal
-                    laptopId={laptopId}
-                    defaultSellingPrice={laptop?.selling_price ?? 0}
-                    editingUnit={editingUnit}
-                    canEditChecklist={!!canEditChecklist}
-                    onClose={closeForm}
-                    onSuccess={handleFormSuccess}
-                    onError={(msg) => setAlertModal(msg)}
-                />
-            )}
-
-            {/* ✅ FIX: modal Tambah Banyak dulu di-import tapi TIDAK pernah
-                di-render → tombolnya seolah "mati". */}
-            {showBulkModal && (
-                <BulkAddUnitModal
-                    laptopId={laptopId}
-                    defaultSellingPrice={laptop?.selling_price ?? 0}
-                    onClose={() => setShowBulkModal(false)}
-                    onSuccess={handleFormSuccess}
-                />
-            )}
+            {/* Modal UnitFormModal & BulkAddUnitModal DIHAPUS dari halaman ini.
+                Semua tambah unit sekarang via "+ Unit/SN" di Data Barang. */}
 
             {/*  Barcode per unit — 1 unit = 1 barcode. presetUnit = kirim unit
                 langsung, jadi modal tidak fetch & RESERVED/BELUM_SIAP pun bisa

@@ -3138,18 +3138,25 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                 />
             )}
 
+
             {/* ── MODAL: Tambah Unit/SN SN-first (flow baru Fase 1) ──────────────── */}
+            {/* ⬅️ UPDATED: Modal sekarang support 2 mode (SINGLE + BULK).
+                SINGLE return { unit, was_existing_parent, ... }, BULK return { bulk: {inserted, failed}, tipe, ... }.
+                Guard `unit` biar TS strict happy + fallback message untuk bulk mode. */}
             {showAddUnitSnFirst && (
                 <AddUnitSnFirstModal
                     categories={categories}
                     onClose={() => setShowAddUnitSnFirst(false)}
-                    onCreated={({ unit, was_existing_parent, message }) => {
+                    onCreated={({ unit, was_existing_parent, message, bulk, tipe }) => {
                         setShowAddUnitSnFirst(false);
                         fetchAll();
-                        toast.success(
-                            message || `Unit SN "${unit.serial_number}" ditambahkan` +
-                            (was_existing_parent ? " (masuk folder existing)" : " (folder baru dibuat)")
-                        );
+                        const defaultMsg = unit
+                            ? `Unit SN "${unit.serial_number}" ditambahkan` +
+                              (was_existing_parent ? " (masuk folder existing)" : " (folder baru dibuat)")
+                            : bulk
+                                ? `${bulk.inserted} unit ${tipe === "LAPTOP" ? "laptop" : "aksesoris"} ditambahkan`
+                                : "Berhasil ditambahkan";
+                        toast.success(message || defaultMsg);
                     }}
                 />
             )}

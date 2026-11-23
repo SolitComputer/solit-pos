@@ -43,7 +43,11 @@ export default function AddFolderOnlyModal({ open, onClose, onCreated }: Props) 
       const res = await fetch("/api/data-barang/folder/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, category: cat.name }),
+        // Kirim BOTH category_id (FK ke laptop_categories) dan category (text snapshot).
+        // category_id dipakai backend untuk INSERT FK → JOIN di GET /api/laptops jalan.
+        // category text tetap dikirim sebagai snapshot biar display tetap work walau
+        // FK belum di-resolve (defense in depth).
+        body: JSON.stringify({ type, category: cat.name, category_id: cat.id }),
       });
       const json = await res.json();
       if (!json.success) { toast.error(json.message || "Gagal bikin folder"); return; }

@@ -1575,7 +1575,7 @@ export default function AccessoryUnitsPage() {
     // Bulk
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
-    const [showBulkModal, setShowBulkModal] = useState(false);
+    // showBulkModal state DIHAPUS — tambah banyak unit sekarang dari Data Barang.
     const [showBulkEditModal, setShowBulkEditModal] = useState(false);
     const [showBulkEditUnitsModal, setShowBulkEditUnitsModal] = useState(false); // ✅ bulk edit unit tercentang
     const [soingId, setSoingId] = useState<string | null>(null);
@@ -2041,27 +2041,14 @@ export default function AccessoryUnitsPage() {
                                     .filter(Boolean).join(" · ") || "Detail aksesori"}
                             </p>
                         </div>
-                        {/* ── CHANGED: 2 buttons — Tambah Unit + Tambah Banyak ── */}
+                        {/* Tombol "Tambah Unit" & "Tambah Banyak" DIHAPUS.
+                            Semua penambahan unit (single & bulk) sekarang via tombol
+                            "+ Unit/SN" di halaman Data Barang. Halaman Kelola Unit
+                            Aksesoris ini jadi VIEW-ONLY untuk unit existing.
+                            Tombol "Edit Banyak SN" di bawah TETAP — itu untuk isi SN
+                            placeholder yang sudah auto-generate, bukan tambah unit baru. */}
                         {canManageUnits && (
                             <div className="flex items-center gap-2">
-                                <button
-                                    onClick={openCreate}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-800 rounded-lg text-sm font-medium text-white hover:bg-gray-900 transition shadow-sm"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    Tambah Unit
-                                </button>
-                                <button
-                                    onClick={() => setShowBulkModal(true)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-600 rounded-lg text-sm font-medium text-white hover:bg-gray-700 transition shadow-sm"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    Tambah Banyak
-                                </button>
                                 {units.some(u => u.serial_number.startsWith("ISI-SN-")) && (
                                     <button
                                         onClick={() => setShowBulkEditModal(true)}
@@ -2266,7 +2253,7 @@ export default function AccessoryUnitsPage() {
                                     Aksesori ini masih pakai stok manual ({accessory?.stock} unit), belum dikonversi ke SN. Hubungi staff yang berwenang.
                                 </p>
                             ) : (
-                                <p className="text-gray-400 text-xs mt-1">Klik &apos;Tambah Unit&apos; untuk mendaftarkan SN</p>
+                                <p className="text-gray-400 text-xs mt-1">Tambahkan unit baru dari halaman Data Barang lewat tombol &apos;+ Unit/SN&apos;</p>
                             )}
                             {(hasActiveFilter || filterStatus !== "ALL" || filterCondition !== "ALL") && (
                                 <button onClick={resetFilters} className="mt-3 px-4 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
@@ -2607,15 +2594,7 @@ export default function AccessoryUnitsPage() {
                     </div>
                 </div>
             )}
-            {/* ── Bulk Add Modal ── */}
-            {showBulkModal && (
-                <BulkAddModal
-                    accessoryId={accessoryId}
-                    defaultSellingPrice={accessory?.sell_price ?? 0}
-                    onClose={() => setShowBulkModal(false)}
-                    onSuccess={fetchData}
-                />
-            )}
+            {/* Modal BulkAddModal DIHAPUS — tambah banyak unit via "+ Unit/SN" di Data Barang. */}
 
             {/* ── Bulk Edit SN Modal (isi SN placeholder "ISI-SN-...") ── */}
             {showBulkEditModal && (

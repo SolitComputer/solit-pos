@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { UserRole } from "@/lib/permissions";
 
@@ -38,10 +39,12 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
 
     // 2. Query folder dari tabel sesuai type
     if (type === "LAPTOP") {
-      const { data, error } = await supabase
+      // ⬅️ FIX: supabaseAdmin bypass RLS + .ilike() case-insensitive biar folder
+      // lama (case category berbeda) tidak kelewat. Konsisten dengan branch AKSESORIS.
+      const { data, error } = await supabaseAdmin
         .from("laptops")
         .select("id, device_type, category, laptop_name, brand, cpu, ram, storage, gpu, display, selling_price, grade")
-        .eq("category", cat.name)
+        .ilike("category", cat.name)
         .is("archived_at", null)
         .order("laptop_name", { nullsFirst: true });
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
@@ -56,10 +59,14 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
     }
 
     // AKSESORIS
-    const { data, error } = await supabase
+    // ⬅️ FIX: supabaseAdmin bypass RLS — folder aksesoris lama tidak muncul di dropdown
+    //         karena policy SELECT accessories block role user ini.
+    // ⬅️ FIX: .ilike() case-insensitive match — folder lama bisa tersimpan dengan
+    //         case berbeda (e.g. "baterai" vs "Baterai" di laptop_categories).
+    const { data, error } = await supabaseAdmin
       .from("accessories")
       .select("id, device_type, category, name, brand, spec, sell_price, grade")
-      .eq("category", cat.name)
+      .ilike("category", cat.name)
       .is("archived_at", null)
       .order("name", { nullsFirst: true });
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });

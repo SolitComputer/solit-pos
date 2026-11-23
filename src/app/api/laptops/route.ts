@@ -55,7 +55,10 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     //  status kelengkapan harga tanpa perlu tahu angka aslinya.
     const withReadyFlag = (data ?? []).map((l: Record<string, any>) => ({
       ...l,
-      category_name: l.laptop_categories?.name ?? null,
+      // Fallback ke kolom text `category` kalau FK join kosong — ini terjadi untuk
+      // folder yang dibuat lewat AddFolderOnlyModal (SN-First rework) yang save
+      // category sebagai text, bukan category_id FK.
+      category_name: l.laptop_categories?.name ?? l.category ?? null,
       laptop_units: (l.laptop_units ?? []).map((u: Record<string, any>) => ({
         ...u,
         is_price_complete: Number(u.purchase_price) > 0 && Number(u.selling_price) > 0,
