@@ -8,6 +8,7 @@ import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { cancelOutflowByInvoice, recordOutflow } from "@/lib/accessoryOutflow";
+import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
 import { revertLoansOnCancel } from "@/lib/itemLoanSync";
 
 interface Props {
@@ -136,7 +137,7 @@ async function reopenMsjGroups(groupIds: string[]) {
 // LANGSUNG dari serial_number di transaction_items, lalu status pending apa pun
 // (termasuk KELUAR) dikembalikan ke BELUM_SIAP. Unit MSJ (msj_group_id terisi)
 // dilewati — sudah diurus restoreMsjAccessoryUnits().
-const ACCESSORY_PENDING_STATUSES = ["PACKING", "RESERVED", "HELD", "PENDING", "KELUAR"] as const;
+const ACCESSORY_PENDING_STATUSES = ["PACKING", "RESERVED", "HELD", "PENDING", "KELUAR", "SOLD", "TERJUAL"] as const;
 
 async function restoreStuckAccessoryUnits(invoice: string) {
   const { data: accItems } = await supabase
@@ -156,7 +157,7 @@ async function restoreStuckAccessoryUnits(invoice: string) {
 
   const { error } = await supabase
     .from("accessory_units")
-    .update({ status: "BELUM_SIAP" })
+    .update({ status: "TERSEDIA" })
     .in("serial_number", sns)
     .in("status", ACCESSORY_PENDING_STATUSES as unknown as string[])
     .is("msj_group_id", null);
@@ -524,7 +525,34 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
     } catch (msjErr: any) {
       console.error("[RESTORE] sinkron Kelompok MSJ gagal (non-fatal):", msjErr?.message ?? msjErr);
     }
+    // ── 5d. ✅ Recalculate parent accessories.stock ──────────────────────
+    // Step 5b–5c sudah mengembalikan STATUS unit aksesoris ke TERSEDIA /
+    // MINUS_SIAP_JUAL, tapi kolom accessories.stock (parent) TIDAK PERNAH
+    // dihitung ulang → barang tetap stok=0 di Data Barang walau unit-nya
+    // sudah balik. recalcAccessoryParentStock menghitung fresh dari jumlah
+    // unit aktif, jadi aman dipanggil setelah semua step di atas selesai.
+    try {
+      const { data: accItemsForRecalc } = await supabase
+        .from("transaction_items")
+        .select("accessory_id")
+        .eq("invoice_number", invoice)
+        .not("accessory_id", "is", null);
 
+      const accIdsToRecalc = [...new Set(
+        (accItemsForRecalc ?? []).map((it: any) => it.accessory_id).filter(Boolean)
+      )] as string[];
+
+      for (const accId of accIdsToRecalc) {
+        await recalcAccessoryParentStock(supabase, accId);
+      }
+
+      if (accIdsToRecalc.length > 0) {
+        console.log(`[RESTORE] ✅ Recalc parent stock untuk ${accIdsToRecalc.length} aksesori`);
+      }
+    } catch (recalcErr: any) {
+      console.error("[RESTORE] recalc parent stock aksesori gagal (non-fatal):", recalcErr?.message ?? recalcErr);
+    }
+    
     // ── 6. Void warranty jika ada ─────────────────────────────────────────
     let warrantyVoided = false;
     const { data: warranty } = await supabase
