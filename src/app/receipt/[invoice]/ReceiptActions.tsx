@@ -117,7 +117,7 @@ export default function ReceiptActions({
             warrantyLine,
             ``,
             ` Cek garansi online:`,
-            ` https://solit03.com/cek-garansi`,
+            ` https://solit.id/cek-garansi`,
             serialNumber ? `Masukkan SN: *${serialNumber}*` : null,
             ``,
             `Terima kasih sudah berbelanja di *Solit 03* `,
