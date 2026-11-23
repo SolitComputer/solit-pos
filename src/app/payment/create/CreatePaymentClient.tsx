@@ -672,18 +672,28 @@ export default function CreatePaymentPage() {
         closeGroupPicker();
     };
     const handleSelectSnResult = (u: UnitOption) => {
-        // FIX: tolak item yang laptop_id ATAU laptop_name-nya bakal kosong
-        // (laptop tanpa laptop_id, aksesori tanpa accessory_id, atau nama produk
-        // kosong) — sebelumnya di-fallback "" yang gagal validasi zod
-        // (units.*.min(1)). Lebih baik tolak di sini dengan pesan jelas daripada
-        // lolos lalu seluruh form invalid "units: tidak valid".
-        const resolvedLaptopId =
-            u.unit_type === "accessory" ? (u.accessory_id ?? "") : (u.laptop_id ?? "");
+        // FIX SN Lepas: bedakan validasi aksesori vs laptop.
+        // - Aksesori: wajib punya accessory_id (tidak ada konsep SN Lepas).
+        // - Laptop:   laptop_id BOLEH null (SN Lepas / tanpa folder), tapi
+        //             nama produk wajib ada — search-sn sudah suplai laptop_name
+        //             dari identity_name untuk SN Lepas.
+        //   laptop_id null disimpan APA ADANYA (bukan "") agar backend
+        //   bisa bedakan "tanpa folder" vs "folder invalid".
         const resolvedLaptopName = u.laptop_name ?? "";
-        if (!resolvedLaptopId || !resolvedLaptopName) {
-            alert(`Unit "${u.serial_number}" tidak punya ID/nama produk yang valid, tidak bisa ditambahkan.`);
+        const isAccessory = u.unit_type === "accessory";
+        const resolvedLaptopId = isAccessory
+            ? (u.accessory_id ?? "")
+            : (u.laptop_id ?? null);
+
+        if (!resolvedLaptopName) {
+            alert(`Unit "${u.serial_number}" tidak punya nama produk yang valid, tidak bisa ditambahkan.`);
             return;
         }
+        if (isAccessory && !resolvedLaptopId) {
+            alert(`Aksesori "${u.serial_number}" tidak punya accessory_id yang valid, tidak bisa ditambahkan.`);
+            return;
+        }
+
         const item: UnitItem & {
             grade?: string | null;
             condition_note?: string;
@@ -691,7 +701,8 @@ export default function CreatePaymentPage() {
             unit_type?: "laptop" | "accessory";
         } = {
             unit_id: u.id,
-            laptop_id: resolvedLaptopId,
+            // SN Lepas: kirim null (bukan ""). Cast karena UnitItem lama expect string.
+            laptop_id: resolvedLaptopId as any,
             serial_number: u.serial_number,
             purchase_price: u.purchase_price ?? 0,
             laptop_name: resolvedLaptopName,

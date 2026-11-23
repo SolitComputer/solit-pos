@@ -26,13 +26,7 @@ export const GET = withAuth(async (req: NextRequest) => {
         supabase
             .from("laptop_units")
             .select(`
-                    id,
-                    serial_number,
-                    grade,
-                    purchase_price,
-                    selling_price,
-                    condition_note,
-                    status,
+                    *,
                     laptops (
                         id,
                         laptop_name,
@@ -103,33 +97,49 @@ export const GET = withAuth(async (req: NextRequest) => {
 
     // ── Format laptop units ───────────────────────────────────────────────────
     const laptopFormatted = (laptopResult.data || [])
-        // FIX: unit yang master laptops-nya null (join putus / data master
-        // kosong) akan menghasilkan laptop_id & laptop_name "" — yang GAGAL
-        // validasi zod di form (units.laptop_id/laptop_name min(1)). Daripada
-        // dikirim lalu ditolak di client dengan alert (UX jelek), disaring di
-        // sini supaya tidak muncul sama sekali di dropdown.
+        // FIX SN Lepas: dulu filter ini DROP semua unit yang laptops null —
+        // termasuk SN Lepas (laptop_id=NULL) yang SAH setelah restructure
+        // SN-First. Sekarang bedakan 2 case:
+        //   - Case A (ada folder): laptop_id ada → master laptops wajib valid
+        //   - Case C (SN Lepas): laptop_id NULL → identity_name wajib ada
         .filter((u: any) => {
-            const ok = Boolean(u.laptops?.id) && Boolean(u.laptops?.laptop_name);
-            if (!ok) console.warn("[search-sn] laptop unit tanpa master valid, dilewati:", u.serial_number);
+            // Case A — unit di folder: validasi standar (master laptops wajib).
+            if (u.laptop_id) {
+                const ok = Boolean(u.laptops?.id) && Boolean(u.laptops?.laptop_name);
+                if (!ok) console.warn("[search-sn] unit dengan laptop_id tapi master invalid, dilewati:", u.serial_number);
+                return ok;
+            }
+            // Case C — SN Lepas: wajib punya nama sendiri (kolom "name" di laptop_units).
+            const ok = Boolean(u.name);
+            if (!ok) console.warn("[search-sn] SN Lepas tanpa name, dilewati:", u.serial_number);
             return ok;
         })
-        .map((u: any) => ({
-            id: u.id,
-            serial_number: u.serial_number,
-            grade: u.grade,
-            purchase_price: u.purchase_price ?? 0,
-            selling_price: u.selling_price ?? 0,
-            condition_note: u.condition_note ?? "",
-            status: u.status,
-            laptop_id: u.laptops.id,
-            laptop_name: u.laptops.laptop_name,
-            // Penanda tipe — dipakai di frontend untuk render berbeda
-            unit_type: "laptop" as const,
-            // True kalau unit ini SEDANG dipakai di penyiapan lain yang masih
-            // aktif (lihat query activeInPrepIds di atas) — dipakai FE untuk
-            // kasih hint visual, bukan untuk memblokir apapun.
-            in_other_preparation: activeInPrepIds.has(u.id),
-        }));
+        .map((u: any) => {
+            // SN Lepas (laptop_id NULL) pakai identity_name + spek sendiri;
+            // Case A pakai laptops.laptop_name dari master folder.
+            const isLepas = !u.laptop_id;
+            const displayName = isLepas
+                ? [u.name, u.brand, u.cpu, u.ram, u.storage]
+                    .filter(Boolean).join(" ")
+                : u.laptops?.laptop_name ?? "";
+            return {
+                id: u.id,
+                serial_number: u.serial_number,
+                grade: u.grade,
+                purchase_price: u.purchase_price ?? 0,
+                selling_price: u.selling_price ?? 0,
+                condition_note: u.condition_note ?? "",
+                status: u.status,
+                // PENTING: SN Lepas kirim laptop_id = null (bukan ""), supaya
+                // zod/transaksi bisa bedakan "tanpa folder" vs "folder invalid".
+                laptop_id: u.laptops?.id ?? null,
+                laptop_name: displayName,
+                // Flag SN Lepas untuk render badge "LEPAS" di dropdown
+                is_lepas: isLepas,
+                unit_type: "laptop" as const,
+                in_other_preparation: activeInPrepIds.has(u.id),
+            };
+        });
 
     // ── Format accessory units ────────────────────────────────────────────────
     // FIX: sama seperti laptop di atas — unit yang master accessories-nya null

@@ -63,7 +63,12 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
 
     if (!item_type || !["LAPTOP", "AKSESORIS"].includes(item_type))
       return NextResponse.json({ success: false, message: "Tipe barang tidak valid" }, { status: 400 });
-    if (!item_id) return NextResponse.json({ success: false, message: "Barang wajib dipilih" }, { status: 400 });
+    // ⬅️ FIX: SN Lepas (unit dengan laptop_id/accessory_id NULL) tidak punya item_id
+    // (parent reference), tapi punya unit_id. Validasi diubah: salah satu harus ada.
+    // Setelah SN-First rework, unit boleh berdiri sendiri tanpa folder parent.
+    if (!item_id && !unit_id) {
+      return NextResponse.json({ success: false, message: "Barang/unit wajib dipilih" }, { status: 400 });
+    }
     if (!item_name) return NextResponse.json({ success: false, message: "Nama barang kosong" }, { status: 400 });
 
     if (unit_id) {
@@ -85,7 +90,10 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
       .from("item_loans")
       .insert({
         item_type,
-        item_id,
+        // ⬅️ FIX: explicit null untuk SN Lepas (unit tanpa parent folder).
+        // Kalau kolom item_id punya constraint NOT NULL di DB, perlu migration:
+        //   ALTER TABLE item_loans ALTER COLUMN item_id DROP NOT NULL;
+        item_id: item_id || null,
         unit_id: unit_id || null,
         serial_number: serial_number || null,
         item_name,
