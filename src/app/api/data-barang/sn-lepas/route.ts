@@ -11,21 +11,41 @@ import { withAuth, AuthUser } from "@/lib/auth";
 
 async function getHandler(_req: NextRequest, _ctx: unknown, _user: AuthUser) {
   try {
+    // ✅ FIX: Pakai SELECT * biar gak break kalau salah satu kolom opsional
+    //    (device_type/category/dll) belum ada di tabel. Field yang gak ada
+    //    di payload tinggal null di frontend — gak ganggu rendering.
     const [lapRes, accRes] = await Promise.all([
       supabase
         .from("laptop_units")
-        .select("id, serial_number, status, qc_status, device_type, category, name, brand, cpu, ram, storage, gpu, display, grade, purchase_price, sparepart_cost, selling_price, source, branch, notes, condition_note, created_at")
+        .select("*")
         .is("laptop_id", null)
         .order("created_at", { ascending: false }),
       supabase
         .from("accessory_units")
-        .select("id, serial_number, status, device_type, category, name, brand, spec, grade, condition, buy_price, selling_price, source, branch, notes, created_at")
+        .select("*")
         .is("accessory_id", null)
         .order("created_at", { ascending: false }),
     ]);
 
-    if (lapRes.error) return NextResponse.json({ success: false, message: lapRes.error.message }, { status: 400 });
-    if (accRes.error) return NextResponse.json({ success: false, message: accRes.error.message }, { status: 400 });
+    // Log error detail buat debug kalau masih gagal
+    if (lapRes.error) {
+      console.error("[sn-lepas] laptop_units error:", lapRes.error);
+      return NextResponse.json({
+        success: false,
+        message: `Laptop units query failed: ${lapRes.error.message}`,
+        detail: lapRes.error,
+      }, { status: 400 });
+    }
+    if (accRes.error) {
+      console.error("[sn-lepas] accessory_units error:", accRes.error);
+      return NextResponse.json({
+        success: false,
+        message: `Accessory units query failed: ${accRes.error.message}`,
+        detail: accRes.error,
+      }, { status: 400 });
+    }
+
+
 
     return NextResponse.json({
       success: true,
