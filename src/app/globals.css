@@ -3257,3 +3257,7 @@ html.dark .mission-badge {
   background-color: color-mix(in srgb, currentColor 16%, transparent) !important;
   border-color: color-mix(in srgb, currentColor 34%, transparent) !important;
 }
+/* CC Reports gap fix: hover gray-50 opacity 70 + ring gray 100 and 900/5 */
+html.dark .hover\:bg-gray-50\/70:hover { background-color: rgba(255,255,255,.05) !important; }
+html.dark .ring-gray-100 { --tw-ring-color: #1e293b; }
+html.dark .ring-gray-900\/5 { --tw-ring-color: rgba(255,255,255,.06); }
