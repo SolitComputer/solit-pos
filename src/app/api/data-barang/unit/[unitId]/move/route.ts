@@ -31,13 +31,21 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     const body = await req.json();
     const { target_folder_id } = body as { target_folder_id: string | null };
 
-    // Deteksi unit
-    const { data: lapUnit } = await supabaseAdmin.from("laptop_units")
+    // Deteksi unit — DEBUG: log error query biar ketahuan kenapa null
+    console.log("[unit/move] DEBUG unitId received:", unitId);
+
+    const { data: lapUnit, error: lapErr } = await supabaseAdmin.from("laptop_units")
       .select("*").eq("id", unitId).maybeSingle();
-    const { data: accUnit } = !lapUnit ? await supabaseAdmin.from("accessory_units")
-      .select("*").eq("id", unitId).maybeSingle() : { data: null };
+    if (lapErr) console.error("[unit/move] laptop_units query error:", lapErr);
+    console.log("[unit/move] lapUnit result:", lapUnit ? `FOUND (SN: ${lapUnit.serial_number})` : "NULL");
+
+    const { data: accUnit, error: accErr } = !lapUnit ? await supabaseAdmin.from("accessory_units")
+      .select("*").eq("id", unitId).maybeSingle() : { data: null, error: null };
+    if (accErr) console.error("[unit/move] accessory_units query error:", accErr);
+    if (!lapUnit) console.log("[unit/move] accUnit result:", accUnit ? `FOUND (SN: ${accUnit.serial_number})` : "NULL");
 
     if (!lapUnit && !accUnit) {
+      console.error("[unit/move] FINAL FAIL — both lapUnit & accUnit are null for unitId:", unitId);
       return NextResponse.json({ success: false, message: "Unit tidak ditemukan" }, { status: 404 });
     }
 
@@ -73,8 +81,11 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
 
       // Cek: apakah folder kosong (identitas detail NULL)?
-      const nameField = isLaptop ? "laptop_name" : "name";
-      const isEmpty = targetFolder[nameField] === null;
+      // Folder table pakai `laptop_name` (laptops) atau `name` (accessories).
+      // Unit table pakai `name` di keduanya — beda dari folder.
+      const folderNameField = isLaptop ? "laptop_name" : "name";
+      const unitNameField = "name"; // laptop_units DAN accessory_units sama-sama "name"
+      const isEmpty = targetFolder[folderNameField] === null;
 
       if (isEmpty) {
         // Folder kosong: adopt identitas dari unit + validate category match
@@ -89,7 +100,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
         // Adopt 5 field pengunci + field lain
         const adoptData: Record<string, any> = isLaptop ? {
-          laptop_name: unit.laptop_name,
+          laptop_name: unit.name, // ⬅️ FIX: unit pakai `name`, folder pakai `laptop_name`
           brand: unit.brand, cpu: unit.cpu, ram: unit.ram, storage: unit.storage,
           gpu: unit.gpu, display: unit.display,
           selling_price: unit.selling_price, grade: unit.grade,
@@ -114,8 +125,8 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         if (norm(targetFolder.category) && norm(targetFolder.category).toUpperCase() !== norm(unit.category).toUpperCase()) {
           mismatches.push("Kategori");
         }
-        const fName = norm(targetFolder[nameField]);
-        if (fName && fName !== norm(unit[nameField])) mismatches.push("Nama");
+        const fName = norm(targetFolder[folderNameField]);
+        if (fName && fName !== norm(unit[unitNameField])) mismatches.push("Nama");
 
         const fGrade = norm(targetFolder.grade);
         if (fGrade && fGrade !== norm(unit.grade)) mismatches.push("Grade");

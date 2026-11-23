@@ -4,10 +4,10 @@
 // "Pindahkan Unit → Folder Tujuan". 2 kategori hasil:
 //   (a) empty_folders: folder yang identitas detail-nya NULL tapi category
 //       match. Pindah ke sini → folder adopt identitas dari unit.
-//   (b) matching_folders: folder yang udah punya identitas DAN 5 field
-//       pengunci-nya 100% match dengan unit.
-// Folder yang category beda atau 5 field beda SENGAJA nggak muncul — strict,
-// konsisten dengan Edge 2 (tolak spec beda).
+//   (b) matching_folders: folder dengan CATEGORY + NAMA + GRADE match.
+//       Spec detail (cpu/ram/storage/harga/dll) TIDAK di-filter di sini —
+//       divalidasi permissive oleh move/route.ts saat user submit.
+// Opsi B (loose match 2026-11-23) — dropdown lebih kaya, backend tetap safe.
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
@@ -23,11 +23,12 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
     const { unitId } = await props.params;
 
     // 1. Deteksi unit ini dari laptop_units atau accessory_units
-    const { data: lapUnit } = await supabaseAdmin
+    const { data: lapUnit, error: lapErr } = await supabaseAdmin
       .from("laptop_units")
-      .select("id, laptop_id, device_type, category, grade, brand, cpu, ram, storage, gpu, display, selling_price, laptop_name")
+      .select("id, laptop_id, device_type, category, grade, brand, cpu, ram, storage, gpu, display, selling_price, name")
       .eq("id", unitId)
       .maybeSingle();
+    if (lapErr) console.error("[compatible-folders] laptop_units query error:", lapErr);
 
     const { data: accUnit } = !lapUnit ? await supabaseAdmin
       .from("accessory_units")
@@ -55,26 +56,19 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
         .is("laptop_name", null)
         .is("archived_at", null);
 
-      // Folder isi: 5 field pengunci match
-      // cpu/ram/storage/gpu/display handle NULL dengan .is() atau .eq()
+      // LOOSE MATCH (Opsi B): cukup CATEGORY + NAMA + GRADE.
+      // Spec detail (harga, cpu, ram, storage, gpu, display) TIDAK di-filter —
+      // validasi detail di-handle move/route.ts saat user submit (permissive).
       let matchQuery = supabaseAdmin
         .from("laptops")
         .select("id, device_type, category, laptop_name, brand, cpu, ram, storage, gpu, display, selling_price, grade")
         .ilike("category", lapUnit!.category ?? "")
-        .eq("laptop_name", lapUnit!.laptop_name)
-        .eq("selling_price", lapUnit!.selling_price)
+        .eq("laptop_name", lapUnit!.name) // ⬅️ unit field namanya "name" di laptop_units
         .is("archived_at", null);
 
       // Grade: tolerate NULL==NULL (treated as match)
       if (lapUnit!.grade !== null) matchQuery = matchQuery.eq("grade", lapUnit!.grade);
       else matchQuery = matchQuery.is("grade", null);
-      // Spek: 5 komponen
-      for (const [col, val] of [
-        ["cpu", lapUnit!.cpu], ["ram", lapUnit!.ram], ["storage", lapUnit!.storage],
-        ["gpu", lapUnit!.gpu], ["display", lapUnit!.display],
-      ] as const) {
-        matchQuery = val !== null ? matchQuery.eq(col, val) : matchQuery.is(col, null);
-      }
 
       const { data: matching } = await matchQuery;
 
@@ -94,20 +88,18 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
       .is("name", null)
       .is("archived_at", null);
 
+    // LOOSE MATCH (Opsi B): cukup CATEGORY + NAMA + GRADE.
+    // Spec detail (brand, spec, sell_price) TIDAK di-filter — validasi detail
+    // di-handle move/route.ts saat user submit (permissive).
     let matchQuery = supabaseAdmin
       .from("accessories")
       .select("id, device_type, category, name, brand, spec, sell_price, grade")
       .ilike("category", accUnit!.category ?? "")
       .eq("name", accUnit!.name)
-      .eq("sell_price", accUnit!.sell_price)
       .is("archived_at", null);
 
     if (accUnit!.grade !== null) matchQuery = matchQuery.eq("grade", accUnit!.grade);
     else matchQuery = matchQuery.is("grade", null);
-
-    for (const [col, val] of [["brand", accUnit!.brand], ["spec", accUnit!.spec]] as const) {
-      matchQuery = val !== null ? matchQuery.eq(col, val) : matchQuery.is(col, null);
-    }
 
     const { data: matching } = await matchQuery;
 
