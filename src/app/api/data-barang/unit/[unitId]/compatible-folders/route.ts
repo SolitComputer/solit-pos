@@ -10,7 +10,7 @@
 // konsisten dengan Edge 2 (tolak spec beda).
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { UserRole } from "@/lib/permissions";
 
@@ -23,13 +23,13 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
     const { unitId } = await props.params;
 
     // 1. Deteksi unit ini dari laptop_units atau accessory_units
-    const { data: lapUnit } = await supabase
+    const { data: lapUnit } = await supabaseAdmin
       .from("laptop_units")
       .select("id, laptop_id, device_type, category, grade, brand, cpu, ram, storage, gpu, display, selling_price, laptop_name")
       .eq("id", unitId)
       .maybeSingle();
 
-    const { data: accUnit } = !lapUnit ? await supabase
+    const { data: accUnit } = !lapUnit ? await supabaseAdmin
       .from("accessory_units")
       .select("id, accessory_id, device_type, category, grade, brand, spec, sell_price, name")
       .eq("id", unitId)
@@ -46,19 +46,21 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
     // 2. Query folder dari tabel yang sesuai
     if (isLaptop) {
       // Folder kosong: category match + laptop_name NULL
-      const { data: empty } = await supabase
+      // FIX case-insensitive: folder lama bisa punya category "LAPTOP" (uppercase)
+      // sementara unit.category "Laptop" (title). Pakai .ilike() biar aman.
+      const { data: empty } = await supabaseAdmin
         .from("laptops")
         .select("id, device_type, category")
-        .eq("category", lapUnit!.category)
+        .ilike("category", lapUnit!.category ?? "")
         .is("laptop_name", null)
         .is("archived_at", null);
 
       // Folder isi: 5 field pengunci match
       // cpu/ram/storage/gpu/display handle NULL dengan .is() atau .eq()
-      let matchQuery = supabase
+      let matchQuery = supabaseAdmin
         .from("laptops")
         .select("id, device_type, category, laptop_name, brand, cpu, ram, storage, gpu, display, selling_price, grade")
-        .eq("category", lapUnit!.category)
+        .ilike("category", lapUnit!.category ?? "")
         .eq("laptop_name", lapUnit!.laptop_name)
         .eq("selling_price", lapUnit!.selling_price)
         .is("archived_at", null);
@@ -85,17 +87,17 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
     }
 
     // Aksesoris
-    const { data: empty } = await supabase
+    const { data: empty } = await supabaseAdmin
       .from("accessories")
       .select("id, device_type, category")
-      .eq("category", accUnit!.category)
+      .ilike("category", accUnit!.category ?? "")
       .is("name", null)
       .is("archived_at", null);
 
-    let matchQuery = supabase
+    let matchQuery = supabaseAdmin
       .from("accessories")
       .select("id, device_type, category, name, brand, spec, sell_price, grade")
-      .eq("category", accUnit!.category)
+      .ilike("category", accUnit!.category ?? "")
       .eq("name", accUnit!.name)
       .eq("sell_price", accUnit!.sell_price)
       .is("archived_at", null);

@@ -15,7 +15,7 @@
 //      folder jadi NULL (Edge 1 Opsi B — konfirmasi Rayhan 2026-11-20)
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { UserRole } from "@/lib/permissions";
 
@@ -32,9 +32,9 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { target_folder_id } = body as { target_folder_id: string | null };
 
     // Deteksi unit
-    const { data: lapUnit } = await supabase.from("laptop_units")
+    const { data: lapUnit } = await supabaseAdmin.from("laptop_units")
       .select("*").eq("id", unitId).maybeSingle();
-    const { data: accUnit } = !lapUnit ? await supabase.from("accessory_units")
+    const { data: accUnit } = !lapUnit ? await supabaseAdmin.from("accessory_units")
       .select("*").eq("id", unitId).maybeSingle() : { data: null };
 
     if (!lapUnit && !accUnit) {
@@ -66,7 +66,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     // ─── Kalau target != null: validasi folder tujuan ────────────────────
     if (target_folder_id !== null) {
-      const { data: targetFolder, error: tErr } = await supabase
+      const { data: targetFolder, error: tErr } = await supabaseAdmin
         .from(folderTable).select("*").eq("id", target_folder_id).single();
       if (tErr || !targetFolder) {
         return NextResponse.json({ success: false, message: "Folder tujuan tidak ditemukan" }, { status: 404 });
@@ -78,7 +78,9 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
       if (isEmpty) {
         // Folder kosong: adopt identitas dari unit + validate category match
-        if (targetFolder.category !== unit.category) {
+        // FIX case-insensitive: category di folder vs unit bisa beda case
+        // (ex: "Charger" vs "CHARGER"). Normalize ke UPPERCASE + trim.
+        if ((targetFolder.category ?? "").toUpperCase().trim() !== (unit.category ?? "").toUpperCase().trim()) {
           return NextResponse.json({
             success: false,
             message: `Kategori unit (${unit.category}) berbeda dengan folder tujuan (${targetFolder.category})`,
@@ -96,25 +98,41 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
           sell_price: unit.sell_price, grade: unit.grade,
         };
 
-        const { error: adoptErr } = await supabase.from(folderTable)
+        const { error: adoptErr } = await supabaseAdmin.from(folderTable)
           .update(adoptData).eq("id", target_folder_id);
         if (adoptErr) return NextResponse.json({ success: false, message: adoptErr.message }, { status: 400 });
       } else {
-        // Folder isi: STRICT validation 5 field pengunci
+        // Folder isi: validasi field pengunci — SKIP kalau folder field null
+        // (artinya folder belum pernah set, unit boleh fill-in). Mismatch
+        // hanya trigger kalau folder DAN unit sama-sama punya value tapi beda.
+        // FIX: align dengan logic units/create yang sudah di-patch.
         const mismatches: string[] = [];
-        if (targetFolder.category !== unit.category) mismatches.push("Kategori");
-        if (targetFolder[nameField] !== unit[nameField]) mismatches.push("Nama");
-        if (targetFolder.grade !== unit.grade) mismatches.push("Grade");
+        const norm = (v: unknown) => (v ?? "").toString().trim();
+
+        // Category wajib case-insensitive match (sudah dicek di atas untuk Case B;
+        // di sini unit sudah pasti match karena pakai fkCol).
+        if (norm(targetFolder.category) && norm(targetFolder.category).toUpperCase() !== norm(unit.category).toUpperCase()) {
+          mismatches.push("Kategori");
+        }
+        const fName = norm(targetFolder[nameField]);
+        if (fName && fName !== norm(unit[nameField])) mismatches.push("Nama");
+
+        const fGrade = norm(targetFolder.grade);
+        if (fGrade && fGrade !== norm(unit.grade)) mismatches.push("Grade");
 
         if (isLaptop) {
-          if (targetFolder.selling_price !== unit.selling_price) mismatches.push("Harga Jual");
+          const fSellPrice = Number(targetFolder.selling_price) || 0;
+          if (fSellPrice > 0 && fSellPrice !== (Number(unit.selling_price) || 0)) mismatches.push("Harga Jual");
           for (const col of ["cpu", "ram", "storage", "gpu", "display"] as const) {
-            if (targetFolder[col] !== unit[col]) mismatches.push(col.toUpperCase());
+            const fVal = norm(targetFolder[col]);
+            if (fVal && fVal !== norm(unit[col])) mismatches.push(col.toUpperCase());
           }
         } else {
-          if (targetFolder.sell_price !== unit.sell_price) mismatches.push("Harga Jual");
+          const fSellPrice = Number(targetFolder.sell_price) || 0;
+          if (fSellPrice > 0 && fSellPrice !== (Number(unit.sell_price) || 0)) mismatches.push("Harga Jual");
           for (const col of ["brand", "spec"] as const) {
-            if (targetFolder[col] !== unit[col]) mismatches.push(col === "brand" ? "Brand" : "Spek");
+            const fVal = norm(targetFolder[col]);
+            if (fVal && fVal !== norm(unit[col])) mismatches.push(col === "brand" ? "Brand" : "Spek");
           }
         }
 
@@ -128,13 +146,13 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     // ─── Pindahkan unit ───────────────────────────────────────────────────
-    const { error: moveErr } = await supabase.from(unitTable)
+    const { error: moveErr } = await supabaseAdmin.from(unitTable)
       .update({ [fkCol]: target_folder_id }).eq("id", unitId);
     if (moveErr) return NextResponse.json({ success: false, message: moveErr.message }, { status: 400 });
 
     // ─── Folder asal: cek sisa unit, kalau habis → RESET identitas (Edge 1 B)
     if (currentFolderId !== null) {
-      const { count: sisaCount } = await supabase
+      const { count: sisaCount } = await supabaseAdmin
         .from(unitTable)
         .select("id", { count: "exact", head: true })
         .eq(fkCol, currentFolderId)
@@ -152,7 +170,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
           buy_price: null, sell_price: null, grade: null,
           is_mixed_grade: false,
         };
-        await supabase.from(folderTable).update(resetData).eq("id", currentFolderId);
+        await supabaseAdmin.from(folderTable).update(resetData).eq("id", currentFolderId);
       }
     }
 

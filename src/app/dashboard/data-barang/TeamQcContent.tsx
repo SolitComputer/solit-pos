@@ -24,6 +24,7 @@ interface QcUnit {
   official_price: number | null;
   qc_status: string;
   status: string;
+  branch: string | null; // ⬅️ BARU: Cabang (UTAMA / JOGJA / NULL)
   created_at: string;
   missing_fields: string[];
   is_sn_lepas: boolean; // ⬅️ Step 4: convenience flag dari backend
@@ -57,6 +58,7 @@ type FormShape = {
   serial_number: string; grade: string; source: string; condition_note: string;
   purchase_price: string; sparepart_cost: string; selling_price: string; official_price: string;
   brand: string; cpu: string; ram: string; storage: string; laptop_name: string;
+  branch: "" | "UTAMA" | "JOGJA"; // ⬅️ BARU: WAJIB — user pilih di QC modal
 };
 function QcInputField({
   label, name, type = "text", required = false, form, setForm, readOnly = false, hint,
@@ -121,7 +123,7 @@ function QcEditModal({
   onSaved: () => void;
 }) {
   // Form state — pre-fill dari unit existing
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormShape>({
     serial_number: unit.serial_number ?? "",
     grade: unit.grade ?? "",
     source: unit.source ?? "",
@@ -135,6 +137,8 @@ function QcEditModal({
     ram: unit.laptop.ram ?? "",
     storage: unit.laptop.storage ?? "",
     laptop_name: unit.laptop.laptop_name ?? "",
+    // ⬅️ BARU: pre-fill dari unit; "" supaya user wajib pilih kalau belum ada.
+    branch: (unit.branch === "UTAMA" || unit.branch === "JOGJA") ? unit.branch : "",
   });
   const [saving, setSaving] = useState(false);
   const [markingMinus, setMarkingMinus] = useState(false);
@@ -167,6 +171,11 @@ function QcEditModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // ⬅️ BARU: Cabang WAJIB diisi sebelum submit QC.
+    if (form.branch !== "UTAMA" && form.branch !== "JOGJA") {
+      toast.error("Cabang WAJIB dipilih (Utama atau Jogja)");
+      return;
+    }
     setSaving(true);
     try {
       const updates = {
@@ -183,6 +192,8 @@ function QcEditModal({
         ram: form.ram.trim() || null,
         storage: form.storage.trim() || null,
         laptop_name: form.laptop_name.trim() || null,
+        // ⬅️ BARU: Cabang (sudah divalidasi WAJIB di atas, pasti UTAMA/JOGJA).
+        branch: form.branch,
       };
 
       const res = await fetch("/api/laptops/qc", {
@@ -310,6 +321,34 @@ function QcEditModal({
               <QcInputField label="RAM" name="ram" required autocompleteField="ram" form={form} setForm={setForm} />
               <QcInputField label="Storage" name="storage" required autocompleteField="storage" form={form} setForm={setForm} />
             </div>
+          </div>
+
+          {/* ── Cabang (WAJIB) ── */}
+          <div>
+            <h3 className="text-xs font-bold text-gray-700 mb-3 flex items-center gap-2">
+              <CheckCircle2 size={14} /> Cabang <span className="text-red-500">*</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { v: "UTAMA" as const, label: "🏢 Cabang Utama" },
+                { v: "JOGJA" as const, label: "📍 Cabang Jogja" },
+              ]).map(o => (
+                <button key={o.v} type="button"
+                  onClick={() => setForm(f => ({ ...f, branch: o.v }))}
+                  className={`h-11 rounded-xl text-sm font-semibold border transition ${form.branch === o.v
+                    ? o.v === "JOGJA"
+                      ? "bg-violet-600 text-white border-violet-600 shadow-sm"
+                      : "bg-slate-700 text-white border-slate-700 shadow-sm"
+                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            {form.branch === "" && (
+              <p className="text-[10px] text-amber-600 mt-1.5 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> Cabang wajib dipilih — tidak bisa Simpan tanpa cabang
+              </p>
+            )}
           </div>
 
           {/* ── Unit Fields ── */}

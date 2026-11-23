@@ -189,6 +189,14 @@ const EMPTY_BULK_FORM = {
 
 const fmt = (n?: number | null) => n == null ? "—" : "Rp " + n.toLocaleString("id-ID");
 
+// ⬅️ BARU: dipindah ke module scope supaya bisa dipakai SearchableFolderSelect.
+const labelFolder = (f: FolderOption) => {
+    if (f.is_empty) return `Folder Kosong · ${f.category}`;
+    const n = f.laptop_name ?? f.name ?? "—";
+    const parts = [n, f.grade, fmt(f.selling_price ?? f.sell_price)];
+    return parts.filter(Boolean).join(" · ");
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
@@ -648,12 +656,7 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
         }
     };
 
-    const labelFolder = (f: FolderOption) => {
-        if (f.is_empty) return `Folder Kosong · ${f.category}`;
-        const n = f.laptop_name ?? f.name ?? "—";
-        const parts = [n, f.grade, fmt(f.selling_price ?? f.sell_price)];
-        return parts.filter(Boolean).join(" · ");
-    };
+
 
     const lockedField = isCase_A;
     // ⬅️ UPDATED: Folder kosong SEKARANG BOLEH jadi target bulk.
@@ -779,15 +782,17 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-semibold text-gray-800">Masukin ke Folder</p>
                                             {targetMode === "FOLDER" && (
-                                                <select className={`${inputCls} mt-1.5`} value={targetFolderId}
-                                                    onChange={e => setTargetFolderId(e.target.value)}>
-                                                    <option value="">{loadingFolders ? "Memuat folder..." : "-- Pilih Folder --"}</option>
-                                                    {folders.map(f => (
-                                                        <option key={f.id} value={f.id}>{labelFolder(f)}</option>
-                                                    ))}
-                                                </select>
-                                            )}
-                                            {targetMode === "FOLDER" && !loadingFolders && folders.length === 0 && (
+                                                <div className="mt-1.5">
+                                                    <SearchableFolderSelect
+                                                        folders={folders}
+                                                        value={targetFolderId}
+                                                        onChange={setTargetFolderId}
+                                                        loading={loadingFolders}
+                                                        placeholder="Ketik nama folder untuk cari..."
+                                                        emptyText="Belum ada folder"
+                                                    />
+                                                </div>
+                                            )}                                            {targetMode === "FOLDER" && !loadingFolders && folders.length === 0 && (
                                                 <p className="text-[10px] text-gray-400 mt-1">Belum ada folder. Bikin folder dulu di tombol &quot;+ Folder&quot;.</p>
                                             )}
                                         </div>
@@ -1038,17 +1043,14 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                         {/* Step 3: Target Folder — WAJIB, tanpa opsi SN Lepas */}
                         {categoryId && (
                             <Field label="3. Target Folder" required>
-                                <select className={inputCls} value={targetFolderId}
-                                    onChange={e => setTargetFolderId(e.target.value)}>
-                                    <option value="">
-                                        {loadingFolders ? "Memuat folder..." :
-                                            foldersForBulk.length === 0 ? "Belum ada folder yang bisa jadi target" :
-                                                "-- Pilih Folder --"}
-                                    </option>
-                                    {foldersForBulk.map(f => (
-                                        <option key={f.id} value={f.id}>{labelFolder(f)}</option>
-                                    ))}
-                                </select>
+                                <SearchableFolderSelect
+                                    folders={foldersForBulk}
+                                    value={targetFolderId}
+                                    onChange={setTargetFolderId}
+                                    loading={loadingFolders}
+                                    placeholder="Ketik nama folder untuk cari..."
+                                    emptyText="Belum ada folder yang bisa jadi target"
+                                />
                                 <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
                                     💡 <b>Boleh pilih folder berisi ATAU folder kosong</b> (asal kategori sama).
                                     SN Lepas tidak didukung di mode ini. Kalau pilih folder kosong, isi identitas folder di section bawah.
@@ -1449,6 +1451,83 @@ function Field({ label, children, required }: { label: string; children: React.R
                 {label}{required && <span className="text-red-400 ml-0.5">*</span>}
             </label>
             {children}
+        </div>
+    );
+}
+
+// ⬅️ BARU: Searchable dropdown untuk folder — ketik untuk filter, klik untuk pilih.
+// Ganti <select> native yang susah kalau folder banyak (puluhan+).
+function SearchableFolderSelect({
+    folders, value, onChange, loading, placeholder, emptyText,
+}: {
+    folders: FolderOption[];
+    value: string;
+    onChange: (id: string) => void;
+    loading: boolean;
+    placeholder?: string;
+    emptyText?: string;
+}) {
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+
+    const selected = folders.find(f => f.id === value);
+    const filtered = query.trim() === ""
+        ? folders
+        : folders.filter(f => labelFolder(f).toLowerCase().includes(query.trim().toLowerCase()));
+
+    const handleSelect = (id: string) => {
+        onChange(id);
+        setOpen(false);
+        setQuery("");
+    };
+
+    const handleClear = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onChange("");
+        setQuery("");
+    };
+
+    return (
+        <div className="relative">
+            <input
+                type="text"
+                value={open ? query : (selected ? labelFolder(selected) : "")}
+                onChange={e => { setQuery(e.target.value); setOpen(true); }}
+                onFocus={() => { if (!open) { setQuery(""); setOpen(true); } }}
+                placeholder={loading ? "Memuat folder..." : (placeholder ?? "-- Pilih Folder --")}
+                disabled={loading}
+                className={inputCls}
+            />
+            {value && !open && (
+                <button type="button" onClick={handleClear}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 text-xs z-10 w-5 h-5 flex items-center justify-center rounded-full hover:bg-red-50 transition"
+                    title="Kosongkan pilihan">
+                    ✕
+                </button>
+            )}
+            {open && (
+                <>
+                    {/* Backdrop untuk close-on-outside-click */}
+                    <div className="fixed inset-0 z-10" onClick={() => { setOpen(false); setQuery(""); }} />
+                    <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl max-h-64 overflow-y-auto shadow-xl">
+                        {filtered.length === 0 ? (
+                            <p className="p-3 text-xs text-gray-400 text-center">
+                                {folders.length === 0
+                                    ? (emptyText ?? "Belum ada folder")
+                                    : `Tidak ada folder yang cocok dengan "${query}"`}
+                            </p>
+                        ) : (
+                            filtered.map(f => (
+                                <button key={f.id} type="button"
+                                    onClick={() => handleSelect(f.id)}
+                                    className={`w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 transition border-b border-gray-50 last:border-0 ${f.id === value ? "bg-indigo-50 font-semibold text-indigo-700" : "text-gray-700"}`}>
+                                    {labelFolder(f)}
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </>
+            )}
         </div>
     );
 }

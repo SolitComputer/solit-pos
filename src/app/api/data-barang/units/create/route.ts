@@ -122,7 +122,10 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         if (tErr || !tFolder) {
           return NextResponse.json({ success: false, message: "Folder tujuan tidak ditemukan" }, { status: 404 });
         }
-        if (tFolder.category !== cat.name) {
+        // FIX case-insensitive: cat.name dari laptop_categories bisa "Charger"
+        // sementara tFolder.category dari laptops bisa "CHARGER". Pakai
+        // normalisasi UPPERCASE + trim di dua sisi supaya tidak false reject.
+        if ((tFolder.category ?? "").toUpperCase().trim() !== (cat.name ?? "").toUpperCase().trim()) {
           return NextResponse.json({
             success: false,
             message: `Kategori unit (${cat.name}) berbeda dengan folder tujuan (${tFolder.category})`,
@@ -145,15 +148,27 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         } else {
           // Case A — folder isi → STRICT validate 5 field pengunci
           caseDetected = "A";
+          // FIX: kalau folder field kosong/null, SKIP validasi — artinya folder
+          // belum pernah set field tsb. Mismatch hanya trigger kalau folder DAN
+          // unit sama-sama punya value tapi beda.
           const mismatches: string[] = [];
-          if ((tFolder.laptop_name ?? "").trim() !== name.trim()) mismatches.push("Nama");
-          if ((tFolder.cpu ?? "") !== (cpu ?? "")) mismatches.push("CPU");
-          if ((tFolder.ram ?? "") !== (ram ?? "")) mismatches.push("RAM");
-          if ((tFolder.storage ?? "") !== (storage ?? "")) mismatches.push("Storage");
-          if ((tFolder.gpu ?? "") !== (gpu ?? "")) mismatches.push("GPU");
-          if ((tFolder.display ?? "") !== (display ?? "")) mismatches.push("Display");
-          if (Number(tFolder.selling_price) !== (sellingPriceNum ?? 0)) mismatches.push("Harga Jual");
-          if ((tFolder.grade ?? "") !== (grade ?? "")) mismatches.push("Grade");
+          const fName = (tFolder.laptop_name ?? "").trim();
+          const fCpu = (tFolder.cpu ?? "").trim();
+          const fRam = (tFolder.ram ?? "").trim();
+          const fStorage = (tFolder.storage ?? "").trim();
+          const fGpu = (tFolder.gpu ?? "").trim();
+          const fDisplay = (tFolder.display ?? "").trim();
+          const fGrade = (tFolder.grade ?? "").trim();
+          const fSellPrice = Number(tFolder.selling_price) || 0;
+
+          if (fName && fName !== name.trim()) mismatches.push("Nama");
+          if (fCpu && fCpu !== (cpu ?? "").trim()) mismatches.push("CPU");
+          if (fRam && fRam !== (ram ?? "").trim()) mismatches.push("RAM");
+          if (fStorage && fStorage !== (storage ?? "").trim()) mismatches.push("Storage");
+          if (fGpu && fGpu !== (gpu ?? "").trim()) mismatches.push("GPU");
+          if (fDisplay && fDisplay !== (display ?? "").trim()) mismatches.push("Display");
+          if (fSellPrice > 0 && fSellPrice !== (sellingPriceNum ?? 0)) mismatches.push("Harga Jual");
+          if (fGrade && fGrade !== (grade ?? "").trim()) mismatches.push("Grade");
 
           if (mismatches.length > 0) {
             return NextResponse.json({
@@ -255,7 +270,10 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         if (tErr || !tFolder) {
           return NextResponse.json({ success: false, message: "Folder tujuan tidak ditemukan" }, { status: 404 });
         }
-        if (tFolder.category !== cat.name) {
+        // FIX case-insensitive: cat.name dari laptop_categories bisa "Charger"
+        // sementara tFolder.category dari accessories bisa "CHARGER". Pakai
+        // normalisasi UPPERCASE + trim di dua sisi supaya tidak false reject.
+        if ((tFolder.category ?? "").toUpperCase().trim() !== (cat.name ?? "").toUpperCase().trim()) {
           return NextResponse.json({
             success: false,
             message: `Kategori unit (${cat.name}) berbeda dengan folder tujuan (${tFolder.category})`,
@@ -268,17 +286,29 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
           caseDetected = "B";
           await supabaseAdmin.from("accessories").update({
             name: name.trim(), brand: brand || null, spec: spec || null,
-            sell_price: sellingPriceNum ?? 0, grade: grade || null,
+            sell_price: sellingPriceNum ?? 0,
+            // NOTE: `grade` dihapus — tabel accessories juga tidak punya kolom
+            // grade (kemungkinan error serupa saat Case B / folder kosong).
           }).eq("id", target_folder_id);
         } else {
           // Case A — STRICT validate
           caseDetected = "A";
+          // FIX: kalau folder field kosong/null, SKIP validasi — artinya folder
+          // belum pernah set field tsb (umum untuk grade/brand/spec di aksesoris
+          // karena UI Edit Folder Aksesoris tidak punya field Grade). Mismatch
+          // hanya trigger kalau folder DAN unit sama-sama punya value tapi beda.
           const mismatches: string[] = [];
-          if ((tFolder.name ?? "").trim() !== name.trim()) mismatches.push("Nama");
-          if ((tFolder.brand ?? "") !== (brand ?? "")) mismatches.push("Brand");
-          if ((tFolder.spec ?? "") !== (spec ?? "")) mismatches.push("Spek");
-          if (Number(tFolder.sell_price) !== (sellingPriceNum ?? 0)) mismatches.push("Harga Jual");
-          if ((tFolder.grade ?? "") !== (grade ?? "")) mismatches.push("Grade");
+          const fName = (tFolder.name ?? "").trim();
+          const fBrand = (tFolder.brand ?? "").trim();
+          const fSpec = (tFolder.spec ?? "").trim();
+
+          const fSellPrice = Number(tFolder.sell_price) || 0;
+
+          if (fName && fName !== name.trim()) mismatches.push("Nama");
+          if (fBrand && fBrand !== (brand ?? "").trim()) mismatches.push("Brand");
+          if (fSpec && fSpec !== (spec ?? "").trim()) mismatches.push("Spek");
+          if (fSellPrice > 0 && fSellPrice !== (sellingPriceNum ?? 0)) mismatches.push("Harga Jual");
+
 
           if (mismatches.length > 0) {
             return NextResponse.json({
@@ -303,7 +333,9 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
           name: name.trim(),
           brand: brand || null,
           spec: spec || null,
-          grade: grade || null,
+          // NOTE: field `grade` DIHAPUS — tabel accessory_units tidak punya
+          // kolom grade (error PGRST204). Grade konsep laptop-only; di UI
+          // modal aksesoris field grade ada tapi tidak dipersist ke DB.
           condition: safeCondition,
           status: "TERSEDIA",
           buy_price: buyPriceNum,
