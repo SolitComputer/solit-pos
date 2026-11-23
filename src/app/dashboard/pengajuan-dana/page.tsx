@@ -1043,8 +1043,11 @@ function DetailModal({
                 <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Note Kembalian</p>
               </div>
               <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-amber-50/60 border border-amber-200/60 rounded-xl px-3 py-2">{fundRequest.note_kembalian}</p>
-              {fundRequest.note_kembalian_at && (
-                <p className="text-[10px] text-slate-400 mt-1.5">Terakhir diubah · {formatDateTime(fundRequest.note_kembalian_at)}</p>
+              {(fundRequest.note_kembalian_by || fundRequest.note_kembalian_at) && (
+                <p className="text-[10px] text-slate-400 mt-1.5">
+                  {fundRequest.note_kembalian_by ? `Noted oleh ${fundRequest.note_kembalian_by}` : "Terakhir diubah"}
+                  {fundRequest.note_kembalian_at ? ` · ${formatDateTime(fundRequest.note_kembalian_at)}` : ""}
+                </p>
               )}
             </div>
           )}
@@ -1530,7 +1533,7 @@ function NoteKembalianModal({
           />
           {hasExisting && (
             <p className="text-[10px] text-slate-400">
-              Terakhir diubah oleh <b>{fundRequest.requester_name ?? "-"}</b> · {formatDateTime(fundRequest.note_kembalian_at)}
+              Noted oleh <b>{fundRequest.note_kembalian_by ?? "-"}</b> · {formatDateTime(fundRequest.note_kembalian_at)}
             </p>
           )}
         </div>
@@ -2329,6 +2332,8 @@ export default function PengajuanDanaPage() {
                                 <StickyNote className="w-4 h-4" />
                               </button>
                               <span className="text-[10px] text-slate-500 line-clamp-2 leading-tight text-center">{row.note_kembalian}</span>
+                              {row.note_kembalian_by && <span className="text-[10px] text-slate-400 max-w-[92px] truncate">{row.note_kembalian_by}</span>}
+                              {row.note_kembalian_at && <span className="text-[9px] text-slate-400 max-w-[92px] text-center leading-tight">{formatDateTime(row.note_kembalian_at)}</span>}
                             </div>
                           ) : canEditNote ? (
                             <button
@@ -2509,7 +2514,15 @@ export default function PengajuanDanaPage() {
                           )}
                         </div>
                         {row.note_kembalian ? (
-                          <p className="text-[11px] text-slate-700 leading-relaxed whitespace-pre-wrap">{row.note_kembalian}</p>
+                          <>
+                            <p className="text-[11px] text-slate-700 leading-relaxed whitespace-pre-wrap">{row.note_kembalian}</p>
+                            {(row.note_kembalian_by || row.note_kembalian_at) && (
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                {row.note_kembalian_by ? `Noted oleh ${row.note_kembalian_by}` : ""}
+                                {row.note_kembalian_at ? ` · ${formatDateTime(row.note_kembalian_at)}` : ""}
+                              </p>
+                            )}
+                          </>
                         ) : (
                           <p className="text-[11px] text-slate-400 italic">Belum ada note kembalian</p>
                         )}

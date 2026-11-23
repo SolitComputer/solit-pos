@@ -424,7 +424,7 @@ export async function PATCH(
       .from("fund_requests")
       .update({
         note_kembalian: normalizedNote,
-        note_kembalian_by: normalizedNote ? userId : null,
+        note_kembalian_by: normalizedNote ? userName : null,
         note_kembalian_at: normalizedNote ? new Date().toISOString() : null,
       })
       .eq("id", id)
