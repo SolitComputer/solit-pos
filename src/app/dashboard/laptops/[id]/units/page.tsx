@@ -44,6 +44,7 @@ interface LaptopUnit {
 interface Laptop {
     id: string;
     laptop_name: string;
+    category_name?: string | null;
     brand: string;
     cpu: string;
     ram: string;
@@ -362,9 +363,13 @@ export default function UnitsPage() {
             ]);
             const laptopData = await laptopRes.json();
             const unitsData = await unitsRes.json();
-            if (laptopData.data) {
-                setLaptop({ ...laptopData.data, selling_price: Math.round(Number(laptopData.data.selling_price) || 0) });
-            }
+if (laptopData.data) {
+    setLaptop({
+        ...laptopData.data,
+        category_name: laptopData.data.laptop_categories?.name ?? laptopData.data.category ?? null,
+        selling_price: Math.round(Number(laptopData.data.selling_price) || 0),
+    });
+}
             if (unitsData.data) {
                 const normalized: LaptopUnit[] = (unitsData.data).map((u: LaptopUnit) => ({
                     ...u,
@@ -796,6 +801,7 @@ export default function UnitsPage() {
     const tableRows: InventoryRow[] = filteredUnits.map(u => ({
         id: u.id,
         laptop_name: laptop?.laptop_name ?? "—",
+        category: laptop?.category_name ?? null,
         cpu: laptop?.cpu ?? "",
         ram: laptop?.ram ?? "",
         storage: laptop?.storage ?? "",
