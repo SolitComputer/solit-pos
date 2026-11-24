@@ -801,7 +801,7 @@ if (laptopData.data) {
     const tableRows: InventoryRow[] = filteredUnits.map(u => ({
         id: u.id,
         laptop_name: laptop?.laptop_name ?? "—",
-        category: laptop?.category_name ?? null,
+        category_name: laptop?.category_name ?? null,
         cpu: laptop?.cpu ?? "",
         ram: laptop?.ram ?? "",
         storage: laptop?.storage ?? "",
