@@ -13,6 +13,7 @@ import {
 import { nextFollowupISO, normalizeSellerType, SellerType } from "@/lib/sellerFollowup";
 import { logActivity } from "@/lib/activityLogger";
 import { updateSellerPhoneSchema } from "@/lib/validation";
+import { isSellerArchiveManager } from "@/lib/sellerArchiveAccess";
 
 export const runtime = "nodejs"; // butuh Buffer untuk upload storage
 
@@ -274,7 +275,16 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       action === "reactivate" ||
       action === "assign"
     ) {
-      if (!canManage) {
+      // ✅ Keputusan bisnis (Task A): khusus action "archive" & "update_archive_reason",
+      // selain Admin (canManage), 2 akun di SELLER_ARCHIVE_MANAGER_IDS juga boleh —
+      // biar Fikri/Nur Alim bisa arsip tanpa perlu jadi Admin penuh.
+      // "reactivate" & "assign" TETAP Admin-only.
+      const isArchiveAction = action === "archive" || action === "update_archive_reason";
+      const authorizedForAction = isArchiveAction
+        ? canManage || isSellerArchiveManager(user.id)
+        : canManage;
+
+      if (!authorizedForAction) {
         return NextResponse.json(
           { success: false, message: "Hanya Admin yang bisa melakukan aksi ini" },
           { status: 403 }
