@@ -19,8 +19,8 @@ export interface CreatedSnFirstUnit {
 
 type Tipe = "LAPTOP" | "AKSESORIS";
 type TargetMode = "FOLDER" | "LEPAS";
-type Mode = "SELECT" | "SINGLE" | "BULK"; // ⬅️ BARU: step 0 selector
-type BulkMethod = "RANGE" | "MANUAL" | "EXCEL"; // ⬅️ BARU: method untuk bulk
+type Mode = "SELECT" | "SINGLE" | "BULK";
+type BulkMethod = "RANGE" | "MANUAL" | "EXCEL";
 
 interface Category {
     id: string;
@@ -57,7 +57,6 @@ interface Props {
         case?: "A" | "B" | "C";
         tipe: Tipe;
         message: string;
-        // ⬅️ BARU: untuk bulk mode
         bulk?: { inserted: number; failed: number };
     }) => void;
 }
@@ -68,7 +67,7 @@ const CONDITION_OPTIONS = [
     { value: "BARU", label: "Baru" },
     { value: "BEKAS", label: "Bekas" },
 ];
-const MAX_UNITS_PER_BATCH = 500; // batas /api/accessory-units/bulk
+const MAX_UNITS_PER_BATCH = 500;
 
 function isLaptopCategoryType(type?: string | null, name?: string | null): boolean {
     const t = (type ?? "").trim().toUpperCase();
@@ -76,7 +75,6 @@ function isLaptopCategoryType(type?: string | null, name?: string | null): boole
     return (name ?? "").trim().toUpperCase() === "PC";
 }
 
-// ⬅️ BARU: helper Range SN (disalin dari BulkAddUnitModal.tsx yang lama)
 function isInvertedRange(from: string, to: string): boolean {
     const fromTrimmed = from.trim();
     const toTrimmed = to.trim();
@@ -103,7 +101,6 @@ function generateRange(from: string, to: string): string[] {
     return fromTrimmed === toTrimmed ? [fromTrimmed] : [fromTrimmed, toTrimmed];
 }
 
-// ⬅️ BARU: batch sender untuk aksesoris (karena endpoint max 500 per batch)
 async function postAccessoryUnitsInChunks(
     accessoryId: string,
     units: Record<string, unknown>[],
@@ -143,7 +140,6 @@ const EMPTY_ACC_FORM = {
     buy_price: "", selling_price: "", notes: "",
 };
 
-// ⬅️ BARU: Empty state untuk bulk form (gabungan default SEMUA unit di batch)
 interface ExcelRow {
     serial_number: string;
     purchase_price: number;
@@ -156,27 +152,19 @@ interface ExcelRow {
 
 const EMPTY_BULK_FORM = {
     method: "RANGE" as BulkMethod,
-    // Range SN
     snFrom: "", snTo: "",
-    // Manual
     manualText: "",
-    // Excel
     excelRows: [] as ExcelRow[],
-    // Default values (berlaku untuk semua unit di batch ini)
     grade: "B",
-    status: "SIAP_JUAL", // untuk laptop: SIAP_JUAL/BELUM_SIAP. Aksesoris: TERSEDIA/BELUM_SIAP
-    condition: "BARU", // khusus aksesoris
-    purchase_price: "", // laptop: purchase_price. Aksesoris: buy_price
+    status: "SIAP_JUAL",
+    condition: "BARU",
+    purchase_price: "",
     selling_price: "",
-    sparepart_cost: "", // khusus laptop
+    sparepart_cost: "",
     source: "",
-    // ⬅️ UPDATED: default UTAMA — opsi "Belum" sudah dihapus dari UI.
-    // Tipe union tetap include "" biar aman kalau ada cache lama.
     branch: "UTAMA" as "" | "UTAMA" | "JOGJA",
     condition_note: "",
     received_at: "",
-    // ⬅️ BARU: Identity fields untuk Case B (folder kosong di bulk).
-    // Di-PATCH ke folder dulu sebelum bulk insert, lalu jadi identitas semua unit.
     identity_name: "",
     identity_brand: "",
     identity_cpu: "",
@@ -189,7 +177,6 @@ const EMPTY_BULK_FORM = {
 
 const fmt = (n?: number | null) => n == null ? "—" : "Rp " + n.toLocaleString("id-ID");
 
-// ⬅️ BARU: dipindah ke module scope supaya bisa dipakai SearchableFolderSelect.
 const labelFolder = (f: FolderOption) => {
     if (f.is_empty) return `Folder Kosong · ${f.category}`;
     const n = f.laptop_name ?? f.name ?? "—";
@@ -201,10 +188,8 @@ const labelFolder = (f: FolderOption) => {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: Props) {
-    // ⬅️ BARU: mode selector state (step 0)
     const [mode, setMode] = useState<Mode>("SELECT");
 
-    // Shared state (dipakai single & bulk)
     const [tipe, setTipe] = useState<Tipe>("LAPTOP");
     const [categoryId, setCategoryId] = useState("");
     const [targetMode, setTargetMode] = useState<TargetMode>("FOLDER");
@@ -212,11 +197,9 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
     const [folders, setFolders] = useState<FolderOption[]>([]);
     const [loadingFolders, setLoadingFolders] = useState(false);
 
-    // Single mode state
     const [laptopForm, setLaptopForm] = useState(EMPTY_LAPTOP_FORM);
     const [accForm, setAccForm] = useState(EMPTY_ACC_FORM);
 
-    // ⬅️ BARU: Bulk mode state
     const [bulkForm, setBulkForm] = useState(EMPTY_BULK_FORM);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -289,7 +272,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mode, selectedFolder, tipe]);
 
-    // Reset semua state
     const resetAll = () => {
         setTipe("LAPTOP"); setCategoryId(""); setTargetFolderId("");
         setTargetMode("FOLDER"); setError("");
@@ -307,8 +289,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
         setTipe(newTipe);
         setCategoryId(""); setTargetFolderId("");
         setTargetMode("FOLDER"); setError("");
-        // ⬅️ UPDATED: Laptop auto-force BELUM_SIAP (unit baru masuk antrian Team QC otomatis,
-        // field Status disembunyikan di UI). Aksesoris default TERSEDIA, user bisa ubah.
         setBulkForm(p => ({ ...p, status: newTipe === "LAPTOP" ? "BELUM_SIAP" : "TERSEDIA" }));
     };
 
@@ -318,7 +298,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
         setError("");
     };
 
-    // ⬅️ BARU: Excel upload handler (laptop only — aksesoris Excel belum ada di endpoint)
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -391,7 +370,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
         XLSX.writeFile(wb, `template_bulk_units_${tipe.toLowerCase()}.xlsx`);
     };
 
-    // ⬅️ BARU: Build units array dari bulk input (semua 3 methods)
     const buildBulkUnits = () => {
         const base = {
             grade: bulkForm.grade,
@@ -401,7 +379,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
             notes: "",
             ...(bulkForm.received_at ? { received_at: new Date(bulkForm.received_at).toISOString() } : {}),
         };
-        // Harga key berbeda antara laptop & aksesoris
         const priceDefaults = tipe === "LAPTOP"
             ? {
                 purchase_price: Number(bulkForm.purchase_price) || 0,
@@ -409,7 +386,7 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                 sparepart_cost: Number(bulkForm.sparepart_cost) || 0,
             }
             : {
-                buy_price: Number(bulkForm.purchase_price) || 0, // mapping: purchase_price -> buy_price
+                buy_price: Number(bulkForm.purchase_price) || 0,
                 selling_price: Number(bulkForm.selling_price) || 0,
                 condition: bulkForm.condition,
                 source: bulkForm.source.trim() || null,
@@ -549,12 +526,10 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
             setError("Tambah Banyak WAJIB pilih folder tujuan (SN Lepas belum didukung untuk bulk)");
             return;
         }
-        // ⬅️ BARU: Cabang WAJIB diisi (UTAMA atau JOGJA). Opsi "Belum" sudah dihapus.
         if (bulkForm.branch !== "UTAMA" && bulkForm.branch !== "JOGJA") {
             setError("Cabang WAJIB dipilih (Utama atau Jogja)");
             return;
         }
-        // ⬅️ UPDATED: Case B (folder kosong) sekarang BOLEH, asal identity_name diisi
         if (isCase_B) {
             if (!bulkForm.identity_name.trim()) {
                 setError("Folder kosong — wajib isi 'Nama' di section Identitas Folder");
@@ -578,8 +553,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
 
         setLoading(true);
         try {
-            // ⬅️ BARU: Case B (folder kosong) → PATCH folder identity DULU sebelum bulk insert.
-            // Kalau gagal, bulk insert di-abort biar tidak ada unit nyangkut di folder kosong.
             if (isCase_B) {
                 const identityBody = tipe === "LAPTOP" ? {
                     laptop_name: bulkForm.identity_name.trim(),
@@ -616,7 +589,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
             }
 
             if (tipe === "LAPTOP") {
-                // Endpoint laptop: /api/laptops/[id]/units/bulk
                 const res = await fetch(`/api/laptops/${targetFolderId}/units/bulk`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -633,7 +605,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                     bulk: { inserted: result.inserted ?? units.length, failed: 0 },
                 });
             } else {
-                // Endpoint aksesoris: /api/accessory-units/bulk (max 500 per batch)
                 const result = await postAccessoryUnitsInChunks(targetFolderId, units);
                 if (result.failed > 0) {
                     setError(
@@ -656,11 +627,7 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
         }
     };
 
-
-
     const lockedField = isCase_A;
-    // ⬅️ UPDATED: Folder kosong SEKARANG BOLEH jadi target bulk.
-    // Identitas folder di-PATCH dari form identity sebelum bulk insert.
     const foldersForBulk = folders;
 
     // ─── RENDER ──────────────────────────────────────────────────────────────
@@ -691,7 +658,7 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                             </h2>
                             <p className="text-xs text-gray-400 mt-0.5 truncate">
                                 {mode === "SELECT" && "Pilih cara tambah unit"}
-                                {mode === "SINGLE" && "SN-first — pilih target folder atau SN Lepas"}
+                                {mode === "SINGLE" && "SN-first — isi data dulu, target di akhir"}
                                 {mode === "BULK" && "Range SN, Manual, atau Import Excel ke 1 folder"}
                             </p>
                         </div>
@@ -771,57 +738,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                 {filteredCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </Field>
-
-                        {/* Step 3: Target Folder */}
-                        {categoryId && (
-                            <Field label="3. Target" required>
-                                <div className="space-y-2">
-                                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
-                                        <input type="radio" name="targetMode" checked={targetMode === "FOLDER"}
-                                            onChange={() => handleTargetModeChange("FOLDER")} className="mt-0.5" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-gray-800">Masukin ke Folder</p>
-                                            {targetMode === "FOLDER" && (
-                                                <div className="mt-1.5">
-                                                    <SearchableFolderSelect
-                                                        folders={folders}
-                                                        value={targetFolderId}
-                                                        onChange={setTargetFolderId}
-                                                        loading={loadingFolders}
-                                                        placeholder="Ketik nama folder untuk cari..."
-                                                        emptyText="Belum ada folder"
-                                                    />
-                                                </div>
-                                            )}                                            {targetMode === "FOLDER" && !loadingFolders && folders.length === 0 && (
-                                                <p className="text-[10px] text-gray-400 mt-1">Belum ada folder. Bikin folder dulu di tombol &quot;+ Folder&quot;.</p>
-                                            )}
-                                        </div>
-                                    </label>
-
-                                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
-                                        <input type="radio" name="targetMode" checked={targetMode === "LEPAS"}
-                                            onChange={() => handleTargetModeChange("LEPAS")} className="mt-0.5" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-gray-800">Tanpa Folder (SN Lepas)</p>
-                                            <p className="text-[11px] text-gray-500 mt-0.5">Unit berdiri sendiri, tidak terikat folder manapun.</p>
-                                        </div>
-                                    </label>
-                                </div>
-                            </Field>
-                        )}
-
-                        {/* Info banner — Case A/B */}
-                        {isCase_A && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] text-amber-800 leading-relaxed">
-                                🔒 <b>Folder isi:</b> Nama, spek, harga jual, dan grade <b>terkunci</b> dari folder (nggak bisa diubah).
-                                Cuma isi: SN, source, harga modal, kondisi.
-                            </div>
-                        )}
-                        {isCase_B && (
-                            <div className="bg-sky-50 border border-sky-200 rounded-xl px-3 py-2 text-[11px] text-sky-800 leading-relaxed">
-                                📦 <b>Folder kosong:</b> Identitas folder akan <b>adopt</b> dari SN ini (nama, spek, harga, grade).
-                            </div>
-                        )}
 
                         {/* ═══════════════════ FORM LAPTOP ═══════════════════ */}
                         {tipe === "LAPTOP" && categoryId && (
@@ -996,6 +912,62 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                             </>
                         )}
 
+                        {/* ⬅️ REVISI 2026-11-24: Step 3 Target DIPINDAH ke paling bawah.
+                            User isi data laptop/aksesoris dulu, baru pilih mau ditaruh di
+                            folder mana atau SN Lepas. Alur & logic lain tidak diubah. */}
+                        {categoryId && (
+                            <>
+                                <Field label="3. Target" required>
+                                    <div className="space-y-2">
+                                        <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                                            <input type="radio" name="targetMode" checked={targetMode === "FOLDER"}
+                                                onChange={() => handleTargetModeChange("FOLDER")} className="mt-0.5" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-gray-800">Masukin ke Folder</p>
+                                                {targetMode === "FOLDER" && (
+                                                    <div className="mt-1.5">
+                                                        <SearchableFolderSelect
+                                                            folders={folders}
+                                                            value={targetFolderId}
+                                                            onChange={setTargetFolderId}
+                                                            loading={loadingFolders}
+                                                            placeholder="Ketik nama folder untuk cari..."
+                                                            emptyText="Belum ada folder"
+                                                        />
+                                                    </div>
+                                                )}
+                                                {targetMode === "FOLDER" && !loadingFolders && folders.length === 0 && (
+                                                    <p className="text-[10px] text-gray-400 mt-1">Belum ada folder. Bikin folder dulu di tombol &quot;+ Folder&quot;.</p>
+                                                )}
+                                            </div>
+                                        </label>
+
+                                        <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                                            <input type="radio" name="targetMode" checked={targetMode === "LEPAS"}
+                                                onChange={() => handleTargetModeChange("LEPAS")} className="mt-0.5" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-gray-800">Tanpa Folder (SN Lepas)</p>
+                                                <p className="text-[11px] text-gray-500 mt-0.5">Unit berdiri sendiri, tidak terikat folder manapun.</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </Field>
+
+                                {/* Info banner — Case A/B */}
+                                {isCase_A && (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] text-amber-800 leading-relaxed">
+                                        🔒 <b>Folder isi:</b> Nama, spek, harga jual, dan grade <b>terkunci</b> dari folder (nggak bisa diubah).
+                                        Cuma isi: SN, source, harga modal, kondisi.
+                                    </div>
+                                )}
+                                {isCase_B && (
+                                    <div className="bg-sky-50 border border-sky-200 rounded-xl px-3 py-2 text-[11px] text-sky-800 leading-relaxed">
+                                        📦 <b>Folder kosong:</b> Identitas folder akan <b>adopt</b> dari SN ini (nama, spek, harga, grade).
+                                    </div>
+                                )}
+                            </>
+                        )}
+
                         {error && (
                             <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
                                 <p className="text-xs text-red-700">{error}</p>
@@ -1040,102 +1012,13 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                             </select>
                         </Field>
 
-                        {/* Step 3: Target Folder — WAJIB, tanpa opsi SN Lepas */}
+                        {/* ⬅️ REVISI 2026-11-24: Dependency Step Cara Input SN & Nilai Default
+                            diubah dari `targetFolderId` ke `categoryId`, karena Target Folder
+                            sekarang dipindah ke paling bawah. User isi data unit dulu, baru
+                            pilih folder tujuan di akhir. */}
                         {categoryId && (
-                            <Field label="3. Target Folder" required>
-                                <SearchableFolderSelect
-                                    folders={foldersForBulk}
-                                    value={targetFolderId}
-                                    onChange={setTargetFolderId}
-                                    loading={loadingFolders}
-                                    placeholder="Ketik nama folder untuk cari..."
-                                    emptyText="Belum ada folder yang bisa jadi target"
-                                />
-                                <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
-                                    💡 <b>Boleh pilih folder berisi ATAU folder kosong</b> (asal kategori sama).
-                                    SN Lepas tidak didukung di mode ini. Kalau pilih folder kosong, isi identitas folder di section bawah.
-                                </p>
-                            </Field>
-                        )}
-
-                        {/* ⬅️ BARU: Step 3b — Identity fields untuk Case B (folder kosong).
-                            Field ini dipakai untuk PATCH folder identity sebelum bulk insert,
-                            sekaligus jadi identitas semua unit di batch. */}
-                        {targetFolderId && isCase_B && (
-                            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 space-y-3">
-                                <p className="text-[11px] text-sky-800 leading-relaxed">
-                                    📦 <b>Folder kosong</b> — isi identitas folder di bawah. Semua SN di batch akan pakai identitas ini,
-                                    dan folder akan di-update sekali sebelum bulk insert.
-                                </p>
-
-                                {tipe === "LAPTOP" ? (
-                                    <>
-                                        <Field label="Nama Laptop" required>
-                                            <input value={bulkForm.identity_name}
-                                                onChange={e => setBulkForm(p => ({ ...p, identity_name: e.target.value }))}
-                                                placeholder="Contoh: Acer Aspire 3 A314" className={inputCls} />
-                                        </Field>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <Field label="Brand">
-                                                <input value={bulkForm.identity_brand}
-                                                    onChange={e => setBulkForm(p => ({ ...p, identity_brand: e.target.value }))}
-                                                    placeholder="Acer, Lenovo..." className={inputCls} />
-                                            </Field>
-                                            <Field label="CPU" required>
-                                                <input value={bulkForm.identity_cpu}
-                                                    onChange={e => setBulkForm(p => ({ ...p, identity_cpu: e.target.value }))}
-                                                    placeholder="i5-1135G7" className={inputCls} />
-                                            </Field>
-                                            <Field label="RAM" required>
-                                                <input value={bulkForm.identity_ram}
-                                                    onChange={e => setBulkForm(p => ({ ...p, identity_ram: e.target.value }))}
-                                                    placeholder="8GB DDR4" className={inputCls} />
-                                            </Field>
-                                            <Field label="Storage" required>
-                                                <input value={bulkForm.identity_storage}
-                                                    onChange={e => setBulkForm(p => ({ ...p, identity_storage: e.target.value }))}
-                                                    placeholder="512GB SSD" className={inputCls} />
-                                            </Field>
-                                            <Field label="GPU">
-                                                <input value={bulkForm.identity_gpu}
-                                                    onChange={e => setBulkForm(p => ({ ...p, identity_gpu: e.target.value }))}
-                                                    placeholder="Iris Xe / MX450" className={inputCls} />
-                                            </Field>
-                                            <Field label="Display">
-                                                <input value={bulkForm.identity_display}
-                                                    onChange={e => setBulkForm(p => ({ ...p, identity_display: e.target.value }))}
-                                                    placeholder='14" FHD IPS' className={inputCls} />
-                                            </Field>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Field label="Nama Aksesoris" required>
-                                            <input value={bulkForm.identity_name}
-                                                onChange={e => setBulkForm(p => ({ ...p, identity_name: e.target.value }))}
-                                                placeholder="Contoh: Charger Acer 65W" className={inputCls} />
-                                        </Field>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <Field label="Brand">
-                                                <input value={bulkForm.identity_brand}
-                                                    onChange={e => setBulkForm(p => ({ ...p, identity_brand: e.target.value }))}
-                                                    placeholder="Acer, Lenovo..." className={inputCls} />
-                                            </Field>
-                                            <Field label="Spesifikasi">
-                                                <input value={bulkForm.identity_spec}
-                                                    onChange={e => setBulkForm(p => ({ ...p, identity_spec: e.target.value }))}
-                                                    placeholder="65W 19V 3.42A" className={inputCls} />
-                                            </Field>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Step 4: Method tabs — Range SN / Manual / Import Excel */}
-                        {targetFolderId && (
                             <>
-                                <Field label="4. Cara Input SN" required>
+                                <Field label="3. Cara Input SN" required>
                                     <div className="flex gap-2">
                                         {([
                                             { id: "RANGE", label: "Range SN", icon: Hash },
@@ -1285,12 +1168,8 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                 {/* Default values — tidak muncul kalau Excel (nilai per-row diambil dari file) */}
                                 {bulkForm.method !== "EXCEL" && (
                                     <div className="border-t border-gray-100 pt-4 space-y-3">
-                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">5. Nilai Default Semua Unit</p>
+                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">4. Nilai Default Semua Unit</p>
 
-                                        {/* Status — LAPTOP: hidden & force BELUM_SIAP (auto masuk Team QC).
-                                                     AKSESORIS: masih bisa pilih TERSEDIA/BELUM_SIAP.
-                                            Requirement Rayhan: unit laptop baru TIDAK bisa pilih status —
-                                            auto masuk antrian Team QC dengan status Belum Siap Jual. */}
                                         {tipe === "LAPTOP" ? (
                                             <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-[11px] text-amber-800 leading-snug">
                                                 🔒 Unit laptop baru otomatis masuk status <b>Belum Siap Jual</b> dan antrian <b>Team QC</b>.
@@ -1316,7 +1195,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                             </Field>
                                         )}
 
-                                        {/* Grade (laptop) atau Kondisi (aksesoris) */}
                                         {tipe === "LAPTOP" ? (
                                             <Field label="Grade">
                                                 <div className="flex gap-1.5">
@@ -1348,8 +1226,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                             </div>
                                         )}
 
-                                        {/* Cabang — WAJIB pilih Utama atau Jogja. Opsi "Belum" DIHAPUS
-                                            sesuai requirement Rayhan: semua unit baru harus langsung tagged cabang. */}
                                         <Field label="Cabang (semua unit)" required>
                                             <div className="flex gap-1.5">
                                                 {([
@@ -1368,7 +1244,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                             </div>
                                         </Field>
 
-                                        {/* Sumber (aksesoris saja, laptop tidak dikirim di payload bulk laptop) */}
                                         {tipe === "AKSESORIS" && (
                                             <Field label="Sumber">
                                                 <AutocompleteInput field="source" name="source" value={bulkForm.source}
@@ -1377,7 +1252,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                             </Field>
                                         )}
 
-                                        {/* Harga */}
                                         <div className="grid grid-cols-2 gap-3">
                                             <Field label="Harga Modal">
                                                 <CurrencyInput value={Number(bulkForm.purchase_price) || 0}
@@ -1389,7 +1263,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                             </Field>
                                         </div>
 
-                                        {/* Sparepart (laptop saja) */}
                                         {tipe === "LAPTOP" && (
                                             <Field label="Modal Sparepart">
                                                 <CurrencyInput value={Number(bulkForm.sparepart_cost) || 0}
@@ -1397,7 +1270,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                             </Field>
                                         )}
 
-                                        {/* Kondisi catatan */}
                                         <Field label="Kondisi Umum (opsional)">
                                             <input type="text" placeholder="Contoh: mulus, normal"
                                                 value={bulkForm.condition_note}
@@ -1405,7 +1277,6 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                                 className={inputCls} />
                                         </Field>
 
-                                        {/* Tanggal masuk (laptop saja — endpoint aksesoris tidak terima received_at) */}
                                         {tipe === "LAPTOP" && (
                                             <Field label="Tanggal Masuk (semua unit)">
                                                 <input type="date" value={bulkForm.received_at}
@@ -1413,6 +1284,96 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                                     max={new Date().toISOString().split("T")[0]}
                                                     className={inputCls} />
                                             </Field>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ⬅️ REVISI 2026-11-24: Step 5 Target Folder DIPINDAH ke paling bawah.
+                                    User isi data unit (SN, default values) dulu, baru pilih folder tujuan.
+                                    Alur insert ke backend tidak berubah — validasi di submit tetap sama. */}
+                                <Field label="5. Target Folder" required>
+                                    <SearchableFolderSelect
+                                        folders={foldersForBulk}
+                                        value={targetFolderId}
+                                        onChange={setTargetFolderId}
+                                        loading={loadingFolders}
+                                        placeholder="Ketik nama folder untuk cari..."
+                                        emptyText="Belum ada folder yang bisa jadi target"
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
+                                        💡 <b>Boleh pilih folder berisi ATAU folder kosong</b> (asal kategori sama).
+                                        SN Lepas tidak didukung di mode ini. Kalau pilih folder kosong, isi identitas folder di section bawah.
+                                    </p>
+                                </Field>
+
+                                {/* Identity Case B — muncul setelah folder dipilih & folder-nya kosong */}
+                                {targetFolderId && isCase_B && (
+                                    <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 space-y-3">
+                                        <p className="text-[11px] text-sky-800 leading-relaxed">
+                                            📦 <b>Folder kosong</b> — isi identitas folder di bawah. Semua SN di batch akan pakai identitas ini,
+                                            dan folder akan di-update sekali sebelum bulk insert.
+                                        </p>
+
+                                        {tipe === "LAPTOP" ? (
+                                            <>
+                                                <Field label="Nama Laptop" required>
+                                                    <input value={bulkForm.identity_name}
+                                                        onChange={e => setBulkForm(p => ({ ...p, identity_name: e.target.value }))}
+                                                        placeholder="Contoh: Acer Aspire 3 A314" className={inputCls} />
+                                                </Field>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <Field label="Brand">
+                                                        <input value={bulkForm.identity_brand}
+                                                            onChange={e => setBulkForm(p => ({ ...p, identity_brand: e.target.value }))}
+                                                            placeholder="Acer, Lenovo..." className={inputCls} />
+                                                    </Field>
+                                                    <Field label="CPU" required>
+                                                        <input value={bulkForm.identity_cpu}
+                                                            onChange={e => setBulkForm(p => ({ ...p, identity_cpu: e.target.value }))}
+                                                            placeholder="i5-1135G7" className={inputCls} />
+                                                    </Field>
+                                                    <Field label="RAM" required>
+                                                        <input value={bulkForm.identity_ram}
+                                                            onChange={e => setBulkForm(p => ({ ...p, identity_ram: e.target.value }))}
+                                                            placeholder="8GB DDR4" className={inputCls} />
+                                                    </Field>
+                                                    <Field label="Storage" required>
+                                                        <input value={bulkForm.identity_storage}
+                                                            onChange={e => setBulkForm(p => ({ ...p, identity_storage: e.target.value }))}
+                                                            placeholder="512GB SSD" className={inputCls} />
+                                                    </Field>
+                                                    <Field label="GPU">
+                                                        <input value={bulkForm.identity_gpu}
+                                                            onChange={e => setBulkForm(p => ({ ...p, identity_gpu: e.target.value }))}
+                                                            placeholder="Iris Xe / MX450" className={inputCls} />
+                                                    </Field>
+                                                    <Field label="Display">
+                                                        <input value={bulkForm.identity_display}
+                                                            onChange={e => setBulkForm(p => ({ ...p, identity_display: e.target.value }))}
+                                                            placeholder='14" FHD IPS' className={inputCls} />
+                                                    </Field>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Field label="Nama Aksesoris" required>
+                                                    <input value={bulkForm.identity_name}
+                                                        onChange={e => setBulkForm(p => ({ ...p, identity_name: e.target.value }))}
+                                                        placeholder="Contoh: Charger Acer 65W" className={inputCls} />
+                                                </Field>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <Field label="Brand">
+                                                        <input value={bulkForm.identity_brand}
+                                                            onChange={e => setBulkForm(p => ({ ...p, identity_brand: e.target.value }))}
+                                                            placeholder="Acer, Lenovo..." className={inputCls} />
+                                                    </Field>
+                                                    <Field label="Spesifikasi">
+                                                        <input value={bulkForm.identity_spec}
+                                                            onChange={e => setBulkForm(p => ({ ...p, identity_spec: e.target.value }))}
+                                                            placeholder="65W 19V 3.42A" className={inputCls} />
+                                                    </Field>
+                                                </div>
+                                            </>
                                         )}
                                     </div>
                                 )}
@@ -1455,8 +1416,7 @@ function Field({ label, children, required }: { label: string; children: React.R
     );
 }
 
-// ⬅️ BARU: Searchable dropdown untuk folder — ketik untuk filter, klik untuk pilih.
-// Ganti <select> native yang susah kalau folder banyak (puluhan+).
+// Searchable dropdown untuk folder — ketik untuk filter, klik untuk pilih.
 function SearchableFolderSelect({
     folders, value, onChange, loading, placeholder, emptyText,
 }: {
@@ -1507,7 +1467,6 @@ function SearchableFolderSelect({
             )}
             {open && (
                 <>
-                    {/* Backdrop untuk close-on-outside-click */}
                     <div className="fixed inset-0 z-10" onClick={() => { setOpen(false); setQuery(""); }} />
                     <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl max-h-64 overflow-y-auto shadow-xl">
                         {filtered.length === 0 ? (
