@@ -11,9 +11,12 @@ async function handler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
         const like = `%${q}%`;
         const [lap, accUnits, accParent] = await Promise.all([
             // Laptop: selalu per-unit (laptop pasti punya SN asli)
+            // ✅ FIX: Hapus embed laptops(laptop_name) — sama seperti fix aksesoris,
+            // embed bisa gagal kalau FK tak kedetect PostgREST → nama jadi "Laptop".
+            // Nama diambil terpisah lewat lapNameById di bawah.
             supabaseAdmin
                 .from("laptop_units")
-                .select("id, serial_number, status, laptop_id, laptops(laptop_name)")
+                .select("id, serial_number, status, laptop_id")
                 .ilike("serial_number", like)
                 .not("status", "in", "(SOLD,KELUAR)")
                 .limit(15),
@@ -37,6 +40,18 @@ async function handler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
                 .limit(15),
         ]);
 
+        // ✅ Nama laptop untuk unit ber-SN: query terpisah by id (hindari embed).
+        const lapUnitRows = lap.data ?? [];
+        const lapIds = Array.from(new Set(lapUnitRows.map((u: Record<string, any>) => u.laptop_id).filter(Boolean)));
+        let lapNameById: Record<string, string> = {};
+        if (lapIds.length > 0) {
+            const { data: lapNameRows } = await supabaseAdmin
+                .from("laptops")
+                .select("id, laptop_name")
+                .in("id", lapIds);
+            lapNameById = Object.fromEntries((lapNameRows ?? []).map((l: Record<string, any>) => [l.id, l.laptop_name]));
+        }
+
         // Nama aksesoris untuk unit ber-SN: query terpisah by id (hindari embed).
         const accUnitRows = accUnits.data ?? [];
         const accIds = Array.from(new Set(accUnitRows.map((u: Record<string, any>) => u.accessory_id).filter(Boolean)));
@@ -54,12 +69,12 @@ async function handler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
         const unitAccIds = new Set(accUnitRows.map((u: Record<string, any>) => u.accessory_id));
 
         const results = [
-            ...((lap.data ?? []).map((u: Record<string, any>) => ({
+            ...(lapUnitRows.map((u: Record<string, any>) => ({
                 item_type: "LAPTOP" as const,
                 item_id: u.laptop_id,
                 unit_id: u.id,
                 serial_number: u.serial_number,
-                item_name: u.laptops?.laptop_name ?? "Laptop",
+                item_name: lapNameById[u.laptop_id] ?? "Laptop",
                 status: u.status,
             }))),
             ...accUnitRows.map((u: Record<string, any>) => ({
