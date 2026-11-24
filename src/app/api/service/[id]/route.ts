@@ -643,13 +643,15 @@ export async function PATCH(
       //   • undefined  → user tidak menyentuh foto, JANGAN update kolom (biarin foto lama tetap)
       //   • string     → user upload foto baru, update ke url baru
       //   • null       → user hapus foto tanpa ganti, set jadi null
-      const updatePaymentPayload: Record<string, unknown> = {
-        payment_amount,
-        payment_note: payment_note || null,
-        payment_method: payment_method || "CASH",
-        payment_by: user.id,
-        payment_confirmed_at: new Date().toISOString(),
-      };
+const updatePaymentPayload: Record<string, unknown> = {
+    payment_amount,
+    payment_status: "LUNAS",
+    total_tagihan: payment_amount,
+    payment_note: payment_note || null,
+    payment_method: payment_method || "CASH",
+    payment_by: user.id,
+    payment_confirmed_at: new Date().toISOString(),
+};
 
       //  NEW — tangkap url foto lama SEBELUM update, buat dihapus dari storage kalau berubah
       const oldProofUrl = (current as { payment_proof_url?: string | null }).payment_proof_url ?? null;

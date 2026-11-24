@@ -2212,6 +2212,7 @@ async function buildServiceDrafts(
       const selesaiDate = s.tanggal_selesai ? jakartaDate(s.tanggal_selesai as string) : null;
       return !!selesaiDate && selesaiDate < SERVICE_STATUS_RULE_CUTOFF;
     }
+    if ((s.status === "TIDAK_JADI" || s.status === "DIBATALKAN") && Number(s.payment_amount ?? 0) > 0 && s.payment_confirmed_at) return true;
     return false;
   });
 
