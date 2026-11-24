@@ -2030,7 +2030,20 @@ export default function UnifiedBarangContent() {
         if (!deleteRow) return;
         setDeleting(true);
         try {
-            const url = deleteRow.tipe === "LAPTOP" ? `/api/laptops/${deleteRow.id}` : `/api/accessories/${deleteRow.id}`;
+            let url: string;
+
+            if (deleteRow.is_sn_lepas) {
+                // SN Lepas → id = unit UUID, hapus langsung dari tabel unit
+                url = deleteRow.tipe === "LAPTOP"
+                    ? `/api/data-barang/sn-lepas/${deleteRow.id}`
+                    : `/api/data-barang/sn-lepas/${deleteRow.id}`;
+            } else {
+                // Normal → id = model UUID, hapus model + semua unit-nya
+                url = deleteRow.tipe === "LAPTOP"
+                    ? `/api/laptops/${deleteRow.id}`
+                    : `/api/accessories/${deleteRow.id}`;
+            }
+
             const res = await fetch(url, { method: "DELETE" });
             const json = await res.json();
             if (!json.success) throw new Error(json.message || json.error || "Gagal menghapus");
@@ -2615,7 +2628,7 @@ export default function UnifiedBarangContent() {
                                                                     Edit
                                                                 </button>
                                                             )}
-                                                            {canDeleteThis && !row.is_sn_lepas && (
+                                                            {canDeleteThis && (
                                                                 <button onClick={() => setDeleteRow(row)}
                                                                     className={`${cardActionCls} text-red-500 bg-red-50 hover:bg-red-100`}>
                                                                     Hapus
@@ -2839,7 +2852,7 @@ export default function UnifiedBarangContent() {
                                                                         {row.tipe === "AKSESORIS" && canEditAcc && (
                                                                             <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
                                                                         )}
-                                                                        {((row.tipe === "LAPTOP" && canDeleteLaptop && !row.is_sn_lepas) || (row.tipe === "AKSESORIS" && canDeleteAcc && !row.is_sn_lepas)) && (
+                                                                      {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
                                                                             <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
                                                                         )}
                                                                     </div>
