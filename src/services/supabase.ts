@@ -18,16 +18,16 @@ export const supabase = createClient(
 // Pakai ini di SEMUA API route (app/api/**) supaya operasi CRUD
 // (terutama DELETE, UPDATE) tidak silently gagal karena RLS policy.
 // JANGAN pakai di client component — service_role key harus rahasia.
-const supabaseServiceRoleKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Fallback ke supabase (anon) kalau SERVICE_ROLE_KEY belum di-set,
+// supaya app tidak crash. Fitur yang butuh bypass RLS baru jalan
+// setelah key ini diisi di .env.
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export const supabaseAdmin = createClient(
-  supabaseUrl,
-  supabaseServiceRoleKey,
-  {
-    global: { fetch: fetchWithTimeout },
-    auth: { autoRefreshToken: false, persistSession: false },
-  }
-);
+export const supabaseAdmin = supabaseServiceRoleKey
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+      global: { fetch: fetchWithTimeout },
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+  : supabase;
 
 export { createClient };
