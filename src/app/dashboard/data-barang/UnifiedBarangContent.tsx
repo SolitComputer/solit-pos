@@ -1290,16 +1290,22 @@ export default function UnifiedBarangContent() {
         });
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
 
-        if (kategoriFilter.length > 0) {
-            const selectedIds = new Set(kategoriFilter);
-            const selectedNames = new Set(
-                kategoriFilter.map(id => (categories.find(c => c.id === id)?.name || "").toUpperCase())
-            );
-            list = list.filter(r => {
-                if (r.tipe === "LAPTOP") return r.kategori_id != null && selectedIds.has(r.kategori_id);
-                return selectedNames.has((r.kategori || "").toUpperCase());
-            });
+if (kategoriFilter.length > 0) {
+    const selectedIds = new Set(kategoriFilter);
+    const selectedNames = new Set(
+        kategoriFilter.map(id => (categories.find(c => c.id === id)?.name || "").toUpperCase())
+    );
+    list = list.filter(r => {
+        if (r.tipe === "LAPTOP") {
+            // Prioritas: cocokkan via FK category_id.
+            // Fallback: laptop lama yang category_id-nya NULL tapi punya
+            // text field `kategori` (category_name) → cocokkan via nama.
+            if (r.kategori_id != null) return selectedIds.has(r.kategori_id);
+            return selectedNames.has((r.kategori || "").toUpperCase());
         }
+        return selectedNames.has((r.kategori || "").toUpperCase());
+    });
+}
 
 
         if (brandFilter) {
