@@ -204,12 +204,14 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
   // (user_shift_config) > shift dasar akun (users.shift) > PAGI. Query di
   // bawah aman-degrade: kalau salah satu tabel kosong/tidak match, jatuh ke
   // prioritas berikutnya, bukan crash.
-  const [{ data: cfgShiftRow }, { data: userShiftRow }] = await Promise.all([
+  const [{ data: weeklyShiftRow }, { data: cfgShiftRow }, { data: userShiftRow }] = await Promise.all([
+    supabaseAdmin.from("user_weekly_schedules").select("shift").eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
     supabaseAdmin.from("user_shift_config").select("shift").eq("user_id", userId).maybeSingle(),
     supabaseAdmin.from("users").select("shift").eq("id", userId).maybeSingle(),
   ]);
   const shiftLabel: "PAGI" | "SORE" =
     ((scheduleOverride as any)?.shift as "PAGI" | "SORE" | undefined)
+    ?? (weeklyShiftRow?.shift as "PAGI" | "SORE" | undefined)   // ✅ NEW — Jadwal Mingguan
     ?? (cfgShiftRow?.shift as "PAGI" | "SORE" | undefined)
     ?? (userShiftRow?.shift as "PAGI" | "SORE" | undefined)
     ?? "PAGI";

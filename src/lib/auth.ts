@@ -289,8 +289,8 @@ export async function resolveShiftConfigFromDB(
       supabaseAdmin.from("user_date_schedule")
         .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute,checkout_hour,checkout_minute")
         .eq("user_id", userId).eq("schedule_date", todayDate).maybeSingle(),
-      supabaseAdmin.from("user_schedule")
-        .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute,checkout_hour,checkout_minute")
+      supabaseAdmin.from("user_weekly_schedules")
+        .select("open_hour,open_minute,late_hour,late_minute,close_hour,close_minute,checkout_hour,checkout_minute")
         .eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
       supabaseAdmin.from("user_shift_config")
         .select("open_hour,open_minute,late_hour,late_minute,close_hour,close_minute,checkout_hour,checkout_minute,shift")
@@ -317,12 +317,12 @@ export async function resolveShiftConfigFromDB(
 
   if (weeklySchedule) {
     return {
-      start: { h: weeklySchedule.start_hour, m: weeklySchedule.start_minute },
+      start: { h: weeklySchedule.open_hour, m: weeklySchedule.open_minute },
       lateFrom: { h: weeklySchedule.late_hour, m: weeklySchedule.late_minute },
-      end: { h: weeklySchedule.end_hour, m: weeklySchedule.end_minute },
+      end: { h: weeklySchedule.close_hour, m: weeklySchedule.close_minute },
       checkout: weeklySchedule.checkout_hour != null
         ? { h: weeklySchedule.checkout_hour, m: weeklySchedule.checkout_minute ?? 0 }
-        : defaultCheckout, // ✅ NEW
+        : defaultCheckout, // ✅ dari user_weekly_schedules (Jadwal Mingguan)
       source: "custom",
     };
   }
