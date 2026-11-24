@@ -110,7 +110,7 @@ export default function CashflowPribadiClient() {
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Cashflow Pribadi</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Cashflow Pribadi</h1>
             <p className="text-sm text-slate-500 mt-0.5">
               Kelola keuangan pribadi Anda — <span className="font-semibold text-indigo-600">100% privat</span>, hanya Anda yang bisa lihat.
             </p>
@@ -133,10 +133,9 @@ export default function CashflowPribadiClient() {
 
         {/* ── Summary Cards ────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-          <div className="col-span-2 md:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white p-5 shadow-lg shadow-indigo-500/20">
-            <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl" />
+          <div className="col-span-2 md:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white p-4 sm:p-5 shadow-lg shadow-indigo-500/20">            <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl" />
             <p className="text-xs uppercase tracking-wider text-indigo-100/80 font-semibold">Saldo Periode Ini</p>
-            <p className={`text-3xl font-bold mt-2 ${balance < 0 ? "text-rose-200" : "text-white"}`}>
+            <p className={`text-2xl sm:text-3xl font-bold mt-2 break-words ${balance < 0 ? "text-rose-200" : "text-white"}`}>
               {formatIDR(balance)}
             </p>
             <p className="text-xs text-indigo-100/70 mt-2">{periodStart} → {periodEnd}</p>
@@ -169,7 +168,7 @@ export default function CashflowPribadiClient() {
 
         {/* ── Period & Filter ──────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center">
+          <div className="flex flex-row flex-wrap gap-2 items-center">
             <button onClick={setLast7Days} className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">7 Hari</button>
             <button onClick={setThisMonth} className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">Bulan Ini</button>
             <button onClick={setLastMonth} className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">Bulan Lalu</button>
@@ -202,7 +201,7 @@ export default function CashflowPribadiClient() {
                         {c.category_name}
                         <span className="text-slate-400 font-normal">({c.count}x)</span>
                       </span>
-                      <span className={`font-semibold ${c.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
+                      <span className={`font-semibold whitespace-nowrap ${c.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
                         {c.type === "income" ? "+" : "-"}{formatIDR(c.total)}
                       </span>
                     </div>
@@ -261,8 +260,8 @@ export default function CashflowPribadiClient() {
                       )}
                       <p className="text-[11px] text-slate-400 mt-0.5">{tx.transaction_date}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-bold ${tx.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                      <span className={`text-sm font-bold whitespace-nowrap ${tx.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
                         {tx.type === "income" ? "+" : "-"}{formatIDR(tx.amount)}
                       </span>
                       <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition flex gap-1">
@@ -393,7 +392,7 @@ function TransactionFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 space-y-4 max-h-[75vh] overflow-y-auto">
           {/* Tipe */}
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setType("expense")} className={`py-3 rounded-xl font-semibold text-sm transition ${type === "expense" ? "bg-rose-50 text-rose-700 border-2 border-rose-500" : "bg-slate-50 text-slate-500 border-2 border-transparent"}`}>
@@ -534,7 +533,7 @@ function CategoryManagerModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
+        <div className="p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 space-y-5 max-h-[75vh] overflow-y-auto">
           <form onSubmit={handleCreate} className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 space-y-3">
             <p className="text-xs font-semibold text-indigo-900 uppercase tracking-wider">Tambah Kategori Baru</p>
             <div className="grid grid-cols-2 gap-2">

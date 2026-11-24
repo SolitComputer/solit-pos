@@ -1790,8 +1790,7 @@ function SummaryCard({ label, value, sublabel, color, icon, loading }: {
                 <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-lg ${c.iconBg}`}>{icon}</div>
                 <div className="min-w-0">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5 truncate">{label}</p>
-                    {loading ? <div className="h-6 w-28 bg-gray-100 rounded animate-pulse mt-1" /> : <p className={`text-xl font-black tabular-nums tracking-tight ${c.value}`}>{value}</p>}
-                    {sublabel && !loading && <p className={`text-[10px] ${c.sub} mt-0.5 font-medium`}>{sublabel}</p>}
+                    {loading ? <div className="h-6 w-28 bg-gray-100 rounded animate-pulse mt-1" /> : <p className={`text-base sm:text-xl font-black tabular-nums tracking-tight ${c.value}`}>{value}</p>}                    {sublabel && !loading && <p className={`text-[10px] ${c.sub} mt-0.5 font-medium`}>{sublabel}</p>}
                 </div>
             </div>
         </div>
@@ -2564,8 +2563,7 @@ export default function CashflowPage() {
                 {/* Saldo Utama — kartu saldo bergaya "balance card" fintech: latar gradient gelap
                     navy-violet (identitas brand), bukan cuma kartu putih dengan garis aksen tipis.
                     Ini satu-satunya elemen "berani" di halaman — semua yang lain sengaja dibuat tenang. */}
-                <div className="relative rounded-[28px] overflow-hidden bg-gradient-to-br from-[#1e1852] via-[#150f3d] to-[#0a0818] shadow-[0_20px_50px_-20px_rgba(15,12,41,0.55)]">
-                    {/* Dekorasi cahaya — satu titik fokus visual, tetap kalem */}
+                <div className="relative rounded-2xl sm:rounded-[28px] overflow-hidden bg-gradient-to-br from-[#1e1852] via-[#150f3d] to-[#0a0818] shadow-[0_20px_50px_-20px_rgba(15,12,41,0.55)]">                    {/* Dekorasi cahaya — satu titik fokus visual, tetap kalem */}
                     <div className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full bg-violet-400/[0.12] blur-3xl" />
                     <div className="pointer-events-none absolute -bottom-28 -left-16 w-64 h-64 rounded-full bg-fuchsia-500/[0.06] blur-3xl" />
                     <div className="pointer-events-none absolute top-1/3 right-1/3 w-40 h-40 rounded-full bg-emerald-400/[0.05] blur-2xl" />
@@ -2574,7 +2572,7 @@ export default function CashflowPage() {
                         className="pointer-events-none absolute inset-0 opacity-[0.06]"
                         style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)", backgroundSize: "22px 22px" }}
                     />
-                    <div className="relative p-5 sm:p-7">
+                    <div className="relative p-4 sm:p-7">
                         <div className="flex items-start justify-between gap-4 flex-wrap">
                             <div>
                                 <div className="flex items-center gap-2.5 mb-3">
@@ -2611,15 +2609,14 @@ export default function CashflowPage() {
                                     <button
                                         type="button"
                                         onClick={showStaleEntries}
-                                        className="inline-flex items-center gap-1.5 mt-2.5 ml-2 px-2.5 py-1 rounded-full bg-orange-400/10 border border-orange-300/30 text-orange-200 hover:bg-orange-400/20 hover:border-orange-300/50 backdrop-blur-sm active:scale-95 transition-all"
-                                        title="Klik untuk lihat entry yang sudah diaudit tapi harga transaksinya berubah"
+                                    className="inline-flex items-center gap-1.5 mt-2.5 sm:ml-2 px-2.5 py-1 rounded-full bg-orange-400/10 border border-orange-300/30 text-orange-200 hover:bg-orange-400/20 hover:border-orange-300/50 backdrop-blur-sm active:scale-95 transition-all"                                        title="Klik untuk lihat entry yang sudah diaudit tapi harga transaksinya berubah"
                                     >
                                         <IconAlertTriangle />
                                         <p className="text-[11px] font-semibold">{summary.stale} entry sudah diaudit tapi harga transaksinya berubah</p>
                                     </button>
                                 )}
                             </div>
-                            <div className="flex flex-col items-end gap-2 shrink-0 w-full sm:w-auto">
+                            <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0 w-full sm:w-auto">
                                 <div className="rounded-xl shadow-2xl shadow-black/40">
                                     <InlineDateRange
                                         from={customFrom}
@@ -2688,14 +2685,14 @@ export default function CashflowPage() {
                         </div>
                         {canManageAuditAccess && (
                             <button onClick={() => setShowAuditAccessModal(true)} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all shrink-0">
-                                <Shield size={14} /> Akses Audit
+                                <Shield size={14} /> <span className="hidden sm:inline">Akses Audit</span>
                             </button>
                         )}
                         {/* ⬅️ BARU — Tombol "Kelola Kategori" — hanya untuk ADMIN & ACCOUNTING.
                             Buka modal CategoryManagerModal untuk CRUD kategori custom cashflow. */}
                         {canManageCategories && (
                             <button onClick={() => setShowCategoryManager(true)} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold border border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 transition-all shrink-0" title="Kelola kategori custom cashflow (tambah/edit/arsip)">
-                                <Tags size={14} /> Kelola Kategori
+                                <Tags size={14} /> <span className="hidden sm:inline">Kelola Kategori</span>
                             </button>
                         )}
                     </div>
@@ -2714,8 +2711,7 @@ export default function CashflowPage() {
                 {showFilter && <FilterPanel filter={currentFilter} onChange={handleFilterChange} onReset={handleFilterReset} direction={tab} nameOptions={nameOptions} customCategories={customCategories} />}
 
                 {!loading && voidedCount > 0 && (
-                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 shadow-sm text-[12px] text-gray-600">
-                        <IconInfo />
+                    <div className="flex items-start gap-2.5 px-3.5 sm:px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 shadow-sm text-[12px] text-gray-600">                        <IconInfo />
                         {currentFilter.status === "ACTIVE" ? (
                             <span>
                                 <b>{voidedCount} entry dari transaksi Batal</b> disembunyikan &amp; tidak dihitung ke saldo maupun total periode
@@ -2738,8 +2734,7 @@ export default function CashflowPage() {
                 )}
 
                 {!loading && belumAuditActive && (
-                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 shadow-sm text-[12px] text-amber-700">
-                        <IconAlertTriangle />
+                    <div className="flex items-start gap-2.5 px-3.5 sm:px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 shadow-sm text-[12px] text-amber-700">                        <IconAlertTriangle />
                         <span>Menampilkan hanya entry yang <b>belum diaudit</b> di kedua tab (Masuk & Keluar).</span>
                         <button
                             onClick={() => { setFilterIn((prev) => ({ ...prev, audit: "ALL" })); setFilterOut((prev) => ({ ...prev, audit: "ALL" })); }}
@@ -2751,8 +2746,7 @@ export default function CashflowPage() {
                 )}
 
                 {!loading && staleOnly && (
-                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-orange-50 border border-orange-200 shadow-sm text-[12px] text-orange-700">
-                        <IconAlertTriangle />
+                    <div className="flex items-start gap-2.5 px-3.5 sm:px-4 py-3 rounded-xl bg-orange-50 border border-orange-200 shadow-sm text-[12px] text-orange-700">                        <IconAlertTriangle />
                         <span>Menampilkan hanya entry yang <b>sudah diaudit tapi harga transaksinya berubah</b>.</span>
                         <button onClick={() => setStaleOnly(false)} className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-orange-700 bg-orange-100 hover:bg-orange-200 transition">
                             <IconX /> Hapus Filter
@@ -2760,8 +2754,7 @@ export default function CashflowPage() {
                     </div>
                 )}
                 {tab === "IN" && (
-                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 shadow-sm text-[12px] text-blue-700">
-                        <IconInfo />
+                    <div className="flex items-start gap-2.5 px-3.5 sm:px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 shadow-sm text-[12px] text-blue-700">                        <IconInfo />
                         <span>Klik baris untuk membuka sumbernya di <b>Riwayat Transaksi</b> atau <b>Service</b>. Uang masuk otomatis sync dari transaksi PAID & service DONE sejak <b>{startDateFormatted}</b>.</span>
                     </div>
                 )}
