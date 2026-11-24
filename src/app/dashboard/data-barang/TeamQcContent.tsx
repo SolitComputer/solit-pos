@@ -380,8 +380,8 @@ function QcEditModal({
             </div>
           </div>
 
-          {/* ── Tes Kondisi (Opsional) ── */}
-          {isConditionCheckCategory(unit.laptop.laptop_name) && (
+          {/* ── Tes Kondisi (Opsional) — tampil untuk semua unit laptop di Team QC ── */}
+          {(
             <div>
               <h3 className="text-xs font-bold text-gray-700 mb-3 flex items-center gap-2">
                 <CheckCircle2 size={14} /> Tes Kondisi
