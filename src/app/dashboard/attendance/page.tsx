@@ -4700,7 +4700,7 @@ export default function AttendanceDashboardPage() {
         if (userCanViewSalary(currentUser)) {
             fetchSalarySlips(year, month);
         }
-       }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchShiftSchedules, fetchShiftConfigs, fetchWeeklySchedules, fetchSalarySlips, currentUser]);
+    }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchShiftSchedules, fetchShiftConfigs, fetchWeeklySchedules, fetchSalarySlips, currentUser]);
     // ── Derived ───────────────────────────────────────────────────────────────
     const dayOffByName = useMemo(() => { const m: Record<string, Set<number>> = {}; dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); }); return m; }, [dayOffs]);
     const dateOffByName = useMemo(() => {
@@ -7277,9 +7277,49 @@ export default function AttendanceDashboardPage() {
                                                                         {eff.fromSchedule && !eff.isCustom && (
                                                                             <span className="text-[8px] font-bold text-violet-500">dari jadwal</span>
                                                                         )}
-                                                                        {eff.fromWeekly && (
-                                                                            <span className="text-[8px] font-bold text-purple-500">dari mingguan</span>
-                                                                        )}
+                                                                        {eff.fromWeekly && (() => {
+                                                                            // Hitung variasi shift dari Jadwal Mingguan user ini
+                                                                            const userWeekly = weeklyByUser[u.userId] ?? {};
+                                                                            const days = Object.values(userWeekly);
+                                                                            const nPagi = days.filter(w => w.shift === "PAGI").length;
+                                                                            const nSore = days.filter(w => w.shift === "SORE").length;
+                                                                            const hasMixed = nPagi > 0 && nSore > 0;
+                                                                            const todayDow = new Date().getDay();
+                                                                            const dayLabels = ["M", "S", "S", "R", "K", "J", "S"];
+                                                                            const dayFull = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+
+                                                                            return (
+                                                                                <>
+                                                                                    {hasMixed ? (
+                                                                                        <span className="inline-flex items-center gap-1 text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md">
+                                                                                            Campur · Pagi {nPagi} · Sore {nSore}
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span className="text-[8px] font-bold text-purple-500">dari mingguan</span>
+                                                                                    )}
+                                                                                    {/* ✅ NEW — mini 7-hari strip preview */}
+                                                                                    <div className="flex gap-0.5 mt-0.5" title="Pola jadwal mingguan">
+                                                                                        {dayLabels.map((_, dow) => {
+                                                                                            const w = userWeekly[dow];
+                                                                                            const isToday = dow === todayDow;
+                                                                                            const bg = w?.shift === "PAGI"
+                                                                                                ? "bg-amber-400"
+                                                                                                : w?.shift === "SORE"
+                                                                                                    ? "bg-indigo-500"
+                                                                                                    : "bg-gray-200";
+                                                                                            const lateStr = w ? `${w.late_hour.toString().padStart(2, "0")}:${w.late_minute.toString().padStart(2, "0")}` : "default";
+                                                                                            return (
+                                                                                                <span
+                                                                                                    key={dow}
+                                                                                                    className={`w-2 h-2 rounded-sm ${bg} ${isToday ? "ring-1 ring-purple-600 ring-offset-1" : ""}`}
+                                                                                                    title={`${dayFull[dow]}: ${w ? (w.shift === "PAGI" ? "Pagi" : "Sore") + " " + lateStr : "default"}`}
+                                                                                                />
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                </>
+                                                                            );
+                                                                        })()}
                                                                         {eff.isCustom && (
                                                                             <span className="text-[8px] font-black text-rose-600">Custom</span>
                                                                         )}
