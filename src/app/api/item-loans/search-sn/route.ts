@@ -16,7 +16,7 @@ async function handler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
             // Nama diambil terpisah lewat lapNameById di bawah.
             supabaseAdmin
                 .from("laptop_units")
-                .select("id, serial_number, status, laptop_id")
+                .select("id, serial_number, status, laptop_id, name")
                 .ilike("serial_number", like)
                 .not("status", "in", "(SOLD,KELUAR)")
                 .limit(15),
@@ -27,7 +27,7 @@ async function handler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
             // padahal laptop muncul). Nama diambil terpisah lewat accParent di bawah.
             supabaseAdmin
                 .from("accessory_units")
-                .select("id, serial_number, status, accessory_id")
+                .select("id, serial_number, status, accessory_id, name")
                 .ilike("serial_number", like)
                 .not("status", "in", "(TERJUAL,KELUAR)")
                 .limit(15),
@@ -74,7 +74,7 @@ async function handler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
                 item_id: u.laptop_id,
                 unit_id: u.id,
                 serial_number: u.serial_number,
-                item_name: lapNameById[u.laptop_id] ?? "Laptop",
+                item_name: lapNameById[u.laptop_id] ?? u.name ?? "Laptop",
                 status: u.status,
             }))),
             ...accUnitRows.map((u: Record<string, any>) => ({
@@ -82,7 +82,7 @@ async function handler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
                 item_id: u.accessory_id,
                 unit_id: u.id,
                 serial_number: u.serial_number,
-                item_name: nameById[u.accessory_id] ?? "Aksesoris",
+                item_name: nameById[u.accessory_id] ?? u.name ?? "Aksesoris",
                 status: u.status,
             })),
             ...((accParent.data ?? [])
