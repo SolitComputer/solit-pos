@@ -1775,16 +1775,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                             <th className="px-2 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[150px]">Nominal</th>
                                             <th className="px-2 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[130px]">Status</th>
                                             <th className="px-2 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[90px]">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <span>Aksi</span>
-                                                    <button
-                                                        onClick={() => setExpandAll((v) => !v)}
-                                                        title={expandAll ? "Tutup semua detail akun" : "Buka semua detail akun"}
-                                                        className={`p-1 rounded-lg active:scale-90 transition-all duration-150 ${expandAll ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"}`}
-                                                    >
-                                                        <ChevronsUpDown className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
+                                                Aksi
                                             </th>
                                         </tr>
                                     </thead>
@@ -2654,7 +2645,20 @@ function SyncAllModal({
                         />
                         Pilih semua
                     </label>
-                    <span className="text-[11px] font-bold text-blue-600">{selectedIds.length} dipilih</span>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const allExpanded = entries.length > 0 && entries.every((e) => expanded.has(e.id));
+                                setExpanded(allExpanded ? new Set() : new Set(entries.map((e) => e.id)));
+                            }}
+                            className="text-[11px] font-semibold text-gray-500 hover:text-gray-800 inline-flex items-center gap-1 hover:bg-gray-200/60 px-2 py-1 rounded-lg active:scale-95 transition-all"
+                        >
+                            <ChevronsUpDown className="w-3.5 h-3.5" />
+                            {entries.length > 0 && entries.every((e) => expanded.has(e.id)) ? "Tutup Semua" : "Buka Semua"}
+                        </button>
+                        <span className="text-[11px] font-bold text-blue-600">{selectedIds.length} dipilih</span>
+                    </div>
                 </div>
 
                 <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
