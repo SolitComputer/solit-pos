@@ -34,8 +34,23 @@ const lastSeenLabel = (s: number | null) => {
     return `${Math.floor(s / 86400)} hari lalu`;
 };
 
+// Deteksi dark mode (html.dark) untuk styling inline yang tak terjangkau globals.css
+function useIsDark() {
+    const [isDark, setIsDark] = useState(false);
+    useEffect(() => {
+        const el = document.documentElement;
+        const update = () => setIsDark(el.classList.contains("dark"));
+        update();
+        const obs = new MutationObserver(update);
+        obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+        return () => obs.disconnect();
+    }, []);
+    return isDark;
+}
+
 export default function ChatBarBackground() {
     const chatCtx = useChatContext();
+    const isDark = useIsDark();
     const { setOpenGroupChat, openGroupChat, activeChats, setExpandedChatId } = chatCtx;
 
     // Angka unread total (DM + grup) untuk bubble di FAB, + rincian per user
@@ -256,7 +271,7 @@ export default function ChatBarBackground() {
             {showMenu && !dragging && (
                 <div className="absolute bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
                     style={{
-                        width: 240, maxHeight: 420, border: "1px solid #e5e7eb",
+                        width: 240, maxHeight: 420, border: isDark ? "1px solid #24314a" : "1px solid #e5e7eb",
                         animation: "floatMenuIn 0.15s ease-out",
                         ...(openUp ? { bottom: "calc(100% + 8px)" } : { top: "calc(100% + 8px)" }),
                         ...(alignRight ? { right: 0 } : { left: 0 }),
@@ -276,9 +291,9 @@ export default function ChatBarBackground() {
                     {/* Grup Chat */}
                     <button onClick={() => { setOpenGroupChat(!openGroupChat); setShowMenu(false); }}
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition hover:bg-gray-50 flex-shrink-0 border-b border-gray-100"
-                        style={{ color: openGroupChat ? "#4f46e5" : "#374151" }}>
+                        style={{ color: openGroupChat ? (isDark ? "#818cf8" : "#4f46e5") : (isDark ? "#cbd5e1" : "#374151") }}>
                         <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{ background: openGroupChat ? "#eef2ff" : "#f3f4f6" }}>
+                            style={{ background: openGroupChat ? (isDark ? "#14233d" : "#eef2ff") : (isDark ? "#1e2a40" : "#f3f4f6") }}>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                     d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
@@ -296,7 +311,7 @@ export default function ChatBarBackground() {
                             </svg>
                             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari anggota..."
                                 className="w-full h-8 rounded-lg pl-8 pr-2 text-[11px] outline-none focus:ring-2 focus:ring-indigo-200"
-                                style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", color: "#334155" }} />
+                                style={{ background: isDark ? "#131d2e" : "#f1f5f9", border: isDark ? "1px solid #22324a" : "1px solid #e2e8f0", color: isDark ? "#f1f5f9" : "#334155" }} />
                         </div>
                     </div>
 

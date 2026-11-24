@@ -3261,3 +3261,5 @@ html.dark .mission-badge {
 html.dark .hover\:bg-gray-50\/70:hover { background-color: rgba(255,255,255,.05) !important; }
 html.dark .ring-gray-100 { --tw-ring-color: #1e293b; }
 html.dark .ring-gray-900\/5 { --tw-ring-color: rgba(255,255,255,.06); }
+/* ChatBarBackground: hover baris anggota jadi gelap (bukan indigo-50 putih) */
+html.dark .hover\:bg-indigo-50:hover { background-color: rgba(99,102,241,0.12) !important; }
