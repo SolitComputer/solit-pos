@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabase, supabaseAdmin } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
@@ -33,21 +33,67 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         : null;
 
     // Ambil nama laptop untuk entityLabel di activity log
-    const { data: laptop, error: laptopErr } = await supabase
+    // ✅ FIX: pakai supabaseAdmin (bypass RLS)
+    const { data: laptop } = await supabaseAdmin
       .from("laptops")
       .select("id, laptop_name")
       .eq("id", id)
       .single();
 
-    if (laptopErr || !laptop) {
-      return NextResponse.json(
-        { success: false, message: laptopErr?.message || "Laptop tidak ditemukan" },
-        { status: 404 }
-      );
+    // ── SN Lepas: kalau laptop tidak ketemu, cari sebagai unit langsung ───
+    if (!laptop) {
+      const { data: snLepasUnit, error: snLepasErr } = await supabaseAdmin
+        .from("laptop_units")
+        .select("id, status, laptop_id, serial_number")
+        .eq("id", id)
+        .is("laptop_id", null)
+        .single();
+
+      if (snLepasErr || !snLepasUnit) {
+        return NextResponse.json(
+          { success: false, message: "Laptop atau SN Lepas tidak ditemukan" },
+          { status: 404 }
+        );
+      }
+
+      if (BLOCKED_STATUSES.has(snLepasUnit.status)) {
+        return NextResponse.json({
+          success: false,
+          message: "Unit sedang dalam transaksi. Batalkan transaksi dulu sebelum kirim ke QC.",
+        }, { status: 400 });
+      }
+
+      if (OUT_STATUSES.has(snLepasUnit.status)) {
+        return NextResponse.json({
+          success: false,
+          message: "Unit sudah keluar dari gudang, tidak bisa dikirim ke QC.",
+        }, { status: 400 });
+      }
+
+      const { error: updateErr } = await supabaseAdmin
+        .from("laptop_units")
+        .update({ status: "BELUM_SIAP", qc_status: "NEEDS_QC" })
+        .eq("id", id);
+
+      if (updateErr) {
+        return NextResponse.json({ success: false, message: updateErr.message }, { status: 400 });
+      }
+
+      await logActivity({
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: "PERLU_QC" as any,
+        entity: "laptop",
+        entityId: id,
+        entityLabel: `SN Lepas: ${snLepasUnit.serial_number}`,
+      });
+
+      return NextResponse.json({ success: true, data: { count: 1 } });
     }
 
     // Ambil semua unit milik laptop ini
-    const { data: units, error: unitsErr } = await supabase
+    const { data: units, error: unitsErr } = await supabaseAdmin
       .from("laptop_units")
       .select("id, status")
       .eq("laptop_id", id);
@@ -110,7 +156,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     //    sudah menandakan unit kembali di antrian QC (bukan di minus flow)
     //  - analisa dibiarkan sebagai referensi Team QC — kalau dulu pernah
     //    ditandai MINUS, konteks alasannya masih ada sebagai info
-    const { error: updateErr } = await supabase
+    const { error: updateErr } = await supabaseAdmin
       .from("laptop_units")
       .update({
         status: "BELUM_SIAP",

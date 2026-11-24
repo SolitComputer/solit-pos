@@ -381,15 +381,16 @@ function normalizeSnLepas(u: any, tipe: ItemType): UnifiedRow {
         is_pedagang_listed: false,
         branch: (u.branch === "UTAMA" || u.branch === "JOGJA") ? u.branch : null,
         is_sn_lepas: true, // ⬅️ Flag penting: tag ini sebagai SN Lepas
-        raw: { id: u.id, laptop_name: u.name ?? null, category_id: null, category_name: u.category ?? null,
-               brand: u.brand ?? "", cpu: u.cpu ?? "", ram: u.ram ?? "", storage: u.storage ?? "",
-               gpu: u.gpu ?? "", display: u.display ?? "", condition_note: u.condition_note ?? "",
-               selling_price: u.selling_price ?? 0, notes: u.notes ?? "", created_at: u.created_at,
-               laptop_units: [],
-               // ⬅️ Step 3: tambahan field raw unit yg dipakai handleRowClick buat buka UnitDetailModal
-               _status: u.status, _purchase_price: u.purchase_price, _sparepart_cost: u.sparepart_cost,
-               _notes: u.notes, _condition_note: u.condition_note, _grade: u.grade, _condition: u.condition,
-               } as any, // cast any krn ada field tambahan non-LaptopRaw
+        raw: {
+            id: u.id, laptop_name: u.name ?? null, category_id: null, category_name: u.category ?? null,
+            brand: u.brand ?? "", cpu: u.cpu ?? "", ram: u.ram ?? "", storage: u.storage ?? "",
+            gpu: u.gpu ?? "", display: u.display ?? "", condition_note: u.condition_note ?? "",
+            selling_price: u.selling_price ?? 0, notes: u.notes ?? "", created_at: u.created_at,
+            laptop_units: [],
+            // ⬅️ Step 3: tambahan field raw unit yg dipakai handleRowClick buat buka UnitDetailModal
+            _status: u.status, _purchase_price: u.purchase_price, _sparepart_cost: u.sparepart_cost,
+            _notes: u.notes, _condition_note: u.condition_note, _grade: u.grade, _condition: u.condition,
+        } as any, // cast any krn ada field tambahan non-LaptopRaw
     };
 }
 
@@ -1290,22 +1291,22 @@ export default function UnifiedBarangContent() {
         });
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
 
-if (kategoriFilter.length > 0) {
-    const selectedIds = new Set(kategoriFilter);
-    const selectedNames = new Set(
-        kategoriFilter.map(id => (categories.find(c => c.id === id)?.name || "").toUpperCase())
-    );
-    list = list.filter(r => {
-        if (r.tipe === "LAPTOP") {
-            // Prioritas: cocokkan via FK category_id.
-            // Fallback: laptop lama yang category_id-nya NULL tapi punya
-            // text field `kategori` (category_name) → cocokkan via nama.
-            if (r.kategori_id != null) return selectedIds.has(r.kategori_id);
-            return selectedNames.has((r.kategori || "").toUpperCase());
+        if (kategoriFilter.length > 0) {
+            const selectedIds = new Set(kategoriFilter);
+            const selectedNames = new Set(
+                kategoriFilter.map(id => (categories.find(c => c.id === id)?.name || "").toUpperCase())
+            );
+            list = list.filter(r => {
+                if (r.tipe === "LAPTOP") {
+                    // Prioritas: cocokkan via FK category_id.
+                    // Fallback: laptop lama yang category_id-nya NULL tapi punya
+                    // text field `kategori` (category_name) → cocokkan via nama.
+                    if (r.kategori_id != null) return selectedIds.has(r.kategori_id);
+                    return selectedNames.has((r.kategori || "").toUpperCase());
+                }
+                return selectedNames.has((r.kategori || "").toUpperCase());
+            });
         }
-        return selectedNames.has((r.kategori || "").toUpperCase());
-    });
-}
 
 
         if (brandFilter) {
@@ -2221,7 +2222,7 @@ if (kategoriFilter.length > 0) {
                             <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
                                 <button
                                     onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition border ${showAdvancedFilter || activeFilterCount > (tipeFilter !== "ALL" || kategoriFilter.length > 0 || brandFilter || search ? 1 : 0)
+                                    className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition border ${showAdvancedFilter || activeFilterCount > (tipeFilter !== "ALL" || kategoriFilter.length > 0 || brandFilter || search ? 1 : 0)
                                         ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
                                         : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
                                         }`}
@@ -2323,7 +2324,7 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                         )}
 
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100/80 text-xs text-zinc-500">
-    <div className="flex flex-wrap items-center gap-1.5 max-w-full overflow-hidden">
+                            <div className="flex flex-wrap items-center gap-1.5 max-w-full overflow-hidden">
                                 <span className="text-[11px] font-medium text-zinc-400">Total:</span>
                                 <span className="font-bold text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded-lg text-[11px]">
                                     {filteredRows.length} dari {rows.length} barang
@@ -2610,7 +2611,7 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                                                                 hanya lewat Team QC. AKSESORIS: Edit tetap flow lama. */}
                                                             {/* Stok > 1: tombol disembunyikan, user masuk Kelola Unit dan
                                                                 pilih unit via checklist — bulk action "Perlu di QC X Unit". */}
-                                                            {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count === 1 && (
+                                                          {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count === 1 && (
                                                                 <button onClick={() => setPerluQcTarget(row)}
                                                                     title="Kirim unit ini ke antrian Team QC"
                                                                     className={`${cardActionCls} text-indigo-700 bg-indigo-50 hover:bg-indigo-100`}>
@@ -2623,7 +2624,7 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                                                                     Edit
                                                                 </button>
                                                             )}
-                                                            {canDeleteThis && (
+                                                            {canDeleteThis && !row.is_sn_lepas && (
                                                                 <button onClick={() => setDeleteRow(row)}
                                                                     className={`${cardActionCls} text-red-500 bg-red-50 hover:bg-red-100`}>
                                                                     Hapus
@@ -2839,7 +2840,7 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                                                                             hanya lewat Team QC. AKSESORIS: Edit tetap flow lama. */}
                                                                         {/* Stok > 1: tombol disembunyikan, user masuk Kelola Unit dan
                                                                             pilih unit via checklist — bulk action "Perlu di QC X Unit". */}
-                                                                        {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count === 1 && (
+                                                                      {row.tipe === "LAPTOP" && canFullAccessBarang && row.unit_count === 1 && (
                                                                             <button onClick={() => setPerluQcTarget(row)}
                                                                                 title="Kirim unit ini ke antrian Team QC"
                                                                                 className="h-7 px-2 text-[11px] font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">Perlu di QC</button>
@@ -2847,7 +2848,7 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                                                                         {row.tipe === "AKSESORIS" && canEditAcc && (
                                                                             <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
                                                                         )}
-                                                                        {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
+                                                                        {((row.tipe === "LAPTOP" && canDeleteLaptop && !row.is_sn_lepas) || (row.tipe === "AKSESORIS" && canDeleteAcc && !row.is_sn_lepas)) && (
                                                                             <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
                                                                         )}
                                                                     </div>
@@ -3158,7 +3159,7 @@ className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center j
                         fetchAll();
                         const defaultMsg = unit
                             ? `Unit SN "${unit.serial_number}" ditambahkan` +
-                              (was_existing_parent ? " (masuk folder existing)" : " (folder baru dibuat)")
+                            (was_existing_parent ? " (masuk folder existing)" : " (folder baru dibuat)")
                             : bulk
                                 ? `${bulk.inserted} unit ${tipe === "LAPTOP" ? "laptop" : "aksesoris"} ditambahkan`
                                 : "Berhasil ditambahkan";

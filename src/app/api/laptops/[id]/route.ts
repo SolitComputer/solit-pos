@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabase, supabaseAdmin } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { LAPTOP_DELETE_ROLES, LAPTOP_VIEW_ROLES, BARANG_PRIVATE_VIEW_ROLES, expandRolesWithParents, hasAnyRole, canEditConditionChecks } from "@/lib/permissions";
@@ -186,14 +186,22 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const { id } = await props.params;
 
-    const { data: laptop } = await supabase
+    // ✅ FIX: pakai supabaseAdmin (bypass RLS) + cek error dari .single()
+    const { data: laptop, error: laptopError } = await supabaseAdmin
       .from("laptops")
       .select("*")
       .eq("id", id)
       .single();
 
+    if (laptopError || !laptop) {
+      return NextResponse.json(
+        { success: false, message: "Laptop tidak ditemukan — mungkin sudah dihapus atau ID tidak valid" },
+        { status: 404 }
+      );
+    }
+
     // Ambil semua unit_id milik laptop ini
-    const { data: unitRows } = await supabase
+    const { data: unitRows } = await supabaseAdmin
       .from("laptop_units")
       .select("id")
       .eq("laptop_id", id);
@@ -201,7 +209,7 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
     const unitIds = (unitRows ?? []).map((u: { id: string }) => u.id);
 
     if (unitIds.length > 0) {
-      const { data: blockedUnits } = await supabase
+      const { data: blockedUnits } = await supabaseAdmin
         .from("laptop_units")
         .select("id, serial_number, status")
         .in("id", unitIds)
@@ -222,7 +230,7 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
     // FK ON DELETE SET NULL hanya handle transactions.unit_id (single).
     // unit_ids array harus dibersihkan manual.
     if (unitIds.length > 0) {
-      const { data: txWithArray } = await supabase
+      const { data: txWithArray } = await supabaseAdmin
         .from("transactions")
         .select("invoice_number, unit_ids")
         .overlaps("unit_ids", unitIds);
@@ -230,7 +238,7 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
       if (txWithArray && txWithArray.length > 0) {
         await Promise.allSettled(
           txWithArray.map((tx) =>
-            supabase
+            supabaseAdmin
               .from("transactions")
               .update({
                 unit_ids: (tx.unit_ids as string[]).filter(
@@ -244,7 +252,7 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     // Hapus semua units (transactions.unit_id auto SET NULL via FK)
-    const { error: unitsError } = await supabase
+    const { error: unitsError } = await supabaseAdmin
       .from("laptop_units")
       .delete()
       .eq("laptop_id", id);
@@ -256,14 +264,20 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    await supabase.from("warranties").delete().eq("laptop_id", id);
+    await supabaseAdmin.from("warranties").delete().eq("laptop_id", id);
 
-    const { error } = await supabase.from("laptops").delete().eq("id", id);
+    // ✅ FIX: .select().single() verifikasi 1 row benar-benar terhapus
+    const { data: deletedLaptop, error } = await supabaseAdmin
+      .from("laptops")
+      .delete()
+      .eq("id", id)
+      .select()
+      .single();
 
-    if (error) {
+    if (error || !deletedLaptop) {
       return NextResponse.json(
-        { success: false, message: error.message },
-        { status: 400 }
+        { success: false, message: error?.message || "Gagal menghapus — laptop tidak ditemukan" },
+        { status: error ? 400 : 404 }
       );
     }
 
