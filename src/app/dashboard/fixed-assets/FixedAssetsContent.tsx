@@ -631,7 +631,7 @@ export default function FixedAssetsContent() {
 
   return (
     <>
-      <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-28 sm:pb-10 max-w-6xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-10 max-w-6xl mx-auto">
         {/* ── Header ─────────────────────────────────────────────────────────── */}
         <header className="flex items-center justify-between gap-4 mb-5">
           <div className="min-w-0">
@@ -642,10 +642,11 @@ export default function FixedAssetsContent() {
           </div>
           <button
             onClick={openCreateModal}
-            className="hidden sm:inline-flex items-center gap-2 rounded-full bg-[#1a1a2e] text-white text-sm font-semibold pl-4 pr-5 py-2.5 hover:bg-[#2d2d4a] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1a1a2e]/20 transition-all shadow-lg shadow-[#1a1a2e]/25 flex-shrink-0"
+            className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-[#1a1a2e] text-white text-xs sm:text-sm font-semibold pl-3 pr-4 sm:pl-4 sm:pr-5 py-2 sm:py-2.5 hover:bg-[#2d2d4a] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1a1a2e]/20 transition-all shadow-lg shadow-[#1a1a2e]/25 flex-shrink-0"
           >
             <PlusIcon className="text-amber-300" />
-            Tambah Aset
+            <span className="hidden sm:inline">Tambah Aset</span>
+            <span className="sm:hidden">Tambah</span>
           </button>
         </header>
 
@@ -876,17 +877,6 @@ export default function FixedAssetsContent() {
           </ul>
         )}
 
-        {/* ── FAB Tambah Aset (khusus HP) ───────────────────────────────────── */}
-        {!modalOpen && (
-          <button
-            onClick={openCreateModal}
-            aria-label="Tambah Aset"
-            className="sm:hidden fixed right-4 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-40 inline-flex items-center gap-2 pl-4 pr-5 h-12 rounded-full bg-[#1a1a2e] text-white text-sm font-bold shadow-xl shadow-[#1a1a2e]/30 active:scale-95 transition"
-          >
-            <PlusIcon className="text-amber-300" />
-            Tambah Aset
-          </button>
-        )}
 
         {/* ── Add/Edit modal ─────────────────────────────────────────────────── */}
         {modalOpen && (
