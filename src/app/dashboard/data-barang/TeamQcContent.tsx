@@ -10,6 +10,8 @@ import {
 import MinusReasonModal from "@/components/inventory/MinusReasonModal";
 import AutocompleteInput from "@/components/ui/AutocompleteInput";
 import SuggestFolderModal from "@/components/inventory/SuggestFolderModal";
+import ConditionChecklist from "@/components/inventory/ConditionChecklist";
+import { ConditionChecks, sanitizeConditionChecks, isConditionCheckCategory } from "@/lib/conditionChecks";
 
 interface QcUnit {
   id: string;
@@ -24,7 +26,8 @@ interface QcUnit {
   official_price: number | null;
   qc_status: string;
   status: string;
-  branch: string | null; // ⬅️ BARU: Cabang (UTAMA / JOGJA / NULL)
+  branch: string | null;
+  condition_checks?: ConditionChecks | null; // Tes Kondisi (opsional)
   created_at: string;
   missing_fields: string[];
   is_sn_lepas: boolean; // ⬅️ Step 4: convenience flag dari backend
@@ -140,6 +143,9 @@ function QcEditModal({
     // ⬅️ BARU: pre-fill dari unit; "" supaya user wajib pilih kalau belum ada.
     branch: (unit.branch === "UTAMA" || unit.branch === "JOGJA") ? unit.branch : "",
   });
+  const [conditionChecks, setConditionChecks] = useState<ConditionChecks>(
+    () => sanitizeConditionChecks(unit.condition_checks)
+  );
   const [saving, setSaving] = useState(false);
   const [markingMinus, setMarkingMinus] = useState(false);
   // State untuk buka MinusReasonModal (ganti window.prompt yang jelek UX-nya)
@@ -194,6 +200,7 @@ function QcEditModal({
         laptop_name: form.laptop_name.trim() || null,
         // ⬅️ BARU: Cabang (sudah divalidasi WAJIB di atas, pasti UTAMA/JOGJA).
         branch: form.branch,
+        condition_checks: conditionChecks,
       };
 
       const res = await fetch("/api/laptops/qc", {
@@ -372,6 +379,17 @@ function QcEditModal({
               </div>
             </div>
           </div>
+
+          {/* ── Tes Kondisi (Opsional) ── */}
+          {isConditionCheckCategory(unit.laptop.laptop_name) && (
+            <div>
+              <h3 className="text-xs font-bold text-gray-700 mb-3 flex items-center gap-2">
+                <CheckCircle2 size={14} /> Tes Kondisi
+                <span className="text-gray-400 text-[10px] font-normal ml-1">(opsional — tidak wajib untuk lolos QC)</span>
+              </h3>
+              <ConditionChecklist value={conditionChecks} onChange={setConditionChecks} />
+            </div>
+          )}
         </form>
 
         {/* Footer */}

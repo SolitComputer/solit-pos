@@ -671,18 +671,7 @@ export default function UnitDetailModal({
                                                         {/*  Tambah unit baru TETAP DI DALAM pop-up ini (bukan navigasi ke
                                 halaman Units) — supaya saat stok = 1, popup ini jadi satu-satunya
                                 tempat yang dibutuhkan untuk lihat, edit, maupun tambah unit. */}
-                            {canManage && (
-                                <button onClick={() => setIsAdding(true)}
-                                    className="h-11 px-4 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition flex items-center justify-center whitespace-nowrap">
-                                    + Tambah Unit
-                                </button>
-                            )}
-                            {canManage && (
-                                <button onClick={() => setIsEditing(true)}
-                                    className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition shadow-lg shadow-gray-800/20">
-                                    Edit Data
-                                </button>
-                            )}
+
                         </>
                     )}
                 </div>

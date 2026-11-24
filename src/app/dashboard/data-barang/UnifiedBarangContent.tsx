@@ -790,29 +790,20 @@ function ConditionChecksModal({
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col animate-popIn">
                 <div className="h-1 w-full bg-gradient-to-r from-sky-400 via-sky-600 to-sky-800 flex-shrink-0" />
                 <div className="px-5 py-4 bg-sky-600 flex-shrink-0">
-                    <p className="font-bold text-white text-sm">Tes Kondisi</p>
+                    <p className="font-bold text-white text-sm">Riwayat Tes Kondisi</p>
                     <p className="text-xs text-white/70 mt-0.5 truncate">{row.nama}</p>
                 </div>
                 <div className="overflow-y-auto flex-1 px-5 py-4">
-                    <ConditionChecklist value={value} onChange={onChange} readOnly={!canEdit} />
-                    {!canEdit && (
-                        <p className="text-[11px] text-zinc-400 mt-3 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2">
-                            Kamu hanya bisa melihat tes kondisi. Perubahan hanya untuk role yang berhak.
-                        </p>
-                    )}
+                    <ConditionChecklist value={value} onChange={() => {}} readOnly />
+                    <p className="text-[11px] text-zinc-400 mt-3 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2">
+                        Tes kondisi sekarang diisi di Team QC. Ini hanya menampilkan hasil terakhir.
+                    </p>
                 </div>
                 <div className="flex gap-3 px-5 py-4 border-t border-zinc-100 flex-shrink-0">
-                    <button onClick={onClose} disabled={loading}
-                        className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition disabled:opacity-50">
-                        {canEdit ? "Batal" : "Tutup"}
+                    <button onClick={onClose}
+                        className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition">
+                        Tutup
                     </button>
-                    {canEdit && (
-                        <button onClick={onConfirm} disabled={loading}
-                            className="flex-1 h-10 bg-sky-600 text-white rounded-xl text-sm font-semibold hover:bg-sky-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
-                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                            Simpan
-                        </button>
-                    )}
                 </div>
             </div>
         </div>
@@ -2601,11 +2592,11 @@ export default function UnifiedBarangContent() {
                                                                 </button>
                                                             )}
                                                             {canShowConditionChecks(row) && (
-                                                                <button onClick={() => openConditionChecks(row)}
-                                                                    title="Edit tes kondisi tanpa buka form Edit penuh"
-                                                                    className={`${cardActionCls} text-sky-700 bg-sky-50 hover:bg-sky-100`}>
-                                                                    Tes Kondisi
-                                                                </button>
+                                                            <button onClick={() => openConditionChecks(row)}
+                                                                title="Lihat riwayat tes kondisi terakhir"
+                                                                className={`${cardActionCls} text-sky-700 bg-sky-50 hover:bg-sky-100`}>
+                                                                Riwayat Tes Kondisi
+                                                            </button>
                                                             )}
                                                             {/* LAPTOP: tombol Edit lama diganti "Perlu di QC" — edit spek
                                                                 hanya lewat Team QC. AKSESORIS: Edit tetap flow lama. */}
@@ -2832,9 +2823,9 @@ export default function UnifiedBarangContent() {
                                                                             </button>
                                                                         )}
                                                                         {canShowConditionChecks(row) && (
-                                                                            <button onClick={() => openConditionChecks(row)}
-                                                                                title="Edit tes kondisi tanpa buka form Edit penuh"
-                                                                                className="h-7 px-2 text-[11px] font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition">Tes Kondisi</button>
+                                                                        <button onClick={() => openConditionChecks(row)}
+                                                                            title="Lihat riwayat tes kondisi terakhir"
+                                                                            className="h-7 px-2 text-[11px] font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition">Riwayat Tes Kondisi</button>
                                                                         )}
                                                                         {/* LAPTOP: tombol Edit lama diganti "Perlu di QC" — edit spek
                                                                             hanya lewat Team QC. AKSESORIS: Edit tetap flow lama. */}
