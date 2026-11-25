@@ -12,7 +12,6 @@ interface Partner {
   email: string;
   full_address: string;
   follow_proof_url: string | null;
-  referrer: { id: string; name: string } | null;
   approver: { id: string; name: string } | null;
   rejector: { id: string; name: string } | null;
   rejection_reason: string | null;
@@ -212,7 +211,6 @@ export default function MitraResellerClient() {
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Tipe</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">No HP</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Email</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Referral</th>
                 <th className="text-center px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Bukti Follow</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Tanggal</th>
@@ -250,9 +248,6 @@ export default function MitraResellerClient() {
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell text-slate-600">{p.phone}</td>
                     <td className="px-4 py-3 hidden lg:table-cell text-slate-600">{p.email}</td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs">
-                      {p.referrer?.name ?? "—"}
-                    </td>
                     <td className="px-4 py-3 hidden md:table-cell text-center">
                       {p.follow_proof_url ? (
                         <button
