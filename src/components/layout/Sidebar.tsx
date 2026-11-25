@@ -12,6 +12,7 @@ import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
 import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES, CONTRACT_EXPIRING_VIEW_ROLES, TRANSACTION_VIEW_EXTRA_USER_IDS, PARTNER_VIEW_ROLES } from "@/lib/permissions";
+import { usePartnerPendingBadge } from "@/hooks/usePartnerPendingBadge";
 import { KOTAK_SURAT_ADMIN_ROLES, canSubmitKotakSurat } from "@/lib/kotakSurat";
 import { hasSopAccess } from "@/lib/sop";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
@@ -2114,6 +2115,7 @@ export default function Sidebar() {
   // Badge senyap (tanpa bunyi): jumlah karyawan yang kontraknya akan habis dalam H-7
   const expiringContracts = useExpiringContractsBadge(userRoles, user?.id);
   const leadsChat = useLeadsChatNotify(effectiveRoles, user?.id);
+  const partnerPending = usePartnerPendingBadge(userRoles, user?.id);
   const { sound_key: notifSoundKey, custom_sound_url: notifCustomUrl } = useNotificationSettings(user?.id ?? null);
 
   useEffect(() => {
@@ -2150,10 +2152,12 @@ export default function Sidebar() {
     "/dashboard/ai-ceo": aiCeoEscalationCount,
     "/dashboard/leads-chat": leadsChat.unreadCount,
     "/dashboard/contract-expiring": expiringContracts.count,
+    "/dashboard/mitra-reseller": partnerPending.count,
   }), [deliveryBadge, prep.menungguUnacked.length, prep.siapKirimUnacked.length,
     onOvertimePage, overtimeNotify.count, onKendaraanPage, vehiclePending.count,
     onPengajuanDanaPage, pengajuanDanaBadge.count, onTanyaCeoPage, reminderUnread,
-    aiCeoEscalationCount, leadsChat.unreadCount, expiringContracts.count]);
+    aiCeoEscalationCount, leadsChat.unreadCount, expiringContracts.count,
+    partnerPending.count]);
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
    const displayGroups = useMemo<MenuGroup[]>(() => groups.map((g) => ({
     ...g,

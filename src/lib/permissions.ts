@@ -837,6 +837,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ── Mitra & Reseller ──────────────────────────────────────────────────────
   "/dashboard/mitra-reseller": [...PARTNER_VIEW_ROLES],
   "/api/partners": [...PARTNER_VIEW_ROLES],
+  "/api/partners/pending-count": [...PARTNER_VIEW_ROLES],
 
   // ── Preparation routes ─────────────────────────────────────────────────────
   "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
