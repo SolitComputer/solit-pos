@@ -36,6 +36,8 @@ const PUBLIC_API_ROUTES = [
   "/api/webhooks/whatsapp",
   "/api/webhooks/facebook", // ✅ FIX: biar Meta bisa hit webhook tanpa cookie login
   "/api/webhooks/instagram", // ✅ IG DM webhook — sama alasannya dgn FB di atas
+  "/api/partners/register", // ✅ Form pendaftaran Mitra & Reseller (public, dari solit03.com)
+  "/api/partners/upload-proof", // ✅ Upload bukti follow sosmed (public, dari solit03.com)
 ];
 const CRON_ROUTES = [
   "/api/cc-reports/sync",
@@ -762,5 +764,7 @@ export const config = {
     "/api/kotak-surat/:path*",
     "/api/cashflow-pribadi/:path*",
     "/dashboard/cashflow-pribadi/:path*",
+    "/api/partners/:path*",
+    "/dashboard/mitra-reseller/:path*",
   ],
 };

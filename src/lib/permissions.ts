@@ -164,6 +164,15 @@ export const SELLER_FOLLOWUP_MANAGE_ROLES: UserRole[] = [...FULL_ACCESS];
 /** Hapus permanen data follow-up — HANYA Admin & Kepala Marketing (lebih ketat dari MANAGE) */
 export const SELLER_FOLLOWUP_DELETE_ROLES: UserRole[] = ["ADMIN", "KEPALA_MARKETING"];
 
+// ─── Mitra & Reseller ────────────────────────────────────────────────────────
+/** Boleh membuka halaman Mitra & Reseller */
+export const PARTNER_VIEW_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES", "CREW_SALES",
+];
+
+/** Approve/Reject pendaftaran mitra & reseller */
+export const PARTNER_MANAGE_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING"];
+
 /** Hanya Admin & Programmer yang boleh ubah checklist akses PIC */
 export const SELLER_PIC_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
@@ -825,6 +834,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/seller-followups": [...SELLER_FOLLOWUP_VIEW_ROLES],
   "/api/seller-pics": [...SELLER_FOLLOWUP_VIEW_ROLES],
 
+  // ── Mitra & Reseller ──────────────────────────────────────────────────────
+  "/dashboard/mitra-reseller": [...PARTNER_VIEW_ROLES],
+  "/api/partners": [...PARTNER_VIEW_ROLES],
+
   // ── Preparation routes ─────────────────────────────────────────────────────
   "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
   "/dashboard/preparation/antrian": [...PREPARATION_ANTRIAN_VIEW_ROLES],
@@ -1073,6 +1086,10 @@ export const PERMISSIONS = {
   FOLLOWUP_SELLER: [...SELLER_FOLLOWUP_ACTOR_ROLES] as UserRole[],
   VIEW_SELLER_PIC: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
   MANAGE_SELLER_PIC: [...SELLER_PIC_MANAGE_ROLES] as UserRole[],
+
+  // ── Mitra & Reseller ──────────────────────────────────────────────────────
+  VIEW_PARTNERS: [...PARTNER_VIEW_ROLES] as UserRole[],
+  MANAGE_PARTNERS: [...PARTNER_MANAGE_ROLES] as UserRole[],
 
   // ── Preparation permissions ─────────────────────────────────────────────────
   VIEW_PREPARATION: [...PREPARATION_VIEW_ROLES] as UserRole[],

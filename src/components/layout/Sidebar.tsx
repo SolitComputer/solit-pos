@@ -11,7 +11,7 @@ import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES, CONTRACT_EXPIRING_VIEW_ROLES, TRANSACTION_VIEW_EXTRA_USER_IDS } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES, LAPTOP_MINUS_SIAP_JUAL_VIEW_ROLES, CONTRACT_EXPIRING_VIEW_ROLES, TRANSACTION_VIEW_EXTRA_USER_IDS, PARTNER_VIEW_ROLES } from "@/lib/permissions";
 import { KOTAK_SURAT_ADMIN_ROLES, canSubmitKotakSurat } from "@/lib/kotakSurat";
 import { hasSopAccess } from "@/lib/sop";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
@@ -238,6 +238,7 @@ const ITEM_PKL_REPORT: MenuItem = { name: "Laporan Kerja PKL", href: "/dashboard
 const ITEM_ACCESSORIES: MenuItem = { name: "Data Aksesori", href: "/dashboard/accessories", icon: Icons.accessories };
 const ITEM_ALL_UNITS: MenuItem = { name: "Barang Terjual", href: "/dashboard/units", icon: Icons.allUnits };
 const ITEM_MANAGEMENT_SELLER: MenuItem = { name: "Management Seller", href: "/dashboard/management-seller", icon: Icons.managementSeller };
+const ITEM_MITRA_RESELLER: MenuItem = { name: "Mitra & Reseller", href: "/dashboard/mitra-reseller", icon: Icons.managementSeller };
 const ITEM_MISSIONS: MenuItem = { name: "Misi Pekerjaan", href: "/dashboard/missions", icon: Icons.missions };
 const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow };
 const ITEM_CASHFLOW_PRIBADI: MenuItem = { name: "Cashflow Pribadi", href: "/dashboard/cashflow-pribadi", icon: Icons.cashflowPribadi };
@@ -1268,6 +1269,36 @@ function withPeminjamanBarang(groups: MenuGroup[]): MenuGroup[] {
   return next;
 }
 
+// Mitra & Reseller: inject ke grup "Transaksi" untuk role yang ada di PARTNER_VIEW_ROLES.
+// Import constant-nya sudah dari permissions.ts (harus ditambahkan di baris import).
+function withMitraReseller(groups: MenuGroup[], userEffectiveRoles: string[]): MenuGroup[] {
+  // Cek apakah user punya akses (import PARTNER_VIEW_ROLES dari permissions.ts)
+  if (!userEffectiveRoles.some((r) => (PARTNER_VIEW_ROLES as string[]).includes(r))) return groups;
+  const HREF = ITEM_MITRA_RESELLER.href;
+  let injected = false;
+  const next = groups.map((g) => {
+    if (g.label !== "Transaksi") return g;
+    injected = true;
+    if (g.items.some((it) => it.href === HREF)) return g;
+    // Taruh setelah Management Seller kalau ada, kalau gak ada taruh di akhir
+    const sellerIdx = g.items.findIndex((it) => it.href === ITEM_MANAGEMENT_SELLER.href);
+    const items = [...g.items];
+    if (sellerIdx >= 0) {
+      items.splice(sellerIdx + 1, 0, ITEM_MITRA_RESELLER);
+    } else {
+      items.push(ITEM_MITRA_RESELLER);
+    }
+    return { ...g, items };
+  });
+  if (!injected) {
+    // Kalau role ini belum punya grup "Transaksi", bikin baru
+    const utamaIdx = next.findIndex((g) => g.label === "Utama");
+    const at = utamaIdx >= 0 ? utamaIdx + 1 : next.length;
+    return [...next.slice(0, at), { label: "Transaksi", items: [ITEM_MITRA_RESELLER] }, ...next.slice(at)];
+  }
+  return next;
+}
+
 // SOP Pekerjaan: grup sidebar berisi "SOP Divisi".
 // Ditambahkan kondisional — hanya muncul kalau user punya mapping divisi
 // SOP atau merupakan admin (lihat hasSopAccess di lib/sop.ts).
@@ -1990,7 +2021,7 @@ export default function Sidebar() {
       .map((g) => ({ ...g, items: g.items.filter((it) => it.href !== ITEM_PKL_REPORT.href) }))
       .filter((g) => g.items.length > 0);
 
-       const groups = useMemo<MenuGroup[]>(() => stripPklReports(withPelanggaranInAbsensi(withContractInAbsensi(withPeminjamanBarang(withSopGroup(withKotakSuratGroup(withCashflowPribadiGroup(withKendaraanGroup(
+              const groups = useMemo<MenuGroup[]>(() => stripPklReports(withPelanggaranInAbsensi(withContractInAbsensi(withMitraReseller(withPeminjamanBarang(withSopGroup(withKotakSuratGroup(withCashflowPribadiGroup(withKendaraanGroup(
     dedupeGroups([
       ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
       ...staticGroups,
@@ -2002,7 +2033,7 @@ export default function Sidebar() {
         items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
       })),
     ])
-   )), effectiveRoles), effectiveRoles)), {
+     )), effectiveRoles), effectiveRoles)), effectiveRoles), {
     showPerjanjian: !!(contractStatus && contractStatus !== "APPROVED"),
     showSign: isContractSigner,
     showExpiring: isContractExpiringAdmin,
