@@ -52,6 +52,7 @@ export default function MitraResellerClient() {
   const [modalAction, setModalAction] = useState<"approve" | "reject" | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const canManage = useMemo(() => hasAnyRole(userRoles, PARTNER_MANAGE_ROLES), [userRoles]);
 
@@ -212,6 +213,7 @@ export default function MitraResellerClient() {
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">No HP</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Email</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Referral</th>
+                <th className="text-center px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Bukti Follow</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Tanggal</th>
                 {canManage && <th className="text-center px-4 py-3 font-semibold text-slate-600">Aksi</th>}
@@ -250,6 +252,23 @@ export default function MitraResellerClient() {
                     <td className="px-4 py-3 hidden lg:table-cell text-slate-600">{p.email}</td>
                     <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs">
                       {p.referrer?.name ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell text-center">
+                      {p.follow_proof_url ? (
+                        <button
+                          onClick={() => setPreviewUrl(p.follow_proof_url)}
+                          className="inline-block rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-400 hover:shadow-md transition"
+                          title="Lihat bukti follow"
+                        >
+                          <img
+                            src={p.follow_proof_url}
+                            alt="Bukti follow"
+                            className="w-10 h-10 object-cover"
+                          />
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold ${STATUS_STYLE[p.status]}`}>
@@ -325,6 +344,17 @@ export default function MitraResellerClient() {
               <p><span className="text-slate-500">HP:</span> {modalPartner.phone}</p>
               <p><span className="text-slate-500">Email:</span> {modalPartner.email}</p>
               <p><span className="text-slate-500">Alamat:</span> {modalPartner.full_address}</p>
+              {modalPartner.follow_proof_url && (
+                <div className="pt-1">
+                  <span className="text-slate-500">Bukti Follow:</span>
+                  <button
+                    onClick={() => setPreviewUrl(modalPartner.follow_proof_url)}
+                    className="ml-2 text-indigo-600 text-xs font-semibold hover:underline"
+                  >
+                    Lihat Foto
+                  </button>
+                </div>
+              )}
             </div>
 
             {modalAction === "reject" && (
@@ -362,6 +392,31 @@ export default function MitraResellerClient() {
                 {actionLoading ? "Memproses..." : modalAction === "approve" ? "Ya, Terima" : "Ya, Tolak"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <div className="relative max-w-2xl max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewUrl(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center text-slate-600 hover:text-red-500 transition z-10"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <img
+              src={previewUrl}
+              alt="Bukti follow sosial media"
+              className="max-w-full max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-white"
+            />
           </div>
         </div>
       )}
