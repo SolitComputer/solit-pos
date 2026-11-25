@@ -1270,32 +1270,24 @@ function withPeminjamanBarang(groups: MenuGroup[]): MenuGroup[] {
   return next;
 }
 
-// Mitra & Reseller: inject ke grup "Transaksi" untuk role yang ada di PARTNER_VIEW_ROLES.
-// Import constant-nya sudah dari permissions.ts (harus ditambahkan di baris import).
+// Mitra & Reseller: inject ke grup "Marketing" untuk role yang ada di PARTNER_VIEW_ROLES.
+// Import constant-nya sudah dari permissions.ts.
 function withMitraReseller(groups: MenuGroup[], userEffectiveRoles: string[]): MenuGroup[] {
-  // Cek apakah user punya akses (import PARTNER_VIEW_ROLES dari permissions.ts)
   if (!userEffectiveRoles.some((r) => (PARTNER_VIEW_ROLES as string[]).includes(r))) return groups;
   const HREF = ITEM_MITRA_RESELLER.href;
   let injected = false;
   const next = groups.map((g) => {
-    if (g.label !== "Transaksi") return g;
+    if (g.label !== "Marketing") return g;
     injected = true;
     if (g.items.some((it) => it.href === HREF)) return g;
-    // Taruh setelah Management Seller kalau ada, kalau gak ada taruh di akhir
-    const sellerIdx = g.items.findIndex((it) => it.href === ITEM_MANAGEMENT_SELLER.href);
-    const items = [...g.items];
-    if (sellerIdx >= 0) {
-      items.splice(sellerIdx + 1, 0, ITEM_MITRA_RESELLER);
-    } else {
-      items.push(ITEM_MITRA_RESELLER);
-    }
-    return { ...g, items };
+    // Taruh di akhir grup Marketing (setelah Laporan Marketing)
+    return { ...g, items: [...g.items, ITEM_MITRA_RESELLER] };
   });
   if (!injected) {
-    // Kalau role ini belum punya grup "Transaksi", bikin baru
+    // Kalau role ini belum punya grup "Marketing" (mis. Kepala Sales), bikin baru
     const utamaIdx = next.findIndex((g) => g.label === "Utama");
     const at = utamaIdx >= 0 ? utamaIdx + 1 : next.length;
-    return [...next.slice(0, at), { label: "Transaksi", items: [ITEM_MITRA_RESELLER] }, ...next.slice(at)];
+    return [...next.slice(0, at), { label: "Marketing", items: [ITEM_MITRA_RESELLER] }, ...next.slice(at)];
   }
   return next;
 }

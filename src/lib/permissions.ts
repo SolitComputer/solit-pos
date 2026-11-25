@@ -167,7 +167,7 @@ export const SELLER_FOLLOWUP_DELETE_ROLES: UserRole[] = ["ADMIN", "KEPALA_MARKET
 // ─── Mitra & Reseller ────────────────────────────────────────────────────────
 /** Boleh membuka halaman Mitra & Reseller */
 export const PARTNER_VIEW_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES", "CREW_SALES",
+  ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES",
 ];
 
 /** Approve/Reject pendaftaran mitra & reseller */
