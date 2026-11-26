@@ -94,6 +94,9 @@ export async function POST(request: NextRequest) {
       full_address: full_address.trim(),
       referred_by_user_id: referred_by?.trim() || null,
       follow_proof_url: body.follow_proof_url?.trim() || null,
+      follow_proof_urls: Array.isArray(body.follow_proof_urls)
+        ? body.follow_proof_urls.filter((u: string) => typeof u === "string" && u.trim())
+        : null,
     };
 
     // ── Cek duplikat (phone atau email yang sudah pernah daftar) ─────────────

@@ -12,7 +12,7 @@ import { compressImage } from "@/lib/imageCompression";
 import {
   ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
   Store, Building2, User, Landmark, Banknote, QrCode, CreditCard,
-  AlertTriangle, Wallet, Package, Gift, Plus, Trash2, Search,
+  AlertTriangle, Wallet, Package, Gift, Plus, Trash2, Search, Repeat,
   type LucideIcon,
 } from "lucide-react";
 
@@ -2524,6 +2524,12 @@ function EditTransactionModal({
   const [accResults, setAccResults] = useState<any[]>([]);
   const [searchingAcc, setSearchingAcc] = useState(false);
 
+  // ── State "Ganti Unit" aksesori ──
+  const [replacingAccIdx, setReplacingAccIdx] = useState<number | null>(null);
+  const [replaceAccSearch, setReplaceAccSearch] = useState("");
+  const [replaceAccResults, setReplaceAccResults] = useState<any[]>([]);
+  const [searchingReplaceAcc, setSearchingReplaceAcc] = useState(false);
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -2703,6 +2709,65 @@ function EditTransactionModal({
 
   const handleRemoveAcc = (idx: number) => {
     setAccessories((prev) => prev.filter((_, i) => i !== idx));
+    // Adjust replacingAccIdx setelah item dihapus supaya panel
+    // "Ganti Unit" tetap menunjuk ke aksesori yang benar.
+    setReplacingAccIdx((prev) => {
+      if (prev === null) return null;
+      if (prev === idx) return null;       // yang dihapus = yang sedang di-replace → tutup panel
+      if (prev > idx) return prev - 1;     // index bergeser turun
+      return prev;
+    });
+  };
+
+  // ── Ganti Unit Aksesori: search SN pengganti ──
+  const handleReplaceAccSearch = async (q: string) => {
+    setReplaceAccSearch(q);
+    if (q.trim().length < 2) { setReplaceAccResults([]); return; }
+    setSearchingReplaceAcc(true);
+    try {
+      const res = await fetch(`/api/accessory-units/search-sn?q=${encodeURIComponent(q.trim())}`);
+      const json = await res.json();
+      if (json.success) {
+        const usedSN = new Set(accessories.map((a) => (a.serial_number ?? "").toUpperCase()).filter(Boolean));
+        const usedUnitIds = new Set(accessories.map((a) => a.unit_id).filter(Boolean));
+        setReplaceAccResults(
+          (json.data || []).filter(
+            (a: any) =>
+              !usedUnitIds.has(a.id) &&
+              !usedSN.has(String(a.serial_number ?? "").toUpperCase())
+          )
+        );
+      }
+    } catch {
+      setReplaceAccResults([]);
+    } finally {
+      setSearchingReplaceAcc(false);
+    }
+  };
+
+  // ── Ganti Unit Aksesori: swap data lama → baru ──
+  // Unit lama otomatis balik ke stok saat disimpan (backend mendeteksi
+  // unit_id lama hilang dari payload accessories[]).
+  const handleReplaceAccessory = (idx: number, newAcc: any) => {
+    setAccessories((prev) =>
+      prev.map((a, i) =>
+        i === idx
+          ? {
+              accessory_id: newAcc.accessory_id,
+              name: newAcc.accessory_name || newAcc.display_name || "Aksesori",
+              quantity: 1,
+              deal_price: a.deal_price,       // inherit harga deal lama
+              selling_price: Number(newAcc.buy_price ?? 0),
+              is_bonus: a.is_bonus,            // inherit status bonus lama
+              serial_number: newAcc.serial_number,
+              unit_id: newAcc.id,
+            }
+          : a
+      )
+    );
+    setReplacingAccIdx(null);
+    setReplaceAccSearch("");
+    setReplaceAccResults([]);
   };
 
   const handleAccSearch = async (q: string) => {
@@ -3108,14 +3173,33 @@ function EditTransactionModal({
                           )}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAcc(idx)}
-                        className="text-gray-400 hover:text-red-600 p-1 rounded transition"
-                        title="Hapus aksesori dari transaksi"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        {acc.serial_number && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplacingAccIdx(replacingAccIdx === idx ? null : idx);
+                              setReplaceAccSearch("");
+                              setReplaceAccResults([]);
+                            }}
+                            className={`p-1 rounded transition ${replacingAccIdx === idx ? "text-blue-600 bg-blue-50" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                            title="Ganti unit aksesori"
+                          >
+                            <Repeat size={13} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (replacingAccIdx === idx) setReplacingAccIdx(null);
+                            handleRemoveAcc(idx);
+                          }}
+                          className="text-gray-400 hover:text-red-600 p-1 rounded transition"
+                          title="Hapus aksesori dari transaksi"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 pt-2 border-t border-gray-100">
@@ -3148,6 +3232,52 @@ function EditTransactionModal({
                         <span className="text-xs font-mono font-bold text-emerald-600">Rp 0 (Bonus)</span>
                       )}
                     </div>
+
+                    {/* ── Panel Ganti Unit (muncul saat tombol Repeat diklik) ── */}
+                    {replacingAccIdx === idx && (
+                      <div className="pt-2 border-t border-blue-100 space-y-1.5">
+                        <label className="text-[10px] font-bold text-blue-600 uppercase tracking-wide flex items-center gap-1">
+                          <Repeat size={10} /> Ganti dengan unit lain:
+                        </label>
+                        <div className="relative">
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            value={replaceAccSearch}
+                            onChange={(e) => handleReplaceAccSearch(e.target.value)}
+                            placeholder="Scan / ketik SN pengganti..."
+                            className="w-full h-8 pl-8 pr-3 text-xs font-mono border border-blue-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                            autoFocus
+                          />
+                          {searchingReplaceAcc && (
+                            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                          )}
+                        </div>
+                        {replaceAccResults.length > 0 && (
+                          <div className="border border-blue-200 rounded-lg bg-white divide-y divide-gray-100 max-h-36 overflow-y-auto shadow-md">
+                            {replaceAccResults.map((res) => (
+                              <button
+                                key={res.id ?? res.serial_number}
+                                type="button"
+                                onClick={() => handleReplaceAccessory(idx, res)}
+                                className="w-full px-3 py-1.5 text-left text-xs hover:bg-blue-50 flex items-center justify-between gap-2 transition"
+                              >
+                                <span className="min-w-0">
+                                  <span className="font-medium text-gray-800 truncate block">{res.accessory_name || res.display_name || "Aksesori"}</span>
+                                  <span className="font-mono text-[10px] text-gray-400">SN: {res.serial_number}</span>
+                                </span>
+                                <span className="font-mono text-blue-700 font-bold shrink-0">{fmtRupiah(res.selling_price)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {!searchingReplaceAcc && replaceAccSearch.trim().length >= 2 && replaceAccResults.length === 0 && (
+                          <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">
+                            SN "<span className="font-mono font-bold">{replaceAccSearch.trim()}</span>" tidak ketemu / stok sudah terjual.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

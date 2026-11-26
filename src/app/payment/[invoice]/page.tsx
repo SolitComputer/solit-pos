@@ -150,6 +150,12 @@ export default function EditTransactionPage() {
   const [accResults, setAccResults] = useState<any[]>([]);
   const [isFetchingAccs, setIsFetchingAccs] = useState(false);
 
+  // ── State "Ganti Unit" aksesori ──
+  const [replacingAccIdx, setReplacingAccIdx] = useState<number | null>(null);
+  const [replaceAccSearch, setReplaceAccSearch] = useState("");
+  const [replaceAccResults, setReplaceAccResults] = useState<any[]>([]);
+  const [searchingReplaceAcc, setSearchingReplaceAcc] = useState(false);
+
   useEffect(() => {
     getAuthUser().then(u => ({ success: true, user: u }))
       .then((r) => {
@@ -567,6 +573,65 @@ export default function EditTransactionPage() {
   const handleRemoveAccessory = (idx: number) => {
     setActiveAccessories((prev) => prev.filter((_, i) => i !== idx));
     setHasChanges(true);
+    // Adjust replacingAccIdx setelah item dihapus supaya panel
+    // "Ganti Unit" tetap menunjuk ke aksesori yang benar.
+    setReplacingAccIdx((prev) => {
+      if (prev === null) return null;
+      if (prev === idx) return null;
+      if (prev > idx) return prev - 1;
+      return prev;
+    });
+  };
+
+  // ── Ganti Unit Aksesori: search SN pengganti ──
+  const handleReplaceAccSearch = async (q: string) => {
+    setReplaceAccSearch(q);
+    if (q.trim().length < 2) { setReplaceAccResults([]); return; }
+    setSearchingReplaceAcc(true);
+    try {
+      const res = await fetch(`/api/accessory-units/search-sn?q=${encodeURIComponent(q.trim())}`);
+      const json = await res.json();
+      if (json.success) {
+        const usedSN = new Set(activeAccessories.map((a) => (a.serial_number ?? "").toUpperCase()).filter(Boolean));
+        const usedUnitIds = new Set(activeAccessories.map((a) => a.unit_id).filter(Boolean));
+        setReplaceAccResults(
+          (json.data || []).filter(
+            (a: any) =>
+              !usedUnitIds.has(a.id) &&
+              !usedSN.has(String(a.serial_number ?? "").toUpperCase())
+          )
+        );
+      }
+    } catch {
+      setReplaceAccResults([]);
+    } finally {
+      setSearchingReplaceAcc(false);
+    }
+  };
+
+  // ── Ganti Unit Aksesori: swap data lama → baru ──
+  const handleReplaceAccessory = (idx: number, newAcc: any) => {
+    setActiveAccessories((prev) =>
+      prev.map((a, i) =>
+        i === idx
+          ? {
+              accessory_id: newAcc.accessory_id,
+              name: newAcc.accessory_name || newAcc.display_name || "Aksesori",
+              category: newAcc.category,
+              quantity: 1,
+              deal_price: a.deal_price,
+              selling_price: Number(newAcc.buy_price ?? 0),
+              is_bonus: a.is_bonus,
+              serial_number: newAcc.serial_number,
+              unit_id: newAcc.id,
+            }
+          : a
+      )
+    );
+    setReplacingAccIdx(null);
+    setReplaceAccSearch("");
+    setReplaceAccResults([]);
+    setHasChanges(true);
   };
 
   const handleSave = async () => {
@@ -983,6 +1048,39 @@ export default function EditTransactionPage() {
             padding: 0 0 32px;
           }
         }
+
+        /* ═══════════ DARK MODE OVERRIDES (ditambahkan; light tetap identik) ═══════════ */
+        html.dark {
+          --etx-inset:      #0c1322;
+          --etx-inset-bd:   1px solid #1e2a40;
+          --etx-amberdot:   #422a09;
+          --etx-profit-bg:  #141d30;
+          --etx-profit-bd:  1px solid #2e1c55;
+          --etx-green-bg:   #0d2a1c;
+          --etx-green-bd:   1px solid #134e2f;
+          --etx-violet-bg:  #14233d;
+          --etx-violet-fg:  #a5b4fc;
+          --etx-emerald-bg: #0d2a1c;
+          --etx-emerald-fg: #34d399;
+          --etx-amber-bg:   #2b1b06;
+          --etx-amber-fg:   #fbbf24;
+          --etx-slate-bg:   #1a263a;
+          --etx-slate-fg:   #94a3b8;
+        }
+        html.dark .form-card { background: #101827; border-color: #1e2a40; box-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 18px 42px -26px rgba(0,0,0,0.6); }
+        html.dark .section-divider { background: linear-gradient(90deg, transparent, #24314a 12%, #24314a 88%, transparent); }
+        html.dark .section-header-title { color: #94a3b8; }
+        html.dark .ctype-btn { background: #131d2e; border-color: #24314a; color: #cbd5e1; }
+        html.dark .ctype-btn:hover { background: #1a263a; border-color: #334155; }
+        html.dark .unit-row { background: #0c1322; border-color: #1e2a40; }
+        html.dark .unit-row:hover { border-color: #3f3a7a; box-shadow: 0 10px 26px -14px rgba(0,0,0,0.6); }
+        html.dark .back-btn:hover { color: #cbd5e1; }
+        html.dark .unit-dropdown { background: #101827; border-color: #24314a; }
+        html.dark .unit-dropdown-item:hover { background: #1e2a40; }
+        html.dark .warning-banner { background: linear-gradient(135deg, #2b1b06 0%, #241506 100%); border-color: #5c390a; }
+        html.dark .split-card { background: linear-gradient(135deg, #171030 0%, #140d2b 100%); border-color: #2e1c55; }
+        html.dark .confirm-shell { background: #101827; border-color: #1e2a40; }
+        html.dark .mobile-action-bar { background: rgba(16,24,39,0.92); border-top-color: #1e2a40; }
       `}</style>
 
       <div className="edit-page max-w-2xl mx-auto px-4 sm:px-0 pb-24 sm:pb-0 space-y-4 sm:space-y-5">
@@ -1017,7 +1115,7 @@ export default function EditTransactionPage() {
         <div className="warning-banner px-3.5 sm:px-4 py-3 sm:py-3.5 flex items-start gap-3">
           <div
             className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
-            style={{ background: "#FEF3C7" }}
+            style={{ background: "var(--etx-amberdot, #FEF3C7)" }}
           >
             <svg
               className="w-3.5 h-3.5 text-amber-500"
@@ -1335,13 +1433,32 @@ export default function EditTransactionPage() {
                           )}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAccessory(idx)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        {acc.serial_number && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplacingAccIdx(replacingAccIdx === idx ? null : idx);
+                              setReplaceAccSearch("");
+                              setReplaceAccResults([]);
+                            }}
+                            className={`p-1.5 rounded-lg transition flex-shrink-0 ${replacingAccIdx === idx ? "text-blue-600 bg-blue-50" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                            title="Ganti unit aksesori"
+                          >
+                            <Repeat className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (replacingAccIdx === idx) setReplacingAccIdx(null);
+                            handleRemoveAccessory(idx);
+                          }}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1413,6 +1530,52 @@ export default function EditTransactionPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* ── Panel Ganti Unit aksesori ── */}
+                    {replacingAccIdx === idx && (
+                      <div className="pt-2.5 border-t border-blue-100 space-y-1.5">
+                        <label className="text-[10px] font-bold text-blue-600 uppercase tracking-wide flex items-center gap-1">
+                          <Repeat className="w-3 h-3" /> Ganti dengan unit lain:
+                        </label>
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            value={replaceAccSearch}
+                            onChange={(e) => handleReplaceAccSearch(e.target.value)}
+                            placeholder="Scan / ketik SN pengganti..."
+                            className="w-full h-9 pl-8 pr-3 text-xs font-mono border border-blue-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 transition"
+                            autoFocus
+                          />
+                          {searchingReplaceAcc && (
+                            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                          )}
+                        </div>
+                        {replaceAccResults.length > 0 && (
+                          <div className="border border-blue-200 rounded-xl bg-white divide-y divide-gray-100 max-h-44 overflow-y-auto shadow-lg">
+                            {replaceAccResults.map((r) => (
+                              <button
+                                key={r.id ?? r.serial_number}
+                                type="button"
+                                onClick={() => handleReplaceAccessory(idx, r)}
+                                className="w-full px-3.5 py-2.5 text-left text-xs hover:bg-blue-50 flex items-center justify-between gap-2 transition"
+                              >
+                                <div className="min-w-0">
+                                  <p className="font-bold text-gray-800 truncate">{r.accessory_name || r.display_name || "Aksesori"}</p>
+                                  <p className="font-mono text-[10px] text-gray-400 mt-0.5">SN: {r.serial_number}{r.category ? ` · ${r.category}` : ""}</p>
+                                </div>
+                                <span className="font-mono text-blue-700 font-bold flex-shrink-0">{fmt(r.selling_price || 0)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {!searchingReplaceAcc && replaceAccSearch.trim().length >= 2 && replaceAccResults.length === 0 && (
+                          <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-2.5 py-1.5">
+                            SN "<span className="font-mono font-bold">{replaceAccSearch.trim()}</span>" tidak ketemu / stok sudah terjual.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1661,8 +1824,8 @@ export default function EditTransactionPage() {
                 className="rounded-2xl p-4 flex items-center justify-between"
                 style={{
                   background:
-                    "linear-gradient(135deg, #F8FAFC 0%, #F3F0FE 100%)",
-                  border: "1px solid #E7E3FA",
+                    "var(--etx-profit-bg, linear-gradient(135deg, #F8FAFC 0%, #F3F0FE 100%))",
+                  border: "var(--etx-profit-bd, 1px solid #E7E3FA)",
                 }}
               >
                 <div className="min-w-0">
@@ -1848,8 +2011,8 @@ export default function EditTransactionPage() {
                 className="rounded-2xl p-4 flex justify-between items-center gap-2"
                 style={{
                   background:
-                    "linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%)",
-                  border: "1px solid #A7F3D0",
+                    "var(--etx-green-bg, linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%))",
+                  border: "var(--etx-green-bd, 1px solid #A7F3D0)",
                 }}
               >
                 <div className="min-w-0">
@@ -1876,7 +2039,7 @@ export default function EditTransactionPage() {
               {formData.payment_method === "TF_CASH" && (
                 <div
                   className="rounded-2xl px-4 py-3 flex items-center justify-between gap-2"
-                  style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}
+                  style={{ background: "var(--etx-inset, #F8FAFC)", border: "var(--etx-inset-bd, 1px solid #E2E8F0)" }}
                 >
                   <div className="flex items-center gap-3 text-xs">
                     <span className="inline-flex items-center gap-1 text-blue-700 font-semibold">
@@ -1902,7 +2065,7 @@ export default function EditTransactionPage() {
               {activeUnits.length > 0 && (
                 <div
                   className="rounded-2xl px-4 py-3"
-                  style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}
+                  style={{ background: "var(--etx-inset, #F8FAFC)", border: "var(--etx-inset-bd, 1px solid #E2E8F0)" }}
                 >
                   <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2.5 inline-flex items-center gap-1">
                     <Laptop className="w-3 h-3" /> Unit Aktif ({activeUnits.length})
@@ -2098,12 +2261,12 @@ function UnitEditRow({
   });
 
   const gradeColors: Record<string, { bg: string; color: string }> = {
-    A: { bg: "#ECFDF5", color: "#059669" },
-    B: { bg: "#FFFBEB", color: "#D97706" },
-    C: { bg: "#F3EFFE", color: "#6D28D9" },
+    A: { bg: "var(--etx-emerald-bg, #ECFDF5)", color: "var(--etx-emerald-fg, #059669)" },
+    B: { bg: "var(--etx-amber-bg, #FFFBEB)", color: "var(--etx-amber-fg, #D97706)" },
+    C: { bg: "var(--etx-violet-bg, #F3EFFE)", color: "var(--etx-violet-fg, #6D28D9)" },
   };
   const gradeStyle = unit.grade
-    ? gradeColors[unit.grade] ?? { bg: "#F1F5F9", color: "#64748B" }
+    ? gradeColors[unit.grade] ?? { bg: "var(--etx-slate-bg, #F1F5F9)", color: "var(--etx-slate-fg, #64748B)" }
     : null;
 
   return (
@@ -2112,7 +2275,7 @@ function UnitEditRow({
       <div className="flex items-center gap-2.5 px-3 sm:px-3.5 py-3">
         <div
           className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-black"
-          style={{ background: "linear-gradient(135deg,#EEF2FF,#E4DBFB)", color: "#6D28D9" }}
+          style={{ background: "var(--etx-violet-bg, linear-gradient(135deg,#EEF2FF,#E4DBFB))", color: "var(--etx-violet-fg, #6D28D9)" }}
         >
           {index + 1}
         </div>
@@ -2170,7 +2333,7 @@ function UnitEditRow({
       {/* ─ Harga Deal per unit ─ */}
       <div
         className="border-t border-gray-100 px-3 sm:px-3.5 py-2.5"
-        style={{ background: "#F8FAFC" }}
+        style={{ background: "var(--etx-inset, #F8FAFC)" }}
       >
         <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-1">
           <Wallet className="w-2.5 h-2.5" /> Harga Deal
@@ -2189,7 +2352,7 @@ function UnitEditRow({
       {showReplace && (
         <div
           className="border-t border-gray-100 px-3 sm:px-3.5 pb-3.5 pt-3"
-          style={{ background: "#FAFBFF" }}
+          style={{ background: "var(--etx-inset, #FAFBFF)" }}
         >
           <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-2 inline-flex items-center gap-1">
             <RefreshCw className="w-2.5 h-2.5" /> Pilih unit pengganti (laptop)
@@ -2311,10 +2474,10 @@ function UnitEditRow({
 
 // ── UI Helpers ────────────────────────────────────────────────────────────────
 const SECTION_TINTS: Record<string, { bg: string; icon: string }> = {
-  violet: { bg: "linear-gradient(135deg,#EEF2FF,#E4DBFB)", icon: "#6D28D9" },
-  emerald: { bg: "linear-gradient(135deg,#ECFDF5,#D8F5E8)", icon: "#059669" },
-  amber: { bg: "linear-gradient(135deg,#FFFBEB,#FDECC8)", icon: "#D97706" },
-  slate: { bg: "linear-gradient(135deg,#F1F5F9,#E7EAF0)", icon: "#475569" },
+  violet: { bg: "var(--etx-violet-bg, linear-gradient(135deg,#EEF2FF,#E4DBFB))", icon: "var(--etx-violet-fg, #6D28D9)" },
+  emerald: { bg: "var(--etx-emerald-bg, linear-gradient(135deg,#ECFDF5,#D8F5E8))", icon: "var(--etx-emerald-fg, #059669)" },
+  amber: { bg: "var(--etx-amber-bg, linear-gradient(135deg,#FFFBEB,#FDECC8))", icon: "var(--etx-amber-fg, #D97706)" },
+  slate: { bg: "var(--etx-slate-bg, linear-gradient(135deg,#F1F5F9,#E7EAF0))", icon: "var(--etx-slate-fg, #475569)" },
 };
 
 function SectionHeader({

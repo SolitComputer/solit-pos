@@ -51,7 +51,7 @@ interface JournalEntry {
     keterangan: string;
     ref: string | null;
     journal_no?: string | null; // ⬅️ BARU — kode jurnal GJ-YYYYMMDD-NNN (entry baru)
-source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN" | "SALARY";
+    source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL" | "KEBUTUHAN" | "SALARY";
     source_id: string | null;
     branch?: "UTAMA" | "JOGJA" | null;
     target_user_id?: string | null; // ⬅️ BARU — karyawan terkait untuk akun Kasbon/Cicilan
@@ -346,7 +346,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     const [bulkBusy, setBulkBusy] = useState(false);
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
     const [expandAll, setExpandAll] = useState(false); // buka/tutup SEMUA detail akun sekaligus
-      const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
+    const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
     const [showOnlyOutOfSync, setShowOnlyOutOfSync] = useState(false);
     const [showOnlyAdjusting, setShowOnlyAdjusting] = useState(false); // ⬅️ BARU — filter tab Penyesuaian
     const [showSortSourceModal, setShowSortSourceModal] = useState(false);
@@ -539,7 +539,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
     // Reset display limit saat period/filter berubah.
     // Dikecualikan saat sedang melompat ke bookmark (scrollToBookmark mengosongkan filter
     // dengan sengaja — jangan ikut mengecilkan tampilan balik ke 50).
-      useEffect(() => {
+    useEffect(() => {
         if (isJumpingToBookmark.current) {
             isJumpingToBookmark.current = false;
             return;
@@ -1056,7 +1056,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         }
 
         return result;
-     }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, showOnlyOutOfSync, isOutOfSync, showOnlyAdjusting, isAdjusting]);
+    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, showOnlyOutOfSync, isOutOfSync, showOnlyAdjusting, isAdjusting]);
 
     const visibleEntries = useMemo(() => {
         return filtered.slice(0, displayLimit);
@@ -1221,7 +1221,7 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
         }, 0);
     }, [filtered, accountCodeFilter]);
 
-      const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || showOnlyWarnings || showOnlyOutOfSync || showOnlyAdjusting;
+    const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || showOnlyWarnings || showOnlyOutOfSync || showOnlyAdjusting;
 
     useEffect(() => {
         if (!toast) return;
@@ -1775,7 +1775,16 @@ export default function JurnalUmum({ period, branch = "ALL" }: { period: string;
                                             <th className="px-2 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[150px]">Nominal</th>
                                             <th className="px-2 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[130px]">Status</th>
                                             <th className="px-2 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[90px]">
-                                                Aksi
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <span>Aksi</span>
+                                                    <button
+                                                        onClick={() => setExpandAll((v) => !v)}
+                                                        title={expandAll ? "Tutup semua detail akun" : "Buka semua detail akun"}
+                                                        className={`p-1.5 rounded-lg active:scale-90 transition-all duration-150 ${expandAll ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"}`}
+                                                    >
+                                                        <ChevronsUpDown className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </th>
                                         </tr>
                                     </thead>
@@ -2772,7 +2781,7 @@ function EntryFormModal({
     const [keterangan, setKeterangan] = useState(entry?.keterangan ?? "");
     const [ref, setRef] = useState(entry?.ref ?? "");
     const [template, setTemplate] = useState("CUSTOM");
-       const [isClosing, setIsClosing] = useState<boolean>(entry?.is_closing === true); // ⬅️ tandai jurnal penutup; saat edit ambil nilai dari entry
+    const [isClosing, setIsClosing] = useState<boolean>(entry?.is_closing === true); // ⬅️ tandai jurnal penutup; saat edit ambil nilai dari entry
     const [isAdjusting, setIsAdjusting] = useState<boolean>(entry?.is_adjusting === true); // ⬅️ BARU — tandai jurnal penyesuaian
     const [autoFilling, setAutoFilling] = useState(false); // ⬅️ BARU — proses tarik saldo jurnal penutup otomatis
 
@@ -2954,7 +2963,7 @@ function EntryFormModal({
         }
     };
 
- const submit = async () => {
+    const submit = async () => {
         setError("");
         if (!keterangan.trim()) return setError("Keterangan wajib diisi");
         if (!balanced) return setError("Total debit harus sama dengan total kredit");
@@ -3630,9 +3639,9 @@ function useJournalEntryDerived(entry: JournalEntry, accountCodeFilter: Set<stri
     const branchBadge = getBranchBadge(entry.branch); // ⬅️ BARU
     const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
     const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
- const cashflowNama = (entry.source_type === "CASHFLOW" || entry.source_type === "MANUAL")
+    const cashflowNama = (entry.source_type === "CASHFLOW" || entry.source_type === "MANUAL")
         ? entry.trx_meta?.nama ?? null
-        : null;    const isPengajuanDana = entry.source_type === "CASHFLOW" && entry.trx_meta?.source_type === "PENGAJUAN_DANA";
+        : null; const isPengajuanDana = entry.source_type === "CASHFLOW" && entry.trx_meta?.source_type === "PENGAJUAN_DANA";
 
     const displayLines: JournalLine[] = useMemo(() => {
         if (!modalMissing) return entry.lines;
@@ -3867,7 +3876,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                 <span className="text-[10px] font-semibold text-slate-500 inline-flex items-center gap-1.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Approved
                                 </span>
-                                                           {entry.has_warning && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-red-600" />Penanda</span>}
+                                {entry.has_warning && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-red-600" />Penanda</span>}
                                 {entry.sync_available && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 inline-flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5 text-blue-600" />Nominal Berubah</span>}
                                 {entry.is_adjusting && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-violet-200 bg-violet-50 text-violet-700 inline-flex items-center gap-1"><Sparkles className="w-2.5 h-2.5 text-violet-600" />Penyesuaian</span>}
                                 {entry.is_closing && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1">Tutup Buku</span>}

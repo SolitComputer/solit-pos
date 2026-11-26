@@ -12,6 +12,7 @@ interface Partner {
   email: string;
   full_address: string;
   follow_proof_url: string | null;
+  follow_proof_urls?: string[] | null;
   approver: { id: string; name: string } | null;
   rejector: { id: string; name: string } | null;
   rejection_reason: string | null;
@@ -51,9 +52,22 @@ export default function MitraResellerClient() {
   const [modalAction, setModalAction] = useState<"approve" | "reject" | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   const canManage = useMemo(() => hasAnyRole(userRoles, PARTNER_MANAGE_ROLES), [userRoles]);
+
+  // Helper: gabungkan follow_proof_urls dan follow_proof_url (backward compat)
+  const getProofUrls = useCallback((p: Partner): string[] => {
+    if (p.follow_proof_urls && p.follow_proof_urls.length > 0) return p.follow_proof_urls;
+    if (p.follow_proof_url) return [p.follow_proof_url];
+    return [];
+  }, []);
+
+  const openGallery = useCallback((urls: string[], startIndex = 0) => {
+    setPreviewUrls(urls);
+    setPreviewIndex(startIndex);
+  }, []);
 
   // Fetch user roles
   useEffect(() => {
@@ -249,21 +263,30 @@ export default function MitraResellerClient() {
                     <td className="px-4 py-3 hidden md:table-cell text-slate-600">{p.phone}</td>
                     <td className="px-4 py-3 hidden lg:table-cell text-slate-600">{p.email}</td>
                     <td className="px-4 py-3 hidden md:table-cell text-center">
-                      {p.follow_proof_url ? (
-                        <button
-                          onClick={() => setPreviewUrl(p.follow_proof_url)}
-                          className="inline-block rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-400 hover:shadow-md transition"
-                          title="Lihat bukti follow"
-                        >
-                          <img
-                            src={p.follow_proof_url}
-                            alt="Bukti follow"
-                            className="w-10 h-10 object-cover"
-                          />
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-400">—</span>
-                      )}
+                      {(() => {
+                        const urls = getProofUrls(p);
+                        if (urls.length === 0) return <span className="text-xs text-slate-400">—</span>;
+                        return (
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => openGallery(urls, 0)}
+                              className="relative inline-block rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-400 hover:shadow-md transition"
+                              title={`Lihat bukti follow (${urls.length} foto)`}
+                            >
+                              <img
+                                src={urls[0]}
+                                alt="Bukti follow"
+                                className="w-10 h-10 object-cover"
+                              />
+                              {urls.length > 1 && (
+                                <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[10px] font-bold px-1 rounded-tl">
+                                  +{urls.length - 1}
+                                </span>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold ${STATUS_STYLE[p.status]}`}>
@@ -339,17 +362,34 @@ export default function MitraResellerClient() {
               <p><span className="text-slate-500">HP:</span> {modalPartner.phone}</p>
               <p><span className="text-slate-500">Email:</span> {modalPartner.email}</p>
               <p><span className="text-slate-500">Alamat:</span> {modalPartner.full_address}</p>
-              {modalPartner.follow_proof_url && (
-                <div className="pt-1">
-                  <span className="text-slate-500">Bukti Follow:</span>
-                  <button
-                    onClick={() => setPreviewUrl(modalPartner.follow_proof_url)}
-                    className="ml-2 text-indigo-600 text-xs font-semibold hover:underline"
-                  >
-                    Lihat Foto
-                  </button>
-                </div>
-              )}
+              {(() => {
+                const urls = getProofUrls(modalPartner);
+                if (urls.length === 0) return null;
+                return (
+                  <div className="pt-1">
+                    <span className="text-slate-500">Bukti Follow:</span>
+                    <button
+                      onClick={() => openGallery(urls, 0)}
+                      className="ml-2 text-indigo-600 text-xs font-semibold hover:underline"
+                    >
+                      Lihat Foto ({urls.length})
+                    </button>
+                    {urls.length > 1 && (
+                      <div className="flex gap-1.5 mt-2">
+                        {urls.map((url, i) => (
+                          <button
+                            key={i}
+                            onClick={() => openGallery(urls, i)}
+                            className="rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-400 transition"
+                          >
+                            <img src={url} alt={`Bukti ${i + 1}`} className="w-10 h-10 object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {modalAction === "reject" && (
@@ -391,15 +431,16 @@ export default function MitraResellerClient() {
         </div>
       )}
 
-      {/* Image Preview Modal */}
-      {previewUrl && (
+      {/* Image Gallery Modal */}
+      {previewUrls.length > 0 && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-          onClick={() => setPreviewUrl(null)}
+          onClick={() => setPreviewUrls([])}
         >
-          <div className="relative max-w-2xl max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-2xl max-h-[80vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            {/* Close button */}
             <button
-              onClick={() => setPreviewUrl(null)}
+              onClick={() => setPreviewUrls([])}
               className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center text-slate-600 hover:text-red-500 transition z-10"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -407,11 +448,59 @@ export default function MitraResellerClient() {
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
+
+            {/* Counter */}
+            {previewUrls.length > 1 && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white shadow-lg rounded-full px-3 py-0.5 text-xs font-bold text-slate-700 z-10">
+                {previewIndex + 1} / {previewUrls.length}
+              </div>
+            )}
+
+            {/* Main image */}
             <img
-              src={previewUrl}
-              alt="Bukti follow sosial media"
-              className="max-w-full max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-white"
+              src={previewUrls[previewIndex]}
+              alt={`Bukti follow ${previewIndex + 1}`}
+              className="max-w-full max-h-[70vh] rounded-2xl shadow-2xl object-contain bg-white"
             />
+
+            {/* Navigation arrows */}
+            {previewUrls.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setPreviewIndex((i) => (i > 0 ? i - 1 : previewUrls.length - 1)); }}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center text-slate-700 hover:bg-white hover:text-indigo-600 transition"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setPreviewIndex((i) => (i < previewUrls.length - 1 ? i + 1 : 0)); }}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center text-slate-700 hover:bg-white hover:text-indigo-600 transition"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              </>
+            )}
+
+            {/* Thumbnail strip */}
+            {previewUrls.length > 1 && (
+              <div className="flex gap-2 mt-3">
+                {previewUrls.map((url, i) => (
+                  <button
+                    key={i}
+                    onClick={(e) => { e.stopPropagation(); setPreviewIndex(i); }}
+                    className={`rounded-lg overflow-hidden border-2 transition ${
+                      i === previewIndex ? "border-indigo-500 shadow-md" : "border-white/50 opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    <img src={url} alt={`Foto ${i + 1}`} className="w-12 h-12 object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
