@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, useDeferredValue } from "react";
+import { useEffect, useState, useMemo, useCallback, useDeferredValue, memo, useRef } from "react";
 import { toast } from "sonner";
 import {
     Search, X, History as HistoryIcon,
@@ -108,6 +108,7 @@ export default function SoLaptopContent() {
     const [loading, setLoading] = useState(true);
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
+    const userNameRef = useRef<string>("");
 
     // SO states
     const [soingUnitId, setSoingUnitId] = useState<string | null>(null);
@@ -219,6 +220,7 @@ export default function SoLaptopContent() {
                     ? (u as any).roles : u?.role ? [u.role] : [];
                 setUserRoles(roles as UserRole[]);
                 setUserId((u as any)?.id ?? null);
+                userNameRef.current = (u as any)?.name ?? (u as any)?.display_name ?? "";
             } catch { setUserRoles([]); }
         })();
     }, []);
@@ -336,7 +338,21 @@ export default function SoLaptopContent() {
 
     const confirmUnitSo = async (row: SoUnitRow, note: string) => {
         if (!canSoRow(row)) return;
-        setSoingUnitId(row.unit_id);
+
+        // ① Tutup modal & update UI LANGSUNG (optimistic) — tanpa nunggu API
+        const optimisticSoAt = new Date().toISOString();
+        const optimisticSoBy = userNameRef.current || row.so_by || "Anda";
+        setSoPromptTarget(null);
+        setSoingUnitId(null);
+
+        setRows(prev => prev.map(r =>
+            r.unit_id === row.unit_id
+                ? { ...r, so_at: optimisticSoAt, so_by: optimisticSoBy, is_so_active: true }
+                : r
+        ));
+        toast.success(row.is_so_active ? "Status SO diperbarui (SO Ulang)" : "Unit ditandai Sudah SO");
+
+        // ② API jalan di background
         try {
             const res = await fetch(`/api/units/${row.unit_id}/so`, {
                 method: "PATCH",
@@ -346,22 +362,20 @@ export default function SoLaptopContent() {
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal update SO");
 
+            // ③ Koreksi dengan data server yang akurat
             setRows(prev => prev.map(r =>
                 r.unit_id === row.unit_id
-                    ? {
-                        ...r,
-                        so_at: json.data.so_at,
-                        so_by: json.data.so_by,
-                        is_so_active: isUnitSoActive(json.data.so_at),
-                    }
+                    ? { ...r, so_at: json.data.so_at, so_by: json.data.so_by, is_so_active: isUnitSoActive(json.data.so_at) }
                     : r
             ));
-            toast.success(row.is_so_active ? "Status SO diperbarui (SO Ulang)" : "Unit ditandai Sudah SO");
-            setSoPromptTarget(null);
         } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Gagal update SO");
-        } finally {
-            setSoingUnitId(null);
+            // ④ Gagal? Rollback ke data lama
+            setRows(prev => prev.map(r =>
+                r.unit_id === row.unit_id
+                    ? { ...r, so_at: row.so_at, so_by: row.so_by, is_so_active: row.is_so_active }
+                    : r
+            ));
+            toast.error(e instanceof Error ? e.message : "Gagal update SO — data dikembalikan");
         }
     };
 
@@ -378,7 +392,23 @@ export default function SoLaptopContent() {
 
     const confirmUnitAudit = async (row: SoUnitRow, note: string) => {
         if (!canManageAudit) return;
-        setAuditingUnitId(row.unit_id);
+
+        // ① Optimistic update — langsung update UI
+        const willBeActive = !row.is_audit_active;
+        const optimisticAt = willBeActive ? new Date().toISOString() : null;
+        const optimisticBy = willBeActive ? (userNameRef.current || row.audited_by || "Anda") : null;
+
+        setAuditPromptTarget(null);
+        setAuditingUnitId(null);
+
+        setRows(prev => prev.map(r =>
+            r.unit_id === row.unit_id
+                ? { ...r, audited_at: optimisticAt, audited_by: optimisticBy, is_audit_active: willBeActive }
+                : r
+        ));
+        toast.success(row.is_audit_active ? "Audit unit dibatalkan" : "Unit ditandai sudah diaudit");
+
+        // ② API di background
         try {
             const res = await fetch(`/api/units/${row.unit_id}/audit`, {
                 method: "PATCH",
@@ -388,22 +418,20 @@ export default function SoLaptopContent() {
             const json = await res.json();
             if (!json.success) throw new Error(json.message || "Gagal update audit");
 
+            // ③ Koreksi data server
             setRows(prev => prev.map(r =>
                 r.unit_id === row.unit_id
-                    ? {
-                        ...r,
-                        audited_at: json.data.audited_at,
-                        audited_by: json.data.audited_by,
-                        is_audit_active: isUnitAuditActive(json.data.audited_at),
-                    }
+                    ? { ...r, audited_at: json.data.audited_at, audited_by: json.data.audited_by, is_audit_active: isUnitAuditActive(json.data.audited_at) }
                     : r
             ));
-            toast.success(row.is_audit_active ? "Audit unit dibatalkan" : "Unit ditandai sudah diaudit");
-            setAuditPromptTarget(null);
         } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Gagal update audit");
-        } finally {
-            setAuditingUnitId(null);
+            // ④ Rollback kalau gagal
+            setRows(prev => prev.map(r =>
+                r.unit_id === row.unit_id
+                    ? { ...r, audited_at: row.audited_at, audited_by: row.audited_by, is_audit_active: row.is_audit_active }
+                    : r
+            ));
+            toast.error(e instanceof Error ? e.message : "Gagal update audit — data dikembalikan");
         }
     };
 
@@ -584,7 +612,7 @@ export default function SoLaptopContent() {
                         {/* ── MOBILE / TABLET ── */}
                         <div className="lg:hidden space-y-2.5">
                             {filteredRows.map((row, idx) => (
-                                <MobileCard
+                                <MobileCardMemo
                                     key={row.unit_id}
                                     row={row}
                                     idx={idx}
@@ -996,6 +1024,21 @@ function MobileCard({
         </div>
     );
 }
+
+// Memo wrapper — cegah re-render semua card saat cuma 1 card berubah
+const MobileCardMemo = memo(MobileCard, (prev, next) =>
+    prev.row.unit_id === next.row.unit_id
+    && prev.row.is_so_active === next.row.is_so_active
+    && prev.row.is_audit_active === next.row.is_audit_active
+    && prev.row.so_by === next.row.so_by
+    && prev.row.audited_by === next.row.audited_by
+    && prev.row.status === next.row.status
+    && prev.soLoading === next.soLoading
+    && prev.auditLoading === next.auditLoading
+    && prev.canSo === next.canSo
+    && prev.canManageAudit === next.canManageAudit
+    && prev.idx === next.idx
+);
 
 // ── Empty state ─────────────────────────────────────────────────────────────
 function EmptyState({ hasFilter, onReset }: { hasFilter: boolean; onReset: () => void }) {

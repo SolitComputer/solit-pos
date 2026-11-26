@@ -1747,3 +1747,11 @@ export const ITEM_LOAN_VIEW_ROLES: UserRole[] = [...ALL_ROLES];
 export const ITEM_LOAN_APPROVE_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "KEPALA_ADMIN_BARANG", "ADMIN_BARANG", "PKL_ADMIN_BARANG",
 ];
+
+// ── Peminjaman Barang: Pengembalian atas nama user lain ──────────────────────
+// Role yang boleh mengajukan pengembalian (request-return) ATAS NAMA peminjam
+// lain — untuk kasus peminjam resign / tidak bisa mengembalikan sendiri.
+// Flow tetap sama: APPROVED → RETURN_PENDING → Approver ACC → RETURNED.
+export const ITEM_LOAN_ADMIN_RETURN_ROLES: UserRole[] = [
+  "KEPALA_ADMIN_BARANG",
+];
