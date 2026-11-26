@@ -122,6 +122,24 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         if (tErr || !tFolder) {
           return NextResponse.json({ success: false, message: "Folder tujuan tidak ditemukan" }, { status: 404 });
         }
+
+        // Auto-reactivate: kalau folder archived/SOLD, un-archive
+        // supaya unit baru muncul di Data Barang
+        if (tFolder.archived_at || tFolder.status === "SOLD") {
+          const { error: reactivateErr } = await supabaseAdmin
+            .from("laptops")
+            .update({
+              archived_at: null,
+              archived_by: null,
+              archive_reason: null,
+              status: "SIAP_JUAL",
+            })
+            .eq("id", target_folder_id);
+          if (reactivateErr) {
+            console.error("[units/create] Gagal reactivate parent laptop:", reactivateErr.message);
+          }
+        }
+
         // FIX case-insensitive: cat.name dari laptop_categories bisa "Charger"
         // sementara tFolder.category dari laptops bisa "CHARGER". Pakai
         // normalisasi UPPERCASE + trim di dua sisi supaya tidak false reject.
@@ -270,6 +288,24 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         if (tErr || !tFolder) {
           return NextResponse.json({ success: false, message: "Folder tujuan tidak ditemukan" }, { status: 404 });
         }
+
+        // Auto-reactivate: kalau folder archived/SOLD, un-archive
+        // supaya unit baru muncul di Data Barang
+        if (tFolder.archived_at || tFolder.status === "SOLD") {
+          const { error: reactivateErr } = await supabaseAdmin
+            .from("accessories")
+            .update({
+              archived_at: null,
+              archived_by: null,
+              archive_reason: null,
+              status: "TERSEDIA",
+            })
+            .eq("id", target_folder_id);
+          if (reactivateErr) {
+            console.error("[units/create] Gagal reactivate parent accessory:", reactivateErr.message);
+          }
+        }
+
         // FIX case-insensitive: cat.name dari laptop_categories bisa "Charger"
         // sementara tFolder.category dari accessories bisa "CHARGER". Pakai
         // normalisasi UPPERCASE + trim di dua sisi supaya tidak false reject.

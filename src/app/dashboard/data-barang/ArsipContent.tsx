@@ -11,7 +11,7 @@ type ItemType = "LAPTOP" | "AKSESORIS";
 interface ArchivedRow {
     id: string;
     tipe: ItemType;
-    nama: string;
+    nama: string | null;
     kategori: string | null;
     brand: string | null;
     harga_jual: number;
@@ -158,7 +158,7 @@ export default function ArsipContent() {
         const q = search.trim().toLowerCase();
         if (!q) return rows;
         return rows.filter(r =>
-            r.nama.toLowerCase().includes(q) ||
+            (r.nama || "").toLowerCase().includes(q) ||
             (r.brand || "").toLowerCase().includes(q) ||
             (r.kategori || "").toLowerCase().includes(q) ||
             (r.sn || []).join(" ").toLowerCase().includes(q)
