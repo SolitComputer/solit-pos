@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
-import { hasAnyRole, ITEM_LOAN_APPROVE_ROLES } from "@/lib/permissions";
+import { hasAnyRole, ITEM_LOAN_APPROVE_ROLES, ITEM_LOAN_ADMIN_RETURN_ROLES } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
 
 interface Props { params: Promise<{ id: string }> }
@@ -60,8 +60,11 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         return NextResponse.json({ success: false, message: "Pengajuan sudah diproses" }, { status: 409 });
       updates = { status: "REJECTED", approved_by: user.id, approved_by_name: user.name, approved_at: new Date().toISOString() };
     } else if (action === "request-return") {
-      // ✅ Hanya PEMINJAM yang boleh ajukan pengembalian — admin/approver pun tidak.
-      if (!isBorrower) return NextResponse.json({ success: false, message: "Hanya peminjam yang bisa mengajukan pengembalian barangnya sendiri" }, { status: 403 });
+      // ✅ Peminjam ATAU Kepala Admin Barang (untuk kasus peminjam resign / tidak bisa kembalikan sendiri).
+      const canAdminReturn = hasAnyRole(userRoles, ITEM_LOAN_ADMIN_RETURN_ROLES);
+      if (!isBorrower && !canAdminReturn) {
+        return NextResponse.json({ success: false, message: "Hanya peminjam atau Kepala Admin Barang yang bisa mengajukan pengembalian" }, { status: 403 });
+      }
       if (loan.status !== "APPROVED")
         return NextResponse.json({ success: false, message: "Hanya pinjaman aktif yang bisa diajukan pengembalian" }, { status: 409 });
       updates = { status: "RETURN_PENDING" };

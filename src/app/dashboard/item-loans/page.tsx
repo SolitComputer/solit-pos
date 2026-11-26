@@ -8,7 +8,7 @@ import { LOAN_APPROVER_MANAGE_ROLES } from "@/lib/permissions";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAuthUser } from "@/hooks/useAuthUser";
-import { UserRole, hasAnyRole, ITEM_LOAN_APPROVE_ROLES } from "@/lib/permissions";
+import { UserRole, hasAnyRole, ITEM_LOAN_APPROVE_ROLES, ITEM_LOAN_ADMIN_RETURN_ROLES } from "@/lib/permissions";
 import { notifyItemLoanResolved } from "@/hooks/useItemLoanNotify";
 
 interface SnResult {
@@ -47,7 +47,8 @@ export default function ItemLoansPage() {
     const [userName, setUserName] = useState("");
     const [userId, setUserId] = useState("");
     const [canApprove, setCanApprove] = useState(false);
-    const canManageApprovers = hasAnyRole(userRoles, LOAN_APPROVER_MANAGE_ROLES);
+const canManageApprovers = hasAnyRole(userRoles, LOAN_APPROVER_MANAGE_ROLES);
+const canAdminReturn = hasAnyRole(userRoles, ITEM_LOAN_ADMIN_RETURN_ROLES);
 
     const [snQuery, setSnQuery] = useState("");
     const [snResults, setSnResults] = useState<SnResult[]>([]);
@@ -311,12 +312,17 @@ export default function ItemLoansPage() {
                 </div>
             );
         }
-        if (l.status === "APPROVED" && l.borrower_id === userId) {
+        if (l.status === "APPROVED" && (l.borrower_id === userId || canAdminReturn)) {
             return (
-                <button onClick={() => act(l.id, "request-return")} disabled={actingId === l.id}
-                    className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
-                    <RotateCcw size={12} /> Ajukan Pengembalian
-                </button>
+                <div className="flex flex-col gap-1">
+                    <button onClick={() => act(l.id, "request-return")} disabled={actingId === l.id}
+                        className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
+                        <RotateCcw size={12} /> Ajukan Pengembalian
+                    </button>
+                    {canAdminReturn && l.borrower_id !== userId && (
+                        <span className="text-[9px] text-zinc-400 italic">atas nama {l.borrower_name}</span>
+                    )}
+                </div>
             );
         }
         if (l.status === "RETURN_PENDING" && canApprove) {
@@ -694,7 +700,7 @@ export default function ItemLoansPage() {
                                                                     </button>
                                                                 </>
                                                             )}
-                                                            {g.borrower_id === userId && approvedIds.length > 0 && (
+                                                            {(g.borrower_id === userId || canAdminReturn) && approvedIds.length > 0 && (
                                                                 <button onClick={() => actMany(approvedIds, "request-return")} disabled={busy}
                                                                     className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
                                                                     <RotateCcw size={12} /> Kembalikan Semua
@@ -823,7 +829,7 @@ export default function ItemLoansPage() {
                                                                                 </button>
                                                                             </>
                                                                         )}
-                                                                        {g.borrower_id === userId && approvedIds.length > 0 && (
+                                                                        {(g.borrower_id === userId || canAdminReturn) && approvedIds.length > 0 && (
                                                                             <button onClick={() => actMany(approvedIds, "request-return")} disabled={busy}
                                                                                 className="h-7 px-2.5 rounded-lg text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition disabled:opacity-40 flex items-center gap-1">
                                                                                 <RotateCcw size={12} /> Ajukan Pengembalian Semua
