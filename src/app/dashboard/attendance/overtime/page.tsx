@@ -762,7 +762,9 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
   }, [o.user_id, o.is_late, isHoliday]);
 
   const holidayLate = isHoliday && (o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start, lateThreshold.h * 60 + lateThreshold.m)));
-  const holidayAutoPay = isHoliday ? (isTargetPkl ? (holidayLate ? 25000 : 50000) : (holidayLate ? 50000 : 100000)) : null;
+  // ✅ CHANGED — telat di hari libur TIDAK lagi flat 50rb/25rb; backend akan
+  // hitung per-jam dari gaji pokok saat Simpan (null = unknown preview).
+  const holidayAutoPay = isHoliday && !holidayLate ? (isTargetPkl ? 50000 : 100000) : null;
 
   const isFlatPay = o.is_holiday === true || (!o.rate_per_hour && (o.total_pay ?? 0) > 0);
   const [payMode, setPayMode] = useState<"PER_JAM" | "TETAP">(isFlatPay ? "TETAP" : "PER_JAM");
@@ -776,7 +778,9 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
   // ke bawah per jam penuh (mis. 6j30m bukan cuma dibayar 6 jam).
   // ✅ CHANGED — kalau role-nya boleh custom, total pakai nilai custom; selain itu tetap terkunci aturan
   const totalPay = isHoliday
-    ? (holidayEditable ? Math.round(Number(customHolidayPay) || 0) : (holidayAutoPay as number))
+    ? (holidayEditable
+      ? Math.round(Number(customHolidayPay) || 0)
+      : (holidayAutoPay ?? 0)) // ✅ telat → preview 0, backend hitung per-jam saat simpan
     : (payMode === "PER_JAM" ? Math.round((durationMinutes / 60) * rate) : fixedPay);
   const save = async () => {
     if (!isHoliday) {
@@ -794,8 +798,13 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
           id: o.id,
           action: "AUDIT",
           decision: "APPROVE",
-          // ✅ CHANGED — kirim nominal custom untuk role yang dikecualikan
-          total_pay: isHoliday ? (holidayEditable ? Math.round(Number(customHolidayPay) || 0) : holidayAutoPay) : totalPay, rate_per_hour: isHoliday ? null : (payMode === "PER_JAM" ? rate : null),
+           // ✅ CHANGED — holiday+telat: kirim null biar backend hitung per-jam sendiri.
+          // holidayEditable (role custom): kirim nominal custom dari admin.
+          // holiday+on-time: kirim holidayAutoPay (flat).
+          total_pay: isHoliday
+            ? (holidayEditable ? Math.round(Number(customHolidayPay) || 0) : (holidayAutoPay ?? null))
+            : totalPay,
+          rate_per_hour: isHoliday ? null : (payMode === "PER_JAM" ? rate : null),
         }),
       });
       const d = await res.json();
@@ -827,8 +836,9 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
                 Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"} {isTargetPkl ? "(PKL)" : ""}
               </p>
               <p className="text-[10px] text-gray-500 mt-1">
-                Aturan tetap sistem ({isTargetPkl ? "PKL" : "Karyawan"}): Tepat waktu = {formatRupiah(isTargetPkl ? 50000 : 100000)} · Terlambat = {formatRupiah(isTargetPkl ? 25000 : 50000)}.
-                Nominal ini terkunci dan tidak bisa diubah manual.
+                {holidayLate
+                  ? <>Telat → dihitung <strong>per-jam</strong> otomatis dari gaji pokok × durasi lembur (sama seperti lembur reguler). Nominal persisnya baru ketahuan setelah klik <strong>Simpan</strong>.</>
+                  : <>Tepat waktu → nominal tetap <strong>{formatRupiah(isTargetPkl ? 50000 : 100000)}</strong>. Nominal ini terkunci dan tidak bisa diubah manual.</>}
               </p>
             </div>
           )
@@ -855,12 +865,21 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
           </div>
           <div className="border-t border-white/10 pt-3.5">
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Total Bayaran</p>
-            <p className="text-xl font-bold text-emerald-400">{formatRupiah(Math.round(totalPay))}</p>
-            {isHoliday
-              ? <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap (aturan hari libur) · tidak dikali jam</p>
-              : payMode === "PER_JAM"
-                ? <p className="text-[9px] text-gray-500 mt-0.5">{hours} jam × {formatRupiah(Math.round(rate))}</p>
-                : <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap · tidak dikali jam</p>}
+            {isHoliday && holidayLate && !holidayEditable ? (
+              <>
+                <p className="text-xl font-bold text-emerald-400">Dihitung saat Simpan</p>
+                <p className="text-[9px] text-gray-500 mt-0.5">Telat hari libur → per-jam dari gaji pokok × {hours} jam</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xl font-bold text-emerald-400">{formatRupiah(Math.round(totalPay))}</p>
+                {isHoliday
+                  ? <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap (aturan hari libur) · tidak dikali jam</p>
+                  : payMode === "PER_JAM"
+                    ? <p className="text-[9px] text-gray-500 mt-0.5">{hours} jam × {formatRupiah(Math.round(rate))}</p>
+                    : <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap · tidak dikali jam</p>}
+              </>
+            )}
           </div>
         </div>
         {/* ✅ NEW — input nominal custom untuk lembur hari libur role dikecualikan */}
@@ -1053,8 +1072,10 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
     return startMinutes >= thresholdMinutes;
   }, [isHolidayOvertime, startTime, targetLateThreshold]);
 
+  // ✅ CHANGED — telat di hari libur tidak lagi punya nominal flat; dihitung
+  // per-jam saat audit. Auto-fill hanya untuk tepat waktu.
   const holidayAutoPay = useMemo(
-    () => (isHolidayOvertime ? (isTargetPkl ? (holidayIsLate ? 25000 : 50000) : (holidayIsLate ? 50000 : 100000)) : null),
+    () => (isHolidayOvertime && !holidayIsLate ? (isTargetPkl ? 50000 : 100000) : null),
     [isHolidayOvertime, holidayIsLate, isTargetPkl]
   );
 
@@ -1140,7 +1161,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           </span>
           <div className="flex-1">
             <p className={`text-[11px] font-semibold leading-tight flex items-center gap-1.5 ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}><CalendarDays size={13} /> Lembur hari libur</p>
-            <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran otomatis: Tepat {isTargetPkl ? "50rb" : "100rb"} / Telat {isTargetPkl ? "25rb" : "50rb"}</p>
+                     <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Tepat waktu: {isTargetPkl ? "50rb" : "100rb"} flat · Telat: per-jam dari gaji pokok (sama seperti lembur biasa)</p>
           </div>
         </button>
         {/*  Mode normal: grid tanggal/jam selalu tampil seperti sebelumnya */}
@@ -1171,7 +1192,9 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
                   {holidayIsLate ? "Mulai 08:00 ke atas dihitung terlambat di hari libur." : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
                 </p>
                 <p className={`text-[11px] font-bold mt-1.5 pt-1.5 border-t ${holidayIsLate ? "text-amber-700 border-amber-200" : "text-emerald-700 border-emerald-200"}`}>
-                  Bayaran lembur: {formatRupiah(holidayAutoPay ?? (isTargetPkl ? (holidayIsLate ? 25000 : 50000) : (holidayIsLate ? 50000 : 100000)))}
+                  Bayaran lembur: {holidayIsLate
+                    ? "Dihitung per-jam saat Audit"
+                    : formatRupiah(holidayAutoPay ?? (isTargetPkl ? 50000 : 100000))}
                 </p>
               </div>
             </div>
@@ -1197,15 +1220,21 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
               min={0}
               value={manualPay}
               onChange={e => setManualPay(e.target.value)}
-              readOnly={isHolidayOvertime}
-              disabled={isHolidayOvertime}
-              placeholder={isHolidayOvertime ? "" : "Kosongkan = otomatis dari tarif/jam"}
-              className={`w-full h-10 border rounded-xl pl-9 pr-3.5 text-xs font-mono transition-all ${isHolidayOvertime ? "border-purple-200 bg-purple-50 text-purple-700 font-bold cursor-not-allowed" : "border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"}`}
+              readOnly={isHolidayOvertime && !holidayIsLate}
+              disabled={isHolidayOvertime && !holidayIsLate}
+              placeholder={
+                isHolidayOvertime
+                  ? (holidayIsLate ? "Kosongkan = dihitung per-jam saat Audit" : "")
+                  : "Kosongkan = otomatis dari tarif/jam"
+              }
+              className={`w-full h-10 border rounded-xl pl-9 pr-3.5 text-xs font-mono transition-all ${isHolidayOvertime && !holidayIsLate ? "border-purple-200 bg-purple-50 text-purple-700 font-bold cursor-not-allowed" : "border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"}`}
             />
           </div>
           <p className="text-[9px] text-gray-400 mt-1">
             {isHolidayOvertime
-              ? `Aturan tetap (${isTargetPkl ? "PKL" : "Karyawan"}): Tepat waktu = ${formatRupiah(isTargetPkl ? 50000 : 100000)} · Terlambat = ${formatRupiah(isTargetPkl ? 25000 : 50000)}. Nominal ini terkunci mengikuti status jam masuk, tidak bisa diedit manual.`
+              ? (holidayIsLate
+                ? `Telat di hari libur → nominal dihitung per-jam otomatis saat Admin melakukan Audit (bukan flat lagi). Kolom ini boleh dikosongkan, boleh juga diisi manual kalau mau override.`
+                : `Tepat waktu → nominal tetap ${formatRupiah(isTargetPkl ? 50000 : 100000)} (${isTargetPkl ? "PKL" : "Karyawan"}), terkunci.`)
               : "Kosong → dihitung dari tarif per jam × durasi. Diisi → pakai nominal ini (tetap), tidak dikali jam."}
           </p>
         </div>

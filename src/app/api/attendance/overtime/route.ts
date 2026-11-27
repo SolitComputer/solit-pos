@@ -885,7 +885,7 @@ export async function PATCH(request: Request) {
         const late = isHolidayOvertimeLate(overtime, holidayLateThresholdMinutes);
         // ✅ NEW — cek override flat rate dulu; kalau user_id-nya terdaftar,
         // pakai nominal itu tanpa peduli status telat/PKL sama sekali.
-        const flatOverride = HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES[overtime.user_id];
+         const flatOverride = HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES[overtime.user_id];
 
         // ✅ NEW — role dikecualikan (Pengantaran / PKL Pengantaran): nominal
         // lembur hari libur boleh di-custom admin saat Audit. Kalau admin
@@ -899,13 +899,85 @@ export async function PATCH(request: Request) {
           Number.isFinite(Number(auditCustomPay)) &&
           Number(auditCustomPay) >= 0;
 
+        // ✅ CHANGED — Lembur hari libur TELAT sekarang dihitung per-jam
+        // (sama persis dengan lembur reguler), bukan lagi dipotong setengah
+        // jadi 50rb/25rb flat. Tepat waktu tetap flat 100rb/50rb.
+        // Override Achmad Jaelani (flatOverride) & role custom (Pengantaran)
+        // tetap menang — mereka tidak kena rumus per-jam.
+        const shouldComputeHourlyForLateHoliday =
+          late && !hasValidCustomPay && flatOverride === undefined;
+
+        if (shouldComputeHourlyForLateHoliday) {
+          const [yearStr, monthStr] = overtime.request_date.split("-");
+          const year = parseInt(yearStr, 10);
+          const month0 = parseInt(monthStr, 10) - 1;
+          const firstDay = `${year}-${String(month0 + 1).padStart(2, "0")}-01`;
+          const lastDay = `${year}-${String(month0 + 1).padStart(2, "0")}-${String(new Date(year, month0 + 1, 0).getDate()).padStart(2, "0")}`;
+
+          const [{ data: salaryRow }, { data: weeklyOffs }, { data: monthlyOffs }, { data: dateOffs }, { data: dateWorks }] = await Promise.all([
+            supabase.from("user_salary").select("salary_type, base_salary").eq("user_id", overtime.user_id).maybeSingle(),
+            supabase.from("user_day_off").select("day_of_week").eq("user_id", overtime.user_id),
+            supabase.from("user_monthly_off").select("off_date").eq("user_id", overtime.user_id).eq("year", year).eq("month", month0 + 1),
+            supabase.from("user_date_off").select("off_date").eq("user_id", overtime.user_id).gte("off_date", firstDay).lte("off_date", lastDay),
+            supabase.from("user_date_work").select("work_date").eq("user_id", overtime.user_id).gte("work_date", firstDay).lte("work_date", lastDay),
+          ]);
+
+          if (!salaryRow && !isPKL) {
+            return NextResponse.json({
+              success: false,
+              message: "Karyawan ini belum punya data gaji (menu Rekap Gaji) — atur gaji dulu sebelum audit lembur hari libur telat.",
+            }, { status: 400 });
+          }
+
+          const weeklyOffDows = new Set<number>((weeklyOffs ?? []).map((r: any) => r.day_of_week));
+          const offDates = new Set<string>([
+            ...(monthlyOffs ?? []).map((r: any) => r.off_date),
+            ...(dateOffs ?? []).map((r: any) => r.off_date),
+          ]);
+          const workOverrideDates = new Set<string>((dateWorks ?? []).map((r: any) => r.work_date));
+          const effectiveWorkdays = countEffectiveWorkdaysInMonth(year, month0, weeklyOffDows, offDates, workOverrideDates);
+
+          let baseSalary = salaryRow?.base_salary ?? 0;
+          if (isPKL && baseSalary <= 0) baseSalary = effectiveWorkdays * 10000;
+
+          const salaryTypeToCompute = isPKL ? "PERCENTAGE" : (salaryRow?.salary_type ?? "PERCENTAGE");
+
+          const { nominal, perMinuteRate, eligible } = computeOvertimeNominal({
+            baseSalary,
+            effectiveWorkdays,
+            overtimeMinutes: overtime.duration_minutes ?? 0,
+            salaryType: salaryTypeToCompute,
+          });
+
+          const { data, error } = await supabase.from("overtime_requests").update({
+            audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
+            base_salary_snapshot: baseSalary,
+            effective_workdays_snapshot: effectiveWorkdays,
+            per_minute_rate: perMinuteRate,
+            total_pay: nominal,
+            rate_per_hour: null,
+            is_late: late,
+            updated_at: new Date().toISOString(),
+          }).eq("id", id).select().single();
+
+          if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+
+          return NextResponse.json({
+            success: true, data,
+            warning: (!eligible && !isPKL)
+              ? "Karyawan ini bergaji FLAT (Tetap) — sesuai kebijakan, nominal lembur hari libur telat otomatis Rp0."
+              : undefined,
+          });
+        }
+
+        // Tepat waktu / ada override / role dengan custom pay → flat lama
         const holidayPay = hasValidCustomPay
           ? Math.round(Number(auditCustomPay))
           : flatOverride !== undefined
             ? flatOverride
             : isPKL
-              ? (late ? PKL_HOLIDAY_OVERTIME_PAY.LATE : PKL_HOLIDAY_OVERTIME_PAY.ON_TIME)
-              : (late ? HOLIDAY_OVERTIME_PAY.LATE : HOLIDAY_OVERTIME_PAY.ON_TIME);
+              ? PKL_HOLIDAY_OVERTIME_PAY.ON_TIME
+              : HOLIDAY_OVERTIME_PAY.ON_TIME;
 
         const { data, error } = await supabase.from("overtime_requests").update({
           audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
