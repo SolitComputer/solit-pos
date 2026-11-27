@@ -140,9 +140,14 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
 
       if (willChangeLockedField) {
         // AUTO EJECT — unit keluar folder jadi SN Lepas
+        // ⬅️ FIX 2026-11-27: inherit `category` dari folder parent biar SN Lepas
+        //    hasil eject TIDAK tampil "TANPA KATEGORI" di Data Barang. Tanpa baris
+        //    ini, user harus manual re-set kategori sebelum bisa pindahkan unit ke
+        //    folder lain, karena filter kategori di UI match by name text.
         const ejectData: Record<string, any> = {
           ...unitUpdates,
           laptop_id: null,
+          category: folder.category ?? null,
           name: updates.laptop_name ?? folder.laptop_name,
           brand: updates.brand ?? folder.brand,
           cpu: updates.cpu ?? folder.cpu,
