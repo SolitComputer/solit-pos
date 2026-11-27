@@ -362,11 +362,13 @@ const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
 ];
 
 const PREPARATION_PENYEDIA_EXTRA_ROLES: UserRole[] = [
-  // KEPALA_SALES, KEPALA_ZENITH, KEPALA_SOTECH, KEPALA_ONPOINT sengaja TIDAK dimasukkan
+  // KEPALA_ZENITH, KEPALA_SOTECH, KEPALA_ONPOINT sengaja TIDAK dimasukkan
   // lagi di sini, supaya mereka tidak dapat akses "Selesai Disiapkan" (terima & cek unit).
   // Terima/cek unit hanya untuk PREPARATION_PENYEDIA_ROLES (Penyedia Barang, Kepala
-  // Penyedia Barang, PKL Penyedia Barang).
-  "CREW_SALES", "KEPALA_MARKETING", "KONTEN", "PKL_SALES", "PKL_ZENITH",
+  // Penyedia Barang, PKL Penyedia Barang) + KEPALA_SALES sebagai supervisor
+  // (keputusan 2026-11-27 — Kepala Sales butuh akses penuh edit/hapus/add/toggle
+  // unit di Penyiapan untuk supervisi tim sales).
+  "KEPALA_SALES", "CREW_SALES", "KEPALA_MARKETING", "KONTEN", "PKL_SALES", "PKL_ZENITH",
 ];
 export const PREPARATION_CREATE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,

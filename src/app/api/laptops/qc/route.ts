@@ -103,9 +103,12 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
     }
 
     // Field yang di-save di level unit (termasuk field model via mirror kolom)
+    // ⬅️ FIX 2026-11-27: tambah "branch" — tanpa ini, perubahan cabang di Team QC
+    //    tidak pernah ter-save ke DB, akibatnya Data Barang tetap tampilin cabang lama.
     const UNIT_FIELDS = ["serial_number", "grade", "source", "condition_note",
                          "purchase_price", "sparepart_cost", "selling_price", "official_price",
-                         "name", "brand", "cpu", "ram", "storage", "gpu", "display"];
+                         "name", "brand", "cpu", "ram", "storage", "gpu", "display",
+                         "branch"];
     // Field yang di-broadcast ke parent laptops (Case A non-eject only)
     const LAPTOP_FIELDS = ["brand", "cpu", "ram", "storage", "laptop_name", "gpu", "display", "selling_price"];
 
