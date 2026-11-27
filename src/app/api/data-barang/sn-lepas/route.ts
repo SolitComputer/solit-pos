@@ -6,7 +6,12 @@
 // section "🆓 SN Lepas" di etalase Data Barang.
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+// ✅ FIX: Ganti dari anon-key (@/services/supabase) ke admin-key.
+// Tabel laptop_units/accessory_units kemungkinan punya RLS yang filter
+// orphan units (accessory_id/laptop_id IS NULL) dari anon query → return
+// array kosong → SN Lepas tidak pernah muncul di Data Barang walau data
+// ada di DB. Pola ini sama dengan fix di restore/route.ts.
+import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 
 async function getHandler(_req: NextRequest, _ctx: unknown, _user: AuthUser) {

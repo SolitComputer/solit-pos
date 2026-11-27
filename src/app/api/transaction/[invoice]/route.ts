@@ -666,11 +666,29 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     if (unitFieldsProvided && !isCancelling) {
       const oldIds: string[] = Array.isArray(before?.unit_ids)
-        ? before.unit_ids.filter(Boolean)
+        ? [...before.unit_ids.filter(Boolean)]
         : before?.unit_id ? [before.unit_id] : [];
       const oldSNs: string[] = Array.isArray(before?.serial_numbers)
-        ? before.serial_numbers.filter(Boolean)
+        ? [...before.serial_numbers.filter(Boolean)]
         : before?.serial_number ? [before.serial_number] : [];
+
+      // ✅ FIX DELL-096: transactions.unit_ids / serial_numbers bisa STALE
+      // (tidak sync dengan transaction_items setelah edit/Tukar SN berulang).
+      // Union juga dari transaction_items — sumber per-unit paling reliable —
+      // supaya unit lama (mis. DELL-096) yang cuma ada di tx_items TAPI tidak
+      // ada di transactions.unit_ids tetap ke-detect & ter-release ke stok.
+      // Pola ini sama dengan restore/route.ts baris 218-258 yang sudah benar.
+      const { data: oldTxItemsForRelease } = await supabase
+        .from("transaction_items")
+        .select("unit_id, serial_number")
+        .eq("invoice_number", invoice)
+        .eq("item_type", "laptop")
+        .eq("restored", false);
+      for (const it of oldTxItemsForRelease ?? []) {
+        if (it.unit_id) oldIds.push(it.unit_id);
+        if (it.serial_number) oldSNs.push(it.serial_number);
+      }
+
       const newIds: string[] = Array.isArray(body.unit_ids)
         ? body.unit_ids.filter(Boolean)
         : body.unit_id ? [body.unit_id] : [];
@@ -1104,7 +1122,10 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
             .from("accessory_units")
             .update({ status: "KELUAR" })
             .eq("id", unitId)
-            .in("status", ["TERSEDIA", "SIAP_JUAL", "BELUM_SIAP", "MINUS_SIAP_JUAL", "DALAM_PENYIAPAN"]);
+            .in("status", [
+              "TERSEDIA", "SIAP_JUAL", "BELUM_SIAP", "MINUS_SIAP_JUAL", "DALAM_PENYIAPAN",
+              "HELD", "RESERVED", "PACKING", "PENDING", // ⬅️ BARU
+            ]);
           if (keluarErr) {
             console.error(`[PUT transaction] gagal set KELUAR unit ${unitId}:`, keluarErr.message);
           }
@@ -1150,11 +1171,19 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       // Unit lama yang TIDAK ada di list baru → restore ke TERSEDIA
       const accToRestore = [...oldAccUnitIds].filter(id => !newAccUnitIds.has(id));
       if (accToRestore.length > 0) {
+        // ✅ FIX DELL-096: tambah HELD/RESERVED/PACKING/PENDING ke guard.
+        // Unit lama yg sudah nyangkut di status pending dari bug sebelumnya
+        // (cancelOutflowByInvoice tidak reset HELD) harus ikut di-restore ke
+        // TERSEDIA, bukan diabaikan. Kalau tidak, DELL-096 selamanya HELD →
+        // hilang dari Data Barang walau transaksi aslinya sudah di-edit keluar.
         const { error: restoreErr } = await supabase
           .from("accessory_units")
           .update({ status: "TERSEDIA" })
           .in("id", accToRestore)
-          .in("status", ["KELUAR", "TERJUAL", "SOLD", "BELUM_SIAP"]);
+          .in("status", [
+            "KELUAR", "TERJUAL", "SOLD", "BELUM_SIAP",
+            "HELD", "RESERVED", "PACKING", "PENDING", // ⬅️ BARU
+          ]);
         if (restoreErr) {
           console.error("[PUT transaction] gagal restore aksesori lama:", restoreErr.message);
         } else if (accToRestore.length > 0) {
