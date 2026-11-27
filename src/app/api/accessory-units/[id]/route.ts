@@ -23,7 +23,12 @@ export const PATCH = withAuth(async (
     try { body = await req.json(); }
     catch { return NextResponse.json({ success: false, error: "Body tidak valid" }, { status: 400 }); }
 
-        const { serial_number, condition, status, source, selling_price, buy_price, notes, branch } = body as Record<string, unknown>;
+        // ✅ BARU: tambah name, brand, spec untuk support Edit SN Lepas Aksesoris
+        // dari modal "Edit Aksesori" di Data Barang (UnifiedBarangContent.tsx).
+        // Tanpa ini, ke-3 field dibuang diam-diam (sama kayak bug MINUS_SIAP_JUAL
+        // sebelumnya) walau user udah submit.
+        const { serial_number, condition, status, source, selling_price, buy_price, notes, branch,
+                name, brand, spec } = body as Record<string, unknown>;
     // source di-handle di bawah — kolom `source` sudah ada di accessory_units
     // (via migration ADD COLUMN source).
 
@@ -57,6 +62,19 @@ export const PATCH = withAuth(async (
     if (typeof notes === "string") updates.notes = notes.trim() || null;
     // ⬅️ BARU: Cabang — diproses hanya kalau dikirim; UTAMA/JOGJA saja, lainnya null.
     if (branch !== undefined) updates.branch = branch === "UTAMA" || branch === "JOGJA" ? branch : null;
+
+    // ✅ BARU: Identitas per-unit (name, brand, spec) — buat Edit SN Lepas.
+    // Divalidasi string; kalau kosong, di-null-kan (bukan string kosong) biar
+    // konsisten sama INSERT di units/create route.
+    if (typeof name === "string") {
+        const clean = name.trim();
+        if (!clean) {
+            return NextResponse.json({ success: false, error: "Nama aksesori tidak boleh kosong" }, { status: 400 });
+        }
+        updates.name = clean;
+    }
+    if (typeof brand === "string") updates.brand = brand.trim() || null;
+    if (typeof spec === "string") updates.spec = spec.trim() || null;
 
     if (Object.keys(updates).length === 0) {
         return NextResponse.json({ success: false, error: "Tidak ada data yang diubah" }, { status: 400 });

@@ -359,6 +359,14 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
 
       const safeCondition = condition === "BARU" || condition === "BEKAS" ? condition : "BARU";
 
+      // ✅ BARU: terima status dari body (3 pilihan valid). Default TERSEDIA
+      // kalau tidak dikirim atau value tidak valid — aksesoris tidak perlu QC
+      // seperti laptop, jadi default langsung siap jual.
+      const VALID_ACC_STATUSES = ["TERSEDIA", "BELUM_SIAP", "MINUS_SIAP_JUAL"] as const;
+      const safeAccStatus = VALID_ACC_STATUSES.includes(body.status)
+        ? body.status
+        : "TERSEDIA";
+
       const { data: newUnit, error: unitErr } = await supabaseAdmin
         .from("accessory_units")
         .insert({
@@ -373,7 +381,7 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
           // kolom grade (error PGRST204). Grade konsep laptop-only; di UI
           // modal aksesoris field grade ada tapi tidak dipersist ke DB.
           condition: safeCondition,
-          status: "TERSEDIA",
+          status: safeAccStatus, // ✅ BARU: dari body, bukan hardcode
           buy_price: buyPriceNum,
           selling_price: sellingPriceNum ?? 0,
           source: source?.trim() || null,

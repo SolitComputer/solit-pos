@@ -138,6 +138,9 @@ const EMPTY_ACC_FORM = {
     name: "", brand: "", spec: "", condition: "BARU", grade: "A",
     serial_number: "", source: "", branch: "",
     buy_price: "", selling_price: "", notes: "",
+    // ✅ BARU: Status unit aksesoris. Default TERSEDIA karena aksesoris
+    // tidak perlu QC seperti laptop — langsung siap jual.
+    status: "TERSEDIA" as "TERSEDIA" | "BELUM_SIAP" | "MINUS_SIAP_JUAL",
 };
 
 interface ExcelRow {
@@ -489,6 +492,7 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                 buy_price: accForm.buy_price === "" ? 0 : Number(accForm.buy_price),
                 selling_price: accForm.selling_price === "" ? 0 : Number(accForm.selling_price),
                 notes: accForm.notes.trim() || null,
+                status: accForm.status, // ✅ BARU: kirim status ke backend
             };
 
             const res = await fetch("/api/data-barang/units/create", {
@@ -870,6 +874,29 @@ export default function AddUnitSnFirstModal({ categories, onClose, onCreated }: 
                                         </select>
                                     </Field>
                                 </div>
+
+                                {/* ✅ BARU: Field Status unit aksesoris — Siap Jual / Belum Siap / Minus Siap Jual.
+                                    Tidak ada "QC flow" seperti laptop — aksesoris langsung bisa pilih status final.
+                                    Default TERSEDIA = langsung siap jual. */}
+                                <Field label="Status" required>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {([
+                                            { v: "TERSEDIA", label: "✓ Siap Jual", activeCls: "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-900/20" },
+                                            { v: "BELUM_SIAP", label: "◷ Belum Siap", activeCls: "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-900/20" },
+                                            { v: "MINUS_SIAP_JUAL", label: "⚠ Minus Siap Jual", activeCls: "bg-rose-500 text-white border-rose-500 shadow-md shadow-rose-900/20" },
+                                        ] as const).map(o => (
+                                            <button key={o.v} type="button"
+                                                onClick={() => setAccForm(p => ({ ...p, status: o.v }))}
+                                                className={`h-10 rounded-xl text-xs font-semibold border transition ${
+                                                    accForm.status === o.v
+                                                        ? o.activeCls
+                                                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                                }`}>
+                                                {o.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </Field>
 
                                 <Field label="Serial Number" required>
                                     <input value={accForm.serial_number}
@@ -1456,7 +1483,9 @@ function SearchableFolderSelect({
                 onFocus={() => { if (!open) { setQuery(""); setOpen(true); } }}
                 placeholder={loading ? "Memuat folder..." : (placeholder ?? "-- Pilih Folder --")}
                 disabled={loading}
-                className={inputCls}
+                // ✅ FIX: relative z-30 — overlay click-outside pakai z-10,
+                // tanpa ini input tertutup overlay → klik ketik ter-intercept.
+                className={`${inputCls} relative z-30`}
             />
             {value && !open && (
                 <button type="button" onClick={handleClear}

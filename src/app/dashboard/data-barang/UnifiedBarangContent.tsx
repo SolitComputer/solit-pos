@@ -401,6 +401,7 @@ const EMPTY_LAPTOP_FORM = {
 };
 const EMPTY_ACC_FORM = {
     name: "", category: "", brand: "", spec: "", buy_price: "", sell_price: "", stock: "", notes: "",
+    status: "TERSEDIA" as "TERSEDIA" | "BELUM_SIAP" | "MINUS_SIAP_JUAL", // ✅ BARU
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1961,12 +1962,26 @@ export default function UnifiedBarangContent() {
             setConditionChecks(sanitizeConditionChecks(l.condition_checks));
             setSelectedCategoryId(l.category_id || "");
         } else {
+            // ✅ FIX: baca field dari UNIT (SN Lepas), bukan parent accessories.
+            // row.raw untuk SN Lepas punya shadow fields _status, _purchase_price, dll
+            // (lihat normalizeSnLepas). Fallback ke parent accessories fields kalau
+            // ada (legacy non-SN-Lepas yang masih bisa edit).
+            const rawUnit = row.raw as any;
             const a = row.raw as AccessoryRaw;
             setAccForm({
-                name: a.name || "", category: a.category || "", brand: a.brand || "", spec: a.spec || "",
-                buy_price: String(a.buy_price ?? ""), sell_price: String(a.sell_price ?? ""), stock: String(a.stock ?? ""), notes: a.notes || "",
+                name: (rawUnit.name ?? a.name ?? "").replace(/^🆓\s*/, "") || row.nama.replace(/^🆓\s*/, ""),
+                category: a.category || row.kategori || "",
+                brand: rawUnit.brand ?? a.brand ?? row.brand ?? "",
+                spec: rawUnit.spec ?? a.spec ?? row.spek ?? "",
+                buy_price: String(rawUnit._purchase_price ?? a.buy_price ?? row.harga_modal ?? ""),
+                sell_price: String(a.sell_price ?? row.harga_jual ?? ""),
+                stock: "", // ✅ dihapus dari UI, tapi field tetap ada supaya type aman
+                notes: rawUnit._notes ?? a.notes ?? "",
+                status: (rawUnit._status === "TERSEDIA" || rawUnit._status === "BELUM_SIAP" || rawUnit._status === "MINUS_SIAP_JUAL")
+                    ? rawUnit._status
+                    : "TERSEDIA", // ✅ BARU: baca status dari unit
             });
-            setSelectedCategoryId(categories.find(c => c.name.toUpperCase() === (a.category || "").toUpperCase())?.id ?? "");
+            setSelectedCategoryId(categories.find(c => c.name.toUpperCase() === (a.category || row.kategori || "").toUpperCase())?.id ?? "");
         }
         setFormModal({ mode: "edit", tipe: row.tipe, row });
     };
@@ -1997,23 +2012,45 @@ export default function UnifiedBarangContent() {
             } else {
                 if (!accForm.name.trim()) { toast.error("Nama aksesori wajib diisi"); return; }
                 if (!accForm.category) { toast.error("Kategori wajib dipilih"); return; }
-                const body = {
-                    ...accForm,
-                    buy_price: Number(accForm.buy_price) || 0,
-                    sell_price: Number(accForm.sell_price) || 0,
-                    // Stok aksesoris sekarang ikut pola laptop: tidak diinput manual saat
-                    // tambah barang. Saat CREATE stok dipaksa 0, lalu diisi otomatis dari
-                    // unit ber-SN lewat "Tambah Unit". Saat EDIT, nilai lama tetap dihormati
-                    // supaya aksesoris lama (stok manual, belum ber-SN) tidak berubah.
-                    stock: formModal.mode === "create" ? 0 : (Number(accForm.stock) || 0),
-                };
-                const url = formModal.mode === "edit" ? `/api/accessories/${formModal.row!.id}` : "/api/accessories";
-                const res = await fetch(url, {
-                    method: formModal.mode === "edit" ? "PATCH" : "POST",
-                    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-                });
-                const json = await res.json();
-                if (!json.success) throw new Error(json.error || "Gagal menyimpan aksesori");
+
+                // ✅ FIX: kalau row SN Lepas (unit tunggal), edit lewat endpoint
+                // /api/accessory-units/{unit_id} yang update UNIT, bukan parent.
+                // Status + nama + harga di-set ke unit itu sendiri.
+                const isSnLepasEdit = formModal.mode === "edit" && formModal.row?.is_sn_lepas;
+
+                if (isSnLepasEdit) {
+                    const unitBody = {
+                        name: accForm.name.trim(),
+                        brand: accForm.brand.trim() || null,
+                        spec: accForm.spec.trim() || null,
+                        buy_price: Number(accForm.buy_price) || 0,
+                        selling_price: Number(accForm.sell_price) || 0,
+                        status: accForm.status,
+                        notes: accForm.notes.trim() || null,
+                    };
+                    const res = await fetch(`/api/accessory-units/${formModal.row!.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(unitBody),
+                    });
+                    const json = await res.json();
+                    if (!json.success) throw new Error(json.message || json.error || "Gagal menyimpan unit aksesoris");
+                } else {
+                    // Flow lama untuk parent aksesoris (legacy / create baru)
+                    const body = {
+                        ...accForm,
+                        buy_price: Number(accForm.buy_price) || 0,
+                        sell_price: Number(accForm.sell_price) || 0,
+                        stock: formModal.mode === "create" ? 0 : (Number(accForm.stock) || 0),
+                    };
+                    const url = formModal.mode === "edit" ? `/api/accessories/${formModal.row!.id}` : "/api/accessories";
+                    const res = await fetch(url, {
+                        method: formModal.mode === "edit" ? "PATCH" : "POST",
+                        headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+                    });
+                    const json = await res.json();
+                    if (!json.success) throw new Error(json.error || "Gagal menyimpan aksesori");
+                }
             }
             toast.success(formModal.mode === "edit" ? "Berhasil diperbarui" : "Berhasil ditambahkan");
             closeForm();
@@ -2622,7 +2659,10 @@ export default function UnifiedBarangContent() {
                                                                     Perlu di QC
                                                                 </button>
                                                             )}
-                                                            {row.tipe === "AKSESORIS" && canEditAcc && (
+                                                            {/* ✅ FIX: tombol Edit aksesoris HANYA tampil untuk SN Lepas (unit tunggal).
+                                                                Aksesoris yg sudah masuk folder → edit per-unit via "Kelola Unit",
+                                                                bukan dari sini. Hindari edit parent yg bikin stok manual rusak. */}
+                                                            {row.tipe === "AKSESORIS" && canEditAcc && row.is_sn_lepas && (
                                                                 <button onClick={() => openEdit(row)}
                                                                     className={`${cardActionCls} text-zinc-600 bg-zinc-100 hover:bg-zinc-200`}>
                                                                     Edit
@@ -2849,7 +2889,9 @@ export default function UnifiedBarangContent() {
                                                                                 title="Kirim unit ini ke antrian Team QC"
                                                                                 className="h-7 px-2 text-[11px] font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">Perlu di QC</button>
                                                                         )}
-                                                                        {row.tipe === "AKSESORIS" && canEditAcc && (
+                                                                        {/* ✅ FIX: tombol Edit aksesoris HANYA tampil untuk SN Lepas (unit tunggal).
+                                                                            Aksesoris folder → edit per-unit di Kelola Unit, bukan dari sini. */}
+                                                                        {row.tipe === "AKSESORIS" && canEditAcc && row.is_sn_lepas && (
                                                                             <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
                                                                         )}
                                                                       {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
@@ -2953,12 +2995,33 @@ export default function UnifiedBarangContent() {
                                         <Field label="Harga Modal"><input type="number" inputMode="numeric" className={inputCls} value={accForm.buy_price} onChange={e => setAccForm(p => ({ ...p, buy_price: e.target.value }))} /></Field>
                                         <Field label="Harga Jual" required><input type="number" inputMode="numeric" className={inputCls} value={accForm.sell_price} onChange={e => setAccForm(p => ({ ...p, sell_price: e.target.value }))} /></Field>
                                     </div>
-                                    {/* Field Stok hanya untuk EDIT aksesoris lama yang stoknya masih manual
-    (belum ber-SN). Saat TAMBAH barang, field ini disembunyikan — stok
-    diisi dari unit ber-SN, sama seperti laptop. */}
-                                    {formModal.mode === "edit" && (
-                                        <Field label="Stok"><input type="number" inputMode="numeric" className={inputCls} value={accForm.stock} onChange={e => setAccForm(p => ({ ...p, stock: e.target.value }))} /></Field>
+                                    {/* ✅ FIX: field Stok DIHAPUS. Stok sekarang murni dari jumlah unit ber-SN —
+                                        edit stok manual bikin desync dengan accessory_units. */}
+
+                                    {/* ✅ BARU: field Status (3 pilihan) untuk Edit SN Lepas Aksesoris.
+                                        Hanya muncul kalau sedang edit SN Lepas — parent legacy tidak punya kolom status unit. */}
+                                    {formModal.mode === "edit" && formModal.row?.is_sn_lepas && (
+                                        <Field label="Status" required>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {([
+                                                    { v: "TERSEDIA", label: "✓ Siap Jual", activeCls: "bg-emerald-600 text-white border-emerald-600" },
+                                                    { v: "BELUM_SIAP", label: "◷ Belum Siap", activeCls: "bg-amber-500 text-white border-amber-500" },
+                                                    { v: "MINUS_SIAP_JUAL", label: "⚠ Minus SJ", activeCls: "bg-rose-500 text-white border-rose-500" },
+                                                ] as const).map(o => (
+                                                    <button key={o.v} type="button"
+                                                        onClick={() => setAccForm(p => ({ ...p, status: o.v }))}
+                                                        className={`h-10 rounded-xl text-xs font-semibold border transition ${
+                                                            accForm.status === o.v
+                                                                ? o.activeCls
+                                                                : "bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50"
+                                                        }`}>
+                                                        {o.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </Field>
                                     )}
+
                                     <Field label="Keterangan"><textarea rows={2} className={inputCls} value={accForm.notes} onChange={e => setAccForm(p => ({ ...p, notes: e.target.value }))} /></Field>
                                 </>
                             )}
