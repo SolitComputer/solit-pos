@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { hasAnyRole, PARTNER_MANAGE_ROLES } from "@/lib/permissions";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 interface Partner {
   id: string;
@@ -152,6 +153,7 @@ export default function MitraResellerClient() {
   };
 
   return (
+    <DashboardLayout>
     <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
       {/* Header */}
       <div>
@@ -505,5 +507,6 @@ export default function MitraResellerClient() {
         </div>
       )}
     </div>
+    </DashboardLayout>
   );
 }
