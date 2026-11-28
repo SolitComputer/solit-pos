@@ -219,7 +219,21 @@ export async function GET() {
       ? { ...baseSchedule, ...overrideShape, checkout: overrideShape.checkout ?? baseSchedule.checkout }
       : baseSchedule;
 
-    const effectiveShift = override ? override.shift : userShift;
+    // ✅ FIX — shift LABEL juga harus ikut Jadwal Mingguan (user_weekly_schedules)
+    // & ShiftConfig, bukan cuma users.shift global. Prioritas sama persis dgn
+    // jalur absen: Jadwal Tanggal > Jadwal Mingguan > ShiftConfig > users.shift.
+    const [{ data: weeklyShiftRow }, { data: cfgShiftRow }] = await Promise.all([
+      supabase.from("user_weekly_schedules").select("shift")
+        .eq("user_id", user.id).eq("day_of_week", todayDow).maybeSingle(),
+      supabase.from("user_shift_config").select("shift")
+        .eq("user_id", user.id).maybeSingle(),
+    ]);
+
+    const effectiveShift =
+      (override?.shift as "PAGI" | "SORE" | undefined)
+      ?? (weeklyShiftRow?.shift as "PAGI" | "SORE" | undefined)
+      ?? (cfgShiftRow?.shift as "PAGI" | "SORE" | undefined)
+      ?? userShift;
 
     const timeStatus = isAttendanceTimeForSchedule(schedule);
 
