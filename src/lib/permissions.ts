@@ -548,6 +548,14 @@ export const MARKETING_PLATFORM_MANAGE_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "KEPALA_MARKETING",
 ];
 
+// ─── Data Analyst (hub analitik lintas divisi, read-only) ───────────────────
+// Halaman view-only yang menampilkan funnel/dashboard dari banyak divisi.
+// SENGAJA hanya Admin (requirement bisnis 2026-11-28). Kalau nanti Programmer
+// / Asisten CEO / kepala divisi perlu akses, cukup tambahkan role-nya ke array
+// di bawah — SATU-SATUNYA sumber "siapa boleh lihat Data Analyst" (dipakai di
+// ROUTE_PERMISSIONS + Sidebar + API gate /api/data-analyst/*).
+export const DATA_ANALYST_VIEW_ROLES: UserRole[] = ["ADMIN"];
+
 // ─── Audit Marketing (Leads Sales per channel WA/FB/OLX/Carousell/Mitra/Reseller) ──
 // Sengaja reuse role list yang sama persis dengan SALES_REPORT_* di atas — tim
 // yang input & audit di kedua fitur ini orangnya sama, biar tidak dobel-maintain
@@ -915,6 +923,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // Marketing saja) — GET nya tetap bisa dibaca semua VIEW_ROLES buat dropdown.
   "/api/marketing-awareness": [...SALES_REPORT_AUDIT_ROLES],
   "/api/marketing-platforms": [...SALES_REPORT_AUDIT_ROLES],
+
+  // Data Analyst — halaman + endpoint aggregator lintas divisi (read-only).
+  // Semua endpoint di bawah /api/data-analyst/* di-gate sama.
+  "/dashboard/data-analyst": [...DATA_ANALYST_VIEW_ROLES],
+  "/api/data-analyst": [...DATA_ANALYST_VIEW_ROLES],
 
   "/dashboard/todos": [...TODO_ROLES],
   "/api/todos": [...TODO_ROLES],

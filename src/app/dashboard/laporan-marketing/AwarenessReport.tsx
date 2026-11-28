@@ -4,7 +4,6 @@ import {
   AlertTriangle, Calendar, Eye, Heart, Target, ShoppingCart,
   Plus, RefreshCw, Trash2, Image as ImageIcon,
 } from "lucide-react";
-import InlineDateRange from "@/components/common/InlineDateRange";
 import { todayWibDate } from "@/lib/marketing-report";
 import { hasAnyRole, MARKETING_PLATFORM_MANAGE_ROLES } from "@/lib/permissions";
 import AwarenessFormModal from "./AwarenessFormModal";
@@ -54,8 +53,28 @@ function useUserRoles(): string[] {
 }
 
 export default function AwarenessReport() {
-  const [customFrom, setCustomFrom] = useState(() => todayWibDate().slice(0, 8) + "01");
-  const [customTo, setCustomTo] = useState(() => todayWibDate());
+  // Tab preset periode — 3 pilihan tetap: hari ini, mingguan (7 hari terakhir
+  // termasuk hari ini), bulanan (awal bulan ini → hari ini). Default: bulanan
+  // (sama seperti perilaku sebelum ganti dari InlineDateRange).
+  // customFrom/customTo di-derive via useMemo — tidak lagi state tersendiri —
+  // supaya hanya recompute waktu `period` berubah (bukan tiap render), dan
+  // fetchData useCallback di bawah otomatis dapet reference yang stabil.
+  const [period, setPeriod] = useState<"today" | "week" | "month">("month");
+  const { customFrom, customTo } = useMemo(() => {
+    const today = todayWibDate();
+    if (period === "today") return { customFrom: today, customTo: today };
+    if (period === "week") {
+      // Parse manual (bukan new Date("YYYY-MM-DD")) biar tidak geser hari
+      // karena UTC — same pola dgn fmtTanggalShort di atas.
+      const [y, m, d] = today.split("-").map(Number);
+      const dt = new Date(y, m - 1, d - 6); // 7 hari terakhir INCLUDING hari ini
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const weekAgo = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+      return { customFrom: weekAgo, customTo: today };
+    }
+    // "month" — awal bulan ini sampai hari ini
+    return { customFrom: today.slice(0, 8) + "01", customTo: today };
+  }, [period]);
   const [rows, setRows] = useState<AwarenessRow[]>([]);
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [summary, setSummary] = useState({ totalJangkauan: 0, totalReports: 0 });
@@ -147,7 +166,28 @@ export default function AwarenessReport() {
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <InlineDateRange from={customFrom} to={customTo} onChange={(f, t) => { setCustomFrom(f); setCustomTo(t); }} />
+            {/* Tab preset periode — 3 pilihan cepat, ganti kalender InlineDateRange
+                sesuai keputusan 2026-11-28. Pakai pill style selaras dgn tab filter
+                toko di tabs lain (Range Harga, Laporan Barang). */}
+            <div className="inline-flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-full p-1">
+              {([
+                { key: "today" as const, label: "Hari Ini" },
+                { key: "week" as const, label: "Mingguan" },
+                { key: "month" as const, label: "Bulanan" },
+              ]).map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setPeriod(t.key)}
+                  className={`px-3 h-8 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/30 ${
+                    period === t.key
+                      ? "bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-sm shadow-violet-300/40"
+                      : "text-gray-500 hover:text-gray-800 hover:bg-white"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => setShowFormModal(true)}
               className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-full text-sm font-semibold bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-sm hover:opacity-95"
