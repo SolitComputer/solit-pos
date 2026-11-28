@@ -204,11 +204,37 @@ export function OvertimeTable({
         }
       }
       const flatOverride = HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES[o.user_id];
-      const holidayPay = flatOverride !== undefined
-        ? flatOverride
-        : isTargetPkl ? (isLate ? 25000 : 50000) : (isLate ? 50000 : 100000);
-      if (confirm(`Audit lemburan hari libur ${o.users?.name}?\n\nStatus: ${isLate ? "Terlambat" : "Tepat Waktu"} — nominal terkunci ${formatRupiah(holidayPay)} (aturan tetap ${isTargetPkl ? "PKL" : "karyawan"}).`)) {
-        runAction(o.id, { action: "AUDIT", decision: "APPROVE", total_pay: holidayPay, rate_per_hour: null });
+
+      // ✅ CHANGED — aturan lembur hari libur telat baru:
+      // - Tepat waktu       → flat on-time (100rb karyawan / 50rb PKL)
+      // - Telat & >9 jam    → flat cap on-time (100rb karyawan / 50rb PKL)
+      // - Telat & ≤9 jam    → per-jam dari gaji pokok (server hitung sendiri,
+      //                       client TIDAK kirim total_pay)
+      // - Override (Achmad) → flat override selalu menang
+      const LATE_HOLIDAY_HOURLY_CAP_MINUTES = 9 * 60;
+      const durationMinutes = o.duration_minutes ?? 0;
+      const hoursWorked = Math.floor(durationMinutes / 60);
+      const flatOnTimePay = isTargetPkl ? 50000 : 100000;
+
+      let confirmMessage: string;
+      const payloadExtra: Record<string, any> = { rate_per_hour: null };
+
+      if (flatOverride !== undefined) {
+        confirmMessage = `Audit lemburan hari libur ${o.users?.name}?\n\nNominal override: ${formatRupiah(flatOverride)} (flat, tidak terpengaruh telat/jam).`;
+        payloadExtra.total_pay = flatOverride;
+      } else if (!isLate) {
+        confirmMessage = `Audit lemburan hari libur ${o.users?.name}?\n\nStatus: Tepat Waktu — nominal terkunci ${formatRupiah(flatOnTimePay)} (aturan tetap ${isTargetPkl ? "PKL" : "karyawan"}).`;
+        payloadExtra.total_pay = flatOnTimePay;
+      } else if (durationMinutes > LATE_HOLIDAY_HOURLY_CAP_MINUTES) {
+        confirmMessage = `Audit lemburan hari libur ${o.users?.name}?\n\nStatus: Terlambat, lembur ${hoursWorked} jam (>9 jam) → nominal cap ${formatRupiah(flatOnTimePay)} (aturan tetap ${isTargetPkl ? "PKL" : "karyawan"}).`;
+        payloadExtra.total_pay = flatOnTimePay;
+      } else {
+        confirmMessage = `Audit lemburan hari libur ${o.users?.name}?\n\nStatus: Terlambat, lembur ${hoursWorked} jam (≤9 jam) → nominal akan dihitung per-jam otomatis dari gaji pokok ${isTargetPkl ? "PKL" : "karyawan"} oleh server.`;
+        // Tidak kirim total_pay — biar backend compute via shouldComputeHourlyForLateHoliday
+      }
+
+      if (confirm(confirmMessage)) {
+        runAction(o.id, { action: "AUDIT", decision: "APPROVE", ...payloadExtra });
       }
       return;
     }
