@@ -7704,7 +7704,7 @@ export default function AttendanceDashboardPage() {
                                     {/* Footer Total */}
                                     <tfoot>
                                         <tr className="border-t-2 border-gray-300 bg-gradient-to-r from-gray-50 to-white">
-                                            <td colSpan={2} className="px-4 py-4 text-sm font-black text-gray-700">
+                                            <td className="sticky left-0 z-10 bg-gray-50 px-4 py-4 text-sm font-black text-gray-700 border-r-2 border-gray-200 min-w-[160px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.25)]">
                                                 TOTAL BULAN INI
                                             </td>
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
@@ -7747,6 +7747,8 @@ export default function AttendanceDashboardPage() {
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Lemburan</span>
                                             </td>
+                                            {/* Slot kosong untuk kolom Kehadiran % (tidak ada total %-nya) */}
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200" />
                                             {/* Kasbon Total */}
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-red-600 text-xs block">
@@ -7783,17 +7785,8 @@ export default function AttendanceDashboardPage() {
                                                 <span className="text-[8px] text-gray-400">Total Pensiun</span>
                                             </td>
 
-                                            {/* Total Potongan gabungan — pindah ke kolom Gross */}
-                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
-                                                <span className="font-mono font-black text-red-600 text-xs block">
-                                                    -{formatRupiah(
-                                                        userSummary
-                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
-                                                            .reduce((sum, u) => sum + ((allowanceMap[u.userId]?.deduction_loan || 0) + (allowanceMap[u.userId]?.deduction_cicilan || 0) + (allowanceMap[u.userId]?.deduction_pension || 0)), 0)
-                                                    )}
-                                                </span>
-                                                <span className="text-[8px] text-gray-400">Total Potongan</span>
-                                            </td>
+                                            {/* Total Potongan gabungan dihapus — tidak ada slot header-nya.
+                                                Breakdown-nya sudah ada di kolom Kasbon/Cicilan/Pensiun di atas. */}
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-blue-600 text-xs block">
                                                     {formatRupiah(
