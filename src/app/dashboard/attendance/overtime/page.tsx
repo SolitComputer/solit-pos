@@ -837,7 +837,9 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
               </p>
               <p className="text-[10px] text-gray-500 mt-1">
                 {holidayLate
-                  ? <>Telat → dihitung <strong>per-jam</strong> otomatis dari gaji pokok × durasi lembur (sama seperti lembur reguler). Nominal persisnya baru ketahuan setelah klik <strong>Simpan</strong>.</>
+                  ? (hours > 9
+                    ? <>Telat → lembur <strong>{hours} jam (&gt;9 jam)</strong> → flat <strong>{formatRupiah(isTargetPkl ? 50000 : 100000)}</strong> (cap aturan baru, bukan per-jam).</>
+                    : <>Telat → lembur <strong>{hours} jam (≤9 jam)</strong> → dihitung <strong>per-jam</strong> otomatis dari gaji pokok × durasi lembur. Nominal persisnya ketahuan setelah klik <strong>Simpan</strong>.</>)
                   : <>Tepat waktu → nominal tetap <strong>{formatRupiah(isTargetPkl ? 50000 : 100000)}</strong>. Nominal ini terkunci dan tidak bisa diubah manual.</>}
               </p>
             </div>
@@ -866,10 +868,18 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
           <div className="border-t border-white/10 pt-3.5">
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Total Bayaran</p>
             {isHoliday && holidayLate && !holidayEditable ? (
-              <>
-                <p className="text-xl font-bold text-emerald-400">Dihitung saat Simpan</p>
-                <p className="text-[9px] text-gray-500 mt-0.5">Telat hari libur → per-jam dari gaji pokok × {hours} jam</p>
-              </>
+              hours > 9 ? (
+                // ✅ NEW — Cap: lembur telat > 9 jam langsung flat 100rb/50rb
+                <>
+                  <p className="text-xl font-bold text-emerald-400">{formatRupiah(isTargetPkl ? 50000 : 100000)}</p>
+                  <p className="text-[9px] text-gray-500 mt-0.5">Telat hari libur, lembur {hours} jam (&gt;9 jam) → flat cap</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xl font-bold text-emerald-400">Dihitung saat Simpan</p>
+                  <p className="text-[9px] text-gray-500 mt-0.5">Telat hari libur → per-jam dari gaji pokok × {hours} jam (≤9 jam)</p>
+                </>
+              )
             ) : (
               <>
                 <p className="text-xl font-bold text-emerald-400">{formatRupiah(Math.round(totalPay))}</p>

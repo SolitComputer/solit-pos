@@ -885,7 +885,7 @@ export async function PATCH(request: Request) {
         const late = isHolidayOvertimeLate(overtime, holidayLateThresholdMinutes);
         // ✅ NEW — cek override flat rate dulu; kalau user_id-nya terdaftar,
         // pakai nominal itu tanpa peduli status telat/PKL sama sekali.
-         const flatOverride = HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES[overtime.user_id];
+        const flatOverride = HOLIDAY_OVERTIME_FLAT_RATE_OVERRIDES[overtime.user_id];
 
         // ✅ NEW — role dikecualikan (Pengantaran / PKL Pengantaran): nominal
         // lembur hari libur boleh di-custom admin saat Audit. Kalau admin
@@ -908,6 +908,34 @@ export async function PATCH(request: Request) {
           late && !hasValidCustomPay && flatOverride === undefined;
 
         if (shouldComputeHourlyForLateHoliday) {
+          // ✅ NEW — Cap: lembur hari libur telat > 9 jam dapat flat (100rb karyawan / 50rb PKL),
+          // bukan dihitung per-jam. Jadi makin lama kerja tidak unlimited — ada batas atas.
+          const LATE_HOLIDAY_HOURLY_CAP_MINUTES = 9 * 60; // 9 jam
+          const durationMinutes = overtime.duration_minutes ?? 0;
+
+          if (durationMinutes > LATE_HOLIDAY_HOURLY_CAP_MINUTES) {
+            // ✅ CHANGED — PKL cap proporsional 50rb (sesuai on-time rate PKL),
+            // bukan 100rb seperti karyawan reguler.
+            const flatCapPay = isPKL
+              ? PKL_HOLIDAY_OVERTIME_PAY.ON_TIME  // PKL cap 50rb
+              : HOLIDAY_OVERTIME_PAY.ON_TIME;     // Karyawan cap 100rb
+
+            const { data, error } = await supabase.from("overtime_requests").update({
+              audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
+              total_pay: flatCapPay,
+              rate_per_hour: null,
+              per_minute_rate: null,
+              base_salary_snapshot: null,
+              effective_workdays_snapshot: null,
+              is_late: late,
+              updated_at: new Date().toISOString(),
+            }).eq("id", id).select().single();
+
+            if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+            return NextResponse.json({ success: true, data });
+          }
+
+          // ≤ 9 jam → hitung per-jam seperti lembur reguler (existing logic)
           const [yearStr, monthStr] = overtime.request_date.split("-");
           const year = parseInt(yearStr, 10);
           const month0 = parseInt(monthStr, 10) - 1;
