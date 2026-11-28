@@ -9,12 +9,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const KASBON_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
+// ⬅️ REVISI — disamakan dengan route.ts: hanya role full-access yang boleh lihat
+// detail SEMUA karyawan. Non-admin lain tetap boleh buka detail, TAPI hanya miliknya.
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 function getRoles(user: any): string[] {
   return Array.isArray(user?.roles) && user.roles.length > 0 ? user.roles : user?.role ? [user.role] : [];
 }
-function hasAccess(user: any): boolean {
-  return getRoles(user).some((r) => KASBON_ACCESS_ROLES.includes(r));
+// ⬅️ BARU — deteksi role PKL (samakan dgn route.ts & page.tsx)
+function isPKLRole(role?: string): boolean {
+  if (!role) return false;
+  return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-");
+}
+function isAdminUser(user: any): boolean {
+  return getRoles(user).some((r) => FULL_ACCESS_ROLES.includes(r));
 }
 
 // Daftar entry kasbon/cicilan satu karyawan di bulan terpilih (IN & OUT) utk modal detail/edit
@@ -22,15 +29,27 @@ export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-    if (!hasAccess(user)) return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+    // ⬅️ REVISI — jangan tolak semua non-admin. Hanya PKL yang diblok (kecuali dia
+    // juga full-access). Non-admin lain lanjut, tapi di bawah dipaksa hanya baca
+    // entry miliknya sendiri.
+    const canViewAll = isAdminUser(user);
+    const userHasPKLRole = getRoles(user).some((r) => isPKLRole(r));
+    if (!canViewAll && userHasPKLRole) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("user_id");
+    const requestedUserId = searchParams.get("user_id");
     const year = parseInt(searchParams.get("year") ?? "", 10);
     const month = parseInt(searchParams.get("month") ?? "", 10); // 1..12
-    if (!userId || Number.isNaN(year) || Number.isNaN(month) || month < 1 || month > 12) {
+    if (!requestedUserId || Number.isNaN(year) || Number.isNaN(month) || month < 1 || month > 12) {
       return NextResponse.json({ success: false, message: "user_id, year, month wajib" }, { status: 400 });
     }
+
+    // ⬅️ BARU — non-admin DIPAKSA hanya boleh baca entry miliknya sendiri. user_id
+    // dari query diabaikan untuk mereka, jadi walau URL/DevTools diubah ke id orang
+    // lain, yang keluar tetap punya dirinya.
+    const userId = canViewAll ? requestedUserId : user.id;
 
     const mm = String(month).padStart(2, "0");
     const monthStart = `${year}-${mm}-01`;
