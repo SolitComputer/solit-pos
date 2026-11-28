@@ -16,6 +16,7 @@ import {
   Search,
   ShieldCheck,
   ShoppingBag,
+  Target,
   Trophy,
   X,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import MarketingInsightBoard from "./MarketingInsightBoard";
 import SalesErrorReport from "./SalesErrorReport";
 import AdsReport from "./AdsReport";
 import BarangHasilAds from "./BarangHasilAds";
+import AwarenessReport from "./AwarenessReport";
 
 // "2026-10-22" → "22 Okt 2026". Diparse manual (bukan new Date("YYYY-MM-DD"))
 // supaya tidak geser hari karena zona waktu.
@@ -78,7 +80,7 @@ function qtyCellClass(value: number, max: number): string {
 }
 
 // Urutan default + definisi tiap tab (dipakai untuk render yang bisa di-drag).
-const DEFAULT_TAB_ORDER = ["barang", "range", "insight", "kesalahan", "ads", "ads_items"];
+const DEFAULT_TAB_ORDER = ["barang", "range", "insight", "kesalahan", "ads", "ads_items", "awareness"];
 const TAB_DEFS = {
   barang: { label: "Laporan Barang", icon: BarChart3 },
   range: { label: "Range Harga", icon: Hash },
@@ -86,6 +88,7 @@ const TAB_DEFS = {
   kesalahan: { label: "Kesalahan Sales", icon: AlertTriangle },
   ads: { label: "Laporan Ads", icon: Megaphone },
   ads_items: { label: "Barang Hasil Ads", icon: ShoppingBag },
+  awareness: { label: "Awareness", icon: Target },
 } as const;
 
 // Filter toko di Rekap Kata Kunci & Rekap Range Harga — HARUS disamakan
@@ -106,7 +109,7 @@ export default function LaporanMarketingPage() {
   const [hideEmptyChannels, setHideEmptyChannels] = useState(false);
   const [storeFilter, setStoreFilter] = useState<StoreFilter>("ALL");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight" | "kesalahan" | "ads" | "ads_items">("barang");
+  const [activeTab, setActiveTab] = useState<"barang" | "range" | "insight" | "kesalahan" | "ads" | "ads_items" | "awareness">("barang");
   const [exporting, setExporting] = useState(false);
   // Sortir tabel Rekap: default "total" menurun (paling dicari dulu — perilaku lama).
   const [sortBy, setSortBy] = useState<"total" | "keyword">("total");
@@ -567,6 +570,7 @@ export default function LaporanMarketingPage() {
         {activeTab === "kesalahan" && <SalesErrorReport />}
         {activeTab === "ads" && <AdsReport />}
         {activeTab === "ads_items" && <BarangHasilAds />}
+        {activeTab === "awareness" && <AwarenessReport />}
       </div>
     </DashboardLayout>
   );

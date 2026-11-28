@@ -539,6 +539,15 @@ export const SALES_REPORT_SOFT_DELETE_ROLES: UserRole[] = [
   ...SALES_REPORT_MARKETING_ROLES,
 ];
 
+// ─── Marketing Awareness (tab baru di Laporan Marketing) ────────────────────
+// Tambah platform baru di registry (POST /api/marketing-platforms) dibatasi
+// KETAT ke ADMIN, PROGRAMMER, KEPALA_MARKETING sesuai keputusan bisnis.
+// Role lain (MARKETING, PKL_MARKETING, ASISTEN_CEO) tetap bisa LIHAT daftar
+// platform untuk dropdown, tapi tidak bisa tambah entry baru.
+export const MARKETING_PLATFORM_MANAGE_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "KEPALA_MARKETING",
+];
+
 // ─── Audit Marketing (Leads Sales per channel WA/FB/OLX/Carousell/Mitra/Reseller) ──
 // Sengaja reuse role list yang sama persis dengan SALES_REPORT_* di atas — tim
 // yang input & audit di kedua fitur ini orangnya sama, biar tidak dobel-maintain
@@ -899,6 +908,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // (redirect HTML → fetch gagal "Unexpected token '<'"). Role = sama dengan yang
   // boleh buka Laporan Marketing. Write tetap digate di handler pakai canManage(). 
   "/api/ads-report": [...SALES_REPORT_AUDIT_ROLES],
+
+  // Tab "Awareness" di Laporan Marketing. View/POST awareness report sama role
+  // dengan Laporan Marketing. POST ke /api/marketing-platforms digate KETAT di
+  // handler pakai MARKETING_PLATFORM_MANAGE_ROLES (Admin, Programmer, Kepala
+  // Marketing saja) — GET nya tetap bisa dibaca semua VIEW_ROLES buat dropdown.
+  "/api/marketing-awareness": [...SALES_REPORT_AUDIT_ROLES],
+  "/api/marketing-platforms": [...SALES_REPORT_AUDIT_ROLES],
 
   "/dashboard/todos": [...TODO_ROLES],
   "/api/todos": [...TODO_ROLES],
