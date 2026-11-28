@@ -78,7 +78,9 @@ export async function GET(request: Request) {
     // ditampilkan walau dia PKL (biar dia tetap bisa lihat kasbon/cicilannya).
     const users = canViewAll
       ? (usersRaw ?? []).filter((u: any) => !isPKLRole(u.role))
-      : (usersRaw ?? []).filter((u: any) => u.id === user.id);
+      // ⬅️ FIX — bandingkan sebagai string biar aman dari beda tipe (number vs
+      // string) antara id DB dan id JWT. Tanpa ini, baris sendiri bisa kosong.
+      : (usersRaw ?? []).filter((u: any) => String(u.id) === String(user.id));
 
     // Saldo awal manual — HANYA yang di-set pada/sesudah cutoff auto-sync.
     // Opening balance lama (sebelum cutoff) sengaja diabaikan supaya tabel
