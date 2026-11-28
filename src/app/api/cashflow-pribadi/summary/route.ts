@@ -10,6 +10,28 @@ const admin = () => createClient(
   { auth: { persistSession: false } }
 );
 
+type BalanceRow = { type: string; amount: number | string; transaction_date: string };
+
+// Ambil SEMUA transaksi user (ringan: 3 kolom) per 1000 baris,
+// karena Supabase membatasi max 1000 baris per request.
+async function fetchAllBalanceRows(sb: ReturnType<typeof admin>, userId: string): Promise<BalanceRow[]> {
+  const PAGE = 1000;
+  const all: BalanceRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from("personal_cashflow_transactions")
+      .select("type, amount, transaction_date")
+      .eq("user_id", userId)               // 🔒 privacy
+      .eq("is_deleted", false)
+      .order("id", { ascending: true })    // urutan stabil untuk pagination
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    all.push(...((data ?? []) as BalanceRow[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return all;
+}
+
 export async function GET(req: NextRequest) {
   const userId = req.headers.get("x-user-id");
   if (!userId) {
@@ -36,6 +58,23 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+
+  // ── Saldo kumulatif ───────────────────────────────────────────────────────
+  let allRows: BalanceRow[];
+  try {
+    allRows = await fetchAllBalanceRows(sb, userId);
+  } catch (e) {
+    const message = (e as { message?: string })?.message ?? "Gagal menghitung saldo";
+    return NextResponse.json({ success: false, message }, { status: 500 });
+  }
+
+  let openingBalance = 0;   // sisa uang sebelum periode (bulan-bulan lalu)
+  let availableBalance = 0; // sisa uang total saat ini (semua transaksi)
+  for (const r of allRows) {
+    const signed = r.type === "income" ? Number(r.amount) : -Number(r.amount);
+    availableBalance += signed;
+    if (r.transaction_date < periodStart) openingBalance += signed;
   }
 
   let totalIncome = 0;
@@ -76,6 +115,9 @@ export async function GET(req: NextRequest) {
     total_income: totalIncome,
     total_expense: totalExpense,
     balance: totalIncome - totalExpense,
+    opening_balance: openingBalance,
+    closing_balance: openingBalance + totalIncome - totalExpense,
+    available_balance: availableBalance,
     by_category: Array.from(catMap.values()).sort((a, b) => b.total - a.total),
     daily_trend: Array.from(dayMap.entries())
       .map(([date, v]) => ({ date, ...v }))
