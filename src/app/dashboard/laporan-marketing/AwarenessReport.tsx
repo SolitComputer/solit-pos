@@ -2,26 +2,31 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, Calendar, Eye, Heart, Target, ShoppingCart,
-  Plus, RefreshCw, Trash2, Image as ImageIcon,
+  Plus, RefreshCw, Trash2, Image as ImageIcon, Settings,
 } from "lucide-react";
 import { todayWibDate } from "@/lib/marketing-report";
 import { hasAnyRole, MARKETING_PLATFORM_MANAGE_ROLES } from "@/lib/permissions";
 import AwarenessFormModal from "./AwarenessFormModal";
+import TambahTokoModal from "./TambahTokoModal";
 import TambahPlatformModal from "./TambahPlatformModal";
+import TambahAkunModal from "./TambahAkunModal";
+import KelolaPlatform from "./KelolaPlatform";
 
-interface Platform {
-  id: string;
-  platform: string;
-  brand_toko: string;
-  daftar_akun: string;
-}
 interface AwarenessRow {
   id: string;
   jangkauan: number;
   foto_bukti_url: string | null;
   tanggal: string;
   created_at: string;
-  platform: Platform | null;
+  account: {
+    id: string;
+    name: string;
+    platform: {
+      id: string;
+      name: string;
+      brand: { id: string; name: string } | null;
+    } | null;
+  } | null;
 }
 
 function fmtTanggalShort(dateStr: string): string {
@@ -76,13 +81,23 @@ export default function AwarenessReport() {
     return { customFrom: today.slice(0, 8) + "01", customTo: today };
   }, [period]);
   const [rows, setRows] = useState<AwarenessRow[]>([]);
-  const [platforms, setPlatforms] = useState<Platform[]>([]);
+  // platforms sekarang di-fetch di dalam AwarenessFormModal (hierarkis)
   const [summary, setSummary] = useState({ totalJangkauan: 0, totalReports: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showFormModal, setShowFormModal] = useState(false);
-  const [showPlatformModal, setShowPlatformModal] = useState(false);
+  // State untuk 3 modal tambah terpisah (toko/platform/akun) + context-nya
+  const [showBrandModal, setShowBrandModal] = useState(false);
+  const [platformModalCtx, setPlatformModalCtx] = useState<{ brandId: string; brandName: string } | null>(null);
+  const [accountModalCtx, setAccountModalCtx] = useState<{ brandPlatformId: string; platformName: string; brandName: string } | null>(null);
+  // refreshKey dinaikin tiap kali ada perubahan di hierarki — trigger refetch di form
+  const [refreshKey, setRefreshKey] = useState(0);
   const [previewFoto, setPreviewFoto] = useState<string | null>(null);
+  // Sub-tab di dalam Awareness: "laporan" (default) vs "platform" (kelola registry).
+  // Dipisah di sini (bukan di parent LaporanMarketingPage) karena tab utama sudah
+  // menampung tab-level drag, jadi "platform" dibungkus di dalam Awareness tanpa
+  // nambah tab level-1 yang bisa di-reorder.
+  const [view, setView] = useState<"laporan" | "platform">("laporan");
 
   const userRoles = useUserRoles();
   const canManagePlatform = hasAnyRole(userRoles, MARKETING_PLATFORM_MANAGE_ROLES);
@@ -94,19 +109,11 @@ export default function AwarenessReport() {
       const params = new URLSearchParams();
       if (customFrom) params.set("from", customFrom);
       if (customTo) params.set("to", customTo);
-      const [reportRes, platformRes] = await Promise.all([
-        fetch(`/api/marketing-awareness?${params.toString()}`, { cache: "no-store" }),
-        fetch(`/api/marketing-platforms`, { cache: "no-store" }),
-      ]);
-      const reportJson = await reportRes.json();
-      const platformJson = await platformRes.json();
-      if (!reportRes.ok || !reportJson.success)
-        throw new Error(reportJson.message || "Gagal memuat laporan");
-      if (!platformRes.ok || !platformJson.success)
-        throw new Error(platformJson.message || "Gagal memuat platform");
-      setRows(reportJson.data as AwarenessRow[]);
-      setSummary(reportJson.summary ?? { totalJangkauan: 0, totalReports: 0 });
-      setPlatforms(platformJson.data as Platform[]);
+      const res = await fetch(`/api/marketing-awareness?${params.toString()}`, { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat laporan");
+      setRows(json.data as AwarenessRow[]);
+      setSummary(json.summary ?? { totalJangkauan: 0, totalReports: 0 });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -147,6 +154,42 @@ export default function AwarenessReport() {
 
   return (
     <div className="space-y-4 sm:space-y-5">
+      {/* Sub-tab switcher — Laporan Awareness vs Kelola Platform */}
+      <div className="flex items-center gap-1 bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 rounded-full p-1 w-fit max-w-full overflow-x-auto">
+        {([
+          { key: "laporan" as const, label: "Laporan Awareness", icon: Eye },
+          { key: "platform" as const, label: "Kelola Platform", icon: Settings },
+        ]).map((t) => {
+          const Icon = t.icon;
+          const isActive = view === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setView(t.key)}
+              className={`inline-flex items-center gap-1.5 px-3.5 sm:px-4 h-9 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap focus:outline-none ${
+                isActive
+                  ? "bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-sm shadow-violet-300/40"
+                  : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {view === "platform" ? (
+        <KelolaPlatform
+          canManagePlatform={canManagePlatform}
+          refreshKey={refreshKey}
+          onRefresh={() => setRefreshKey((k) => k + 1)}
+          onRequestAddBrand={() => setShowBrandModal(true)}
+          onRequestAddPlatform={(brandId, brandName) => setPlatformModalCtx({ brandId, brandName })}
+          onRequestAddAccount={(brandPlatformId, platformName, brandName) => setAccountModalCtx({ brandPlatformId, platformName, brandName })}
+        />
+      ) : (
+      <>
       {/* Header actions */}
       <div className="rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex flex-col-reverse lg:flex-row gap-4 lg:items-center lg:justify-between">
@@ -277,13 +320,13 @@ export default function AwarenessReport() {
                       {fmtTanggalShort(row.tanggal)}
                     </td>
                     <td className="border border-gray-200 px-3 py-1.5 font-semibold text-gray-800">
-                      {row.platform?.platform ?? "—"}
+                      {row.account?.platform?.name ?? "—"}
                     </td>
                     <td className="border border-gray-200 px-3 py-1.5 text-gray-700">
-                      {row.platform?.brand_toko ?? "—"}
+                      {row.account?.platform?.brand?.name ?? "—"}
                     </td>
                     <td className="border border-gray-200 px-3 py-1.5 text-gray-700">
-                      {row.platform?.daftar_akun ?? "—"}
+                      {row.account?.name ?? "—"}
                     </td>
                     <td className="border border-gray-200 px-3 py-1.5 text-right tabular-nums font-semibold text-violet-700">
                       {Number(row.jangkauan).toLocaleString("id-ID")}
@@ -329,27 +372,59 @@ export default function AwarenessReport() {
           </div>
         )}
       </div>
+      </>
+      )}
 
-      {/* Modals */}
+      {/* Modals — form utama + 3 modal tambah (toko/platform/akun) */}
       {showFormModal && (
         <AwarenessFormModal
-          platforms={platforms}
           canManagePlatform={canManagePlatform}
+          refreshKey={refreshKey}
           onClose={() => setShowFormModal(false)}
           onSuccess={fetchData}
-          onRequestAddPlatform={() => {
+          onRequestAddBrand={() => { setShowFormModal(false); setShowBrandModal(true); }}
+          onRequestAddPlatform={(brandId, brandName) => {
             setShowFormModal(false);
-            setShowPlatformModal(true);
+            setPlatformModalCtx({ brandId, brandName });
+          }}
+          onRequestAddAccount={(brandPlatformId, platformName, brandName) => {
+            setShowFormModal(false);
+            setAccountModalCtx({ brandPlatformId, platformName, brandName });
           }}
         />
       )}
-      {showPlatformModal && (
+      {showBrandModal && (
+        <TambahTokoModal
+          onClose={() => setShowBrandModal(false)}
+          onSuccess={() => {
+            setShowBrandModal(false);
+            setRefreshKey((k) => k + 1);
+            setShowFormModal(true); // balik ke form awareness
+          }}
+        />
+      )}
+      {platformModalCtx && (
         <TambahPlatformModal
-          onClose={() => setShowPlatformModal(false)}
-          onSuccess={(newPlatform) => {
-            setPlatforms((prev) => [...prev, newPlatform]);
-            setShowPlatformModal(false);
-            setShowFormModal(true); // Kembali ke form awareness
+          brandId={platformModalCtx.brandId}
+          brandName={platformModalCtx.brandName}
+          onClose={() => setPlatformModalCtx(null)}
+          onSuccess={() => {
+            setPlatformModalCtx(null);
+            setRefreshKey((k) => k + 1);
+            setShowFormModal(true);
+          }}
+        />
+      )}
+      {accountModalCtx && (
+        <TambahAkunModal
+          brandPlatformId={accountModalCtx.brandPlatformId}
+          platformName={accountModalCtx.platformName}
+          brandName={accountModalCtx.brandName}
+          onClose={() => setAccountModalCtx(null)}
+          onSuccess={() => {
+            setAccountModalCtx(null);
+            setRefreshKey((k) => k + 1);
+            setShowFormModal(true);
           }}
         />
       )}

@@ -5,6 +5,7 @@ import { AlertTriangle, BarChart3, RefreshCw, Calendar, Layers } from "lucide-re
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { todayWibDate } from "@/lib/marketing-report";
 import MarketingFunnel from "./MarketingFunnel";
+import AwarenessBreakdownModal from "./AwarenessBreakdownModal";
 
 interface FunnelData {
   awareness: number;
@@ -33,6 +34,7 @@ export default function DataAnalystPage() {
   const [funnel, setFunnel] = useState<FunnelData>({
     awareness: 0, interest: 0, decision: 0, action: 0,
   });
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -171,9 +173,23 @@ export default function DataAnalystPage() {
           </p>
         )}
 
-        {/* Marketing Funnel visualization */}
+        {/* Marketing Funnel visualization — awareness band clickable */}
         {division === "marketing" && (
-          <MarketingFunnel data={funnel} loading={loading} />
+          <MarketingFunnel
+            data={funnel}
+            loading={loading}
+            onAwarenessClick={() => setShowBreakdown(true)}
+          />
+        )}
+
+        {/* Breakdown modal — buka saat user klik Awareness band */}
+        {showBreakdown && (
+          <AwarenessBreakdownModal
+            from={customFrom}
+            to={customTo}
+            periodLabel={periodLabel}
+            onClose={() => setShowBreakdown(false)}
+          />
         )}
 
         {/* Hint */}

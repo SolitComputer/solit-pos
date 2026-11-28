@@ -34,7 +34,12 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         foto_bukti_url,
         tanggal,
         created_at,
-        platform:platform_id ( id, platform, brand_toko, daftar_akun )
+        account:account_id (
+          id, name,
+          platform:brand_platform_id ( id, name,
+            brand:brand_id ( id, name )
+          )
+        )
       `)
       .is("deleted_at", null);
 
@@ -78,14 +83,14 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     }
 
     const body = await req.json();
-    const platform_id = String(body.platform_id ?? "").trim();
+    const account_id = String(body.account_id ?? "").trim();
     const jangkauan = Number(body.jangkauan ?? 0);
     const foto_bukti_url = body.foto_bukti_url ? String(body.foto_bukti_url) : null;
     const tanggal = String(body.tanggal ?? "").trim();
 
-    if (!platform_id) {
+    if (!account_id) {
       return NextResponse.json(
-        { success: false, message: "Platform wajib dipilih" },
+        { success: false, message: "Akun wajib dipilih" },
         { status: 400 }
       );
     }
@@ -105,7 +110,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     const { data, error } = await supabaseAdmin
       .from("marketing_awareness_reports")
       .insert({
-        platform_id,
+        account_id,
         jangkauan: Math.trunc(jangkauan),
         foto_bukti_url,
         tanggal,

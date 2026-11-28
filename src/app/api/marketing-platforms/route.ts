@@ -94,5 +94,51 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   }
 }
 
+// DELETE /api/marketing-platforms?platform=Facebook
+//   → hapus SEMUA akun di platform Facebook (bulk)
+// DELETE /api/marketing-platforms?platform=Facebook&brand=Solit
+//   → hapus SEMUA akun di Facebook/Solit saja (bulk per-brand)
+// Pakai query params biar URL deklaratif & bisa di-test langsung dari curl.
+// Delete per-row (1 akun) pakai endpoint terpisah /api/marketing-platforms/[id].
+async function deleteBulkHandler(req: NextRequest, _ctx: any, user: AuthUser) {
+  try {
+    if (!hasAnyRole(getUserRoles(user), MARKETING_PLATFORM_MANAGE_ROLES)) {
+      return NextResponse.json(
+        { success: false, message: "Hanya Admin & Kepala Marketing yang boleh hapus platform" },
+        { status: 403 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const platform = searchParams.get("platform")?.trim();
+    const brand = searchParams.get("brand")?.trim();
+
+    if (!platform) {
+      return NextResponse.json(
+        { success: false, message: "Query param 'platform' wajib diisi untuk bulk delete" },
+        { status: 400 }
+      );
+    }
+
+    let query = supabaseAdmin
+      .from("marketing_platforms")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("platform", platform)
+      .is("deleted_at", null);
+    if (brand) query = query.eq("brand_toko", brand);
+
+    const { error, data } = await query.select("id");
+    if (error) throw new Error(error.message);
+    return NextResponse.json({ success: true, deletedCount: data?.length ?? 0 });
+  } catch (error: any) {
+    console.error("DELETE /api/marketing-platforms bulk error:", error);
+    return NextResponse.json(
+      { success: false, message: "Gagal menghapus" },
+      { status: 500 }
+    );
+  }
+}
+
 export const GET = withAuth(getHandler);
 export const POST = withAuth(postHandler);
+export const DELETE = withAuth(deleteBulkHandler);

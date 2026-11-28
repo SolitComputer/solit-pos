@@ -2,17 +2,41 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  formatIDR, monthStartWIB, todayWIB, PAYMENT_METHODS,
+  formatIDR, todayWIB, PAYMENT_METHODS,
   type CashflowType, type PaymentMethod,
   type PersonalCategory, type PersonalTransaction, type PersonalSummary,
 } from "@/lib/cashflowPribadi";
+import { useOverlay } from "@/contexts/OverlayContext";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER: periode bulanan (format "YYYY-MM")
+// ─────────────────────────────────────────────────────────────────────────────
+const currentMonthWIB = () => todayWIB().slice(0, 7);
+
+const shiftMonth = (ym: string, delta: number) => {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 7);
+};
+
+const monthRange = (ym: string) => {
+  const [y, m] = ym.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { start: `${ym}-01`, end: `${ym}-${String(lastDay).padStart(2, "0")}` };
+};
+
+const formatMonthLabel = (ym: string) => {
+  const [y, m] = ym.split("-").map(Number);
+  return new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(y, m - 1, 1)));
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CashflowPribadiClient() {
-  const [periodStart, setPeriodStart] = useState(monthStartWIB());
-  const [periodEnd, setPeriodEnd] = useState(todayWIB());
+  const [period, setPeriod] = useState<string>(currentMonthWIB());
+  const { start: periodStart, end: periodEnd } = useMemo(() => monthRange(period), [period]);
+  const isCurrentMonth = period >= currentMonthWIB();
   const [filterType, setFilterType] = useState<"all" | CashflowType>("all");
 
   const [summary, setSummary] = useState<PersonalSummary | null>(null);
@@ -23,6 +47,7 @@ export default function CashflowPribadiClient() {
   const [showForm, setShowForm] = useState(false);
   const [editTx, setEditTx] = useState<PersonalTransaction | null>(null);
   const [showCategoryMgr, setShowCategoryMgr] = useState(false);
+  const { isOverlayOpen } = useOverlay();
 
   // ── Fetchers ───────────────────────────────────────────────────────────────
   const fetchCategories = useCallback(async () => {
@@ -60,7 +85,13 @@ export default function CashflowPribadiClient() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (tx: PersonalTransaction) => {
+    const { id } = tx;
+    // Hapus pemasukan tidak boleh bikin saldo minus
+    if (tx.type === "income" && availableBalance - Number(tx.amount) < 0) {
+      toast.error("Pemasukan ini tidak bisa dihapus karena saldo jadi minus. Hapus/ubah pengeluarannya dulu.");
+      return;
+    }
     if (!confirm("Hapus transaksi ini? Tindakan ini tidak bisa dibatalkan.")) return;
     const r = await fetch(`/api/cashflow-pribadi/transactions/${id}`, { method: "DELETE" });
     const j = await r.json();
@@ -82,40 +113,35 @@ export default function CashflowPribadiClient() {
     setShowForm(true);
   };
 
-  // ── Quick period presets ───────────────────────────────────────────────────
-  const setThisMonth = () => { setPeriodStart(monthStartWIB()); setPeriodEnd(todayWIB()); };
-  const setLastMonth = () => {
-    const start = monthStartWIB(-1);
-    const end = (() => {
-      const d = new Date(monthStartWIB());
-      d.setUTCDate(d.getUTCDate() - 1);
-      return d.toISOString().slice(0, 10);
-    })();
-    setPeriodStart(start); setPeriodEnd(end);
-  };
-  const setLast7Days = () => {
-    const d = new Date(todayWIB());
-    d.setUTCDate(d.getUTCDate() - 6);
-    setPeriodStart(d.toISOString().slice(0, 10)); setPeriodEnd(todayWIB());
+  // ── Navigasi bulan ─────────────────────────────────────────────────────────
+  const goPrevMonth = () => setPeriod((p) => shiftMonth(p, -1));
+  const goNextMonth = () => setPeriod((p) => (p >= currentMonthWIB() ? p : shiftMonth(p, 1)));
+  const handleMonthChange = (v: string) => {
+    if (!v) return; // input month bisa kosong saat di-clear
+    const max = currentMonthWIB();
+    setPeriod(v > max ? max : v);
   };
 
-  const balance = summary?.balance ?? 0;
-  const income = summary?.total_income ?? 0;
-  const expense = summary?.total_expense ?? 0;
+  // Normalisasi angka: numeric Postgres bisa datang sebagai string,
+  // dan `|| 0` membuang -0 supaya tidak tampil "-Rp 0".
+  const income = Number(summary?.total_income ?? 0) || 0;
+  const expense = Number(summary?.total_expense ?? 0) || 0;
+  // Saldo kumulatif: sisa bulan lalu + pemasukan − pengeluaran bulan ini
+  const openingBalance = Number(summary?.opening_balance ?? 0) || 0;
+  const balance = Number(summary?.closing_balance ?? income - expense) || 0;
+  // Sisa uang total saat ini → dipakai untuk validasi pengeluaran
+  const availableBalance = Number(summary?.available_balance ?? 0) || 0;
 
-    return (
-    <div className="bg-slate-50 pb-20 lg:pb-8">
+  return (
+    <div className="bg-slate-50 pb-44 sm:pb-20 lg:pb-8">
       <div className="max-w-6xl mx-auto px-4 py-4 lg:py-8 space-y-4 lg:space-y-6">
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Cashflow Pribadi</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              Kelola keuangan pribadi Anda — <span className="font-semibold text-indigo-600">100% privat</span>, hanya Anda yang bisa lihat.
-            </p>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto">
+          <div className="hidden sm:flex gap-2">
             <button
               onClick={() => setShowCategoryMgr(true)}
               className="flex-1 sm:flex-none px-3 py-2 text-sm font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition whitespace-nowrap"
@@ -134,11 +160,13 @@ export default function CashflowPribadiClient() {
         {/* ── Summary Cards ────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
           <div className="col-span-2 md:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white p-4 sm:p-5 shadow-lg shadow-indigo-500/20">            <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl" />
-            <p className="text-xs uppercase tracking-wider text-indigo-100/80 font-semibold">Saldo Periode Ini</p>
+            <p className="text-xs uppercase tracking-wider text-indigo-100/80 font-semibold">Saldo</p>
             <p className={`text-2xl sm:text-3xl font-bold mt-2 break-words ${balance < 0 ? "text-rose-200" : "text-white"}`}>
               {formatIDR(balance)}
             </p>
-            <p className="text-xs text-indigo-100/70 mt-2">{periodStart} → {periodEnd}</p>
+            <p className="text-xs text-indigo-100/70 mt-2">
+              s/d akhir {formatMonthLabel(period)} · Saldo awal bulan {formatIDR(openingBalance)}
+            </p>
           </div>
 
           <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
@@ -168,20 +196,26 @@ export default function CashflowPribadiClient() {
 
         {/* ── Period & Filter ──────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-          <div className="flex flex-row flex-wrap gap-2 items-center">
-            <button onClick={setLast7Days} className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">7 Hari</button>
-            <button onClick={setThisMonth} className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">Bulan Ini</button>
-            <button onClick={setLastMonth} className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">Bulan Lalu</button>
-            <div className="sm:ml-auto flex items-center gap-2 flex-wrap w-full sm:w-auto">
-              <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="flex-1 sm:flex-none min-w-0 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
-              <span className="text-slate-400 text-sm">→</span>
-              <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="flex-1 sm:flex-none min-w-0 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
-              <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-full sm:w-auto px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none">
-                <option value="all">Semua</option>
-                <option value="income">Pemasukan</option>
-                <option value="expense">Pengeluaran</option>
-              </select>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button type="button" onClick={goPrevMonth} aria-label="Bulan sebelumnya" className="p-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+              </button>
+              <input
+                type="month" value={period} max={currentMonthWIB()}
+                onChange={(e) => handleMonthChange(e.target.value)}
+                aria-label="Pilih bulan"
+                className="flex-1 sm:flex-none min-w-0 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none"
+              />
+              <button type="button" onClick={goNextMonth} disabled={isCurrentMonth} aria-label="Bulan berikutnya" className="p-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+              </button>
             </div>
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value as "all" | CashflowType)} className="w-full sm:w-auto sm:ml-auto px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none">
+              <option value="all">Semua</option>
+              <option value="income">Pemasukan</option>
+              <option value="expense">Pengeluaran</option>
+            </select>
           </div>
         </div>
 
@@ -268,7 +302,7 @@ export default function CashflowPribadiClient() {
                         <button onClick={() => openEdit(tx)} title="Edit" className="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                         </button>
-                        <button onClick={() => handleDelete(tx.id)} title="Hapus" className="p-2 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded">
+                        <button onClick={() => handleDelete(tx)} title="Hapus" className="p-2 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></svg>
                         </button>
                       </div>
@@ -281,11 +315,33 @@ export default function CashflowPribadiClient() {
         </div>
       </div>
 
+      {/* ── Mobile Bottom Action Bar (khusus HP < 640px) ────────────────── */}
+      {/* Posisi di atas BottomNavBar (tinggi ±74px + safe-area). Hilang saat modal/overlay terbuka. */}
+      {!showForm && !showCategoryMgr && !isOverlayOpen && (
+        <div className="sm:hidden fixed inset-x-0 z-20 bottom-[calc(74px+env(safe-area-inset-bottom))] px-3 pb-2">
+          <div className="flex gap-2 bg-white/95 backdrop-blur border border-slate-200 rounded-2xl p-2 shadow-lg shadow-slate-900/10">
+            <button
+              onClick={() => setShowCategoryMgr(true)}
+              className="flex-1 py-2.5 text-sm font-medium bg-white border border-slate-200 text-slate-700 rounded-lg active:bg-slate-50 transition"
+            >
+              Kelola Kategori
+            </button>
+            <button
+              onClick={openCreate}
+              className="flex-[1.4] py-2.5 text-sm font-semibold bg-indigo-600 text-white rounded-lg active:bg-indigo-700 transition shadow-sm shadow-indigo-500/20"
+            >
+              + Tambah Transaksi
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── MODALS ──────────────────────────────────────────────────────── */}
       {showForm && (
         <TransactionFormModal
           categories={categories}
           editTx={editTx}
+          availableBalance={availableBalance}
           onClose={() => { setShowForm(false); setEditTx(null); }}
           onSaved={() => { setShowForm(false); setEditTx(null); fetchData(); }}
         />
@@ -306,10 +362,11 @@ export default function CashflowPribadiClient() {
 // MODAL: Form Transaksi (add/edit)
 // ─────────────────────────────────────────────────────────────────────────────
 function TransactionFormModal({
-  categories, editTx, onClose, onSaved,
+  categories, editTx, availableBalance, onClose, onSaved,
 }: {
   categories: PersonalCategory[];
   editTx: PersonalTransaction | null;
+  availableBalance: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -333,11 +390,28 @@ function TransactionFormModal({
     }
   }, [type, availableCategories, categoryId]);
 
+  // Efek transaksi ke saldo: pemasukan (+), pengeluaran (−)
+  const effectOf = (t: CashflowType, n: number) => (t === "income" ? n : -n);
+  // Saat edit, efek transaksi lama dikeluarkan dulu dari saldo
+  const oldEffect = editTx ? effectOf(editTx.type, Number(editTx.amount)) : 0;
+  const maxSpend = Math.max(0, availableBalance - oldEffect);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const amtNum = Number(amount.replace(/[^\d]/g, ""));
     if (!Number.isFinite(amtNum) || amtNum <= 0) {
       toast.error("Nominal harus lebih dari 0");
+      return;
+    }
+
+    // Tolak kalau perubahan ini bikin saldo minus
+    const projected = availableBalance - oldEffect + effectOf(type, amtNum);
+    if (projected < 0 && projected < availableBalance) {
+      toast.error(
+        type === "expense"
+          ? `Saldo tidak cukup. Maksimal pengeluaran ${formatIDR(maxSpend)} — catat pemasukan dulu.`
+          : "Perubahan ini membuat saldo minus."
+      );
       return;
     }
 
@@ -415,6 +489,13 @@ function TransactionFormModal({
                 className="w-full pl-10 pr-3 py-3 text-lg font-bold border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
               />
             </div>
+            {type === "expense" && (
+              <p className={`text-[11px] mt-1.5 ${maxSpend > 0 ? "text-slate-500" : "text-rose-600 font-medium"}`}>
+                {maxSpend > 0
+                  ? <>Saldo tersedia: <span className="font-semibold">{formatIDR(maxSpend)}</span></>
+                  : "Saldo masih Rp 0 — catat pemasukan dulu sebelum pengeluaran."}
+              </p>
+            )}
           </div>
 
           {/* Kategori */}

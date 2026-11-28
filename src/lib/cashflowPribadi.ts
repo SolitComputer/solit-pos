@@ -46,6 +46,9 @@ export interface PersonalSummary {
   total_income: number;
   total_expense: number;
   balance: number;
+  opening_balance: number;   // sisa uang sebelum periode
+  closing_balance: number;   // saldo s/d akhir periode (kumulatif)
+  available_balance: number; // sisa uang total saat ini
   by_category: {
     category_id: string | null;
     category_name: string;

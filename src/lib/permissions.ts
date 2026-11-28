@@ -922,7 +922,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // handler pakai MARKETING_PLATFORM_MANAGE_ROLES (Admin, Programmer, Kepala
   // Marketing saja) — GET nya tetap bisa dibaca semua VIEW_ROLES buat dropdown.
   "/api/marketing-awareness": [...SALES_REPORT_AUDIT_ROLES],
-  "/api/marketing-platforms": [...SALES_REPORT_AUDIT_ROLES],
+  // Struktur baru hierarkis (toko → platform → akun) — 3 endpoint separate.
+  // POST/DELETE digate di handler pakai MARKETING_PLATFORM_MANAGE_ROLES.
+  "/api/marketing-brands": [...SALES_REPORT_AUDIT_ROLES],
+  "/api/marketing-brand-platforms": [...SALES_REPORT_AUDIT_ROLES],
+  "/api/marketing-platform-accounts": [...SALES_REPORT_AUDIT_ROLES],
 
   // Data Analyst — halaman + endpoint aggregator lintas divisi (read-only).
   // Semua endpoint di bawah /api/data-analyst/* di-gate sama.

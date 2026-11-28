@@ -12,6 +12,7 @@ interface FunnelData {
 interface Props {
   data: FunnelData;
   loading?: boolean;
+  onAwarenessClick?: () => void; // click handler untuk buka breakdown modal
 }
 
 // ─── SVG Funnel (segitiga terbalik) ────────────────────────────────────────
@@ -69,7 +70,7 @@ function pct(part: number, whole: number): string {
   return `${((part / whole) * 100).toFixed(1)}%`;
 }
 
-export default function MarketingFunnel({ data, loading }: Props) {
+export default function MarketingFunnel({ data, loading, onAwarenessClick }: Props) {
   const { awareness, interest, decision, action } = data;
 
   // Konversi antar tahap — selalu relatif ke tahap sebelumnya
@@ -119,8 +120,10 @@ export default function MarketingFunnel({ data, loading }: Props) {
             {BANDS.map((band) => {
               const meta = STAGE_META[band.stage];
               const value = data[band.stage];
+              const clickable = band.stage === "awareness" && !!onAwarenessClick;
               return (
-                <g key={band.stage}>
+                <g key={band.stage} onClick={clickable ? onAwarenessClick : undefined}
+                   style={clickable ? { cursor: "pointer" } : undefined}>
                   <polygon
                     points={band.points}
                     fill={`url(#${INSTANCE}-${band.stage})`}
